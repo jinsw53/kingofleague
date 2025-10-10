@@ -56,3 +56,8 @@ td img {
   text-overflow: ellipsis;
   font-size: 16px;
 }
+/* ✅ Google Sites용 스크롤 제거 */
+html, body {
+  overflow: hidden !important;
+}
+
