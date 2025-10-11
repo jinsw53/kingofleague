@@ -1,6 +1,6 @@
 [
   {
-    "팀명": "https://jinsw53.github.io/kingofleague/gamename.png\n",
+    "이미지 주소": "https://jinsw53.github.io/kingofleague/gamename.png\n",
     "1종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EB%AA%A8%EC%A3%A0.png",
     "2종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%95%BC%EC%B0%8C.png",
     "3종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%B1%8C%EB%A6%B0%EC%A0%80%EC%8A%A4.png",
@@ -10,11 +10,10 @@
     "7종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%95%84%ED%81%AC%20%EB%85%B8%EB%B0%94.png",
     "8종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%8A%A4%ED%94%8C%EB%A0%8C%EB%8D%94.png",
     "9종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EB%9F%AD%ED%82%A4%20%EB%84%98%EB%B2%84%EC%8A%A4.png",
-    "정렬": 1,
     "게임주소": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EB%AA%A8%EC%A3%A0.png"
   },
   {
-    "팀명": "https://jinsw53.github.io/kingofleague/tournament.png",
+    "이미지 주소": "https://jinsw53.github.io/kingofleague/tournament.png",
     "1종목": "다인플(5)",
     "2종목": "2인플",
     "3종목": "다인플(3)",
@@ -24,11 +23,10 @@
     "7종목": "다인플(5)",
     "8종목": "2인플",
     "9종목": "다인플(5)",
-    "정렬": 2,
     "게임주소": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%95%BC%EC%B0%8C.png"
   },
   {
-    "팀명": "https://jinsw53.github.io/kingofleague/setting.png",
+    "이미지 주소": "https://jinsw53.github.io/kingofleague/setting.png",
     "1종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EB%9D%BC%EC%9A%B4%EB%93%9C%20%EB%A1%9C%EB%B9%88.png",
     "2종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EB%9D%BC%EC%9A%B4%EB%93%9C%20%EB%A1%9C%EB%B9%88.png",
     "3종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%8A%A4%EC%9C%84%EC%8A%A4%20%EC%8B%9C%EC%8A%A4%ED%85%9C.png",
@@ -38,7 +36,6 @@
     "7종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%8A%A4%EC%9C%84%EC%8A%A4%20%EC%8B%9C%EC%8A%A4%ED%85%9C.png",
     "8종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%8B%B1%EA%B8%80%20%EC%97%98%EB%A6%AC%EB%AF%B8%EB%84%A4%EC%9D%B4%EC%85%98.png",
     "9종목": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%8A%A4%EC%9C%84%EC%8A%A4%20%EC%8B%9C%EC%8A%A4%ED%85%9C.png",
-    "정렬": 3,
     "게임주소": "https://jinsw53.github.io/kingofleague/%EB%8C%80%ED%95%AD%EC%A0%84%20%EA%B4%80%EB%A0%A8/%EC%B1%8C%EB%A6%B0%EC%A0%80%EC%8A%A4.png"
   },
   {
