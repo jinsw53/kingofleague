@@ -125,7 +125,7 @@ function mergeLastBlock() {
         baseCell.setAttribute("rowspan", 3);
         baseCell.setAttribute("colspan", 3);
         baseCell.innerHTML = "";
-        baseCell.style.backgroundImage = "url('https://jinsw53.github.io/kingofleague/BOAKO%20%ED%8C%80%20%EB%A6%AC%EA%B7%B8%20%EB%8C%80%ED%95%AD%EC%A0%84.png')";
+        baseCell.style.backgroundImage = "url('https://jinsw53.github.io/kingofleague/wlskstlwms.png')";
         baseCell.style.backgroundSize = "contain";
         baseCell.style.backgroundRepeat = "no-repeat";
         baseCell.style.backgroundPosition = "center";
