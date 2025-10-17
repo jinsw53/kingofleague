@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>보드게임 대시보드 (Sound + Missile)</title>
+<style>
+body {
+  background: #eef3ff;
+  font-family: 'Noto Sans KR', sans-serif;
+  margin: 0; padding: 0;
+  display: flex; justify-content: center; align-items: flex-start;
+  height: 100vh; overflow-y: auto;
+}
+
+.board-wrapper {
+  position: relative;
+  width: 1000px;
+  height: 800px;
+  margin-left: 380px;
+  margin-top: 20px;
+}
+
+.board {
+  position: relative;
+  width: 700px; height: 700px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #dbe8ff;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
+
+#logo {
+  position: fixed; top: 0; left: 10px;
+  width: 360px; height: 360px;
+  object-fit: contain; z-index: 1000;
+}
+
+#log-area {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px; max-height: 250px;
+  background: #fff; border: 3px solid #ccc; border-radius: 12px;
+  text-align: center; padding: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  overflow-y: auto;
+  display: flex; flex-direction: column; z-index: 5;
+}
+
+#log-area h3 { margin: 0; padding-bottom: 6px; font-size: 18px; border-bottom: 1px solid #ddd; }
+#log-list { font-size: 14px; margin-top: 8px; overflow-y: auto; word-break: break-word; flex-grow: 1; }
+
+.log-item {
+  padding: 6px 8px;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+.log-item:hover { background-color: #f0f0f0; }
+
+.team-card {
+  position: absolute; width: 120px; height: 160px;
+  background: #fdf6e3; border: 3px solid #c49e58;
+  border-radius: 12px; text-align: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  transform-origin: center center;
+  transition: transform 0.3s; cursor: pointer;
+  user-select: none; display: flex;
+  flex-direction: column; align-items: center; justify-content: flex-start;
+  padding-top: 10px;
+}
+
+.team-card img { width: 80px; height: 80px; object-fit: contain; margin-bottom: 8px; }
+.team-card h3 { margin: 0 0 6px 0; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.team-card p { margin: 0; font-size: 16px; color: #b33; font-weight: bold; }
+
+.shake { animation: shake 0.4s; }
+@keyframes shake { 0%{transform:translate(0,0);}25%{transform:translate(-5px,0);}50%{transform:translate(5px,0);}75%{transform:translate(-5px,0);}100%{transform:translate(0,0);} }
+
+/* 미사일 */
+.missile {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(45deg, #ffb347, #ff5e5e);
+  box-shadow: 0 0 8px rgba(255,94,94,0.7);
+  border-radius: 50%;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* 폭발 */
+.explosion {
+  position: absolute;
+  width: 20px; height: 20px;
+  background: yellow;
+  border-radius: 50%;
+  opacity: 0.9;
+  z-index: 1001;
+  pointer-events: none;
+  animation: explode 0.5s forwards;
+}
+
+@keyframes explode {
+  0% { transform: scale(0.6); opacity: 1; filter: blur(0px); }
+  40% { transform: scale(2); opacity: 0.9; background: orange; filter: blur(1px); }
+  100% { transform: scale(3.2); opacity: 0; background: red; filter: blur(2px); }
+}
+</style>
+</head>
+<body>
+<div class="board-wrapper">
+  <img id="logo" src="https://raw.githubusercontent.com/jinsw53/kingofleague/main/킹 오브 리그.png" alt="로고">
+  <div class="board" id="board">
+    <div id="team-container"></div>
+    <div id="log-area">
+      <h3>📜 로그</h3>
+      <div id="log-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------
+   데이터 URL / DOM 캡처
+   --------------------------- */
+const dataJsonUrl = 'https://jinsw53.github.io/kingofleague/data.json';
+const logJsonUrl = 'https://jinsw53.github.io/kingofleague/logs.json';
+const container = document.getElementById('team-container');
+const logList = document.getElementById('log-list');
+const board = document.getElementById('board');
+
+/* ---------------------------
+   레이아웃 상수
+   --------------------------- */
+const radius = 280;
+const logWidth = 400;
+const radiusAdjusted = radius + logWidth/2 - 150;
+const centerX = 350;
+const centerY = 350;
+
+/* ---------------------------
+   오디오 컨텍스트 (지연 생성)
+   --------------------------- */
+let audioCtx = null;
+function ensureAudioContext(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+/* 발사음: 짧은 상승 톤 + 약간의 잡음 */
+function playLaunchSound(){
+  ensureAudioContext();
+  const ctx = audioCtx;
+  const now = ctx.currentTime;
+
+  // 톤 (sweep up)
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(400, now);
+  osc.frequency.exponentialRampToValueAtTime(1200, now + 0.28);
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.36);
+
+  // 짧은 고주파 잡음(휘익)
+  const bufferSize = 2 * ctx.sampleRate;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.6));
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.08, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+  noise.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(now);
+  noise.stop(now + 0.35);
+}
+
+/* 폭발음: 저역 펀치 + 노이즈 버스트 */
+function playExplosionSound(){
+  ensureAudioContext();
+  const ctx = audioCtx;
+  const now = ctx.currentTime;
+
+  // 저역 펀치(짧은 사인)
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(120, now);
+  osc.frequency.exponentialRampToValueAtTime(60, now + 0.18);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.6);
+
+  // 폭발 노이즈 버스트
+  const bufferSize = ctx.sampleRate * 0.6;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++){
+    // 초기 강한 잡음 후 서서히 줄어들게
+    output[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+  }
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 1000;
+  noiseFilter.Q.value = 0.6;
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.8, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(now);
+  noise.stop(now + 0.5);
+}
+
+/* ---------------------------
+   유틸: 폰트 크기 조정
+   --------------------------- */
+function adjustFontSize(element, maxWidth){
+  let fontSize = parseInt(window.getComputedStyle(element).fontSize);
+  while(element.scrollWidth > maxWidth && fontSize > 8){
+    fontSize--; element.style.fontSize = fontSize+'px';
+  }
+}
+
+/* ---------------------------
+   미사일 발사 + 폭발 (시각 + 음향)
+   --------------------------- */
+function launchMissile(fromCard, toCard){
+  // 오디오는 사용자의 클릭(제스처) 이후 컨텍스트 생성
+  playLaunchSound();
+
+  const missile = document.createElement('div');
+  missile.className = 'missile';
+  board.appendChild(missile);
+
+  const fromRect = fromCard.getBoundingClientRect();
+  const toRect = toCard.getBoundingClientRect();
+  const boardRect = board.getBoundingClientRect();
+
+  const startX = fromRect.left + fromRect.width/2 - boardRect.left;
+  const startY = fromRect.top + fromRect.height/2 - boardRect.top;
+  const endX = toRect.left + toRect.width/2 - boardRect.left;
+  const endY = toRect.top + toRect.height/2 - boardRect.top;
+
+  // 약간의 곡선 효과를 주기 위해 중간 오프셋 (단일 굽힘)
+  const midX = (startX + endX) / 2;
+  const midY = (startY + endY) / 2 - Math.max(30, Math.hypot(endX-startX, endY-startY) * 0.12);
+
+  const duration = 620; // ms (거리 상관없이 고정으로 자연스러움)
+  const startTime = performance.now();
+
+  function animate(now){
+    let t = (now - startTime) / duration;
+    if (t > 1) t = 1;
+
+    // 베지어(쿼드) 보간: B(t) = (1 - t)^2 * P0 + 2*(1-t)*t*P1 + t^2 * P2
+    const inv = 1 - t;
+    const x = inv*inv*startX + 2*inv*t*midX + t*t*endX;
+    const y = inv*inv*startY + 2*inv*t*midY + t*t*endY;
+
+    missile.style.left = (x - 6) + 'px';
+    missile.style.top = (y - 6) + 'px';
+
+    // 미사일 회전(진행 방향)
+    if(t < 1){
+      requestAnimationFrame(animate);
+    } else {
+      missile.remove();
+
+      // 폭발 시각 효과
+      const explosion = document.createElement('div');
+      explosion.className = 'explosion';
+      explosion.style.left = (endX - 16) + 'px';
+      explosion.style.top = (endY - 16) + 'px';
+      board.appendChild(explosion);
+
+      // 폭발 소리
+      playExplosionSound();
+
+      setTimeout(()=> explosion.remove(), 520);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+/* ---------------------------
+   데이터 로드 및 UI 구성
+   --------------------------- */
+async function fetchData(){
+  try {
+    const response = await fetch(dataJsonUrl);
+    const data = await response.json();
+    container.innerHTML = '';
+    const visibleData = data.filter(item => item.팀명 && item.팀명.trim() !== "");
+    visibleData.forEach((item,i)=>{
+      const name = item.팀명;
+      const life = item.하트 || 3;
+      const game = item['회복에 필요한 게임'] || '';
+      const logo = item.로고 || 'https://via.placeholder.com/80';
+      const angle = (360/visibleData.length)*i;
+      const rad = angle*Math.PI/180;
+      const x = centerX + radiusAdjusted*Math.cos(rad) - 60;
+      const y = centerY + radiusAdjusted*Math.sin(rad) - 80;
+
+      const card = document.createElement('div');
+      card.className='team-card';
+      card.style.left = `${x}px`;
+      card.style.top = `${y}px`;
+      card.setAttribute('data-team', name);
+      card.setAttribute('data-game', game);
+      card.innerHTML=`
+        <img src="${logo}" alt="${name} 로고">
+        <h3>${name}</h3>
+        <p>${'❤️'.repeat(life)}</p>
+      `;
+      container.appendChild(card);
+      adjustFontSize(card.querySelector('h3'),100);
+    });
+  } catch(e){ console.error('Error fetching data:', e); }
+}
+
+async function fetchLogs(){
+  try{
+    const response = await fetch(logJsonUrl);
+    const logs = await response.json();
+    logList.innerHTML = '';
+
+    logs.forEach(item=>{
+      const attackerName = item['공격 팀'];
+      const gameName = item['게임'];
+      const logText = `${attackerName} 팀이 (${gameName})${item['공격 / 회복 판단']}`;
+      const logDiv = document.createElement('div');
+      logDiv.className='log-item';
+      logDiv.innerText=logText;
+
+      logDiv.onclick = () => {
+        // 첫 사용자 제스처에서 오디오 컨텍스트를 활성화
+        ensureAudioContext();
+
+        const attackerCard = document.querySelector(`.team-card[data-team="${attackerName}"]`);
+        if (!attackerCard) {
+          console.warn(`공격 팀 카드 미발견: ${attackerName}`);
+          return;
+        }
+
+        console.log('--- 로그 클릭 ---');
+        console.log('공격 팀:', attackerName);
+        console.log('게임:', gameName);
+
+        const currentCards = document.querySelectorAll('.team-card');
+        console.log('전체 카드 데이터:');
+        Array.from(currentCards).forEach(c => {
+          console.log(`- ${c.dataset.team}: "${c.dataset.game}"`);
+        });
+
+        attackerCard.classList.add('shake');
+        setTimeout(() => attackerCard.classList.remove('shake'), 500);
+
+        // 타깃 선택 (게임명 포함 검색, 소문자/공백 처리)
+        const targets = Array.from(currentCards).filter(c => {
+          const cardGame = (c.dataset.game || '').trim().toLowerCase();
+          const gameToMatch = (gameName || '').trim().toLowerCase();
+          return cardGame.includes(gameToMatch) && c.dataset.team !== attackerName;
+        });
+
+        if(targets.length === 0) console.warn('타깃 없음!');
+        console.log('선택된 타깃:');
+        targets.forEach(t => console.log(`- ${t.dataset.team}`));
+
+        // 발사: 여러 타깃이면 짧은 간격(순차)으로 발사하면 보기 좋음
+        targets.forEach((t, idx) => {
+          setTimeout(() => {
+            launchMissile(attackerCard, t);
+            t.classList.add('shake');
+            setTimeout(() => t.classList.remove('shake'), 500);
+          }, idx * 180); // 180ms 간격으로 연속 발사
+        });
+      };
+
+      logList.prepend(logDiv);
+    });
+  }catch(e){ console.error('Error fetching logs:',e);}
+}
+
+window.addEventListener('load', async ()=>{
+  await fetchData();
+  await fetchLogs();
+});
+</script>
+</body>
+</html>
