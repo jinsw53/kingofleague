@@ -9,6 +9,7 @@ let audioCtx = null;
 function ensureAudioContext() {
   if (!audioCtx)
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
 /* -------------------
@@ -16,24 +17,17 @@ function ensureAudioContext() {
 ------------------- */
 function adjustLogBox() {
   const boardRect = board.getBoundingClientRect();
-
-  const maxHeight = boardRect.height * 0.4; // 세로 최대 40%
-  const maxWidth = boardRect.width * 0.25; // 가로 최대 25%
-
-  // 세로 기준으로 가로 계산, 최대폭 제한
+  const maxHeight = boardRect.height * 0.4;
+  const maxWidth = boardRect.width * 0.25;
   const height = Math.min(maxHeight, boardRect.height * 0.4);
-  const width = Math.min(height * 2, maxWidth); // 비율 0.6로 제한
-
+  const width = Math.min(height * 2, maxWidth);
   logBox.style.maxHeight = height + "px";
   logBox.style.height = height + "px";
   logBox.style.width = width + "px";
 }
 
-window.addEventListener("load", adjustLogBox);
-window.addEventListener("resize", adjustLogBox);
-
 /* -------------------
-   카드 생성
+   데이터 불러오기 + 카드 생성
 ------------------- */
 async function fetchData() {
   try {
@@ -41,10 +35,7 @@ async function fetchData() {
     const data = await response.json();
     container.innerHTML = "";
 
-    const visibleData = data.filter(
-      (item) => item.팀명 && item.팀명.trim() !== ""
-    );
-
+    const visibleData = data.filter((item) => item.팀명?.trim() !== "");
     visibleData.forEach((item) => {
       const name = item.팀명;
       const MAX_HEARTS = 7;
@@ -58,17 +49,16 @@ async function fetchData() {
 
       const card = document.createElement("div");
       card.className = "team-card";
-      card.setAttribute("data-team", name);
-      card.setAttribute("data-game", game);
+      card.dataset.team = name;
+      card.dataset.game = game;
 
-      // 기존 div 구조 대신 info div 추가
       card.innerHTML = `
-    <img class="team-logo" src="${logo}" alt="${name} 로고">
-    <div class="team-info">
-      <h3 class="team-name">${name}</h3>
-      <p class="team-life">${heartDisplay}</p>
-    </div>
-  `;
+        <img class="team-logo" src="${logo}" alt="${name} 로고">
+        <div class="team-info">
+          <h3 class="team-name">${name}</h3>
+          <p class="team-life">${heartDisplay}</p>
+        </div>
+      `;
       container.appendChild(card);
     });
 
@@ -79,78 +69,60 @@ async function fetchData() {
 }
 
 /* -------------------
-   카드 배치 (타원형)
-------------------- */
-/* -------------------
-   팀 카드 배치 (로그 박스 기준 타원)
-------------------- */
-/* -------------------
-   카드 배치 + 반응형
+   팀 카드 배치
 ------------------- */
 function positionCards() {
   const cards = document.querySelectorAll(".team-card");
   const logRect = logBox.getBoundingClientRect();
   const boardRect = board.getBoundingClientRect();
-  if (cards.length === 0 || !logRect) return;
+  if (!cards.length || !logRect) return;
 
-  // 로그 박스 중심 좌표
   const centerX = logRect.left + logRect.width / 2 - boardRect.left;
   const centerY = logRect.top + logRect.height / 2 - boardRect.top;
 
-  // 화면 비율 기준 타원 반지름
-  // 화면 비율 기준 타원 반지름 + 여유(margin)
-  const margin = 60; // px 단위 최소 여백
+  const margin = 60;
   const radiusX =
     Math.min(boardRect.width * 0.35, logRect.width * 1.2) + margin;
   const radiusY =
     Math.min(boardRect.height * 0.25, logRect.height * 1) + margin;
-
-  const totalCards = cards.length;
+  const total = cards.length;
 
   cards.forEach((card, i) => {
     const img = card.querySelector(".team-logo");
     const title = card.querySelector(".team-name");
     const life = card.querySelector(".team-life");
 
-    // 카드 높이와 로고 크기 화면 비율로 설정
-    const baseCardHeight = Math.min(boardRect.height * 0.08, 100); // 최대 100px
-    const logoSize = baseCardHeight * 0.9;
+    const baseH = Math.min(boardRect.height * 0.08, 100);
+    const logoSize = baseH * 0.9;
     img.style.width = logoSize + "px";
     img.style.height = logoSize + "px";
     img.style.marginRight = "6px";
 
-    // 글자 크기 화면 비율로 설정
-    const titleFont = Math.max(baseCardHeight * 0.25, 10);
-    const lifeFont = Math.max(baseCardHeight * 0.15, 9);
+    const titleFont = Math.max(baseH * 0.25, 10);
+    const lifeFont = Math.max(baseH * 0.15, 9);
     title.style.fontSize = titleFont + "px";
     life.style.fontSize = lifeFont + "px";
 
-    // 정보 영역 너비 계산
     const infoWidth = Math.max(title.scrollWidth, life.scrollWidth);
-
-    // 카드 폭 = 이미지 + info + padding
     const cardWidth = Math.min(
       img.offsetWidth + infoWidth + 8,
       boardRect.width * 0.3
     );
     card.style.width = cardWidth + "px";
-    card.style.height = baseCardHeight + "px";
+    card.style.height = baseH + "px";
 
-    // 타원형 배치
-    const angle = ((2 * Math.PI) / totalCards) * i;
+    const angle = ((2 * Math.PI) / total) * i;
     const x = centerX + radiusX * Math.cos(angle) - cardWidth / 2;
-    const y = centerY + radiusY * Math.sin(angle) - baseCardHeight / 2;
-
-    card.style.left = x + "px";
-    card.style.top = y + "px";
+    const y = centerY + radiusY * Math.sin(angle) - baseH / 2;
+    card.style.left = `${x}px`;
+    card.style.top = `${y}px`;
   });
 }
 
 /* -------------------
-   로그 박스 헤더 추가
+   로그 헤더
 ------------------- */
 function updateLogHeader() {
-  if (!logBox) return;
   if (!logBox.querySelector(".log-header")) {
     const header = document.createElement("div");
     header.className = "log-header";
@@ -163,105 +135,19 @@ function updateLogHeader() {
   }
 }
 
-// 초기화 시 실행
-window.addEventListener("load", () => {
-  updateLogHeader();
-  positionCards();
-  adjustLogBox();
-});
-
-window.addEventListener("resize", () => {
-  positionCards();
-  adjustLogBox();
-});
-
 /* -------------------
-   로그 불러오기 + 클릭 처리
-------------------- */
-async function fetchLogs() {
-  try {
-    const response = await fetch(logJsonUrl);
-    const logs = await response.json();
-    logBox.innerHTML = "";
-
-    logs.forEach((item) => {
-      const attackerName = item["공격 팀"];
-      const gameName = item["게임"];
-      const logText = `${attackerName} 팀이 (${gameName})${item["공격 / 회복 판단"]}`;
-
-      const logDiv = document.createElement("div");
-      logDiv.className = "log-item";
-      logDiv.innerText = logText;
-
-      logDiv.onclick = () => {
-        const attackerCard = document.querySelector(
-          `.team-card[data-team="${attackerName}"]`
-        );
-        if (!attackerCard) return;
-
-        attackerCard.classList.add("shake");
-        setTimeout(() => attackerCard.classList.remove("shake"), 500);
-
-        const currentCards = document.querySelectorAll(".team-card");
-        const targets = Array.from(currentCards).filter((c) => {
-          const cardGame = (c.dataset.game || "").trim().toLowerCase();
-          const gameToMatch = (gameName || "").trim().toLowerCase();
-          return (
-            cardGame.includes(gameToMatch) && c.dataset.team !== attackerName
-          );
-        });
-
-        targets.forEach((t, idx) => {
-          setTimeout(() => {
-            launchMissile(attackerCard, t);
-
-            // 미사일 도착 타이밍 맞춰 흔들림
-            setTimeout(() => {
-              t.classList.add("shake");
-              setTimeout(() => t.classList.remove("shake"), 500);
-            }, 700);
-          }, idx * 180);
-        });
-      };
-
-      logBox.prepend(logDiv);
-
-      // 로그 폰트 리사이징
-      const boardRect = board.getBoundingClientRect();
-      logDiv.style.fontSize = Math.max(boardRect.width * 0.012, 10) + "px";
-    });
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-/* -------------------
-   초기화
-------------------- */
-window.addEventListener("load", async () => {
-  adjustLogBox();
-  await fetchData();
-  await fetchLogs();
-});
-window.addEventListener("resize", () => {
-  adjustLogBox();
-  positionCards();
-});
-
-/* -------------------
-   미사일 발사
+   미사일 + 공격 사운드
 ------------------- */
 function launchMissile(fromCard, toCard) {
   if (!fromCard || !toCard) return;
   ensureAudioContext();
 
-  // 효과음
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = "triangle";
   osc.frequency.setValueAtTime(500, audioCtx.currentTime);
   osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.4);
-  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
   osc.connect(gain).connect(audioCtx.destination);
   osc.start();
@@ -294,10 +180,8 @@ function launchMissile(fromCard, toCard) {
   const startTime = performance.now();
   function animate(time) {
     const t = Math.min((time - startTime) / duration, 1);
-    const x =
-      (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * midX + t * t * endX;
-    const y =
-      (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * midY + t * t * endY;
+    const x = (1 - t) ** 2 * startX + 2 * (1 - t) * t * midX + t ** 2 * endX;
+    const y = (1 - t) ** 2 * startY + 2 * (1 - t) * t * midY + t ** 2 * endY;
     missile.style.left = x + "px";
     missile.style.top = y + "px";
 
@@ -306,8 +190,159 @@ function launchMissile(fromCard, toCard) {
       missile.classList.add("explode");
       missile.style.left = endX + "px";
       missile.style.top = endY + "px";
+      playExplosionSound();
       setTimeout(() => missile.remove(), 500);
     }
   }
   requestAnimationFrame(animate);
 }
+
+/* -------------------
+   폭발음
+------------------- */
+function playExplosionSound() {
+  ensureAudioContext();
+  const ctx = audioCtx;
+  const now = ctx.currentTime;
+
+  // 저역 펀치
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(120, now);
+  osc.frequency.exponentialRampToValueAtTime(60, now + 0.18);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.6);
+
+  // 노이즈
+  const bufferSize = ctx.sampleRate * 0.6;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++)
+    output[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 1000;
+  filter.Q.value = 0.6;
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.8, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+  noise.connect(filter);
+  filter.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(now);
+  noise.stop(now + 0.5);
+}
+
+/* -------------------
+   회복 사운드
+------------------- */
+function playHealingSound() {
+  ensureAudioContext();
+  const ctx = audioCtx;
+  const now = ctx.currentTime;
+
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(200, now);
+  osc.frequency.exponentialRampToValueAtTime(800, now + 0.4);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.2, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.5);
+}
+
+/* -------------------
+   로그 불러오기 + 클릭 이벤트
+------------------- */
+async function fetchLogs() {
+  try {
+    const response = await fetch(logJsonUrl);
+    const logs = await response.json();
+    logBox.innerHTML = "";
+
+    logs.forEach((item) => {
+      const attackerName = item["공격 팀"];
+      const gameName = item["게임"];
+      const logText = `${attackerName} 팀이 (${gameName})${item["공격 / 회복 판단"]}`;
+
+      const logDiv = document.createElement("div");
+      logDiv.className = "log-item";
+      logDiv.innerText = logText;
+
+      logDiv.onclick = () => {
+        const attackerCard = document.querySelector(
+          `.team-card[data-team="${attackerName}"]`
+        );
+        if (!attackerCard) return;
+
+        attackerCard.classList.add("shake");
+        setTimeout(() => attackerCard.classList.remove("shake"), 500);
+
+        const isHealing = (item["공격 / 회복 판단"] || "").includes("회복");
+
+        const targets = Array.from(
+          document.querySelectorAll(".team-card")
+        ).filter((c) => {
+          const cardGame = (c.dataset.game || "").trim().toLowerCase();
+          const gameToMatch = (gameName || "").trim().toLowerCase();
+          return (
+            cardGame.includes(gameToMatch) && c.dataset.team !== attackerName
+          );
+        });
+
+        targets.forEach((t, idx) => {
+          setTimeout(() => {
+            if (isHealing) {
+              playHealingSound();
+              t.classList.add("healing");
+              setTimeout(() => t.classList.remove("healing"), 700);
+            } else {
+              launchMissile(attackerCard, t);
+              setTimeout(() => {
+                t.classList.add("shake");
+                setTimeout(() => t.classList.remove("shake"), 500);
+              }, 700);
+            }
+          }, idx * 180);
+        });
+      };
+
+      logBox.prepend(logDiv);
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+/* -------------------
+   초기화
+------------------- */
+window.addEventListener("load", async () => {
+  updateLogHeader();
+  adjustLogBox();
+  await fetchData();
+  await fetchLogs();
+  positionCards();
+});
+window.addEventListener("resize", () => {
+  adjustLogBox();
+  positionCards();
+});
