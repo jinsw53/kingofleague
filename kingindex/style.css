@@ -1,0 +1,182 @@
+/* ===============================
+   기본 리셋
+=============================== */
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: "Noto Sans KR", sans-serif;
+  background: url("https://jinsw53.github.io/kingofleague/kingbg.png") no-repeat
+    center center;
+  background-size: cover;
+  overflow: hidden;
+}
+
+/* ===============================
+   그리드 레이아웃
+=============================== */
+#app {
+  display: grid;
+  grid-template-columns: 16.7% 83.3%;
+  grid-template-rows: 1fr auto;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* 좌측 사이드 영역 */
+.side-area {
+  display: grid;
+  grid-template-rows: 1fr 3fr;
+}
+
+.logo-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1%;
+}
+
+.logo-area img {
+  width: 90%;
+  height: auto;
+  object-fit: contain;
+}
+
+.info-area {
+  background: rgba(238, 238, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2vw;
+}
+
+/* 보드 영역 */
+.board-area {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 팀 카드 */
+/* 팀 카드: 좌측 로고, 우측 정보 */
+.team-card {
+  position: absolute;
+  display: flex;
+  flex-direction: row; /* 로고와 정보 가로 배치 */
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #666;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  z-index: 5;
+  transition: width 0.2s, height 0.2s;
+}
+
+/* 팀 로고 */
+.team-card img.team-logo {
+  object-fit: contain;
+  margin-right: 6px; /* 로고와 정보 사이 간격 */
+  flex-shrink: 0; /* 카드가 작아져도 줄어들지 않음 */
+}
+
+/* 팀 정보 (팀명 + 하트) */
+.team-card .team-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* 팀명 */
+.team-card .team-name {
+  margin: 0 0 7px 0;
+  font-weight: bold;
+}
+
+/* 하트 */
+.team-card .team-life {
+  margin: 0;
+  white-space: nowrap; /* 한 줄 고정 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 로그 박스 */
+.log-box {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 25%;
+  height: 25%;
+  background: rgba(255, 255, 255, 0.8);
+  border: 0.3vw solid #777;
+  border-radius: 1.5%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px;
+  overflow-y: auto;
+  z-index: 2;
+}
+
+/* 하단 이미지 영역 */
+.bottom-text-area {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bottom-text-area img {
+  width: 100%;
+  height: auto; /* 세로 비율 기준 */
+  object-fit: contain; /* 이미지 비율 유지하면서 찌그러지지 않게 */
+  max-height: 250px; /* 최대 높이 제한 */
+}
+
+/* 미사일 */
+.missile {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle, #ff3838 0%, #990000 80%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 999;
+  transform: translate(-50%, -50%);
+  transition: width 0.2s, height 0.2s, background 0.2s, opacity 0.2s;
+}
+
+.missile.explode {
+  width: 35px;
+  height: 35px;
+  background: radial-gradient(circle, #ffeb3b 0%, rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+  transition: all 0.4s ease-out;
+}
+@keyframes shake {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-3px, 3px);
+  }
+  50% {
+    transform: translate(3px, -3px);
+  }
+  75% {
+    transform: translate(-3px, 3px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+.shake {
+  animation: shake 0.4s ease-in-out;
+}
