@@ -84,6 +84,9 @@ async function fetchData() {
 /* -------------------
    팀 카드 배치 (로그 박스 기준 타원)
 ------------------- */
+/* -------------------
+   카드 배치 + 반응형
+------------------- */
 function positionCards() {
   const cards = document.querySelectorAll(".team-card");
   const logRect = logBox.getBoundingClientRect();
@@ -94,45 +97,49 @@ function positionCards() {
   const centerX = logRect.left + logRect.width / 2 - boardRect.left;
   const centerY = logRect.top + logRect.height / 2 - boardRect.top;
 
-  // 타원 반지름: 가로는 로그 박스 너비 기반, 세로는 조금 작게
-  const baseRadiusX = logRect.width * 1.2;
-  const radiusY = logRect.height * 1;
+  // 화면 비율 기준 타원 반지름
+  // 화면 비율 기준 타원 반지름 + 여유(margin)
+  const margin = 60; // px 단위 최소 여백
+  const radiusX =
+    Math.min(boardRect.width * 0.35, logRect.width * 1.2) + margin;
+  const radiusY =
+    Math.min(boardRect.height * 0.25, logRect.height * 1) + margin;
 
-  // 카드 간 최소 간격 (px)
-  const gap = 10;
-
-  // 총 각도 계산 (360도)
   const totalCards = cards.length;
 
   cards.forEach((card, i) => {
-    // 카드 폭은 글자 길이에 맞춰 자동
     const img = card.querySelector(".team-logo");
     const title = card.querySelector(".team-name");
     const life = card.querySelector(".team-life");
 
-    const cardHeight = Math.min(logRect.height * 0.25, 160);
-    img.style.width = cardHeight + "px";
-    img.style.height = cardHeight + "px";
+    // 카드 높이와 로고 크기 화면 비율로 설정
+    const baseCardHeight = Math.min(boardRect.height * 0.08, 100); // 최대 100px
+    const logoSize = baseCardHeight * 0.9;
+    img.style.width = logoSize + "px";
+    img.style.height = logoSize + "px";
     img.style.marginRight = "6px";
 
-    title.style.fontSize = Math.max(cardHeight * 0.18, 10) + "px";
-    life.style.fontSize = Math.max(cardHeight * 0.1, 9) + "px";
+    // 글자 크기 화면 비율로 설정
+    const titleFont = Math.max(baseCardHeight * 0.25, 10);
+    const lifeFont = Math.max(baseCardHeight * 0.15, 9);
+    title.style.fontSize = titleFont + "px";
+    life.style.fontSize = lifeFont + "px";
 
     // 정보 영역 너비 계산
-    const infoWidth = Math.max(title.offsetWidth, life.offsetWidth);
+    const infoWidth = Math.max(title.scrollWidth, life.scrollWidth);
 
-    // 카드 전체 폭
-    const cardWidth = img.offsetWidth + infoWidth + 6 + 16; // 이미지 + info + 마진 + padding
+    // 카드 폭 = 이미지 + info + padding
+    const cardWidth = Math.min(
+      img.offsetWidth + infoWidth + 8,
+      boardRect.width * 0.3
+    );
     card.style.width = cardWidth + "px";
-    card.style.height = cardHeight + "px";
-
-    // 각 카드별 반지름 조정 (겹치지 않도록)
-    const radiusX = baseRadiusX + cardWidth / 2;
+    card.style.height = baseCardHeight + "px";
 
     // 타원형 배치
     const angle = ((2 * Math.PI) / totalCards) * i;
     const x = centerX + radiusX * Math.cos(angle) - cardWidth / 2;
-    const y = centerY + radiusY * Math.sin(angle) - cardHeight / 2;
+    const y = centerY + radiusY * Math.sin(angle) - baseCardHeight / 2;
 
     card.style.left = x + "px";
     card.style.top = y + "px";

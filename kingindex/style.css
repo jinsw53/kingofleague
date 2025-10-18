@@ -25,7 +25,6 @@ html {
   height: 100vh;
 }
 
-/* 좌측 사이드 영역 */
 .side-area {
   display: grid;
   grid-template-rows: 1fr 3fr;
@@ -52,21 +51,19 @@ html {
   font-size: 1.2vw;
 }
 
-/* 보드 영역 */
 .board-area {
   position: relative;
   overflow: hidden;
 }
 
 /* 팀 카드 */
-/* 팀 카드: 좌측 로고, 우측 정보 */
 .team-card {
   position: absolute;
   display: flex;
   flex-direction: row; /* 로고와 정보 가로 배치 */
   align-items: center;
   justify-content: flex-start;
-  padding: 8px;
+  padding: 0.5em;
   background: rgba(255, 255, 255, 0.9);
   border: 2px solid #666;
   border-radius: 10px;
@@ -75,14 +72,12 @@ html {
   transition: width 0.2s, height 0.2s;
 }
 
-/* 팀 로고 */
 .team-card img.team-logo {
   object-fit: contain;
-  margin-right: 6px; /* 로고와 정보 사이 간격 */
-  flex-shrink: 0; /* 카드가 작아져도 줄어들지 않음 */
+  margin-right: 0.5em;
+  flex-shrink: 0;
 }
 
-/* 팀 정보 (팀명 + 하트) */
 .team-card .team-info {
   display: flex;
   flex-direction: column;
@@ -90,16 +85,15 @@ html {
   align-items: flex-start;
 }
 
-/* 팀명 */
 .team-card .team-name {
-  margin: 0 0 7px 0;
+  margin: 0 0 0.2em 0;
   font-weight: bold;
+  word-break: break-word;
 }
 
-/* 하트 */
 .team-card .team-life {
   margin: 0;
-  white-space: nowrap; /* 한 줄 고정 */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -134,9 +128,9 @@ html {
 
 .bottom-text-area img {
   width: 100%;
-  height: auto; /* 세로 비율 기준 */
-  object-fit: contain; /* 이미지 비율 유지하면서 찌그러지지 않게 */
-  max-height: 250px; /* 최대 높이 제한 */
+  height: auto;
+  object-fit: contain;
+  max-height: 250px;
 }
 
 /* 미사일 */
@@ -159,6 +153,7 @@ html {
   opacity: 0;
   transition: all 0.4s ease-out;
 }
+
 @keyframes shake {
   0% {
     transform: translate(0, 0);
@@ -176,7 +171,6 @@ html {
     transform: translate(0, 0);
   }
 }
-
 .shake {
   animation: shake 0.4s ease-in-out;
 }
