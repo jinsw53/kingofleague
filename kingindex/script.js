@@ -12,6 +12,8 @@ function ensureAudioContext() {
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
+let isPlaying = false; // 재생 상태 플래그
+
 /* -------------------
    로그 박스 크기 조정
 ------------------- */
@@ -63,8 +65,12 @@ async function fetchData() {
     });
 
     positionCards();
+    setupLogoClicks(); // 로고 클릭 이벤트 설정
   } catch (e) {
-    console.error(e);
+    console.error("데이터 불러오기 실패:", e);
+    if (e instanceof Response) {
+      e.text().then((text) => console.log("응답 내용:", text));
+    }
   }
 }
 
@@ -205,7 +211,6 @@ function playExplosionSound() {
   const ctx = audioCtx;
   const now = ctx.currentTime;
 
-  // 저역 펀치
   const osc = ctx.createOscillator();
   osc.type = "sine";
   osc.frequency.setValueAtTime(120, now);
@@ -219,7 +224,6 @@ function playExplosionSound() {
   osc.start(now);
   osc.stop(now + 0.6);
 
-  // 노이즈
   const bufferSize = ctx.sampleRate * 0.6;
   const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const output = noiseBuffer.getChannelData(0);
@@ -287,42 +291,119 @@ async function fetchLogs() {
       logDiv.className = "log-item";
       logDiv.innerText = logText;
 
-      logDiv.onclick = () => {
-        const attackerCard = document.querySelector(
-          `.team-card[data-team="${attackerName}"]`
+      logDiv.onclick = (e) => {
+        if (isPlaying) return; // 재생 중 클릭 무시
+        handleLogClick(item);
+      };
+
+      logBox.prepend(logDiv);
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+/* -------------------
+   로그 클릭 처리 함수
+------------------- */
+/* -------------------
+   로그 클릭 처리 함수 (Promise 버전)
+------------------- */
+function handleLogClick(item) {
+  return new Promise((resolve) => {
+    const attackerName = item["공격 팀"];
+    const gameName = item["게임"];
+    const isHealing = (item["공격 / 회복 판단"] || "").includes("회복");
+
+    const attackerCard = document.querySelector(
+      `.team-card[data-team="${attackerName}"]`
+    );
+    if (!attackerCard) return resolve();
+
+    attackerCard.classList.add("shake");
+    setTimeout(() => attackerCard.classList.remove("shake"), 500);
+
+    const targets = Array.from(document.querySelectorAll(".team-card")).filter(
+      (c) => {
+        const cardGame = (c.dataset.game || "").trim().toLowerCase();
+        const gameToMatch = (gameName || "").trim().toLowerCase();
+        return (
+          cardGame.includes(gameToMatch) && c.dataset.team !== attackerName
         );
-        if (!attackerCard) return;
+      }
+    );
 
-        attackerCard.classList.add("shake");
-        setTimeout(() => attackerCard.classList.remove("shake"), 500);
+    if (targets.length === 0) return resolve();
 
-        const isHealing = (item["공격 / 회복 판단"] || "").includes("회복");
-
-        const targets = Array.from(
-          document.querySelectorAll(".team-card")
-        ).filter((c) => {
-          const cardGame = (c.dataset.game || "").trim().toLowerCase();
-          const gameToMatch = (gameName || "").trim().toLowerCase();
-          return (
-            cardGame.includes(gameToMatch) && c.dataset.team !== attackerName
-          );
-        });
-
-        targets.forEach((t, idx) => {
+    let completed = 0;
+    targets.forEach((t, idx) => {
+      setTimeout(() => {
+        if (isHealing) {
+          playHealingSound();
+          t.classList.add("healing");
+          setTimeout(() => t.classList.remove("healing"), 700);
+        } else {
+          launchMissile(attackerCard, t);
           setTimeout(() => {
-            if (isHealing) {
-              playHealingSound();
-              t.classList.add("healing");
-              setTimeout(() => t.classList.remove("healing"), 700);
-            } else {
-              launchMissile(attackerCard, t);
-              setTimeout(() => {
-                t.classList.add("shake");
-                setTimeout(() => t.classList.remove("shake"), 500);
-              }, 700);
-            }
-          }, idx * 180);
-        });
+            t.classList.add("shake");
+            setTimeout(() => t.classList.remove("shake"), 500);
+          }, 700);
+        }
+
+        completed++;
+        if (completed === targets.length) {
+          // 모든 타겟 처리 완료 후 resolve
+          setTimeout(resolve, 700);
+        }
+      }, idx * 180);
+    });
+  });
+}
+
+/* -------------------
+   로고 클릭 이벤트 설정
+------------------- */
+function setupLogoClicks() {
+  const kolLogo = document.getElementById("kol-logo");
+  kolLogo.addEventListener("click", async () => {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    const logItems = Array.from(
+      document.querySelectorAll(".log-item")
+    ).reverse();
+    for (const log of logItems) {
+      const item = log.itemData; // itemData를 logDiv에 저장해야 함
+      await handleLogClick(item);
+      await new Promise((res) => setTimeout(res, 300)); // 로그 간 간격
+    }
+
+    isPlaying = false;
+  });
+}
+
+/* -------------------
+   로그 불러오기 + 클릭 이벤트 수정
+------------------- */
+async function fetchLogs() {
+  try {
+    const response = await fetch(logJsonUrl);
+    const logs = await response.json();
+    logBox.innerHTML = "";
+
+    logs.forEach((item) => {
+      const attackerName = item["공격 팀"];
+      const gameName = item["게임"];
+      const logText = `${attackerName} 팀이 (${gameName})${item["공격 / 회복 판단"]}`;
+
+      const logDiv = document.createElement("div");
+      logDiv.className = "log-item";
+      logDiv.innerText = logText;
+      logDiv.itemData = item; // <- 여기에 원본 데이터 저장
+
+      logDiv.onclick = (e) => {
+        if (isPlaying) return;
+        handleLogClick(item);
       };
 
       logBox.prepend(logDiv);
@@ -346,3 +427,117 @@ window.addEventListener("resize", () => {
   adjustLogBox();
   positionCards();
 });
+/* -------------------
+   전광판 정보 업데이트
+------------------- */
+let infoData = [];
+let autoInfoInterval = null;
+let selectedTeam = null;
+
+function updateInfoPanel(team) {
+  const logoEl = document.getElementById("info-logo");
+  const nameEl = document.getElementById("info-name");
+  const r1 = document.getElementById("info-round1");
+  const r2 = document.getElementById("info-round2");
+  const r3 = document.getElementById("info-round3");
+  const bonus = document.getElementById("info-bonus");
+  const game = document.getElementById("info-game");
+  const heart1 = team["1차 하트"];
+  const score1 = team["1차 점수"]; // 여기에 날짜가 들어올 수도 있음
+  const heart2 = team["2차 하트"];
+  const score2 = team["2차 점수"]; // 여기에 날짜가 들어올 수도 있음
+  const heart3 = team["3차 하트"];
+  const score3 = team["3차 점수"]; // 여기에 날짜가 들어올 수도 있음
+
+  if (!team) return;
+
+  logoEl.src = team.로고 || "https://via.placeholder.com/80";
+  nameEl.textContent = team.팀명 || "???";
+  r1.textContent =
+    (heart1 ? `❤️${heart1} | ` : "") + // 하트가 있을 때만 표시
+    (score1 ?? "—"); // 점수나 날짜가 없으면 기본값
+  r2.textContent =
+    (heart2 ? `❤️${heart2} | ` : "") + // 하트가 있을 때만 표시
+    (score2 ?? "—"); // 점수나 날짜가 없으면 기본값
+  r3.textContent =
+    (heart3 ? `❤️${heart3} | ` : "") + // 하트가 있을 때만 표시
+    (score3 ?? "—"); // 점수나 날짜가 없으면 기본값
+  bonus.textContent = `${team["총 보너스 점수"] || 0}점`;
+  game.textContent = team["회복에 필요한 게임"] || "-";
+}
+
+/* -------------------
+   자동 전환 모드
+------------------- */
+function startAutoInfoCycle() {
+  clearInterval(autoInfoInterval);
+  let index = 0;
+  autoInfoInterval = setInterval(() => {
+    if (selectedTeam) return; // 클릭 중이면 정지
+    if (infoData.length === 0) return;
+    updateInfoPanel(infoData[index]);
+    index = (index + 1) % infoData.length;
+  }, 2500);
+}
+
+/* -------------------
+   팀 클릭 시 정보 표시
+------------------- */
+function setupInfoPanelInteraction() {
+  const cards = document.querySelectorAll(".team-card");
+  cards.forEach((card) => {
+    card.addEventListener("click", () => {
+      const teamName = card.dataset.team;
+      selectedTeam = infoData.find((t) => t.팀명 === teamName);
+      updateInfoPanel(selectedTeam);
+      document.querySelector(".info-area").classList.add("active");
+      clearTimeout(card.timeout);
+      card.timeout = setTimeout(() => {
+        selectedTeam = null;
+        document.querySelector(".info-area").classList.remove("active");
+      }, 8000); // 8초 후 자동 해제
+    });
+  });
+}
+
+/* -------------------
+   fetchData 확장
+------------------- */
+async function fetchData() {
+  try {
+    const response = await fetch(dataJsonUrl);
+    const data = await response.json();
+    infoData = data.filter((item) => item.팀명?.trim() !== ""); // 전광판용 데이터 저장
+
+    container.innerHTML = "";
+    infoData.forEach((item) => {
+      const name = item.팀명;
+      const MAX_HEARTS = 7;
+      const life = Math.min(item.하트 || 0, MAX_HEARTS);
+      const game = item["회복에 필요한 게임"] || "";
+      const logo = item.로고 || "https://via.placeholder.com/80";
+      const redHearts = "❤️".repeat(life);
+      const blackHearts = "🖤".repeat(7 - life);
+      const heartDisplay = redHearts + blackHearts;
+
+      const card = document.createElement("div");
+      card.className = "team-card";
+      card.dataset.team = name;
+      card.dataset.game = game;
+      card.innerHTML = `
+        <img class="team-logo" src="${logo}" alt="${name} 로고">
+        <div class="team-info">
+          <h3 class="team-name">${name}</h3>
+          <p class="team-life">${heartDisplay}</p>
+        </div>`;
+      container.appendChild(card);
+    });
+
+    positionCards();
+    setupLogoClicks();
+    setupInfoPanelInteraction(); // 전광판 연동
+    startAutoInfoCycle(); // 자동 순환 시작
+  } catch (e) {
+    console.error("데이터 불러오기 실패:", e);
+  }
+}

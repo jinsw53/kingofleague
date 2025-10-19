@@ -13,11 +13,24 @@
   <!-- 왼쪽 사이드 영역 -->
   <div class="side-area">
     <div class="logo-area">
-      <img src="https://jinsw53.github.io/kingofleague/king-of-league.png" alt="logo">
+      <img id="kol-logo" src="https://jinsw53.github.io/kingofleague/king-of-league.png" alt="KingOfLeague 로고" style="cursor:pointer;">
     </div>
     <div class="info-area">
-      <canvas id="sideChart"></canvas>
+      <div id="info-panel">
+        <div class="team-info-main">
+          <img id="info-logo" src="" alt="팀 로고">
+          <h2 id="info-name">TEAM NAME</h2>
+        </div>
+        <div class="team-info-details">
+          <p><strong>1차:</strong> <span id="info-round1"></span></p>
+          <p><strong>2차:</strong> <span id="info-round2"></span></p>
+          <p><strong>3차:</strong> <span id="info-round3"></span></p>
+          <p><strong>총 보너스:</strong> <span id="info-bonus"></span></p>
+          <p><strong>회복에 필요한 게임:</strong> <span id="info-game"></span></p>
+        </div>
+      </div>
     </div>
+
   </div>
 
   <!-- 오른쪽 보드 영역 -->
