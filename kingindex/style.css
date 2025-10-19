@@ -235,3 +235,7 @@ html {
   opacity: 0;
   transition: all 0.4s ease-out;
 }
+.team-card.eliminated {
+  filter: grayscale(100%) brightness(0.7);
+  opacity: 0.7;
+}

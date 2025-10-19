@@ -46,7 +46,7 @@ async function fetchData() {
       const logo = item.로고 || "https://via.placeholder.com/80";
 
       const redHearts = "❤️".repeat(life);
-      const blackHearts = "🖤".repeat(7 - life);
+      const blackHearts = "🖤".repeat(MAX_HEARTS - life);
       const heartDisplay = redHearts + blackHearts;
 
       const card = document.createElement("div");
@@ -55,12 +55,18 @@ async function fetchData() {
       card.dataset.game = game;
 
       card.innerHTML = `
-        <img class="team-logo" src="${logo}" alt="${name} 로고">
-        <div class="team-info">
-          <h3 class="team-name">${name}</h3>
-          <p class="team-life">${heartDisplay}</p>
-        </div>
-      `;
+    <img class="team-logo" src="${logo}" alt="${name} 로고">
+    <div class="team-info">
+      <h3 class="team-name">${name}</h3>
+      <p class="team-life">${heartDisplay}</p>
+    </div>
+  `;
+
+      // 하트가 0이면 흑백 처리
+      if (life === 0) {
+        card.classList.add("eliminated");
+      }
+
       container.appendChild(card);
     });
 
