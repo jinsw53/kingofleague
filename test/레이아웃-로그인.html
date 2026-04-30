@@ -324,7 +324,6 @@
         // 로그인 핸들러
         window.handleLoginRequest = async function() {
             const cleanUrl = window.location.origin + window.location.pathname;
-            console.log("로그인 시도 URL:", cleanUrl);
             await supabaseClient.auth.signInWithOAuth({
                 provider: 'kakao',
                 options: { 
@@ -340,34 +339,12 @@
             location.reload();
         };
 
-        // 닉네임 수정
-        window.changeNickname = async function() {
-            const newName = prompt("변경할 닉네임을 입력하세요.");
-            if (!newName || !newName.trim()) return;
-
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (!user) return;
-
-            const { error } = await supabaseClient
-                .from('profiles')
-                .upsert({ id: user.id, full_name: newName.trim() });
-
-            if (!error) {
-                document.getElementById('user-name').innerText = newName.trim();
-                alert("닉네임이 변경되었습니다.");
-            } else {
-                console.error("저장 실패:", error);
-                alert("변경 중 오류가 발생했습니다.");
-            }
-        };
-
-        // 사용자 데이터 로드 및 UI 반영
-        async function fetchUserData(user) {
+        // 사용자 데이터 로드 및 UI 반영 (분리하여 재사용 가능하게 만듦)
+        async function fetchAndRefreshUser(user) {
             if (!user) return;
             let displayName = user.user_metadata.full_name || "사용자";
 
             try {
-                // profiles 테이블에서 커스텀 닉네임 조회
                 const { data: profile, error } = await supabaseClient
                     .from('profiles')
                     .select('full_name')
@@ -381,29 +358,47 @@
                     await supabaseClient.from('profiles').upsert({ id: user.id, full_name: displayName });
                 }
             } catch (err) {
-                console.warn("DB 데이터 확인 중 오류 발생:", err);
+                console.warn("DB 데이터 확인 중 오류:", err);
             }
 
             updateUI(true, displayName);
         }
 
+        // 닉네임 수정
+        window.changeNickname = async function() {
+            const newName = prompt("변경할 닉네임을 입력하세요.");
+            if (!newName || !newName.trim()) return;
+
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) return;
+
+            // 1. DB 업데이트 시도
+            const { error } = await supabaseClient
+                .from('profiles')
+                .upsert({ id: user.id, full_name: newName.trim() });
+
+            if (!error) {
+                // 2. 💡 성공하면 즉시 데이터를 다시 불러와서 UI를 갱신합니다.
+                await fetchAndRefreshUser(user);
+                alert("닉네임이 성공적으로 변경되었습니다.");
+            } else {
+                console.error("저장 실패:", error);
+                alert("변경 중 오류가 발생했습니다: " + error.message);
+            }
+        };
+
         // 앱 초기화 로직
         async function initApp() {
             console.log("BOAKO App Initializing...");
 
-            // 1. 현재 세션 즉시 확인
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session?.user) {
-                console.log("활성 세션 발견");
-                await fetchUserData(session.user);
+                await fetchAndRefreshUser(session.user);
             }
 
-            // 2. 인증 상태 리스너 (로그인/로그아웃 즉시 대응)
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log("인증 이벤트:", event);
                 if (session?.user) {
-                    await fetchUserData(session.user);
-                    // 로그인 직후 지저분한 URL 파라미터 정리
+                    await fetchAndRefreshUser(session.user);
                     if (window.location.hash || window.location.search.includes('access_token')) {
                         setTimeout(() => {
                             window.history.replaceState(null, null, window.location.pathname);
