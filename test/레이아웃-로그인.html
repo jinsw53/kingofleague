@@ -10,12 +10,13 @@
         /* 1. 전체 초기화 및 기본 폰트 설정 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
-            background-color: #f8f7fa; 
+            background-color: #f0f2f5; 
             font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Segoe UI", Roboto, sans-serif; 
             color: #222; 
             line-height: 1.5;
         }
         ul { list-style: none; }
+        a { text-decoration: none; color: inherit; }
 
         /* 2. 유동형 너비 설정 (중앙 정렬) */
         .inner { 
@@ -24,23 +25,22 @@
             margin: 0 auto; 
         }
 
-        /* 3. 헤더: 통합 검색바 (보라색 포인트) */
+        /* 3. 헤더: 통합 검색바 */
         .header { 
             background-color: #fff; 
             border-bottom: 1px solid #e4e8eb; 
-            padding: 25px 0; 
+            padding: 20px 0; 
         }
         .header .inner { 
             display: flex; 
             align-items: center; 
-            gap: 20px; 
+            gap: 25px; 
         }
         .logo { 
-            font-size: 32px; 
+            font-size: 36px; 
             font-weight: 900; 
-            color: #8b5cf6; /* 메인 보라색 */
-            letter-spacing: -1.5px; 
-            text-decoration: none;
+            color: #7c3aed; /* 보아코 메인 보라색 */
+            letter-spacing: -2px; 
             flex-shrink: 0;
         }
         .search-area { 
@@ -50,224 +50,240 @@
         }
         .search-box { 
             width: 100%; 
-            max-width: 550px; 
-            height: 52px; 
-            border: 2px solid #8b5cf6; /* 보라색 테두리 */
+            max-width: 580px; 
+            height: 54px; 
+            border: 2px solid #7c3aed; 
             display: flex; 
             background: #fff; 
-            border-radius: 2px;
+            border-radius: 4px;
+            overflow: hidden;
         }
         .search-box input { 
             flex: 1; 
             border: none; 
-            padding: 0 15px; 
+            padding: 0 20px; 
             outline: none; 
-            font-size: 16px; 
+            font-size: 17px; 
             font-weight: 600;
         }
         .btn-search { 
-            width: 56px; 
-            background: #8b5cf6; 
+            width: 60px; 
+            background: #7c3aed; 
             border: none; 
             color: white; 
             cursor: pointer; 
-            font-size: 20px; 
+            font-size: 22px; 
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: background 0.2s;
         }
+        .btn-search:hover { background: #6d28d9; }
 
-        /* 4. 메뉴바 */
+        /* 4. 네비게이션 바 */
         .nav { 
             background-color: #fff; 
             border-bottom: 1px solid #e4e8eb; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
         .menu-list { 
             display: flex; 
-            gap: 30px; 
-            height: 52px; 
+            gap: 35px; 
+            height: 56px; 
             align-items: center; 
         }
         .menu-item { 
-            font-size: 14px; 
+            font-size: 15px; 
             font-weight: 700; 
-            color: #333; 
+            color: #444; 
             cursor: pointer; 
             display: flex; 
             align-items: center; 
-            gap: 6px;
+            gap: 8px;
+            transition: color 0.2s;
         }
-        .menu-item:hover { color: #8b5cf6; }
+        .menu-item:hover { color: #7c3aed; }
         .menu-item .ico { font-size: 18px; }
 
         /* 5. 메인 레이아웃 */
         .container { 
-            padding: 20px 0 80px 0; 
+            padding: 25px 0 100px 0; 
         }
         .flex-container { 
             display: flex; 
-            gap: 20px; 
+            gap: 25px; 
         }
 
-        /* 왼쪽: 메인 콘텐츠 */
+        /* 왼쪽: 콘텐츠 영역 */
         .main-content { 
             flex: 1; 
             min-width: 0; 
         }
         .main-banner { 
-            height: 130px; 
-            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); /* 보라색 그라데이션 */
-            border-radius: 8px; 
-            margin-bottom: 20px; 
+            height: 160px; 
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); 
+            border-radius: 12px; 
+            margin-bottom: 25px; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
             color: white; 
-            font-size: 24px; 
+            font-size: 32px; 
             font-weight: 900; 
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+            letter-spacing: 1px;
+            box-shadow: 0 10px 20px rgba(124, 58, 237, 0.2);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .section-card { 
             background: #fff; 
-            border: 1px solid #dae1e6; 
-            border-radius: 8px; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px; 
             overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
         }
         .card-header { 
-            padding: 18px 20px; 
-            font-size: 16px; 
+            padding: 20px 25px; 
+            font-size: 18px; 
             font-weight: 800; 
-            border-bottom: 1px solid #f1f3f5; 
-            color: #7c3aed; /* 카드 헤더 보라색 */
+            border-bottom: 1px solid #f1f5f9; 
+            color: #5b21b6; 
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         .card-body { 
-            min-height: 500px; 
+            min-height: 450px; 
             padding: 30px; 
         }
         .loading-msg { 
             text-align: center; 
             color: #94a3b8; 
-            padding-top: 50px; 
+            padding-top: 100px; 
+            font-size: 15px;
         }
 
-        /* 오른쪽: 사이드바 (로그인) */
+        /* 오른쪽: 사이드바 */
         .side-content { 
-            width: 330px; 
+            width: 340px; 
             flex-shrink: 0; 
         }
         .login-widget { 
             background: #fff; 
-            border: 1px solid #dae1e6; 
-            padding: 20px; 
-            border-radius: 8px; 
-            margin-bottom: 15px; 
+            border: 1px solid #e2e8f0; 
+            padding: 25px; 
+            border-radius: 12px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
         }
         .login-before p { 
-            font-size: 12px; 
-            color: #666; 
-            margin-bottom: 15px; 
-            line-height: 1.4;
+            font-size: 14px; 
+            color: #64748b; 
+            margin-bottom: 20px; 
+            line-height: 1.6;
         }
         .btn-kakao { 
             width: 100%; 
-            height: 48px; 
+            height: 52px; 
             background-color: #FEE500; 
             border: none; 
-            border-radius: 4px; 
+            border-radius: 6px; 
             font-weight: 800; 
             cursor: pointer; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            gap: 8px; 
-            font-size: 15px;
+            gap: 10px; 
+            font-size: 16px;
             color: #3c1e1e;
+            transition: transform 0.1s;
         }
+        .btn-kakao:active { transform: scale(0.98); }
 
-        /* 로그인 후 유저 카드 */
+        /* 로그인 후 프로필 */
         .user-profile { 
             display: none; 
         }
         .user-info { 
             display: flex; 
             align-items: center; 
-            gap: 12px; 
-            margin-bottom: 15px; 
+            gap: 15px; 
+            margin-bottom: 20px; 
         }
         .user-avatar { 
-            width: 44px; 
-            height: 44px; 
-            background: #f5f3ff; /* 연보라 배경 */
+            width: 52px; 
+            height: 52px; 
+            background: #ede9fe; 
             border-radius: 50%; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            font-size: 24px; 
-            color: #8b5cf6;
+            font-size: 28px; 
+            color: #7c3aed;
         }
         .user-txt strong { 
             display: block; 
-            font-size: 15px; 
-            color: #222; 
+            font-size: 17px; 
+            color: #1e293b; 
+            margin-bottom: 2px;
         }
         .user-txt .badge { 
-            font-size: 11px; 
-            color: #8b5cf6; 
+            font-size: 12px; 
+            color: #7c3aed; 
             font-weight: 700; 
+            background: #f5f3ff;
+            padding: 2px 8px;
+            border-radius: 4px;
         }
-        .name-box { 
-            display: flex; 
-            align-items: center; 
-            gap: 5px; 
-        }
+        .name-box { display: flex; align-items: center; gap: 8px; }
         .btn-nick-edit { 
-            background: none; 
-            border: 1px solid #ddd; 
-            font-size: 10px; 
-            padding: 2px 5px; 
-            border-radius: 3px; 
+            background: #f1f5f9; 
+            border: 1px solid #e2e8f0; 
+            font-size: 11px; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
             cursor: pointer; 
-            color: #888; 
+            color: #64748b; 
         }
+        .btn-nick-edit:hover { background: #e2e8f0; }
         .btn-logout { 
             width: 100%; 
-            padding: 10px; 
-            background: #f8f9fa; 
-            border: 1px solid #dee2e6; 
-            color: #666; 
-            font-size: 12px; 
-            cursor: pointer; 
-            border-radius: 4px; 
-        }
-
-        /* 하단 공지 위젯 */
-        .notice-widget { 
-            height: 180px; 
+            padding: 12px; 
             background: #fff; 
-            border: 1px solid #dae1e6; 
-            border-radius: 8px; 
+            border: 1px solid #e2e8f0; 
+            color: #94a3b8; 
+            font-size: 13px; 
+            font-weight: 600;
+            cursor: pointer; 
+            border-radius: 6px; 
+            transition: all 0.2s;
+        }
+        .btn-logout:hover { background: #f8fafc; color: #ef4444; border-color: #fecaca; }
+
+        .notice-widget { 
+            height: 200px; 
+            background: #fff; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            color: #999; 
-            font-size: 13px; 
+            color: #94a3b8; 
+            font-size: 14px; 
         }
 
-        /* 반응형 모바일 대응 */
-        @media (max-width: 900px) {
+        /* 반응형 */
+        @media (max-width: 960px) {
             .flex-container { flex-direction: column; }
             .side-content { width: 100%; order: -1; }
-            .logo { font-size: 26px; }
-            .search-box { height: 46px; }
+            .logo { font-size: 28px; }
+            .search-box { height: 48px; }
         }
     </style>
 </head>
 <body>
 
     <div id="wrap">
+        <!-- 헤더 영역 -->
         <header class="header">
             <div class="inner">
                 <a href="#" class="logo">BOAKO</a>
@@ -280,6 +296,7 @@
             </div>
         </header>
 
+        <!-- 네비게이션 -->
         <nav class="nav">
             <div class="inner">
                 <ul class="menu-list">
@@ -292,14 +309,16 @@
             </div>
         </nav>
 
+        <!-- 메인 본문 -->
         <div class="container">
             <div class="inner flex-container">
                 <main class="main-content">
                     <div class="main-banner">BOAKO BOARDGAME ARCHIVE</div>
+                    
                     <section class="section-card">
                         <div class="card-header">
                             <span>🏆 실시간 보드게임 랭킹</span>
-                            <span style="font-size:12px; color:#999; font-weight:400;">업데이트: 방금 전</span>
+                            <span style="font-size:12px; color:#94a3b8; font-weight:400;">업데이트: 방금 전</span>
                         </div>
                         <div class="card-body" id="data-display">
                             <p class="loading-msg">데이터를 불러오는 중입니다...</p>
@@ -307,15 +326,17 @@
                     </section>
                 </main>
 
+                <!-- 사이드바 -->
                 <aside class="side-content">
                     <div class="login-widget">
                         <!-- 로그인 전 -->
                         <div id="login-before" class="login-before">
                             <p>보아코 아카이브 서비스를<br>더 안전하고 편리하게 이용하세요.</p>
                             <button type="button" class="btn-kakao" onclick="window.handleLoginRequest()">
-                                🟡 카카오 로그인
+                                <span style="font-size: 20px;">🟡</span> 카카오 로그인
                             </button>
                         </div>
+
                         <!-- 로그인 후 -->
                         <div id="user-profile" class="user-profile">
                             <div class="user-info">
@@ -331,54 +352,50 @@
                             <button type="button" class="btn-logout" onclick="window.handleLogout()">로그아웃</button>
                         </div>
                     </div>
-                    <div class="notice-widget">공지사항 및 이벤트 영역</div>
+
+                    <div class="notice-widget">
+                        공지사항 및 이벤트 영역
+                    </div>
                 </aside>
             </div>
         </div>
     </div>
 
     <script>
+        // Supabase 설정
         const S_URL = 'https://qrredwrxdnvqwdxzanba.supabase.co';
         const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY';
         const supabaseClient = supabase.createClient(S_URL, S_KEY);
 
-        // 로그인 요청 처리
+        // [로그인] 414 에러 방지 및 깔끔한 리다이렉트
         window.handleLoginRequest = async function() {
-            console.log("로그인 버튼 클릭됨");
-            
             if (window.self !== window.top) {
-                console.log("미리보기 환경: 데모 모드 실행");
                 updateUI(true, "시월(데모)");
             } else {
-                const targetUrl = window.location.origin + window.location.pathname;
-                console.log("실제 환경: 카카오 로그인 시도. Redirect URL:", targetUrl);
-                
+                const cleanUrl = window.location.origin + window.location.pathname;
                 try {
-                    const { error } = await supabaseClient.auth.signInWithOAuth({
+                    await supabaseClient.auth.signInWithOAuth({
                         provider: 'kakao',
                         options: { 
-                            redirectTo: targetUrl,
+                            redirectTo: cleanUrl,
                             queryParams: { prompt: 'login' } 
                         }
                     });
-                    if (error) throw error;
                 } catch (err) {
-                    console.error("로그인 시도 중 에러 발생:", err.message);
-                    alert("로그인 요청 중 오류가 발생했습니다: " + err.message);
+                    console.error("로그인 시도 에러:", err.message);
+                    alert("로그인 중 오류가 발생했습니다.");
                 }
             }
         };
 
-        // 로그아웃
+        // [로그아웃] 세션 종료 및 페이지 리셋
         window.handleLogout = async function() {
-            console.log("로그아웃 시도");
             await supabaseClient.auth.signOut();
-            // 로그아웃 시 명시적으로 UI 초기화 및 페이지 새로고침
             updateUI(false);
             location.href = window.location.origin + window.location.pathname;
         };
 
-        // UI 업데이트 통합 함수
+        // UI 전환 함수
         function updateUI(isLoggedIn, name = "사용자") {
             const loginBefore = document.getElementById('login-before');
             const userProfile = document.getElementById('user-profile');
@@ -394,8 +411,9 @@
             }
         }
 
+        // [닉네임 수정] DB(profiles 테이블)에 저장
         window.changeNickname = async function() {
-            const newName = prompt("아카이브에서 사용할 닉네임을 입력해주세요.");
+            const newName = prompt("아카이브에서 사용할 새로운 닉네임을 입력해주세요.");
             if (!newName || !newName.trim()) return;
 
             const { data: { user } } = await supabaseClient.auth.getUser();
@@ -406,19 +424,16 @@
                 .upsert({ id: user.id, full_name: newName.trim() });
 
             if (error) {
-                console.error("닉네임 저장 실패:", error);
-                alert("닉네임 변경에 실패했습니다.");
+                alert("닉네임 변경 실패: " + error.message);
             } else {
                 document.getElementById('user-name').innerText = newName.trim();
                 alert("닉네임이 성공적으로 변경되었습니다.");
             }
         };
 
-        // 인증 상태에 따른 유저 정보 로드 로직
+        // 유저 정보 로드 (프로필 DB 확인 및 자동 생성)
         async function loadUserInfo(user) {
             if (!user) return;
-            
-            console.log("사용자 정보 로드 시작:", user.email);
             let displayName = user.user_metadata.full_name || "사용자";
 
             try {
@@ -430,37 +445,38 @@
 
                 if (profile && profile.full_name) {
                     displayName = profile.full_name;
-                    console.log("DB 프로필 닉네임 로드 성공:", displayName);
+                } else {
+                    // 첫 로그인 시 DB에 기본 정보 생성
+                    await supabaseClient.from('profiles').upsert({
+                        id: user.id,
+                        full_name: displayName
+                    });
                 }
             } catch (dbErr) {
-                console.warn("DB 프로필 로드 실패 (기본값 사용):", dbErr);
+                console.warn("프로필 로드 중 경고:", dbErr);
             }
 
             updateUI(true, displayName);
         }
 
+        // 앱 초기화 및 실시간 인증 상태 감지
         async function initApp() {
-            console.log("앱 초기화 시작...");
-            
-            // 1. 주소창 토큰 청소 (OAuth 리다이렉트 후 지저분한 URL 정리)
-            if (window.location.hash) {
-                console.log("주소창 토큰 발견, 청소 진행");
-                // 토큰 처리를 위해 약간의 지연 시간을 줄 수 있음
-                setTimeout(() => {
-                    window.history.replaceState(null, null, window.location.pathname);
-                }, 500);
+            // URL 파라미터 에러 정리
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('error')) {
+                window.history.replaceState(null, null, window.location.pathname);
             }
 
-            // 2. 실시간 인증 상태 리스너 등록 (가장 확실한 방법)
-            // 페이지 로드 시점뿐만 아니라, 로그인 성공 직후 상태 변화를 즉시 감지함
+            // 실시간 세션 감지 리스너 (가장 중요)
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                console.log("인증 상태 변경 감지 이벤트:", event);
-                
-                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-                    if (session?.user) {
-                        await loadUserInfo(session.user);
+                console.log("인증 이벤트 발생:", event);
+                if (session?.user) {
+                    await loadUserInfo(session.user);
+                    // 로그인 후 주소창 정리
+                    if (window.location.hash) {
+                        window.history.replaceState(null, null, window.location.pathname);
                     }
-                } else if (event === 'SIGNED_OUT') {
+                } else {
                     updateUI(false);
                 }
             });
