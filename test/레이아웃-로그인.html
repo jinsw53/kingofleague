@@ -355,7 +355,7 @@
         const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY';
         const supabaseClient = supabase.createClient(S_URL, S_KEY);
 
-        // 로그인 요청 처리 (캔버스 환경 대응)
+        // 로그인 요청 처리 (캔버스 환경 대응 및 414 에러 방지)
         window.handleLoginRequest = async function() {
             if (window.self !== window.top) {
                 console.log("미리보기 환경 감지: 데모 모드로 전환합니다.");
@@ -363,7 +363,10 @@
             } else {
                 await supabaseClient.auth.signInWithOAuth({
                     provider: 'kakao',
-                    options: { redirectTo: window.location.href }
+                    options: { 
+                        // 💡 중요: window.location.href 대신 순수 주소만 사용하여 토큰 중첩 방지
+                        redirectTo: window.location.origin + window.location.pathname 
+                    }
                 });
             }
         };
@@ -406,6 +409,11 @@
 
         // 유저 상태 체크 및 초기화
         async function initApp() {
+            // 💡 추가: 로그인 성공 후 주소창의 지저분한 #access_token... 을 자동 제거
+            if (window.location.hash) {
+                window.history.replaceState(null, null, window.location.pathname);
+            }
+
             const { data: { user } } = await supabaseClient.auth.getUser();
             
             if (user) {
