@@ -309,12 +309,14 @@
 
                 <aside class="side-content">
                     <div class="login-widget">
+                        <!-- 로그인 전 -->
                         <div id="login-before" class="login-before">
                             <p>보아코 아카이브 서비스를<br>더 안전하고 편리하게 이용하세요.</p>
                             <button type="button" class="btn-kakao" onclick="window.handleLoginRequest()">
                                 🟡 카카오 로그인
                             </button>
                         </div>
+                        <!-- 로그인 후 -->
                         <div id="user-profile" class="user-profile">
                             <div class="user-info">
                                 <div class="user-avatar">👤</div>
@@ -346,7 +348,7 @@
             
             if (window.self !== window.top) {
                 console.log("미리보기 환경: 데모 모드 실행");
-                showUserProfile("시월(데모)");
+                updateUI(true, "시월(데모)");
             } else {
                 const targetUrl = window.location.origin + window.location.pathname;
                 console.log("실제 환경: 카카오 로그인 시도. Redirect URL:", targetUrl);
@@ -371,13 +373,25 @@
         window.handleLogout = async function() {
             console.log("로그아웃 시도");
             await supabaseClient.auth.signOut();
+            // 로그아웃 시 명시적으로 UI 초기화 및 페이지 새로고침
+            updateUI(false);
             location.href = window.location.origin + window.location.pathname;
         };
 
-        function showUserProfile(name) {
-            document.getElementById('login-before').style.display = 'none';
-            document.getElementById('user-profile').style.display = 'block';
-            document.getElementById('user-name').innerText = name || "사용자";
+        // UI 업데이트 통합 함수
+        function updateUI(isLoggedIn, name = "사용자") {
+            const loginBefore = document.getElementById('login-before');
+            const userProfile = document.getElementById('user-profile');
+            const userName = document.getElementById('user-name');
+
+            if (isLoggedIn) {
+                loginBefore.style.display = 'none';
+                userProfile.style.display = 'block';
+                userName.innerText = name;
+            } else {
+                loginBefore.style.display = 'block';
+                userProfile.style.display = 'none';
+            }
         }
 
         window.changeNickname = async function() {
@@ -385,10 +399,7 @@
             if (!newName || !newName.trim()) return;
 
             const { data: { user } } = await supabaseClient.auth.getUser();
-            if (!user) {
-                document.getElementById('user-name').innerText = newName.trim();
-                return;
-            };
+            if (!user) return;
 
             const { error } = await supabaseClient
                 .from('profiles')
@@ -396,60 +407,63 @@
 
             if (error) {
                 console.error("닉네임 저장 실패:", error);
-                alert("닉네임 변경에 실패했습니다. (profiles 테이블 구조 확인 필요)");
+                alert("닉네임 변경에 실패했습니다.");
             } else {
                 document.getElementById('user-name').innerText = newName.trim();
                 alert("닉네임이 성공적으로 변경되었습니다.");
             }
         };
 
+        // 인증 상태에 따른 유저 정보 로드 로직
+        async function loadUserInfo(user) {
+            if (!user) return;
+            
+            console.log("사용자 정보 로드 시작:", user.email);
+            let displayName = user.user_metadata.full_name || "사용자";
+
+            try {
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                if (profile && profile.full_name) {
+                    displayName = profile.full_name;
+                    console.log("DB 프로필 닉네임 로드 성공:", displayName);
+                }
+            } catch (dbErr) {
+                console.warn("DB 프로필 로드 실패 (기본값 사용):", dbErr);
+            }
+
+            updateUI(true, displayName);
+        }
+
         async function initApp() {
             console.log("앱 초기화 시작...");
             
+            // 1. 주소창 토큰 청소 (OAuth 리다이렉트 후 지저분한 URL 정리)
             if (window.location.hash) {
                 console.log("주소창 토큰 발견, 청소 진행");
-                window.history.replaceState(null, null, window.location.pathname);
+                // 토큰 처리를 위해 약간의 지연 시간을 줄 수 있음
+                setTimeout(() => {
+                    window.history.replaceState(null, null, window.location.pathname);
+                }, 500);
             }
 
-            try {
-                // 💡 getUser() 에러를 바로 throw하지 않고 안전하게 처리합니다.
-                const { data, error: userError } = await supabaseClient.auth.getUser();
-                const user = data?.user;
-
-                if (userError) {
-                    // 로그인이 안 된 상태에서 발생하는 'Auth session missing'은 정상적인 상황입니다.
-                    if (userError.message.includes("Auth session missing")) {
-                        console.log("로그인된 사용자가 없습니다. (정상 로그아웃 상태)");
-                    } else {
-                        console.warn("세션 확인 중 경고 발생:", userError.message);
+            // 2. 실시간 인증 상태 리스너 등록 (가장 확실한 방법)
+            // 페이지 로드 시점뿐만 아니라, 로그인 성공 직후 상태 변화를 즉시 감지함
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                console.log("인증 상태 변경 감지 이벤트:", event);
+                
+                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                    if (session?.user) {
+                        await loadUserInfo(session.user);
                     }
+                } else if (event === 'SIGNED_OUT') {
+                    updateUI(false);
                 }
-
-                if (user) {
-                    console.log("로그인된 사용자 발견:", user.email);
-                    let displayName = user.user_metadata.full_name || "사용자";
-
-                    try {
-                        const { data: profile } = await supabaseClient
-                            .from('profiles')
-                            .select('full_name')
-                            .eq('id', user.id)
-                            .maybeSingle();
-
-                        if (profile && profile.full_name) {
-                            displayName = profile.full_name;
-                            console.log("DB 프로필 닉네임 로드 성공:", displayName);
-                        }
-                    } catch (dbErr) {
-                        console.warn("DB 프로필 로드 실패 (기본 메타데이터 사용):", dbErr);
-                    }
-
-                    showUserProfile(displayName);
-                }
-            } catch (initErr) {
-                // 예상치 못한 치명적 오류만 기록합니다.
-                console.error("초기화 과정 중 시스템 예외:", initErr.message);
-            }
+            });
         }
 
         window.onload = initApp;
