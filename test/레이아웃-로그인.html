@@ -366,7 +366,9 @@
 
         // 닉네임 수정
         window.changeNickname = async function() {
-            const newName = prompt("변경할 닉네임을 입력하세요.");
+            const newName = prompt("변경할 닉네임을 입력하세요.\n" +
+  "닉네임은 원활한 아카이브 활동을 위해,\n" +
+  "아레나의 아이디와 동일하게 입력하셔야 합니다.");
             if (!newName || !newName.trim()) return;
 
             const { data: { user } } = await supabaseClient.auth.getUser();
