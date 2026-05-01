@@ -25,7 +25,7 @@
             margin: 0 auto; 
         }
 
-        /* 3. 헤더: 보라색 포인트 디자인 */
+        /* 3. 헤더 디자인 */
         .header { 
             background-color: #fff; 
             border-bottom: 1px solid #e4e8eb; 
@@ -42,6 +42,7 @@
             color: #7c3aed; 
             letter-spacing: -2px; 
             flex-shrink: 0;
+            cursor: pointer;
         }
         .search-area { 
             flex: 1; 
@@ -97,8 +98,10 @@
             display: flex; 
             align-items: center; 
             gap: 8px;
+            padding: 10px 0;
+            transition: color 0.2s;
         }
-        .menu-item:hover { color: #7c3aed; }
+        .menu-item:hover, .menu-item.active { color: #7c3aed; border-bottom: 2px solid #7c3aed; }
 
         /* 5. 메인 레이아웃 */
         .container { 
@@ -109,7 +112,6 @@
             gap: 25px; 
         }
 
-        /* 메인 배너 및 콘텐츠 */
         .main-content { 
             flex: 1; 
             min-width: 0; 
@@ -132,6 +134,11 @@
             border: 1px solid #e2e8f0; 
             border-radius: 12px; 
             overflow: hidden;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .card-header { 
             padding: 20px 25px; 
@@ -144,13 +151,8 @@
             min-height: 450px; 
             padding: 30px; 
         }
-        .loading-msg { 
-            text-align: center; 
-            color: #94a3b8; 
-            padding-top: 100px; 
-        }
 
-        /* 사이드바 및 로그인 위젯 */
+        /* 사이드바 */
         .side-content { 
             width: 340px; 
             flex-shrink: 0; 
@@ -178,61 +180,19 @@
             font-size: 16px;
             color: #3c1e1e;
         }
-        .user-profile { 
-            display: none; 
-        }
-        .user-info { 
-            display: flex; 
-            align-items: center; 
-            gap: 15px; 
-            margin-bottom: 20px; 
-        }
-        .user-avatar { 
-            width: 52px; 
-            height: 52px; 
-            background: #ede9fe; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 28px; 
-            color: #7c3aed;
-        }
-        .user-txt strong { 
-            display: block; 
-            font-size: 17px; 
-            color: #1e293b; 
-        }
-        .user-txt .badge { 
-            font-size: 12px; 
-            color: #7c3aed; 
-            font-weight: 700; 
-            background: #f5f3ff;
-            padding: 2px 8px;
-            border-radius: 4px;
-        }
-        .btn-nick-edit { 
-            background: #f1f5f9; 
-            border: 1px solid #e2e8f0; 
-            font-size: 11px; 
-            padding: 4px 8px; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            color: #64748b; 
-        }
-        .btn-logout { 
-            width: 100%; 
-            padding: 12px; 
-            background: #fff; 
-            border: 1px solid #e2e8f0; 
-            color: #94a3b8; 
-            font-size: 13px; 
-            font-weight: 600;
-            cursor: pointer; 
-            border-radius: 6px; 
-        }
+        .user-profile { display: none; }
+        .user-info { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .user-avatar { width: 52px; height: 52px; background: #ede9fe; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #7c3aed; }
+        .user-txt strong { display: block; font-size: 17px; color: #1e293b; }
+        .badge { font-size: 12px; color: #7c3aed; font-weight: 700; background: #f5f3ff; padding: 2px 8px; border-radius: 4px; }
+        .btn-nick-edit { background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #64748b; }
+        .btn-logout { width: 100%; padding: 12px; background: #fff; border: 1px solid #e2e8f0; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 6px; }
 
-        /* 모바일 반응형 */
+        /* 데이터 테이블 */
+        .table-data { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .table-data th { text-align: left; padding: 12px; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 13px; }
+        .table-data td { padding: 15px 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+
         @media (max-width: 960px) {
             .flex-container { flex-direction: column; }
             .side-content { width: 100%; order: -1; }
@@ -244,7 +204,7 @@
     <div id="wrap">
         <header class="header">
             <div class="inner">
-                <a href="#" class="logo">BOAKO</a>
+                <a href="javascript:void(0)" onclick="window.renderPage('main')" class="logo">BOAKO</a>
                 <div class="search-area">
                     <div class="search-box">
                         <input type="text" id="main-search" placeholder="보드게임 전적 및 유저 검색">
@@ -257,37 +217,24 @@
         <nav class="nav">
             <div class="inner">
                 <ul class="menu-list">
-                    <li class="menu-item"><span class="ico">🎮</span>보드게임</li>
-                    <li class="menu-item"><span class="ico">🏆</span>랭킹</li>
-                    <li class="menu-item"><span class="ico">📋</span>전적기록</li>
-                    <li class="menu-item"><span class="ico">☕</span>카페</li>
-                    <li class="menu-item"><span class="ico">📖</span>블로그</li>
+                    <li class="menu-item" onclick="window.renderPage('boardgame')"><span class="ico">🎮</span>보드게임</li>
+                    <li class="menu-item" onclick="window.renderPage('ranking')"><span class="ico">🏆</span>랭킹</li>
+                    <li class="menu-item" onclick="window.renderPage('records')"><span class="ico">📋</span>전적기록</li>
+                    <li class="menu-item" onclick="window.renderPage('cafe')"><span class="ico">☕</span>카페</li>
+                    <li class="menu-item" onclick="window.renderPage('blog')"><span class="ico">📖</span>블로그</li>
                 </ul>
             </div>
         </nav>
 
         <div class="container">
             <div class="inner flex-container">
-                <main class="main-content">
-                    <div class="main-banner">BOAKO BOARDGAME ARCHIVE</div>
-                    <section class="section-card">
-                        <div class="card-header">🏆 실시간 보드게임 랭킹</div>
-                        <div class="card-body" id="data-display">
-                            <p class="loading-msg">데이터를 불러오는 중입니다...</p>
-                        </div>
-                    </section>
-                </main>
-
+                <main class="main-content" id="main-content-area"></main>
                 <aside class="side-content">
                     <div class="login-widget">
-                        <!-- 로그인 전 UI -->
                         <div id="login-before" class="login-before">
                             <p style="font-size:14px; color:#64748b; margin-bottom:20px;">보아코 아카이브 서비스를<br>더 안전하고 편리하게 이용하세요.</p>
-                            <button type="button" class="btn-kakao" onclick="window.handleLoginRequest()">
-                                🟡 카카오 로그인
-                            </button>
+                            <button type="button" class="btn-kakao" onclick="window.handleLoginRequest()">🟡 카카오 로그인</button>
                         </div>
-                        <!-- 로그인 후 UI -->
                         <div id="user-profile" class="user-profile">
                             <div class="user-info">
                                 <div class="user-avatar">👤</div>
@@ -308,111 +255,112 @@
     </div>
 
     <script>
-        // Supabase 초기화
         const S_URL = 'https://qrredwrxdnvqwdxzanba.supabase.co';
         const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY';
         const supabaseClient = supabase.createClient(S_URL, S_KEY);
 
-        // UI 상태 업데이트 함수
-        function updateUI(isLoggedIn, name = "사용자") {
-            console.log("UI 상태 업데이트:", isLoggedIn ? "로그인 상태" : "로그아웃 상태");
-            document.getElementById('login-before').style.display = isLoggedIn ? 'none' : 'block';
-            document.getElementById('user-profile').style.display = isLoggedIn ? 'block' : 'none';
+        // 실시간 랭킹 로드
+        async function fetchRankings() {
+            const tbody = document.getElementById('ranking-list');
+            if (!tbody) return;
+            try {
+                const { data, error } = await supabaseClient.from('profiles').select('full_name, rp, recent_result').order('rp', { ascending: false }).limit(20);
+                if (error) throw error;
+                tbody.innerHTML = data.length ? data.map((row, idx) => `
+                    <tr>
+                        <td>${idx + 1}</td>
+                        <td style="font-weight:700;">${row.full_name || '익명'}</td>
+                        <td style="color:#7c3aed; font-weight:800;">${(row.rp || 0).toLocaleString()}</td>
+                        <td>${row.recent_result || '-'}</td>
+                    </tr>`).join('') : '<tr><td colspan="4" style="text-align:center; padding:50px 0;">등록된 유저가 없습니다.</td></tr>';
+            } catch (err) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#ef4444; padding:50px 0;">데이터 로드 오류</td></tr>'; }
+        }
+
+        // SPA 렌더링 엔진
+        window.renderPage = function(pageId) {
+            const container = document.getElementById('main-content-area');
+            let content = '';
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            
+            switch(pageId) {
+                case 'ranking':
+                    content = `<div class="main-banner">🏆 실시간 랭킹</div><section class="section-card"><div class="card-header">아카이브 통합 랭킹</div><div class="card-body"><table class="table-data"><thead><tr><th>순위</th><th>닉네임</th><th>RP</th><th>최근 경기</th></tr></thead><tbody id="ranking-list"><tr><td colspan="4" style="text-align:center;">로딩 중...</td></tr></tbody></table></div></section>`;
+                    container.innerHTML = content;
+                    fetchRankings();
+                    break;
+                case 'records':
+                    content = `<div class="main-banner">📋 전적 기록</div><section class="section-card"><div class="card-header">최근 팀 매치</div><div class="card-body"><p>필터링 버튼이나 시즌 선택 기능을 여기에 추가할 예정입니다.</p></div></section>`;
+                    container.innerHTML = content;
+                    break;
+                case 'main':
+                default:
+                    content = `<div class="main-banner">BOAKO ARCHIVE</div><section class="section-card"><div class="card-header">환영합니다!</div><div class="card-body"><p>보드게임 전적 관리를 시작해보세요.</p></div></section>`;
+                    container.innerHTML = content;
+                    break;
+            }
+        };
+
+        // 인증 로직
+        window.handleLoginRequest = async function() {
+            await supabaseClient.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname } });
+        };
+        window.handleLogout = async function() { await supabaseClient.auth.signOut(); location.reload(); };
+        
+        async function fetchAndRefreshUser(user) {
+            if (!user) return;
+            let name = user.user_metadata.full_name || "사용자";
+            try {
+                const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+                if (profile?.full_name) name = profile.full_name;
+                else await supabaseClient.from('profiles').upsert({ id: user.id, full_name: name });
+            } catch (e) {}
+            document.getElementById('login-before').style.display = 'none';
+            document.getElementById('user-profile').style.display = 'block';
             document.getElementById('user-name').innerText = name;
         }
 
-        // 로그인 핸들러
-        window.handleLoginRequest = async function() {
-            const cleanUrl = window.location.origin + window.location.pathname;
-            await supabaseClient.auth.signInWithOAuth({
-                provider: 'kakao',
-                options: { 
-                    redirectTo: cleanUrl,
-                    queryParams: { prompt: 'login' } 
-                }
-            });
-        };
-
-        // 로그아웃 핸들러
-        window.handleLogout = async function() {
-            await supabaseClient.auth.signOut();
-            location.reload();
-        };
-
-        // 사용자 데이터 로드 및 UI 반영 (분리하여 재사용 가능하게 만듦)
-        async function fetchAndRefreshUser(user) {
-            if (!user) return;
-            let displayName = user.user_metadata.full_name || "사용자";
-
-            try {
-                const { data: profile, error } = await supabaseClient
-                    .from('profiles')
-                    .select('full_name')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                if (profile && profile.full_name) {
-                    displayName = profile.full_name;
-                } else {
-                    // 데이터가 없을 경우 초기 데이터 생성 시도
-                    await supabaseClient.from('profiles').upsert({ id: user.id, full_name: displayName });
-                }
-            } catch (err) {
-                console.warn("DB 데이터 확인 중 오류:", err);
-            }
-
-            updateUI(true, displayName);
-        }
-
-        // 닉네임 수정
+        // 닉네임 수정 (중복 체크 로직 포함)
         window.changeNickname = async function() {
-            const newName = prompt("변경할 닉네임을 입력하세요.\n" +
-  "닉네임은 원활한 아카이브 활동을 위해,\n" +
-  "아레나의 아이디와 동일하게 입력하셔야 합니다.");
+            const promptMsg = "변경할 닉네임을 입력하세요.\n" +
+                             "닉네임은 원활한 아카이브 활동을 위해,\n" +
+                             "아레나의 아이디와 동일하게 입력하셔야 합니다.";
+            
+            const newName = prompt(promptMsg);
             if (!newName || !newName.trim()) return;
 
             const { data: { user } } = await supabaseClient.auth.getUser();
             if (!user) return;
 
-            // 1. DB 업데이트 시도
+            // 업데이트 시도
             const { error } = await supabaseClient
                 .from('profiles')
-                .upsert({ id: user.id, full_name: newName.trim() });
+                .update({ full_name: newName.trim() })
+                .eq('id', user.id);
 
-            if (!error) {
-                // 2. 💡 성공하면 즉시 데이터를 다시 불러와서 UI를 갱신합니다.
-                await fetchAndRefreshUser(user);
-                alert("닉네임이 성공적으로 변경되었습니다.");
-            } else {
-                console.error("저장 실패:", error);
-                alert("변경 중 오류가 발생했습니다: " + error.message);
+            if (error) {
+                // 중복 에러 코드 (PostgreSQL 23505)
+                if (error.code === '23505') {
+                    alert("❌ 중복된 아레나 아이디입니다.\n\n이미 다른 유저가 이 아이디를 사용 중입니다.\n본인의 아이디가 맞다면 관리자에게 문의해주세요.");
+                } else {
+                    alert("오류가 발생했습니다: " + error.message);
+                }
+                return;
             }
+
+            // 성공 시 화면 갱신
+            await fetchAndRefreshUser(user);
+            alert("✅ 닉네임이 성공적으로 변경되었습니다!");
         };
 
-        // 앱 초기화 로직
-        async function initApp() {
-            console.log("BOAKO App Initializing...");
-
+        window.onload = async () => {
+            window.renderPage('main');
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session?.user) {
-                await fetchAndRefreshUser(session.user);
-            }
-
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (session?.user) {
-                    await fetchAndRefreshUser(session.user);
-                    if (window.location.hash || window.location.search.includes('access_token')) {
-                        setTimeout(() => {
-                            window.history.replaceState(null, null, window.location.pathname);
-                        }, 1000);
-                    }
-                } else {
-                    updateUI(false);
-                }
+            if (session?.user) await fetchAndRefreshUser(session.user);
+            supabaseClient.auth.onAuthStateChange(async (evt, sess) => {
+                if (sess?.user) { await fetchAndRefreshUser(sess.user); }
+                else { document.getElementById('login-before').style.display = 'block'; document.getElementById('user-profile').style.display = 'none'; }
             });
-        }
-
-        window.onload = initApp;
+        };
     </script>
 </body>
 </html>
