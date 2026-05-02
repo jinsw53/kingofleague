@@ -172,12 +172,6 @@
         .team-logo-preview { width: 100px; height: 100px; border-radius: 15px; object-fit: contain; background: #f8fafc; border: 1px solid #e2e8f0; }
         .team-info-txt h2 { font-size: 24px; font-weight: 900; color: #1e293b; }
 
-        /* 경고 메시지 박스 */
-        .alert-box {
-            background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px; text-align: center;
-        }
-        .alert-box .icon { font-size: 48px; margin-bottom: 20px; display: block; }
-
         /* 사이드바 */
         .side-content { 
             width: 340px; 
@@ -285,7 +279,7 @@
         let userTeamInfo = null;
 
         /**
-         * 유저 팀 상태 확인 (소장님 요청 커스텀 로그 반영)
+         * 유저 팀 상태 확인 (커스텀 로그 보강)
          */
         async function refreshUserTeamStatus(user) {
             const menuTxt = document.getElementById('team-menu-text');
@@ -303,7 +297,9 @@
                     .eq('leader_id', user.id)
                     .maybeSingle();
                 
-                if (leaderTeam) {
+                if (lError) {
+                    console.log("Teams 테이블 조회 중 네트워크 오류 (400) 발생: 테이블이 없거나 컬럼이 다를 수 있습니다.");
+                } else if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam };
                     if (menuTxt) menuTxt.innerText = "팀 메뉴";
                     return;
@@ -325,7 +321,9 @@
                         .eq('player_name', profile.full_name)
                         .maybeSingle();
                     
-                    if (memberEntry) {
+                    if (mError) {
+                        console.log("Team Members 테이블 조회 중 네트워크 오류 (400) 발생: 테이블이 없거나 컬럼이 다를 수 있습니다.");
+                    } else if (memberEntry) {
                         const { data: memberTeam } = await supabaseClient
                             .from('teams')
                             .select('*')
@@ -342,12 +340,10 @@
                     }
                 }
                 
-                // 최종적으로 소속 없음
                 userTeamInfo = null;
                 if (menuTxt) menuTxt.innerText = "팀 창단";
             } catch (e) {
-                // 테이블 자체가 없는 경우 등에 대비
-                console.log("데이터 조회 실패 또는 테이블 부재: ", e.message);
+                console.log("전반적인 데이터 조회 실패: ", e.message);
             }
         }
 
@@ -397,10 +393,6 @@
                                         <div style="font-size:12px; color:#64748b;">최근 우승</div>
                                         <div style="font-size:24px; font-weight:900; color:#1e293b;">준비 중</div>
                                     </div>
-                                </div>
-                                <div style="margin-top:30px; padding:20px; border-top:1px solid #f1f5f9;">
-                                    <h4 style="font-size:14px; color:#475569; margin-bottom:10px;">팀 소개</h4>
-                                    <p style="color:#64748b; font-size:14px; line-height:1.6;">${team.description || '소개글이 등록되지 않았습니다.'}</p>
                                 </div>
                             </div>
                         </section>`;
@@ -462,10 +454,15 @@
                 
                 const fileExt = logoFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const filePath = `teams/${fileName}`;
+                
+                // 업로드 경로를 bucket과 일치하게 수정
+                const filePath = `${fileName}`; 
                 
                 const { error: uploadError } = await supabaseClient.storage.from('teams').upload(filePath, logoFile);
-                if (uploadError) throw new Error(`이미지 업로드 실패: ${uploadError.message}`);
+                if (uploadError) {
+                    console.log("Storage 400 오류 분석: 버킷 이름 'teams'가 없거나, 해당 파일명으로 업로드할 권한이 없습니다.");
+                    throw new Error(`이미지 업로드 실패: ${uploadError.message}`);
+                }
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
@@ -479,7 +476,10 @@
                     points: 0
                 }]);
                 
-                if (dbError) throw new Error(`팀 정보 저장 실패: ${dbError.message}`);
+                if (dbError) {
+                    console.log("Database 400 오류 분석: 'teams' 테이블이 없거나 컬럼이 코드와 맞지 않습니다.");
+                    throw new Error(`팀 정보 저장 실패: ${dbError.message}`);
+                }
                 
                 alert("✅ 팀 창단 완료! 관리자님의 별 작업을 기다려주세요.");
                 await refreshUserTeamStatus(currentUser);
