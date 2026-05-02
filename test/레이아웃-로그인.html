@@ -377,7 +377,7 @@
                                     <img src="${team.logo_url || 'https://via.placeholder.com/100'}" class="team-logo-preview" alt="팀 로고">
                                     <div class="team-info-txt">
                                         <h2>${team.team_name}</h2>
-                                        <p>"${team.motto || '슬로건이 없습니다.'}"</p>
+                                        <p>"${team.team_motto || '슬로건이 없습니다.'}"</p>
                                         <span class="badge" style="margin-top:5px; display:inline-block;">${type === 'LEADER' ? '👑 팀 리더' : '👤 팀 멤버'}</span>
                                     </div>
                                 </div>
@@ -393,7 +393,7 @@
                                 </div>
                                 <div style="margin-top:30px; padding:20px; border-top:1px solid #f1f5f9;">
                                     <h4 style="font-size:14px; color:#475569; margin-bottom:10px;">팀 소개</h4>
-                                    <p style="color:#64748b; font-size:14px; line-height:1.6;">${team.description || '소개글이 등록되지 않았습니다.'}</p>
+                                    <p style="color:#64748b; font-size:14px; line-height:1.6;">${team.team_desc || '소개글이 등록되지 않았습니다.'}</p>
                                 </div>
                             </div>
                         </section>`;
@@ -414,7 +414,7 @@
                                     </div>
                                     <div class="form-group">
                                         <label>팀 슬로건 (한 줄 각오)</label>
-                                        <input type="text" id="team_motto" placeholder="예: 우리는 지지 않는다">
+                                        <input type="text" id="team_motto_input" placeholder="예: 우리는 지지 않는다">
                                     </div>
                                     <div class="form-group">
                                         <label>팀 로고 이미지</label>
@@ -423,7 +423,7 @@
                                     </div>
                                     <div class="form-group">
                                         <label>팀 소개</label>
-                                        <textarea id="team_desc" rows="4" placeholder="우리 팀을 자유롭게 소개해 주세요."></textarea>
+                                        <textarea id="team_desc_input" rows="4" placeholder="우리 팀을 자유롭게 소개해 주세요."></textarea>
                                     </div>
                                     <button type="submit" id="btn-submit-team" class="btn-submit">팀 창단 신청하기</button>
                                 </form>
@@ -440,14 +440,14 @@
         };
 
         /**
-         * 팀 창단 로직 (업로드 경로 루트로 단순화)
+         * 팀 창단 로직 (team_motto, team_desc 컬럼명 통일)
          */
         window.submitTeamFounding = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-submit-team');
             const teamName = document.getElementById('team_name').value;
-            const motto = document.getElementById('team_motto').value;
-            const desc = document.getElementById('team_desc').value;
+            const motto = document.getElementById('team_motto_input').value;
+            const desc = document.getElementById('team_desc_input').value;
             const logoFile = document.getElementById('team_logo').files[0];
             
             if (!currentUser) return alert("로그인 세션이 만료되었습니다. 다시 로그인 해주세요.");
@@ -457,44 +457,32 @@
                 btn.innerText = "처리 중...";
                 
                 // 1. 파일 업로드 단계
-                // 파일 경로에서 'teams/' 폴더를 빼고 파일명만으로 업로드 (루트 업로드)
                 const fileExt = logoFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
                 const filePath = fileName; 
                 
-                console.log(`업로드 시도: 버킷=teams, 경로=${filePath}`);
-                
                 const { error: uploadError } = await supabaseClient.storage
                     .from('teams')
-                    .upload(filePath, logoFile, {
-                        cacheControl: '3600',
-                        upsert: false
-                    });
+                    .upload(filePath, logoFile);
                 
-                if (uploadError) {
-                    console.error("Storage Error Details:", uploadError);
-                    throw new Error(`이미지 업로드 실패: ${uploadError.message}\n(슈파베이스 스토리지의 Policy에서 폴더 경로 제한을 지우고 버킷 'teams' 전체에 대해 INSERT를 허용했는지 확인하세요)`);
-                }
+                if (uploadError) throw new Error(`이미지 업로드 실패: ${uploadError.message}`);
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
-                // 2. DB 저장 단계
+                // 2. DB 저장 단계 (컬럼명 team_motto, team_desc로 사용)
                 const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
                     leader_id: currentUser.id,
-                    motto: motto,
-                    description: desc,
+                    team_motto: motto,
+                    team_desc: desc,
                     logo_url_origin: urlData.publicUrl,
                     logo_url: urlData.publicUrl,
                     points: 0
                 }]);
                 
-                if (dbError) {
-                    console.error("Database Error Details:", dbError);
-                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블 컬럼이 코드와 일치하는지 확인하세요)`);
-                }
+                if (dbError) throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블의 컬럼명이 team_motto인지 확인하세요)`);
                 
-                alert("✅ 팀 창단이 완료되었습니다! 대시보드로 이동합니다.");
+                alert("✅ 팀 창단이 완료되었습니다!");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
@@ -536,7 +524,7 @@
 
         window.changeNickname = async function() {
             if (!currentUser) return;
-            const newName = prompt("변경할 닉네임을 입력하세요.\n아레나 아이디와 동일하게 입력해야 연동됩니다.");
+            const newName = prompt("변경할 닉네임을 입력하세요.");
             if (!newName || !newName.trim()) return;
             const { error } = await supabaseClient.from('profiles').update({ full_name: newName.trim() }).eq('id', currentUser.id);
             if (error) {
