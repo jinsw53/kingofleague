@@ -168,6 +168,7 @@
             font-size: 16px; font-weight: 800; cursor: pointer; transition: background 0.2s;
         }
         .btn-submit:hover { background: #6d28d9; }
+        .btn-submit:disabled { background: #cbd5e1; cursor: not-allowed; }
         .file-info { font-size: 12px; color: #94a3b8; margin-top: 5px; }
 
         /* 대시보드 스타일 */
@@ -392,7 +393,7 @@
                             <div class="card-body">
                                 <p style="color:#64748b; font-size:14px; margin-bottom:30px;">
                                     💡 최초 로고 등록은 무료입니다. <br>
-                                    등록 후 로고 수정 시에는 <strong>포인트</strong>가 소모되며 소장님의 재검토가 필요합니다.
+                                    등록 후 로고 수정 시에는 <strong>포인트</strong>가 소모되며 관리자님의 재검토가 필요합니다.
                                 </p>
                                 <form id="founding-form" onsubmit="window.submitTeamFounding(event)">
                                     <div class="form-group">
@@ -434,17 +435,24 @@
             const desc = document.getElementById('team_desc').value;
             const logoFile = document.getElementById('team_logo').files[0];
             
+            if (!currentUser) return alert("로그인 세션이 만료되었습니다.");
+
             try {
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
+                
+                // 1. 파일 업로드
                 const fileExt = logoFile.name.split('.').pop();
-                const fileName = `${Math.random()}.${fileExt}`;
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
                 const filePath = `logos/${fileName}`;
                 
-                await supabaseClient.storage.from('teams').upload(filePath, logoFile);
+                const { error: uploadError } = await supabaseClient.storage.from('teams').upload(filePath, logoFile);
+                if (uploadError) throw new Error("이미지 업로드 실패: " + uploadError.message);
+                
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
-                await supabaseClient.from('teams').insert([{
+                // 2. DB 저장
+                const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
                     leader_id: currentUser.id,
                     motto: motto,
@@ -454,11 +462,16 @@
                     points: 0
                 }]);
                 
-                alert("✅ 팀 창단 완료! 소장님의 별 작업을 기다려주세요.");
+                if (dbError) throw new Error("팀 정보 저장 실패: " + dbError.message);
+                
+                alert("✅ 팀 창단 완료! 관리자님의 별 작업을 기다려주세요.");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
-                alert("오류: " + err.message);
+                console.error("창단 오류 상세:", err);
+                alert("오류 발생: " + err.message);
+            } finally {
+                // 버튼 상태 복구 (성공하든 실패하든 실행)
                 btn.disabled = false;
                 btn.innerText = "팀 창단 신청하기";
             }
