@@ -280,7 +280,7 @@
         let userTeamInfo = null;
 
         /**
-         * 유저 팀 상태 확인 (leader_name 컬럼 기준 매칭)
+         * 유저 팀 상태 확인
          */
         async function refreshUserTeamStatus(user) {
             const menuTxt = document.getElementById('team-menu-text');
@@ -291,7 +291,6 @@
             }
 
             try {
-                // 1. 현재 사용자 닉네임 가져오기 (profiles 테이블의 full_name)
                 const { data: profile } = await supabaseClient
                     .from('profiles')
                     .select('full_name')
@@ -300,11 +299,12 @@
 
                 const currentNickname = profile?.full_name || user.user_metadata.full_name;
 
-                // 2. 팀장 여부 확인 (leader_name 컬럼)
+                // 1. 팀장 여부 확인 (owner_id 또는 leader_name 기준)
+                // 400 에러를 방지하기 위해 에러가 발생하면 다음 로직으로 넘어가도록 처리
                 const { data: leaderTeam, error: lError } = await supabaseClient
                     .from('teams')
                     .select('*')
-                    .eq('leader_name', currentNickname)
+                    .or(`owner_id.eq.${user.id},leader_name.eq.${currentNickname}`)
                     .maybeSingle();
                 
                 if (leaderTeam) {
@@ -315,7 +315,7 @@
                     console.log("Teams 테이블에 매칭되는 명단 없음 (팀장 아님)");
                 }
 
-                // 3. 팀원 여부 확인 (team_members 테이블)
+                // 2. 팀원 여부 확인
                 if (currentNickname) {
                     const { data: memberEntry } = await supabaseClient
                         .from('team_members')
@@ -343,7 +343,7 @@
                 userTeamInfo = null;
                 if (menuTxt) menuTxt.innerText = "팀 창단";
             } catch (e) {
-                console.log("데이터 조회 중 예상치 못한 상황: ", e.message);
+                console.log("데이터 조회 중 오류: ", e.message);
             }
         }
 
@@ -435,7 +435,7 @@
         };
 
         /**
-         * 팀 창단 로직 (leader_name, team_motto, team_desc 컬럼만 사용)
+         * 팀 창단 로직 (owner_id 추가 반영)
          */
         window.submitTeamFounding = async function(e) {
             e.preventDefault();
@@ -451,7 +451,6 @@
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
                 
-                // 현재 사용자의 닉네임 확보
                 const { data: profile } = await supabaseClient
                     .from('profiles')
                     .select('full_name')
@@ -473,9 +472,10 @@
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
-                // 2. DB 저장 단계 (확정된 컬럼명만 사용, points 필드는 제외)
+                // 2. DB 저장 단계 (owner_id 필수값 추가)
                 const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
+                    owner_id: currentUser.id, // 에러 메시지에서 요구한 필수 컬럼 추가
                     leader_name: nickname,
                     team_motto: motto,
                     team_desc: desc,
@@ -485,7 +485,7 @@
                 
                 if (dbError) {
                     console.error("Database Error Details:", dbError);
-                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블의 컬럼명을 다시 확인하세요)`);
+                    throw new Error(`팀 정보 저장 실패: ${dbError.message}`);
                 }
                 
                 alert("✅ 팀 창단이 성공적으로 완료되었습니다!");
