@@ -162,11 +162,13 @@
         .form-group input, .form-group textarea { 
             width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; font-size: 15px;
         }
+        .form-group input:focus, .form-group textarea:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1); }
         .btn-submit { 
             width: 100%; background: #7c3aed; color: #fff; border: none; padding: 15px; border-radius: 8px; 
             font-size: 16px; font-weight: 800; cursor: pointer; transition: background 0.2s;
         }
         .btn-submit:hover { background: #6d28d9; }
+        .file-info { font-size: 12px; color: #94a3b8; margin-top: 5px; }
 
         /* 대시보드 스타일 */
         .team-profile-header { display: flex; align-items: center; gap: 20px; margin-bottom: 30px; }
@@ -300,6 +302,7 @@
             }
 
             try {
+                // 팀장인지 확인
                 const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('leader_id', user.id).maybeSingle();
                 if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam };
@@ -308,6 +311,7 @@
                     return;
                 }
 
+                // 팀원인지 확인
                 const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
                 if (profile?.full_name) {
                     const { data: memberEntry } = await supabaseClient.from('team_members').select('team_name').eq('player_name', profile.full_name).maybeSingle();
@@ -348,6 +352,7 @@
                         break;
                     }
                     await refreshUserTeamStatus(currentUser);
+
                     if (userTeamInfo) {
                         const { team, type } = userTeamInfo;
                         content = `
@@ -373,6 +378,10 @@
                                         <div style="font-size:24px; font-weight:900; color:#1e293b;">준비 중</div>
                                     </div>
                                 </div>
+                                <div style="margin-top:30px; padding:20px; border-top:1px solid #f1f5f9;">
+                                    <h4 style="font-size:14px; color:#475569; margin-bottom:10px;">팀 소개</h4>
+                                    <p style="color:#64748b; font-size:14px; line-height:1.6;">${team.description || '소개글이 등록되지 않았습니다.'}</p>
+                                </div>
                             </div>
                         </section>`;
                     } else {
@@ -381,14 +390,27 @@
                         <section class="section-card">
                             <div class="card-header">새로운 팀 창단 신청</div>
                             <div class="card-body">
+                                <p style="color:#64748b; font-size:14px; margin-bottom:30px;">
+                                    💡 최초 로고 등록은 무료입니다. <br>
+                                    등록 후 로고 수정 시에는 <strong>포인트</strong>가 소모되며 소장님의 재검토가 필요합니다.
+                                </p>
                                 <form id="founding-form" onsubmit="window.submitTeamFounding(event)">
                                     <div class="form-group">
                                         <label>팀 이름</label>
                                         <input type="text" id="team_name" placeholder="멋진 팀 이름을 지어주세요" required>
                                     </div>
                                     <div class="form-group">
+                                        <label>팀 슬로건 (한 줄 각오)</label>
+                                        <input type="text" id="team_motto" placeholder="예: 우리는 지지 않는다">
+                                    </div>
+                                    <div class="form-group">
                                         <label>팀 로고 이미지</label>
                                         <input type="file" id="team_logo" accept="image/*" required>
+                                        <p class="file-info">배경이 없는 투명 PNG 파일을 권장합니다. (별 작업 최적화)</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>팀 소개</label>
+                                        <textarea id="team_desc" rows="4" placeholder="우리 팀을 자유롭게 소개해 주세요."></textarea>
                                     </div>
                                     <button type="submit" id="btn-submit-team" class="btn-submit">팀 창단 신청하기</button>
                                 </form>
@@ -408,21 +430,31 @@
             e.preventDefault();
             const btn = document.getElementById('btn-submit-team');
             const teamName = document.getElementById('team_name').value;
+            const motto = document.getElementById('team_motto').value;
+            const desc = document.getElementById('team_desc').value;
             const logoFile = document.getElementById('team_logo').files[0];
+            
             try {
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
-                const filePath = `logos/${Math.random()}.${logoFile.name.split('.').pop()}`;
+                const fileExt = logoFile.name.split('.').pop();
+                const fileName = `${Math.random()}.${fileExt}`;
+                const filePath = `logos/${fileName}`;
+                
                 await supabaseClient.storage.from('teams').upload(filePath, logoFile);
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
+                
                 await supabaseClient.from('teams').insert([{
                     team_name: teamName,
                     leader_id: currentUser.id,
+                    motto: motto,
+                    description: desc,
                     logo_url_origin: urlData.publicUrl,
                     logo_url: urlData.publicUrl,
                     points: 0
                 }]);
-                alert("✅ 팀 창단 완료!");
+                
+                alert("✅ 팀 창단 완료! 소장님의 별 작업을 기다려주세요.");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
@@ -432,7 +464,7 @@
             }
         };
 
-        // UI 업데이트: 로그인 전/후 상태 토글 및 데이터 로드
+        // UI 업데이트
         async function updateAuthUI(user) {
             const loginBefore = document.getElementById('login-before');
             const userProfile = document.getElementById('user-profile');
@@ -443,19 +475,12 @@
                 loginBefore.style.display = 'none';
                 userProfile.style.display = 'block';
                 
-                // DB에서 최신 프로필 정보 가져오기
                 let displayName = user.user_metadata.full_name || "사용자";
                 try {
                     const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
-                    if (profile?.full_name) {
-                        displayName = profile.full_name;
-                    } else {
-                        // DB에 프로필이 없으면 생성
-                        await supabaseClient.from('profiles').upsert({ id: user.id, full_name: displayName });
-                    }
-                } catch (e) {
-                    console.error("프로필 로드 오류:", e);
-                }
+                    if (profile?.full_name) displayName = profile.full_name;
+                    else await supabaseClient.from('profiles').upsert({ id: user.id, full_name: displayName });
+                } catch (e) {}
                 
                 userName.innerText = displayName;
                 await refreshUserTeamStatus(user);
@@ -467,25 +492,17 @@
             }
         }
 
-        // 닉네임 수정 로직 보강
         window.changeNickname = async function() {
             if (!currentUser) return;
-            
-            const promptMsg = "변경할 닉네임을 입력하세요.\n아레나 아이디와 동일하게 입력해야 전적이 연동됩니다.";
-            const newName = prompt(promptMsg);
+            const newName = prompt("변경할 닉네임을 입력하세요.\n아레나 아이디와 동일하게 입력해야 연동됩니다.");
             if (!newName || !newName.trim()) return;
-
             const { error } = await supabaseClient.from('profiles').update({ full_name: newName.trim() }).eq('id', currentUser.id);
-
             if (error) {
-                if (error.code === '23505') alert("❌ 중복된 아레나 아이디입니다.");
-                else alert("오류가 발생했습니다: " + error.message);
+                alert("오류: " + error.message);
                 return;
             }
-
-            // UI 즉시 업데이트
             document.getElementById('user-name').innerText = newName.trim();
-            alert("✅ 닉네임이 성공적으로 변경되었습니다!");
+            alert("✅ 변경 완료!");
         };
 
         window.handleLoginRequest = async function() {
