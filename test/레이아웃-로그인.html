@@ -162,20 +162,15 @@
         .form-group input, .form-group textarea { 
             width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; font-size: 15px;
         }
-        .form-group input:focus, .form-group textarea:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1); }
         .btn-submit { 
             width: 100%; background: #7c3aed; color: #fff; border: none; padding: 15px; border-radius: 8px; 
             font-size: 16px; font-weight: 800; cursor: pointer; transition: background 0.2s;
         }
-        .btn-submit:hover { background: #6d28d9; }
-        .btn-submit:disabled { background: #cbd5e1; cursor: not-allowed; }
-        .file-info { font-size: 12px; color: #94a3b8; margin-top: 5px; }
 
         /* 대시보드 스타일 */
         .team-profile-header { display: flex; align-items: center; gap: 20px; margin-bottom: 30px; }
         .team-logo-preview { width: 100px; height: 100px; border-radius: 15px; object-fit: contain; background: #f8fafc; border: 1px solid #e2e8f0; }
         .team-info-txt h2 { font-size: 24px; font-weight: 900; color: #1e293b; }
-        .team-info-txt p { color: #64748b; font-style: italic; }
 
         /* 경고 메시지 박스 */
         .alert-box {
@@ -216,10 +211,6 @@
         .user-txt strong { display: block; font-size: 17px; }
         .badge { font-size: 12px; color: #7c3aed; font-weight: 700; background: #f5f3ff; padding: 2px 8px; border-radius: 4px; }
         .btn-logout { width: 100%; padding: 12px; background: #fff; border: 1px solid #e2e8f0; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 6px; }
-
-        .table-data { width: 100%; border-collapse: collapse; }
-        .table-data th { text-align: left; padding: 12px; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 13px; }
-        .table-data td { padding: 15px 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
 
         @media (max-width: 960px) {
             .flex-container { flex-direction: column; }
@@ -293,42 +284,70 @@
         let currentUser = null;
         let userTeamInfo = null;
 
-        // 유저 팀 상태 확인
+        /**
+         * 유저 팀 상태 확인 (소장님 요청 커스텀 로그 반영)
+         */
         async function refreshUserTeamStatus(user) {
+            const menuTxt = document.getElementById('team-menu-text');
             if (!user) {
                 userTeamInfo = null;
-                const menuTxt = document.getElementById('team-menu-text');
                 if (menuTxt) menuTxt.innerText = "팀 창단";
                 return;
             }
 
             try {
-                // 팀장인지 확인
-                const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('leader_id', user.id).maybeSingle();
+                // 1. 팀장 여부 확인
+                const { data: leaderTeam, error: lError } = await supabaseClient
+                    .from('teams')
+                    .select('*')
+                    .eq('leader_id', user.id)
+                    .maybeSingle();
+                
                 if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam };
-                    const menuTxt = document.getElementById('team-menu-text');
                     if (menuTxt) menuTxt.innerText = "팀 메뉴";
                     return;
+                } else {
+                    console.log("Teams 테이블에 매칭되는 명단 없음 (팀장 아님)");
                 }
 
-                // 팀원인지 확인
-                const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+                // 2. 팀원 여부 확인
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
                 if (profile?.full_name) {
-                    const { data: memberEntry } = await supabaseClient.from('team_members').select('team_name').eq('player_name', profile.full_name).maybeSingle();
+                    const { data: memberEntry, error: mError } = await supabaseClient
+                        .from('team_members')
+                        .select('team_name')
+                        .eq('player_name', profile.full_name)
+                        .maybeSingle();
+                    
                     if (memberEntry) {
-                        const { data: memberTeam } = await supabaseClient.from('teams').select('*').eq('team_name', memberEntry.team_name).maybeSingle();
-                        userTeamInfo = { type: 'MEMBER', team: memberTeam };
-                        const menuTxt = document.getElementById('team-menu-text');
-                        if (menuTxt) menuTxt.innerText = "팀 메뉴";
-                        return;
+                        const { data: memberTeam } = await supabaseClient
+                            .from('teams')
+                            .select('*')
+                            .eq('team_name', memberEntry.team_name)
+                            .maybeSingle();
+                        
+                        if (memberTeam) {
+                            userTeamInfo = { type: 'MEMBER', team: memberTeam };
+                            if (menuTxt) menuTxt.innerText = "팀 메뉴";
+                            return;
+                        }
+                    } else {
+                        console.log("Team Members 테이블에 매칭되는 명단 없음 (팀원 아님)");
                     }
                 }
+                
+                // 최종적으로 소속 없음
                 userTeamInfo = null;
-                const menuTxt = document.getElementById('team-menu-text');
                 if (menuTxt) menuTxt.innerText = "팀 창단";
             } catch (e) {
-                console.error("팀 상태 확인 오류:", e);
+                // 테이블 자체가 없는 경우 등에 대비
+                console.log("데이터 조회 실패 또는 테이블 부재: ", e.message);
             }
         }
 
@@ -441,23 +460,15 @@
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
                 
-                // 1. 파일 업로드 단계
                 const fileExt = logoFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                // 폴더 이름을 logos에서 teams로 수정
                 const filePath = `teams/${fileName}`;
                 
                 const { error: uploadError } = await supabaseClient.storage.from('teams').upload(filePath, logoFile);
-                
-                // [디버깅] 스토리지 업로드 에러 상세 출력
-                if (uploadError) {
-                    console.error("Storage Error:", uploadError);
-                    throw new Error(`이미지 업로드 실패: ${uploadError.message}\n(버킷 'teams'가 있는지, Public 설정이 되었는지 확인하세요)`);
-                }
+                if (uploadError) throw new Error(`이미지 업로드 실패: ${uploadError.message}`);
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
-                // 2. DB 저장 단계
                 const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
                     leader_id: currentUser.id,
@@ -468,17 +479,12 @@
                     points: 0
                 }]);
                 
-                // [디버깅] DB 저장 에러 상세 출력
-                if (dbError) {
-                    console.error("DB Error:", dbError);
-                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블에 motto, description, logo_url_origin 컬럼이 모두 있는지 확인하세요)`);
-                }
+                if (dbError) throw new Error(`팀 정보 저장 실패: ${dbError.message}`);
                 
                 alert("✅ 팀 창단 완료! 관리자님의 별 작업을 기다려주세요.");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
-                console.error("창단 실패 원인:", err);
                 alert(err.message);
             } finally {
                 btn.disabled = false;
@@ -494,8 +500,8 @@
 
             if (user) {
                 currentUser = user;
-                loginBefore.style.display = 'none';
-                userProfile.style.display = 'block';
+                if (loginBefore) loginBefore.style.display = 'none';
+                if (userProfile) userProfile.style.display = 'block';
                 
                 let displayName = user.user_metadata.full_name || "사용자";
                 try {
@@ -504,26 +510,27 @@
                     else await supabaseClient.from('profiles').upsert({ id: user.id, full_name: displayName });
                 } catch (e) {}
                 
-                userName.innerText = displayName;
+                if (userName) userName.innerText = displayName;
                 await refreshUserTeamStatus(user);
             } else {
                 currentUser = null;
-                loginBefore.style.display = 'block';
-                userProfile.style.display = 'none';
+                if (loginBefore) loginBefore.style.display = 'block';
+                if (userProfile) userProfile.style.display = 'none';
                 await refreshUserTeamStatus(null);
             }
         }
 
         window.changeNickname = async function() {
             if (!currentUser) return;
-            const newName = prompt("변경할 닉네임을 입력하세요.\n아레나 아이디와 동일하게 입력해야 연동됩니다.");
+            const newName = prompt("변경할 닉네임을 입력하세요.");
             if (!newName || !newName.trim()) return;
             const { error } = await supabaseClient.from('profiles').update({ full_name: newName.trim() }).eq('id', currentUser.id);
             if (error) {
                 alert("오류: " + error.message);
                 return;
             }
-            document.getElementById('user-name').innerText = newName.trim();
+            const userName = document.getElementById('user-name');
+            if (userName) userName.innerText = newName.trim();
             alert("✅ 변경 완료!");
         };
 
