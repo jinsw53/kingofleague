@@ -166,6 +166,7 @@
             width: 100%; background: #7c3aed; color: #fff; border: none; padding: 15px; border-radius: 8px; 
             font-size: 16px; font-weight: 800; cursor: pointer; transition: background 0.2s;
         }
+        .btn-submit:disabled { background: #cbd5e1; cursor: not-allowed; }
 
         /* 대시보드 스타일 */
         .team-profile-header { display: flex; align-items: center; gap: 20px; margin-bottom: 30px; }
@@ -279,7 +280,7 @@
         let userTeamInfo = null;
 
         /**
-         * 유저 팀 상태 확인 (커스텀 로그 보강)
+         * 유저 팀 상태 확인
          */
         async function refreshUserTeamStatus(user) {
             const menuTxt = document.getElementById('team-menu-text');
@@ -297,13 +298,11 @@
                     .eq('leader_id', user.id)
                     .maybeSingle();
                 
-                if (lError) {
-                    console.log("Teams 테이블 조회 중 네트워크 오류 (400) 발생: 테이블이 없거나 컬럼이 다를 수 있습니다.");
-                } else if (leaderTeam) {
+                if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam };
                     if (menuTxt) menuTxt.innerText = "팀 메뉴";
                     return;
-                } else {
+                } else if (!lError) {
                     console.log("Teams 테이블에 매칭되는 명단 없음 (팀장 아님)");
                 }
 
@@ -321,9 +320,7 @@
                         .eq('player_name', profile.full_name)
                         .maybeSingle();
                     
-                    if (mError) {
-                        console.log("Team Members 테이블 조회 중 네트워크 오류 (400) 발생: 테이블이 없거나 컬럼이 다를 수 있습니다.");
-                    } else if (memberEntry) {
+                    if (memberEntry) {
                         const { data: memberTeam } = await supabaseClient
                             .from('teams')
                             .select('*')
@@ -335,7 +332,7 @@
                             if (menuTxt) menuTxt.innerText = "팀 메뉴";
                             return;
                         }
-                    } else {
+                    } else if (!mError) {
                         console.log("Team Members 테이블에 매칭되는 명단 없음 (팀원 아님)");
                     }
                 }
@@ -343,7 +340,7 @@
                 userTeamInfo = null;
                 if (menuTxt) menuTxt.innerText = "팀 창단";
             } catch (e) {
-                console.log("전반적인 데이터 조회 실패: ", e.message);
+                console.log("팀 상태 확인 중 예상치 못한 상황 발생: ", e.message);
             }
         }
 
@@ -394,6 +391,10 @@
                                         <div style="font-size:24px; font-weight:900; color:#1e293b;">준비 중</div>
                                     </div>
                                 </div>
+                                <div style="margin-top:30px; padding:20px; border-top:1px solid #f1f5f9;">
+                                    <h4 style="font-size:14px; color:#475569; margin-bottom:10px;">팀 소개</h4>
+                                    <p style="color:#64748b; font-size:14px; line-height:1.6;">${team.description || '소개글이 등록되지 않았습니다.'}</p>
+                                </div>
                             </div>
                         </section>`;
                     } else {
@@ -418,7 +419,7 @@
                                     <div class="form-group">
                                         <label>팀 로고 이미지</label>
                                         <input type="file" id="team_logo" accept="image/*" required>
-                                        <p class="file-info">배경이 없는 투명 PNG 파일을 권장합니다. (별 작업 최적화)</p>
+                                        <p style="font-size:12px; color:#94a3b8; margin-top:5px;">배경이 없는 투명 PNG 파일을 권장합니다.</p>
                                     </div>
                                     <div class="form-group">
                                         <label>팀 소개</label>
@@ -438,6 +439,9 @@
             }
         };
 
+        /**
+         * 팀 창단 로직 (업로드 경로 루트로 단순화)
+         */
         window.submitTeamFounding = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-submit-team');
@@ -446,26 +450,35 @@
             const desc = document.getElementById('team_desc').value;
             const logoFile = document.getElementById('team_logo').files[0];
             
-            if (!currentUser) return alert("로그인 세션이 만료되었습니다.");
+            if (!currentUser) return alert("로그인 세션이 만료되었습니다. 다시 로그인 해주세요.");
 
             try {
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
                 
+                // 1. 파일 업로드 단계
+                // 파일 경로에서 'teams/' 폴더를 빼고 파일명만으로 업로드 (루트 업로드)
                 const fileExt = logoFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                const filePath = fileName; 
                 
-                // 업로드 경로를 bucket과 일치하게 수정
-                const filePath = `${fileName}`; 
+                console.log(`업로드 시도: 버킷=teams, 경로=${filePath}`);
                 
-                const { error: uploadError } = await supabaseClient.storage.from('teams').upload(filePath, logoFile);
+                const { error: uploadError } = await supabaseClient.storage
+                    .from('teams')
+                    .upload(filePath, logoFile, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+                
                 if (uploadError) {
-                    console.log("Storage 400 오류 분석: 버킷 이름 'teams'가 없거나, 해당 파일명으로 업로드할 권한이 없습니다.");
-                    throw new Error(`이미지 업로드 실패: ${uploadError.message}`);
+                    console.error("Storage Error Details:", uploadError);
+                    throw new Error(`이미지 업로드 실패: ${uploadError.message}\n(슈파베이스 스토리지의 Policy에서 폴더 경로 제한을 지우고 버킷 'teams' 전체에 대해 INSERT를 허용했는지 확인하세요)`);
                 }
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
+                // 2. DB 저장 단계
                 const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
                     leader_id: currentUser.id,
@@ -477,14 +490,15 @@
                 }]);
                 
                 if (dbError) {
-                    console.log("Database 400 오류 분석: 'teams' 테이블이 없거나 컬럼이 코드와 맞지 않습니다.");
-                    throw new Error(`팀 정보 저장 실패: ${dbError.message}`);
+                    console.error("Database Error Details:", dbError);
+                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블 컬럼이 코드와 일치하는지 확인하세요)`);
                 }
                 
-                alert("✅ 팀 창단 완료! 관리자님의 별 작업을 기다려주세요.");
+                alert("✅ 팀 창단이 완료되었습니다! 대시보드로 이동합니다.");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
+                console.error("창단 프로세스 중단:", err);
                 alert(err.message);
             } finally {
                 btn.disabled = false;
@@ -522,7 +536,7 @@
 
         window.changeNickname = async function() {
             if (!currentUser) return;
-            const newName = prompt("변경할 닉네임을 입력하세요.");
+            const newName = prompt("변경할 닉네임을 입력하세요.\n아레나 아이디와 동일하게 입력해야 연동됩니다.");
             if (!newName || !newName.trim()) return;
             const { error } = await supabaseClient.from('profiles').update({ full_name: newName.trim() }).eq('id', currentUser.id);
             if (error) {
