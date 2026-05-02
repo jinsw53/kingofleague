@@ -280,7 +280,7 @@
         let userTeamInfo = null;
 
         /**
-         * 유저 팀 상태 확인
+         * 유저 팀 상태 확인 (leader_name 컬럼 사용)
          */
         async function refreshUserTeamStatus(user) {
             const menuTxt = document.getElementById('team-menu-text');
@@ -291,33 +291,36 @@
             }
 
             try {
-                // 1. 팀장 여부 확인
-                const { data: leaderTeam, error: lError } = await supabaseClient
-                    .from('teams')
-                    .select('*')
-                    .eq('leader_id', user.id)
-                    .maybeSingle();
-                
-                if (leaderTeam) {
-                    userTeamInfo = { type: 'LEADER', team: leaderTeam };
-                    if (menuTxt) menuTxt.innerText = "팀 메뉴";
-                    return;
-                } else if (!lError) {
-                    console.log("Teams 테이블에 매칭되는 명단 없음 (팀장 아님)");
-                }
-
-                // 2. 팀원 여부 확인
+                // 현재 사용자의 프로필 닉네임 가져오기
                 const { data: profile } = await supabaseClient
                     .from('profiles')
                     .select('full_name')
                     .eq('id', user.id)
                     .maybeSingle();
 
-                if (profile?.full_name) {
+                const nickname = profile?.full_name || user.user_metadata.full_name;
+
+                // 1. 팀장 여부 확인 (leader_name 기준)
+                const { data: leaderTeam, error: lError } = await supabaseClient
+                    .from('teams')
+                    .select('*')
+                    .eq('leader_name', nickname)
+                    .maybeSingle();
+                
+                if (leaderTeam) {
+                    userTeamInfo = { type: 'LEADER', team: leaderTeam };
+                    if (menuTxt) menuTxt.innerText = "팀 메뉴";
+                    return;
+                } else {
+                    console.log("Teams 테이블에 매칭되는 명단 없음 (팀장 아님)");
+                }
+
+                // 2. 팀원 여부 확인 (team_members 테이블 기준)
+                if (nickname) {
                     const { data: memberEntry, error: mError } = await supabaseClient
                         .from('team_members')
                         .select('team_name')
-                        .eq('player_name', profile.full_name)
+                        .eq('player_name', nickname)
                         .maybeSingle();
                     
                     if (memberEntry) {
@@ -332,7 +335,7 @@
                             if (menuTxt) menuTxt.innerText = "팀 메뉴";
                             return;
                         }
-                    } else if (!mError) {
+                    } else {
                         console.log("Team Members 테이블에 매칭되는 명단 없음 (팀원 아님)");
                     }
                 }
@@ -340,7 +343,7 @@
                 userTeamInfo = null;
                 if (menuTxt) menuTxt.innerText = "팀 창단";
             } catch (e) {
-                console.log("팀 상태 확인 중 예상치 못한 상황 발생: ", e.message);
+                console.log("팀 데이터 조회 오류: ", e.message);
             }
         }
 
@@ -440,7 +443,7 @@
         };
 
         /**
-         * 팀 창단 로직 (team_motto, team_desc 컬럼명 통일)
+         * 팀 창단 로직 (leader_name 컬럼 사용)
          */
         window.submitTeamFounding = async function(e) {
             e.preventDefault();
@@ -456,6 +459,15 @@
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
                 
+                // 현재 사용자의 닉네임 가져오기
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', currentUser.id)
+                    .maybeSingle();
+                
+                const nickname = profile?.full_name || currentUser.user_metadata.full_name;
+
                 // 1. 파일 업로드 단계
                 const fileExt = logoFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -469,10 +481,10 @@
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
-                // 2. DB 저장 단계 (컬럼명 team_motto, team_desc로 사용)
+                // 2. DB 저장 단계 (leader_name 컬럼 사용)
                 const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
-                    leader_id: currentUser.id,
+                    leader_name: nickname, // leader_id 대신 leader_name 사용
                     team_motto: motto,
                     team_desc: desc,
                     logo_url_origin: urlData.publicUrl,
@@ -480,13 +492,16 @@
                     points: 0
                 }]);
                 
-                if (dbError) throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블의 컬럼명이 team_motto인지 확인하세요)`);
+                if (dbError) {
+                    console.error("Database Error Details:", dbError);
+                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블의 컬럼명이 leader_name 인지 확인하세요)`);
+                }
                 
-                alert("✅ 팀 창단이 완료되었습니다!");
+                alert("✅ 팀 창단이 성공적으로 완료되었습니다!");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
-                console.error("창단 프로세스 중단:", err);
+                console.error("팀 창단 오류:", err);
                 alert(err.message);
             } finally {
                 btn.disabled = false;
@@ -494,7 +509,7 @@
             }
         };
 
-        // UI 업데이트
+        // UI 업데이트 및 초기 세션 관리
         async function updateAuthUI(user) {
             const loginBefore = document.getElementById('login-before');
             const userProfile = document.getElementById('user-profile');
@@ -531,8 +546,8 @@
                 alert("오류: " + error.message);
                 return;
             }
-            const userName = document.getElementById('user-name');
-            if (userName) userName.innerText = newName.trim();
+            const userNameTxt = document.getElementById('user-name');
+            if (userNameTxt) userNameTxt.innerText = newName.trim();
             alert("✅ 변경 완료!");
         };
 
