@@ -294,7 +294,8 @@
         async function refreshUserTeamStatus(user) {
             if (!user) {
                 userTeamInfo = null;
-                document.getElementById('team-menu-text').innerText = "팀 창단";
+                const menuTxt = document.getElementById('team-menu-text');
+                if (menuTxt) menuTxt.innerText = "팀 창단";
                 return;
             }
 
@@ -302,7 +303,8 @@
                 const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('leader_id', user.id).maybeSingle();
                 if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam };
-                    document.getElementById('team-menu-text').innerText = "팀 메뉴";
+                    const menuTxt = document.getElementById('team-menu-text');
+                    if (menuTxt) menuTxt.innerText = "팀 메뉴";
                     return;
                 }
 
@@ -312,12 +314,14 @@
                     if (memberEntry) {
                         const { data: memberTeam } = await supabaseClient.from('teams').select('*').eq('team_name', memberEntry.team_name).maybeSingle();
                         userTeamInfo = { type: 'MEMBER', team: memberTeam };
-                        document.getElementById('team-menu-text').innerText = "팀 메뉴";
+                        const menuTxt = document.getElementById('team-menu-text');
+                        if (menuTxt) menuTxt.innerText = "팀 메뉴";
                         return;
                     }
                 }
                 userTeamInfo = null;
-                document.getElementById('team-menu-text').innerText = "팀 창단";
+                const menuTxt = document.getElementById('team-menu-text');
+                if (menuTxt) menuTxt.innerText = "팀 창단";
             } catch (e) {
                 console.error("팀 상태 확인 오류:", e);
             }
@@ -428,8 +432,8 @@
             }
         };
 
-        // UI 업데이트: 로그인 전/후 상태 토글
-        function updateAuthUI(user) {
+        // UI 업데이트: 로그인 전/후 상태 토글 및 데이터 로드
+        async function updateAuthUI(user) {
             const loginBefore = document.getElementById('login-before');
             const userProfile = document.getElementById('user-profile');
             const userName = document.getElementById('user-name');
@@ -438,15 +442,51 @@
                 currentUser = user;
                 loginBefore.style.display = 'none';
                 userProfile.style.display = 'block';
-                userName.innerText = user.user_metadata.full_name || "사용자";
-                refreshUserTeamStatus(user);
+                
+                // DB에서 최신 프로필 정보 가져오기
+                let displayName = user.user_metadata.full_name || "사용자";
+                try {
+                    const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+                    if (profile?.full_name) {
+                        displayName = profile.full_name;
+                    } else {
+                        // DB에 프로필이 없으면 생성
+                        await supabaseClient.from('profiles').upsert({ id: user.id, full_name: displayName });
+                    }
+                } catch (e) {
+                    console.error("프로필 로드 오류:", e);
+                }
+                
+                userName.innerText = displayName;
+                await refreshUserTeamStatus(user);
             } else {
                 currentUser = null;
                 loginBefore.style.display = 'block';
                 userProfile.style.display = 'none';
-                refreshUserTeamStatus(null);
+                await refreshUserTeamStatus(null);
             }
         }
+
+        // 닉네임 수정 로직 보강
+        window.changeNickname = async function() {
+            if (!currentUser) return;
+            
+            const promptMsg = "변경할 닉네임을 입력하세요.\n아레나 아이디와 동일하게 입력해야 전적이 연동됩니다.";
+            const newName = prompt(promptMsg);
+            if (!newName || !newName.trim()) return;
+
+            const { error } = await supabaseClient.from('profiles').update({ full_name: newName.trim() }).eq('id', currentUser.id);
+
+            if (error) {
+                if (error.code === '23505') alert("❌ 중복된 아레나 아이디입니다.");
+                else alert("오류가 발생했습니다: " + error.message);
+                return;
+            }
+
+            // UI 즉시 업데이트
+            document.getElementById('user-name').innerText = newName.trim();
+            alert("✅ 닉네임이 성공적으로 변경되었습니다!");
+        };
 
         window.handleLoginRequest = async function() {
             await supabaseClient.auth.signInWithOAuth({ 
@@ -463,10 +503,10 @@
         window.onload = async () => {
             window.renderPage('main');
             const { data: { session } } = await supabaseClient.auth.getSession();
-            updateAuthUI(session?.user);
+            await updateAuthUI(session?.user);
             
             supabaseClient.auth.onAuthStateChange(async (evt, sess) => {
-                updateAuthUI(sess?.user);
+                await updateAuthUI(sess?.user);
             });
         };
     </script>
