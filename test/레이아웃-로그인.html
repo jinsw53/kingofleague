@@ -280,7 +280,7 @@
         let userTeamInfo = null;
 
         /**
-         * 유저 팀 상태 확인 (leader_name 컬럼 사용)
+         * 유저 팀 상태 확인 (leader_name 컬럼 기준 매칭)
          */
         async function refreshUserTeamStatus(user) {
             const menuTxt = document.getElementById('team-menu-text');
@@ -291,20 +291,20 @@
             }
 
             try {
-                // 현재 사용자의 프로필 닉네임 가져오기
+                // 1. 현재 사용자 닉네임 가져오기 (profiles 테이블의 full_name)
                 const { data: profile } = await supabaseClient
                     .from('profiles')
                     .select('full_name')
                     .eq('id', user.id)
                     .maybeSingle();
 
-                const nickname = profile?.full_name || user.user_metadata.full_name;
+                const currentNickname = profile?.full_name || user.user_metadata.full_name;
 
-                // 1. 팀장 여부 확인 (leader_name 기준)
+                // 2. 팀장 여부 확인 (leader_name 컬럼)
                 const { data: leaderTeam, error: lError } = await supabaseClient
                     .from('teams')
                     .select('*')
-                    .eq('leader_name', nickname)
+                    .eq('leader_name', currentNickname)
                     .maybeSingle();
                 
                 if (leaderTeam) {
@@ -315,12 +315,12 @@
                     console.log("Teams 테이블에 매칭되는 명단 없음 (팀장 아님)");
                 }
 
-                // 2. 팀원 여부 확인 (team_members 테이블 기준)
-                if (nickname) {
-                    const { data: memberEntry, error: mError } = await supabaseClient
+                // 3. 팀원 여부 확인 (team_members 테이블)
+                if (currentNickname) {
+                    const { data: memberEntry } = await supabaseClient
                         .from('team_members')
                         .select('team_name')
-                        .eq('player_name', nickname)
+                        .eq('player_name', currentNickname)
                         .maybeSingle();
                     
                     if (memberEntry) {
@@ -343,7 +343,7 @@
                 userTeamInfo = null;
                 if (menuTxt) menuTxt.innerText = "팀 창단";
             } catch (e) {
-                console.log("팀 데이터 조회 오류: ", e.message);
+                console.log("데이터 조회 중 예상치 못한 상황: ", e.message);
             }
         }
 
@@ -384,13 +384,9 @@
                                         <span class="badge" style="margin-top:5px; display:inline-block;">${type === 'LEADER' ? '👑 팀 리더' : '👤 팀 멤버'}</span>
                                     </div>
                                 </div>
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:20px;">
+                                <div style="display:grid; grid-template-columns:1fr; gap:15px; margin-top:20px;">
                                     <div style="padding:20px; background:#f8fafc; border-radius:12px; text-align:center;">
-                                        <div style="font-size:12px; color:#64748b;">보유 포인트</div>
-                                        <div style="font-size:24px; font-weight:900; color:#7c3aed;">${(team.points || 0).toLocaleString()} P</div>
-                                    </div>
-                                    <div style="padding:20px; background:#f8fafc; border-radius:12px; text-align:center;">
-                                        <div style="font-size:12px; color:#64748b;">최근 우승</div>
+                                        <div style="font-size:12px; color:#64748b;">공식 성적</div>
                                         <div style="font-size:24px; font-weight:900; color:#1e293b;">준비 중</div>
                                     </div>
                                 </div>
@@ -406,10 +402,6 @@
                         <section class="section-card">
                             <div class="card-header">새로운 팀 창단 신청</div>
                             <div class="card-body">
-                                <p style="color:#64748b; font-size:14px; margin-bottom:30px;">
-                                    💡 최초 로고 등록은 무료입니다. <br>
-                                    등록 후 로고 수정 시에는 <strong>포인트</strong>가 소모되며 관리자님의 재검토가 필요합니다.
-                                </p>
                                 <form id="founding-form" onsubmit="window.submitTeamFounding(event)">
                                     <div class="form-group">
                                         <label>팀 이름</label>
@@ -443,7 +435,7 @@
         };
 
         /**
-         * 팀 창단 로직 (leader_name 컬럼 사용)
+         * 팀 창단 로직 (leader_name, team_motto, team_desc 컬럼만 사용)
          */
         window.submitTeamFounding = async function(e) {
             e.preventDefault();
@@ -453,13 +445,13 @@
             const desc = document.getElementById('team_desc_input').value;
             const logoFile = document.getElementById('team_logo').files[0];
             
-            if (!currentUser) return alert("로그인 세션이 만료되었습니다. 다시 로그인 해주세요.");
+            if (!currentUser) return alert("로그인 세션이 만료되었습니다.");
 
             try {
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
                 
-                // 현재 사용자의 닉네임 가져오기
+                // 현재 사용자의 닉네임 확보
                 const { data: profile } = await supabaseClient
                     .from('profiles')
                     .select('full_name')
@@ -481,27 +473,26 @@
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
-                // 2. DB 저장 단계 (leader_name 컬럼 사용)
+                // 2. DB 저장 단계 (확정된 컬럼명만 사용, points 필드는 제외)
                 const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
-                    leader_name: nickname, // leader_id 대신 leader_name 사용
+                    leader_name: nickname,
                     team_motto: motto,
                     team_desc: desc,
                     logo_url_origin: urlData.publicUrl,
-                    logo_url: urlData.publicUrl,
-                    points: 0
+                    logo_url: urlData.publicUrl
                 }]);
                 
                 if (dbError) {
                     console.error("Database Error Details:", dbError);
-                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블의 컬럼명이 leader_name 인지 확인하세요)`);
+                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블의 컬럼명을 다시 확인하세요)`);
                 }
                 
                 alert("✅ 팀 창단이 성공적으로 완료되었습니다!");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
-                console.error("팀 창단 오류:", err);
+                console.error("창단 프로세스 중단:", err);
                 alert(err.message);
             } finally {
                 btn.disabled = false;
@@ -509,7 +500,7 @@
             }
         };
 
-        // UI 업데이트 및 초기 세션 관리
+        // UI 업데이트
         async function updateAuthUI(user) {
             const loginBefore = document.getElementById('login-before');
             const userProfile = document.getElementById('user-profile');
