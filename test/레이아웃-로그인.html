@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BOAKO BOARDGAME ARCHIVE</title>
+    <!-- 파비콘 오류 해결을 위한 이모지 파비콘 추가 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
     <!-- Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -207,7 +209,7 @@
         }
         .user-profile { display: none; }
         .user-info { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
-        .user-avatar { width: 52px; height: 52px; background: #ede9fe; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+        .user-avatar { width: 52px; height: 52px; background: #ede9fe; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #7c3aed; }
         .user-txt strong { display: block; font-size: 17px; }
         .badge { font-size: 12px; color: #7c3aed; font-weight: 700; background: #f5f3ff; padding: 2px 8px; border-radius: 4px; }
         .btn-logout { width: 100%; padding: 12px; background: #fff; border: 1px solid #e2e8f0; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 6px; }
@@ -258,7 +260,6 @@
                 <aside class="side-content">
                     <div class="login-widget">
                         <div id="login-before" class="login-before">
-                            <!-- 로그인 안내 문구 복구 -->
                             <p style="font-size:14px; color:#64748b; margin-bottom:20px;">보아코 아카이브 서비스를<br>더 안전하고 편리하게 이용하세요.</p>
                             <button type="button" class="btn-kakao" onclick="window.handleLoginRequest()">🟡 카카오 로그인</button>
                         </div>
@@ -287,9 +288,9 @@
         const supabaseClient = supabase.createClient(S_URL, S_KEY);
 
         let currentUser = null;
-        let userTeamInfo = null; // { type: 'LEADER' | 'MEMBER', team: data }
+        let userTeamInfo = null;
 
-        // 유저의 팀 소속 상태 확인 및 메뉴 텍스트 갱신
+        // 유저 팀 상태 확인
         async function refreshUserTeamStatus(user) {
             if (!user) {
                 userTeamInfo = null;
@@ -298,7 +299,6 @@
             }
 
             try {
-                // 1. 내가 팀장인 팀이 있는지 확인
                 const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('leader_id', user.id).maybeSingle();
                 if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam };
@@ -306,7 +306,6 @@
                     return;
                 }
 
-                // 2. 내가 팀원인 팀이 있는지 확인 (프로필 이름 기준)
                 const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
                 if (profile?.full_name) {
                     const { data: memberEntry } = await supabaseClient.from('team_members').select('team_name').eq('player_name', profile.full_name).maybeSingle();
@@ -317,8 +316,6 @@
                         return;
                     }
                 }
-
-                // 소속 없음
                 userTeamInfo = null;
                 document.getElementById('team-menu-text').innerText = "팀 창단";
             } catch (e) {
@@ -326,12 +323,11 @@
             }
         }
 
-        // SPA 렌더링 엔진
+        // 페이지 렌더링
         window.renderPage = async function(pageId) {
             const container = document.getElementById('main-content-area');
             let content = '';
             document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
-            
             const menuKey = pageId === 'team' ? 'menu-team' : `menu-${pageId}`;
             const activeMenu = document.getElementById(menuKey);
             if (activeMenu) activeMenu.classList.add('active');
@@ -347,9 +343,7 @@
                         container.innerHTML = content;
                         break;
                     }
-
                     await refreshUserTeamStatus(currentUser);
-
                     if (userTeamInfo) {
                         const { team, type } = userTeamInfo;
                         content = `
@@ -375,13 +369,6 @@
                                         <div style="font-size:24px; font-weight:900; color:#1e293b;">준비 중</div>
                                     </div>
                                 </div>
-                                <div style="margin-top:30px;">
-                                    <h4 style="margin-bottom:15px; font-size:14px; font-weight:800;">팀 관리 메뉴</h4>
-                                    <ul style="display:flex; gap:10px;">
-                                        ${type === 'LEADER' ? `<li style="flex:1; padding:12px; background:#ede9fe; color:#7c3aed; text-align:center; border-radius:8px; font-weight:700; cursor:pointer;">로고/정보 수정</li>` : ''}
-                                        <li style="flex:1; padding:12px; background:#f1f5f9; text-align:center; border-radius:8px; font-weight:700; cursor:pointer;">팀원 목록</li>
-                                    </ul>
-                                </div>
                             </div>
                         </section>`;
                     } else {
@@ -396,13 +383,8 @@
                                         <input type="text" id="team_name" placeholder="멋진 팀 이름을 지어주세요" required>
                                     </div>
                                     <div class="form-group">
-                                        <label>팀 슬로건</label>
-                                        <input type="text" id="team_motto" placeholder="예: 우리는 지지 않는다">
-                                    </div>
-                                    <div class="form-group">
                                         <label>팀 로고 이미지</label>
                                         <input type="file" id="team_logo" accept="image/*" required>
-                                        <p style="font-size:12px; color:#94a3b8; margin-top:5px;">배경이 없는 PNG 파일을 권장합니다. 최초 등록은 무료입니다.</p>
                                     </div>
                                     <button type="submit" id="btn-submit-team" class="btn-submit">팀 창단 신청하기</button>
                                 </form>
@@ -423,14 +405,12 @@
             const btn = document.getElementById('btn-submit-team');
             const teamName = document.getElementById('team_name').value;
             const logoFile = document.getElementById('team_logo').files[0];
-            
             try {
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
                 const filePath = `logos/${Math.random()}.${logoFile.name.split('.').pop()}`;
                 await supabaseClient.storage.from('teams').upload(filePath, logoFile);
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
-                
                 await supabaseClient.from('teams').insert([{
                     team_name: teamName,
                     leader_id: currentUser.id,
@@ -438,8 +418,7 @@
                     logo_url: urlData.publicUrl,
                     points: 0
                 }]);
-                
-                alert("✅ 팀 창단이 완료되었습니다!");
+                alert("✅ 팀 창단 완료!");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
@@ -449,29 +428,45 @@
             }
         };
 
-        async function fetchAndRefreshUser(user) {
-            if (!user) { currentUser = null; return; }
-            currentUser = user;
-            await refreshUserTeamStatus(user);
-            
-            let name = user.user_metadata.full_name || "사용자";
-            document.getElementById('login-before').style.display = 'none';
-            document.getElementById('user-profile').style.display = 'block';
-            document.getElementById('user-name').innerText = name;
+        // UI 업데이트: 로그인 전/후 상태 토글
+        function updateAuthUI(user) {
+            const loginBefore = document.getElementById('login-before');
+            const userProfile = document.getElementById('user-profile');
+            const userName = document.getElementById('user-name');
+
+            if (user) {
+                currentUser = user;
+                loginBefore.style.display = 'none';
+                userProfile.style.display = 'block';
+                userName.innerText = user.user_metadata.full_name || "사용자";
+                refreshUserTeamStatus(user);
+            } else {
+                currentUser = null;
+                loginBefore.style.display = 'block';
+                userProfile.style.display = 'none';
+                refreshUserTeamStatus(null);
+            }
         }
 
         window.handleLoginRequest = async function() {
-            await supabaseClient.auth.signInWithOAuth({ provider: 'kakao' });
+            await supabaseClient.auth.signInWithOAuth({ 
+                provider: 'kakao',
+                options: { redirectTo: window.location.origin + window.location.pathname }
+            });
         };
-        window.handleLogout = async function() { await supabaseClient.auth.signOut(); location.reload(); };
+        
+        window.handleLogout = async function() { 
+            await supabaseClient.auth.signOut(); 
+            location.reload(); 
+        };
 
         window.onload = async () => {
             window.renderPage('main');
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session?.user) await fetchAndRefreshUser(session.user);
+            updateAuthUI(session?.user);
+            
             supabaseClient.auth.onAuthStateChange(async (evt, sess) => {
-                if (sess?.user) await fetchAndRefreshUser(sess.user);
-                else { currentUser = null; await refreshUserTeamStatus(null); }
+                updateAuthUI(sess?.user);
             });
         };
     </script>
