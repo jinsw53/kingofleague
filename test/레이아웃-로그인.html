@@ -441,17 +441,23 @@
                 btn.disabled = true;
                 btn.innerText = "처리 중...";
                 
-                // 1. 파일 업로드
+                // 1. 파일 업로드 단계
                 const fileExt = logoFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const filePath = `logos/${fileName}`;
+                // 폴더 이름을 logos에서 teams로 수정
+                const filePath = `teams/${fileName}`;
                 
                 const { error: uploadError } = await supabaseClient.storage.from('teams').upload(filePath, logoFile);
-                if (uploadError) throw new Error("이미지 업로드 실패: " + uploadError.message);
+                
+                // [디버깅] 스토리지 업로드 에러 상세 출력
+                if (uploadError) {
+                    console.error("Storage Error:", uploadError);
+                    throw new Error(`이미지 업로드 실패: ${uploadError.message}\n(버킷 'teams'가 있는지, Public 설정이 되었는지 확인하세요)`);
+                }
                 
                 const { data: urlData } = supabaseClient.storage.from('teams').getPublicUrl(filePath);
                 
-                // 2. DB 저장
+                // 2. DB 저장 단계
                 const { error: dbError } = await supabaseClient.from('teams').insert([{
                     team_name: teamName,
                     leader_id: currentUser.id,
@@ -462,16 +468,19 @@
                     points: 0
                 }]);
                 
-                if (dbError) throw new Error("팀 정보 저장 실패: " + dbError.message);
+                // [디버깅] DB 저장 에러 상세 출력
+                if (dbError) {
+                    console.error("DB Error:", dbError);
+                    throw new Error(`팀 정보 저장 실패: ${dbError.message}\n(teams 테이블에 motto, description, logo_url_origin 컬럼이 모두 있는지 확인하세요)`);
+                }
                 
                 alert("✅ 팀 창단 완료! 관리자님의 별 작업을 기다려주세요.");
                 await refreshUserTeamStatus(currentUser);
                 window.renderPage('team');
             } catch (err) {
-                console.error("창단 오류 상세:", err);
-                alert("오류 발생: " + err.message);
+                console.error("창단 실패 원인:", err);
+                alert(err.message);
             } finally {
-                // 버튼 상태 복구 (성공하든 실패하든 실행)
                 btn.disabled = false;
                 btn.innerText = "팀 창단 신청하기";
             }
