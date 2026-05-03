@@ -4,10 +4,12 @@
 Boako.Shop = {
     // 1. 판매할 아이템 목록 (DB 없이 배열로 초간단 구현)
     items: [
-        { id: 'item_color_gold', name: '닉네임 황금색 변경권', price: 500, icon: '✨', desc: '아카이브에서 닉네임이 황금색으로 빛납니다.' },
-        { id: 'item_badge_vip', name: '프리미엄 VIP 배지', price: 1000, icon: '👑', desc: '프로필 옆에 영구적인 간지폭발 VIP 배지가 달립니다.' },
-        { id: 'item_ticket_rename', name: '팀명 변경권', price: 2000, icon: '🎫', desc: '소속 팀의 이름을 1회 변경할 수 있는 희귀 아이템입니다.' }
-    ],
+        { id: 'item_badge_vip', type: 'BADGE', name: '프리미엄 VIP 배지', price: 1000000, icon: '👑', desc: '프로필 옆에 영구적인 간지폭발 VIP 배지가 달립니다.' },
+        { id: 'item_ticket_rename', type: 'TICKET', name: '닉네임 변경권', price: 1000, icon: '✨', desc: '아카이브에서 닉네임을 변경할 수 있습니다. 즉시 사용됩니다' },
+        { id: 'item_ticket_reteamlogo', type: 'TICKET', name: '팀로고 변경권', price: 3000, icon: '🎫', desc: '소속 팀의 로고를 1회 변경할 수 잇는 희귀 아이템입니다. 즉시 사용됩니다.' },
+        { id: 'item_slot_expand', type: 'UPGRADE', name: '배지 슬롯 확장권', price: 3000, icon: '🔓' } // 슬롯 확장권 추가!
+  
+           ],
     
   // 2. 구매 로직 (shop.js의 buyItem 부분을 이걸로 교체하세요)
     buyItem: async (itemId, price, itemName) => {
