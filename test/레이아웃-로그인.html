@@ -26,7 +26,7 @@
             --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
             --inner-width: 1130px;
-            --radius: 12px;
+            --radius: 16px;
         }
 
         /* [2. RESET & BASE] */
@@ -236,7 +236,6 @@
 
         /* [7. TEAM DASHBOARD - MASTER VIEW] */
         .team-profile-header { display: flex; align-items: center; gap: 35px; margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid #f1f5f9; }
-        .team-logo-wrapper { position: relative; }
         .team-logo-preview { 
             width: 160px; height: 160px; border-radius: 24px; object-fit: contain; 
             background: #fff; border: 2px solid var(--border-color); padding: 15px;
@@ -282,6 +281,11 @@
             padding: 8px 16px; border-radius: 10px; transition: all 0.2s;
         }
         .btn-kick:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+        .btn-leave {
+            font-size: 12px; font-weight: 900; color: #64748b; border: 1.5px solid var(--border-color);
+            padding: 8px 16px; border-radius: 10px; transition: all 0.2s;
+        }
+        .btn-leave:hover { background: #f1f5f9; color: #1e293b; border-color: #94a3b8; }
 
         /* [8. SIDEBAR PREMIUM WIDGETS] */
         .login-widget { 
@@ -340,7 +344,7 @@
                 <div onclick="window.renderPage('main')" class="logo">BOAKO</div>
                 <div class="search-area">
                     <div class="search-box">
-                        <input type="text" id="main-search" placeholder="보드게임 랭커, 팀, 전적 통합 검색">
+                        <input type="text" id="main-search" placeholder="전적 통합 검색 (랭커, 팀, 게임)">
                         <button type="button" class="btn-search">🔍</button>
                     </div>
                 </div>
@@ -370,7 +374,7 @@
                 <aside class="side-content">
                     <!-- LOGIN WIDGET -->
                     <div class="login-widget" id="login-widget-area">
-                        <p style="color:#94a3b8;">사용자 정보를 불러오고 있습니다...</p>
+                        <p style="color:#94a3b8;">데이터를 불러오고 있습니다...</p>
                     </div>
                     
                     <!-- POPULAR GAMES WIDGET -->
@@ -381,7 +385,6 @@
                                 <li style="display:flex; justify-content:space-between;">1. 스플렌더 <span style="color:#7c3aed;">+12%</span></li>
                                 <li style="display:flex; justify-content:space-between;">2. 테라포밍 마스 <span style="color:#ef4444;">-3%</span></li>
                                 <li style="display:flex; justify-content:space-between;">3. 아그리콜라 <span style="color:#94a3b8;">NEW</span></li>
-                                <li style="display:flex; justify-content:space-between;">4. 정령섬 <span style="color:#7c3aed;">HOT</span></li>
                             </ul>
                         </div>
                     </div>
@@ -391,8 +394,8 @@
                         <div class="card-header" style="font-size:16px; padding:18px 25px;">📢 주요 소식</div>
                         <div class="card-body" style="padding:15px 25px;">
                             <ul style="font-size:13px; color:#64748b; line-height:1.8;">
-                                <li style="margin-bottom:8px;">• 5월 정규 시즌 팀 대항전 공지</li>
-                                <li style="margin-bottom:8px;">• BGA 전적 연동 지연 안내</li>
+                                <li style="margin-bottom:8px;">• 5월 시즌 팀 리그 대항전 공지</li>
+                                <li style="margin-bottom:8px;">• BGA 전적 연동 지연 복구 안내</li>
                                 <li>• 아카이브 정식 멤버 등급 상향 안내</li>
                             </ul>
                         </div>
@@ -410,7 +413,7 @@
         let currentUser = null;
         let userTeamInfo = null;
 
-        // USER & TEAM STATUS FETCH
+        // [CORE] Refresh user and team status (Filtered by is_active)
         async function refreshUserTeamStatus(user) {
             const menuTxt = document.getElementById('team-menu-text');
             if (!user) { userTeamInfo = null; if (menuTxt) menuTxt.innerText = "팀 창단"; return; }
@@ -419,6 +422,7 @@
                 const nickname = profile?.full_name || user.user_metadata?.full_name || "사용자";
                 currentUser.nickname = nickname;
 
+                // 1. Leader Check
                 const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('owner_id', user.id).maybeSingle();
                 if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam, nickname: nickname };
@@ -426,7 +430,13 @@
                     return;
                 }
 
-                const { data: memberEntry } = await supabaseClient.from('team_members').select('team_id, team_name').eq('player_name', nickname).maybeSingle();
+                // 2. Active Member Check (Filtering by is_active = true)
+                const { data: memberEntry } = await supabaseClient.from('team_members')
+                    .select('team_id, team_name')
+                    .eq('player_name', nickname)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
                 if (memberEntry) {
                     const { data: memberTeam } = await supabaseClient.from('teams').select('*').eq('id', memberEntry.team_id).maybeSingle();
                     if (memberTeam) {
@@ -436,10 +446,10 @@
                     }
                 }
                 userTeamInfo = null; if (menuTxt) menuTxt.innerText = "팀 창단";
-            } catch (e) { console.error("팀 상태 갱신 에러:", e); }
+            } catch (e) { console.error("팀 갱신 에러:", e); }
         }
 
-        // PAGE RENDERER (700-line Masterpiece)
+        // [UI] Page Rendering System
         window.renderPage = async function(pageId) {
             const container = document.getElementById('main-content-area');
             let content = '';
@@ -451,20 +461,18 @@
             switch(pageId) {
                 case 'ranking':
                     content = `
-                        <div class="main-banner"><h1>🏆 BTL 통합 랭킹</h1><p>상위 1%의 실시간 리그 순위와 포인트를 확인하세요.</p></div>
+                        <div class="main-banner"><h1>🏆 통합 랭킹</h1><p>BTL 리그의 실시간 순위와 아카이브 포인트를 확인하세요.</p></div>
                         <section class="section-card">
-                            <div class="card-header">실시간 플레이어 랭킹</div>
+                            <div class="card-header">실시간 랭킹 (Top 5)</div>
                             <div class="card-body">
                                 <table class="ranking-table">
-                                    <thead>
-                                        <tr><th>순위</th><th>플레이어</th><th>소속 팀</th><th>전적</th><th>포인트</th></tr>
-                                    </thead>
+                                    <thead><tr><th>순위</th><th>플레이어</th><th>팀</th><th>전적</th><th>포인트</th></tr></thead>
                                     <tbody>
-                                        <tr><td class="rank-gold">🥇 1</td><td>시월</td><td>보아코 본대</td><td>128승 12패</td><td style="color:var(--primary);">12,500 P</td></tr>
-                                        <tr><td style="color:#94a3b8; font-weight:950;">🥈 2</td><td>소장님</td><td>운영위원회</td><td>95승 8패</td><td style="color:var(--primary);">10,200 P</td></tr>
-                                        <tr><td style="color:#b45309; font-weight:950;">🥉 3</td><td>게이머X</td><td>보드게임 동호회</td><td>82승 24패</td><td style="color:var(--primary);">8,450 P</td></tr>
-                                        <tr><td>4</td><td>플레이어A</td><td>-</td><td>60승 30패</td><td style="color:var(--primary);">7,200 P</td></tr>
-                                        <tr><td>5</td><td>루키보이</td><td>새싹모임</td><td>45승 12패</td><td style="color:var(--primary);">5,800 P</td></tr>
+                                        <tr><td class="rank-gold">🥇 1</td><td>시월</td><td>보아코 본대</td><td>128승</td><td style="color:var(--primary);">12,500</td></tr>
+                                        <tr><td style="color:#94a3b8; font-weight:950;">🥈 2</td><td>소장님</td><td>운영진</td><td>95승</td><td style="color:var(--primary);">10,200</td></tr>
+                                        <tr><td style="color:#b45309; font-weight:950;">🥉 3</td><td>게이머A</td><td>전략파</td><td>82승</td><td style="color:var(--primary);">8,400</td></tr>
+                                        <tr><td>4</td><td>플레이어B</td><td>친목회</td><td>60승</td><td style="color:var(--primary);">7,100</td></tr>
+                                        <tr><td>5</td><td>보린이</td><td>-</td><td>45승</td><td style="color:var(--primary);">5,200</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -472,22 +480,18 @@
                     break;
                 case 'records':
                     content = `
-                        <div class="main-banner"><h1>📋 전적 아카이브</h1><p>BGA 연동을 통해 기록된 모든 경기의 상세 로그입니다.</p></div>
+                        <div class="main-banner"><h1>📋 전적기록</h1><p>BGA 연동을 통해 기록된 모든 경기 데이터입니다.</p></div>
                         <section class="section-card">
-                            <div class="card-header">최근 경기 전적</div>
+                            <div class="card-header">최근 경기 로그</div>
                             <div class="card-body">
                                 <div style="display:flex; flex-direction:column; gap:15px;">
                                     <div class="match-log-item">
                                         <div><strong style="font-size:18px;">스플렌더</strong> <span style="color:#94a3b8; font-size:13px; margin-left:10px;">15분 전</span></div>
-                                        <div style="font-weight:950; font-size:17px;">시월 <span style="color:var(--primary);">WIN</span> vs 소장님</div>
+                                        <div style="font-weight:950;">시월 <span style="color:var(--primary);">WIN</span> vs 소장님</div>
                                     </div>
                                     <div class="match-log-item">
                                         <div><strong style="font-size:18px;">테라포밍 마스</strong> <span style="color:#94a3b8; font-size:13px; margin-left:10px;">1시간 전</span></div>
-                                        <div style="font-weight:950; font-size:17px;">게이머X <span style="color:var(--primary);">WIN</span> vs 루키보이</div>
-                                    </div>
-                                    <div class="match-log-item">
-                                        <div><strong style="font-size:18px;">아그리콜라</strong> <span style="color:#94a3b8; font-size:13px; margin-left:10px;">3시간 전</span></div>
-                                        <div style="font-weight:950; font-size:17px;">소장님 <span style="color:var(--primary);">WIN</span> vs 플레이어A</div>
+                                        <div style="font-weight:950;">게이머A <span style="color:var(--primary);">WIN</span> vs 플레이어B</div>
                                     </div>
                                 </div>
                             </div>
@@ -504,21 +508,19 @@
                     if (userTeamInfo) {
                         const { team, type } = userTeamInfo;
                         const isLeader = type === 'LEADER';
-                        const { data: members } = await supabaseClient.from('team_members').select('*').eq('team_id', team.id);
+                        const { data: members } = await supabaseClient.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
 
                         content = `
-                        <div class="main-banner"><h1>${team.team_name}</h1><p>${team.team_motto || '함께해서 더 즐거운 보드게임 팀'}</p></div>
+                        <div class="main-banner"><h1>${team.team_name}</h1><p>${team.team_motto || '전설적인 보드게임 팀'}</p></div>
                         <section class="section-card">
                             <div class="card-header">나의 팀 대시보드</div>
                             <div class="card-body">
                                 <div class="team-profile-header">
-                                    <div class="team-logo-wrapper">
-                                        <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
-                                    </div>
+                                    <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
                                     <div class="team-info-txt">
                                         <h2>${team.team_name}</h2>
                                         <div id="motto-display-row" style="display:flex; align-items:center; gap:12px;">
-                                            <p class="team-motto-txt">"${team.team_motto || '슬로건을 등록해 보세요.'}"</p>
+                                            <p class="team-motto-txt">"${team.team_motto || '슬로건 등록 가능'}"</p>
                                             ${isLeader ? `<button class="btn-edit-small" onclick="window.toggleEdit('motto')">수정</button>` : ''}
                                         </div>
                                         <div id="motto-edit-area" class="edit-area">
@@ -535,44 +537,49 @@
                                         <h4 style="font-weight:950; font-size:18px;">🛡️ 팀 상세 소개</h4>
                                         ${isLeader ? `<button class="btn-edit-small" onclick="window.toggleEdit('desc')">소개 수정</button>` : ''}
                                     </div>
-                                    <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap; line-height:1.8;">${team.team_desc || '등록된 팀 소개가 없습니다.'}</p>
+                                    <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap;">${team.team_desc || '등록된 팀 소개가 없습니다.'}</p>
                                     <div id="desc-edit-area" class="edit-area">
                                         <textarea id="textarea-desc" rows="6" class="form-group">${team.team_desc || ''}</textarea>
-                                        <button class="save-btn-mini" onclick="window.saveTeam('team_desc')">소개 저장</button>
+                                        <button class="save-btn-mini" onclick="window.saveTeam('team_desc')">저장</button>
                                     </div>
                                 </div>
 
                                 <div class="member-section">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
                                         <h4 style="font-weight:950; font-size:20px;">👥 팀 멤버 (${members?.length || 0}/4)</h4>
-                                        ${isLeader ? `<button class="btn-edit-small" onclick="window.addMember()" style="padding:8px 20px;">+ 멤버 추가</button>` : ''}
+                                        ${isLeader ? `<button class="btn-edit-small" onclick="window.addMember()">+ 멤버 추가</button>` : ''}
                                     </div>
                                     <div class="member-grid">
-                                        ${members?.map(m => `
+                                        ${members?.map(m => {
+                                            const isMe = m.player_name === currentUser.nickname;
+                                            return `
                                             <div class="member-item">
                                                 <div class="member-info">
                                                     <span class="role-tag ${m.role === 'LEADER' ? 'role-leader' : 'role-member'}">${m.role}</span>
-                                                    <strong>${m.player_name}</strong>
+                                                    <strong>${m.player_name} ${isMe ? '<small style="color:var(--primary); font-weight:700;">(나)</small>' : ''}</strong>
                                                 </div>
-                                                ${isLeader && m.role !== 'LEADER' ? `<button class="btn-kick" onclick="window.kickMember('${m.player_name}')">방출</button>` : ''}
-                                            </div>
-                                        `).join('')}
+                                                <div>
+                                                    ${isLeader && m.role !== 'LEADER' ? `<button class="btn-kick" onclick="window.kickMember('${m.player_name}')">방출</button>` : ''}
+                                                    ${!isLeader && isMe ? `<button class="btn-leave" onclick="window.leaveTeam()">팀 탈퇴</button>` : ''}
+                                                </div>
+                                            </div>`;
+                                        }).join('')}
                                     </div>
                                 </div>
                             </div>
                         </section>`;
                     } else {
                         content = `
-                        <div class="main-banner"><h1>🛡️ 팀 창단 신청</h1><p>새로운 전설의 서막을 열어보세요.</p></div>
+                        <div class="main-banner"><h1>🛡️ 팀 창단 신청</h1><p>데이터로 완성되는 나만의 보드게임 팀</p></div>
                         <section class="section-card">
                             <div class="card-header">신규 팀 정보 입력</div>
                             <div class="card-body">
                                 <form onsubmit="window.submitTeam(event)">
                                     <div class="form-group"><label>팀 이름 (필수)</label><input type="text" id="team_name" placeholder="멋진 팀명을 지어주세요" required></div>
-                                    <div class="form-group"><label>팀 슬로건</label><input type="text" id="team_motto" placeholder="팀의 각오를 한 줄로 표현하세요"></div>
+                                    <div class="form-group"><label>팀 슬로건</label><input type="text" id="team_motto" placeholder="한 줄 각오"></div>
                                     <div class="form-group"><label>팀 로고 (필수)</label><input type="file" id="team_logo" accept="image/*" required></div>
-                                    <div class="form-group"><label>팀 상세 소개</label><textarea id="team_desc" placeholder="팀원 모집 공고나 팀의 목표를 자유롭게 적으세요" rows="6"></textarea></div>
-                                    <button type="submit" id="btn_f" class="btn-submit">팀 창단 신청하기</button>
+                                    <div class="form-group"><label>팀 상세 소개</label><textarea id="team_desc" placeholder="팀의 역사나 목표" rows="6"></textarea></div>
+                                    <button type="submit" id="btn_f" class="btn-submit">팀 창단 승인 및 기록 시작</button>
                                 </form>
                             </div>
                         </section>`;
@@ -580,10 +587,10 @@
                     break;
                 case 'main': default:
                     content = `
-                        <div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>기록으로 완성되는 보드게임 아카이브 성지</p></div>
+                        <div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록하고 매거진으로 기억하는 보드게임 성지</p></div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;">
-                            <section class="section-card"><div class="card-header">최신 공지사항</div><div class="card-body" style="min-height:180px;"><ul style="font-size:15px; line-height:2.4; color:#64748b;"><li>[공지] BTL 5월 시즌 팀 리그 대전표 공개</li><li>[업데이트] 라이벌 매칭 알고리즘 고도화</li><li>[이벤트] 최우수 공략 작성자 포인트 지급</li></ul></div></section>
-                            <section class="section-card"><div class="card-header">자유 게시판 이슈</div><div class="card-body" style="min-height:180px;"><p style="font-size:14px; color:#94a3b8;">"스플렌더 신규 확장은 밸런스가 어떤가요? 어제 해봤는데 자원이 너무 빡빡하네요..."</p><div style="margin-top:20px; font-weight:900; color:var(--primary); font-size:13px;">댓글 32개 더보기 ></div></div></section>
+                            <section class="section-card"><div class="card-header">최신 공지사항</div><div class="card-body" style="min-height:180px;"><ul style="font-size:15px; line-height:2.4; color:#64748b;"><li>[공지] BTL 5월 시즌 팀 리그 대전표 공개</li><li>[업데이트] 라이벌 매칭 알고리즘 고도화</li></ul></div></section>
+                            <section class="section-card"><div class="card-header">자유 게시판 이슈</div><div class="card-body" style="min-height:180px;"><p style="font-size:14px; color:#94a3b8;">"스플렌더 신규 확장 밸런스에 대해..."</p><div style="margin-top:20px; font-weight:900; color:var(--primary); font-size:13px;">댓글 24개 더보기 ></div></div></section>
                         </div>`;
             }
             container.innerHTML = content;
@@ -598,7 +605,7 @@
             display.style.display = isHidden ? 'none' : (type === 'motto' ? 'flex' : 'block');
         };
 
-        // Team Management Logic
+        // [TEAM LOGIC] Save Info
         window.saveTeam = async (col) => {
             const val = col === 'team_motto' ? document.getElementById('input-motto').value : document.getElementById('textarea-desc').value;
             const { error } = await supabaseClient.from('teams').update({ [col]: val }).eq('id', userTeamInfo.team.id);
@@ -606,10 +613,10 @@
             else { alert("✅ 저장되었습니다."); window.renderPage('team'); }
         };
 
+        // [MEMBER LOGIC] Add (Active = True)
         window.addMember = async () => {
-            const name = prompt("추가할 팀원의 닉네임을 정확히 입력해 주세요.");
+            const name = prompt("추가할 팀원의 닉네임을 정확히 입력하세요.");
             if (!name || !name.trim()) return;
-            // is_active: true를 넣어서 4인 제한 트리거를 작동시킵니다.
             const { error } = await supabaseClient.from('team_members').insert([{
                 team_id: userTeamInfo.team.id,
                 team_name: userTeamInfo.team.team_name,
@@ -617,58 +624,65 @@
                 role: 'MEMBER',
                 is_active: true
             }]);
-            if (error) alert("추가 실패: " + error.message);
-            else { alert(`✅ ${name} 님이 팀원으로 합류했습니다!`); window.renderPage('team'); }
+            if (error) alert("추가 실패 (정원초과 가능성): " + error.message);
+            else { alert(`✅ ${name} 님이 합류했습니다!`); window.renderPage('team'); }
         };
 
+        // [MEMBER LOGIC] Kick (Update is_active & left_at)
         window.kickMember = async (name) => {
-            if (!confirm(`${name} 님을 정말 방출하시겠습니까?`)) return;
-            const { error } = await supabaseClient.from('team_members').delete().eq('team_id', userTeamInfo.team.id).eq('player_name', name);
-            if (error) alert(error.message); else { alert("방출 완료."); window.renderPage('team'); }
+            if (!confirm(`${name} 님을 방출하시겠습니까? 기록은 보존됩니다.`)) return;
+            const { error } = await supabaseClient.from('team_members')
+                .update({ is_active: false, left_at: new Date().toISOString() })
+                .eq('team_id', userTeamInfo.team.id)
+                .eq('player_name', name);
+            if (error) alert(error.message); else window.renderPage('team');
         };
 
+        // [MEMBER LOGIC] Leave (Update is_active & left_at)
+        window.leaveTeam = async () => {
+            if (!confirm("정말 팀에서 탈퇴하시겠습니까? 이적 기록은 보존됩니다.")) return;
+            const { error } = await supabaseClient.from('team_members')
+                .update({ is_active: false, left_at: new Date().toISOString() })
+                .eq('team_id', userTeamInfo.team.id)
+                .eq('player_name', currentUser.nickname);
+            if (error) alert(error.message); else { alert("탈퇴 완료."); location.reload(); }
+        };
+
+        // [TEAM LOGIC] Create
         window.submitTeam = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn_f');
-            const teamName = document.getElementById('team_name').value.trim();
-            const motto = document.getElementById('team_motto').value.trim();
-            const desc = document.getElementById('team_desc').value.trim();
             const file = document.getElementById('team_logo').files[0];
-            
             btn.disabled = true; btn.innerText = "처리 중...";
             try {
                 const fName = `${Date.now()}.${file.name.split('.').pop()}`;
                 await supabaseClient.storage.from('teams').upload(fName, file);
                 const { data: uData } = supabaseClient.storage.from('teams').getPublicUrl(fName);
-                
                 const { error: dbErr } = await supabaseClient.from('teams').insert([{
-                    team_name: teamName, owner_id: currentUser.id, leader_name: currentUser.nickname,
-                    team_motto: motto, team_desc: desc, logo_url: uData.publicUrl, logo_url_origin: uData.publicUrl
+                    team_name: document.getElementById('team_name').value.trim(),
+                    owner_id: currentUser.id,
+                    leader_name: currentUser.nickname,
+                    team_motto: document.getElementById('team_motto').value.trim(),
+                    team_desc: document.getElementById('team_desc').value.trim(),
+                    logo_url: uData.publicUrl,
+                    logo_url_origin: uData.publicUrl
                 }]);
                 if (dbErr) throw dbErr;
-                alert("✅ 팀 창단이 완료되었습니다!"); window.renderPage('team');
-            } catch (err) { alert("창단 실패: " + err.message); } 
-            finally { btn.disabled = false; btn.innerText = "팀 창단 신청하기"; }
+                alert("✅ 팀 창단 완료!"); window.renderPage('team');
+            } catch (err) { alert(err.message); } finally { btn.disabled = false; btn.innerText = "팀 창단 신청하기"; }
         };
 
-        // Auth & Sidebar UI
+        // Sidebar UI
         function renderWidget() {
             const area = document.getElementById('login-widget-area');
             if (!currentUser) {
-                area.innerHTML = `
-                    <div class="login-before">
-                        <p style="font-size:15px; color:#64748b; margin-bottom:25px;">보아코 아카이브에서<br>모든 전적을 기록하세요.</p>
-                        <button class="btn-kakao" onclick="window.login()">🟡 카카오 로그인</button>
-                    </div>`;
+                area.innerHTML = `<div class="login-before"><button class="btn-kakao" onclick="window.login()">🟡 카카오 로그인</button></div>`;
             } else {
                 area.innerHTML = `
                     <div class="user-profile">
                         <div class="user-avatar">👤</div>
-                        <div class="user-nick-container">
-                            <strong>${currentUser.nickname}</strong>
-                            <button class="btn-edit-small" onclick="window.editNick()">수정</button>
-                        </div>
-                        <span class="badge-premium">아카이브 정식 멤버</span>
+                        <div class="user-nick-container"><strong>${currentUser.nickname}</strong> <button class="btn-edit-small" onclick="window.editNick()">수정</button></div>
+                        <span class="badge-premium">아카이브 정식 멤버</span><br>
                         <button class="btn-logout" onclick="window.logout()">로그아웃</button>
                     </div>`;
             }
@@ -677,10 +691,10 @@
         window.login = () => supabaseClient.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname } });
         window.logout = async () => { await supabaseClient.auth.signOut(); location.reload(); };
         window.editNick = async () => {
-            const n = prompt("변경할 닉네임을 입력하세요.", currentUser.nickname);
+            const n = prompt("변경할 닉네임:", currentUser.nickname);
             if (n && n.trim()) {
-                const { error } = await supabaseClient.from('profiles').upsert({ id: currentUser.id, full_name: n.trim() });
-                if (error) alert("닉네임 변경 실패: " + error.message); else location.reload();
+                await supabaseClient.from('profiles').upsert({ id: currentUser.id, full_name: n.trim() });
+                location.reload();
             }
         };
 
