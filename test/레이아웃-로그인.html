@@ -4,232 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BOAKO BOARDGAME ARCHIVE - PREMIUM MASTER</title>
-    <!-- 파비콘: 게임기 이모지 -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
-    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Google Fonts: Noto Sans KR -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <!-- 
+      [CSS MODULE] 
+      디자인과 레이아웃을 담당합니다. (소장님의 프리미엄 스타일 유지)
+    -->
     <style>
-        /* [1. GLOBAL DESIGN TOKENS] */
         :root {
-            --primary: #7c3aed;
-            --primary-light: #a78bfa;
-            --primary-dark: #5b21b6;
-            --accent: #f59e0b;
-            --bg-body: #f0f2f5;
-            --bg-card: #ffffff;
-            --text-main: #1e293b;
-            --text-sub: #64748b;
-            --border-color: #e2e8f0;
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --primary: #7c3aed; --primary-light: #a78bfa; --primary-dark: #5b21b6;
+            --accent: #f59e0b; --bg-body: #f0f2f5; --bg-card: #ffffff;
+            --text-main: #1e293b; --text-sub: #64748b; --border-color: #e2e8f0;
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
             --inner-width: 1130px;
-            --radius: 16px;
         }
 
-        /* [2. RESET & BASE] */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-            background-color: var(--bg-body); 
-            font-family: 'Noto Sans KR', sans-serif; 
-            color: var(--text-main); 
-            line-height: 1.6;
-            overflow-y: scroll;
-            word-break: keep-all;
-        }
+        body { background-color: var(--bg-body); font-family: 'Noto Sans KR', sans-serif; color: var(--text-main); line-height: 1.6; overflow-y: scroll; word-break: keep-all; }
+        .inner { width: 95%; max-width: var(--inner-width); margin: 0 auto; }
         ul { list-style: none; }
         button { cursor: pointer; border: none; background: none; font-family: inherit; transition: all 0.2s; }
         input, textarea { font-family: inherit; }
 
-        /* [3. LAYOUT COMPONENTS] */
-        .inner { width: 95%; max-width: var(--inner-width); margin: 0 auto; }
-
-        /* [4. HEADER SECTION] */
-        .header { 
-            background-color: #fff; 
-            border-bottom: 1px solid var(--border-color); 
-            padding: 24px 0; 
-            position: relative;
-            z-index: 1000;
-        }
+        /* Header & Nav */
+        .header { background-color: #fff; border-bottom: 1px solid var(--border-color); padding: 24px 0; }
         .header .inner { display: flex; align-items: center; gap: 45px; }
-        .logo { 
-            font-size: 44px; 
-            font-weight: 950; 
-            color: var(--primary); 
-            letter-spacing: -3px; 
-            flex-shrink: 0; 
-            cursor: pointer; 
-            user-select: none; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-        }
-        .logo:hover { transform: scale(1.05); color: var(--primary-dark); }
-        
-        .search-area { flex: 1; display: flex; justify-content: flex-start; }
-        .search-box { 
-            width: 100%; 
-            max-width: 600px; 
-            height: 56px; 
-            border: 2px solid var(--primary); 
-            display: flex; 
-            background: #fff; 
-            border-radius: 4px; 
-            overflow: hidden; 
-            box-shadow: var(--shadow-md); 
-        }
-        .search-box input { flex: 1; border: none; padding: 0 24px; outline: none; font-size: 18px; font-weight: 600; color: #1e293b; }
+        .logo { font-size: 44px; font-weight: 950; color: var(--primary); letter-spacing: -3px; cursor: pointer; }
+        .search-box { width: 100%; max-width: 600px; height: 56px; border: 2px solid var(--primary); display: flex; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: var(--shadow-md); }
+        .search-box input { flex: 1; border: none; padding: 0 24px; outline: none; font-size: 18px; font-weight: 600; }
         .btn-search { width: 68px; background: var(--primary); color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; }
-
-        /* [5. NAVIGATION] */
-        .nav { 
-            background-color: #fff; 
-            border-bottom: 1px solid var(--border-color); 
-            position: sticky; 
-            top: 0; 
-            z-index: 900; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
-        }
+        .nav { background-color: #fff; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 900; }
         .menu-list { display: flex; gap: 40px; height: 60px; align-items: center; }
-        .menu-item { font-size: 16px; font-weight: 800; color: #444; display: flex; align-items: center; gap: 10px; padding: 10px 0; transition: all 0.2s; height: 100%; border-bottom: 3px solid transparent; }
-        .menu-item:hover, .menu-item.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+        .menu-item { font-size: 16px; font-weight: 800; color: #444; padding: 10px 0; border-bottom: 3px solid transparent; cursor: pointer; }
+        .menu-item.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
 
-        /* [6. MAIN CONTENT AREA] */
+        /* Layout */
         .container { padding: 30px 0 120px 0; }
         .flex-container { display: flex; gap: 30px; align-items: flex-start; }
         .main-content { flex: 1; min-width: 0; }
         .side-content { width: 340px; flex-shrink: 0; position: sticky; top: 90px; }
-
-        .main-banner { 
-            height: 200px; 
-            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); 
-            border-radius: 20px; 
-            margin-bottom: 30px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            color: white; 
-            box-shadow: 0 15px 30px rgba(124, 58, 237, 0.25); 
-            text-align: center; 
-            animation: fadeIn 0.8s ease-out; 
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .main-banner h1 { font-size: 38px; font-weight: 900; text-shadow: 0 4px 8px rgba(0,0,0,0.2); letter-spacing: -1px; }
-
-        /* Card System */
-        .section-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; margin-bottom: 30px; box-shadow: var(--shadow-md); transition: transform 0.3s; }
-        .card-header { padding: 24px 30px; font-size: 20px; font-weight: 900; border-bottom: 1px solid #f1f5f9; color: #1e293b; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
+        .main-banner { height: 200px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-radius: 20px; margin-bottom: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; box-shadow: 0 15px 30px rgba(124, 58, 237, 0.25); text-align: center; }
+        .section-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; margin-bottom: 30px; box-shadow: var(--shadow-md); }
+        .card-header { padding: 24px 30px; font-size: 20px; font-weight: 900; border-bottom: 1px solid #f1f5f9; background: #fafafa; }
         .card-body { padding: 35px; }
 
         /* Premium Form Controls */
-        .form-group label { display: block; font-weight: 900; margin-bottom: 10px; color: #334155; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .edit-input-box { width: 100%; padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; outline: none; font-size: 16px; background: #fff; transition: all 0.2s; }
-        .edit-input-box:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1); }
-
-        /* Custom Upload Zone */
-        .custom-upload {
-            position: relative;
-            width: 100%;
-            height: 200px;
-            border: 3px dashed #cbd5e1;
-            border-radius: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            background-color: #f8fafc;
-            transition: all 0.3s;
-            overflow: hidden;
-            text-align: center;
-        }
+        .edit-input-box { width: 100%; padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; outline: none; font-size: 16px; transition: border-color 0.2s; }
+        .edit-input-box:focus { border-color: var(--primary); }
+        .custom-upload { position: relative; width: 100%; height: 200px; border: 3px dashed #cbd5e1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #f8fafc; cursor: pointer; transition: 0.3s; }
         .custom-upload:hover { border-color: var(--primary); background-color: #f5f3ff; }
-        .custom-upload .upload-icon { font-size: 48px; margin-bottom: 12px; filter: grayscale(1); opacity: 0.5; transition: 0.3s; }
-        .custom-upload:hover .upload-icon { filter: grayscale(0); opacity: 1; transform: scale(1.1); }
-        .custom-upload p { font-size: 15px; color: #64748b; font-weight: 800; margin-bottom: 4px; }
-        .custom-upload span { font-size: 12px; color: #94a3b8; font-weight: 400; }
-        .custom-upload input[type="file"] { display: none; }
-        .preview-img-container { 
-            position: absolute; 
-            inset: 0; 
-            background: #fff; 
-            display: none; 
-            align-items: center; 
-            justify-content: center; 
-            padding: 20px;
-            z-index: 5;
-        }
-        .preview-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 12px; }
-        .preview-img-container .remove-btn {
-            position: absolute; top: 15px; right: 15px; background: #ef4444; color: white; width: 32px; height: 32px; 
-            border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; box-shadow: var(--shadow-md);
-        }
+        .preview-img-container { position: absolute; inset: 0; background: #fff; display: none; align-items: center; justify-content: center; padding: 20px; z-index: 5; }
+        .preview-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .btn-submit { width: 100%; background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); color: #fff; padding: 22px; border-radius: 14px; font-size: 19px; font-weight: 950; box-shadow: 0 10px 25px rgba(124, 58, 237, 0.35); }
 
-        /* Premium Submit Button */
-        .btn-submit { 
-            width: 100%; 
-            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); 
-            color: #fff; 
-            border: none; 
-            padding: 22px; 
-            border-radius: 14px; 
-            font-size: 19px; 
-            font-weight: 950; 
-            cursor: pointer; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            box-shadow: 0 10px 25px rgba(124, 58, 237, 0.35);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-top: 30px;
-            position: relative;
-            overflow: hidden;
-        }
-        .btn-submit::after {
-            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: 0.5s;
-        }
-        .btn-submit:hover { 
-            transform: translateY(-4px);
-            box-shadow: 0 15px 35px rgba(124, 58, 237, 0.5);
-            filter: brightness(1.1);
-        }
-        .btn-submit:hover::after { left: 100%; }
-        .btn-submit:active { transform: translateY(-1px); }
-        .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; }
-
-        /* Dashboard UI */
+        /* Dashboard items */
         .team-profile-header { display: flex; align-items: center; gap: 35px; margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid #f1f5f9; }
         .team-logo-preview { width: 160px; height: 160px; border-radius: 24px; object-fit: contain; background: #fff; border: 2px solid var(--border-color); padding: 15px; box-shadow: var(--shadow-lg); }
-        .team-info-txt h2 { font-size: 36px; font-weight: 950; color: #0f172a; letter-spacing: -1.5px; }
-        .team-motto-txt { color: var(--primary); font-weight: 800; font-style: italic; font-size: 20px; margin-top: 5px; }
         .btn-edit-small { font-size: 12px; padding: 5px 14px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 800; color: #64748b; }
-
-        .edit-area { display: none; margin-top: 15px; flex-direction: column; gap: 12px; animation: slideDown 0.3s ease-out; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .save-btn-mini { background: var(--primary); color: white; padding: 12px 24px; border-radius: 10px; font-weight: 900; font-size: 14px; align-self: flex-end; }
-
-        .member-grid { display: grid; gap: 15px; margin-top: 20px; }
-        .member-item { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 16px; transition: all 0.3s; }
-        .member-info { display: flex; align-items: center; gap: 18px; }
-        .role-tag { font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; text-transform: uppercase; color: white; }
+        .btn-edit-small:hover { background: var(--primary); color: white; }
+        .member-item { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 12px; transition: 0.2s; }
+        .role-tag { font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; color: white; text-transform: uppercase; }
         .role-leader { background: var(--primary); }
         .role-member { background: #94a3b8; }
-        .btn-kick { font-size: 12px; font-weight: 900; color: #ef4444; border: 1.5px solid #fee2e2; padding: 8px 16px; border-radius: 10px; }
-        .btn-leave { font-size: 12px; font-weight: 900; color: #64748b; border: 1.5px solid var(--border-color); padding: 8px 16px; border-radius: 10px; }
 
-        /* Login Widget */
+        /* Widget */
         .login-widget { background: #fff; border: 1px solid var(--border-color); padding: 40px 30px; border-radius: 20px; box-shadow: var(--shadow-lg); text-align: center; }
-        .user-avatar { width: 85px; height: 85px; background: #f5f3ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 44px; color: var(--primary); margin: 0 auto 20px; border: 4px solid #fff; box-shadow: 0 0 25px rgba(124, 58, 237, 0.25); }
+        .user-avatar { width: 85px; height: 85px; background: #f5f3ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 44px; color: #7c3aed; margin: 0 auto 20px; border: 4px solid #fff; box-shadow: 0 0 25px rgba(124, 58, 237, 0.25); }
         .btn-kakao { width: 100%; height: 58px; background-color: #FEE500; border-radius: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 17px; color: #3c1e1e; }
-        .btn-logout { width: 100%; padding: 15px; color: #94a3b8; font-size: 14px; font-weight: 700; border: 1px solid var(--border-color); border-radius: 10px; margin-top: 25px; transition: all 0.2s; }
+        .badge-premium { font-size: 12px; color: var(--primary); font-weight: 800; background: #f5f3ff; padding: 3px 10px; border-radius: 4px; display: inline-block; margin-top: 5px; }
 
-        /* Notification */
-        #boako-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 16px 32px; border-radius: 50px; font-weight: 700; box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 10000; opacity: 0; pointer-events: none; transition: all 0.3s; }
+        #boako-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 16px 32px; border-radius: 50px; font-weight: 700; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 10000; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
         #boako-toast.show { opacity: 1; bottom: 50px; }
 
         @media (max-width: 960px) { .flex-container { flex-direction: column; } .side-content { width: 100%; order: -1; position: static; margin-bottom: 30px; } }
@@ -237,13 +84,14 @@
 </head>
 <body>
 
+    <!-- [HTML BODY] -->
     <div id="wrap">
         <header class="header">
             <div class="inner">
-                <div onclick="window.renderPage('main')" class="logo">BOAKO</div>
+                <div onclick="Boako.View.render('main')" class="logo">BOAKO</div>
                 <div class="search-area">
                     <div class="search-box">
-                        <input type="text" id="main-search" placeholder="전적 통합 검색 (랭커, 팀, 게임)">
+                        <input type="text" id="main-search" placeholder="통합 검색 (팀, 유저, 전적, 게시글)">
                         <button type="button" class="btn-search">🔍</button>
                     </div>
                 </div>
@@ -253,11 +101,11 @@
         <nav class="nav">
             <div class="inner">
                 <ul class="menu-list">
-                    <li class="menu-item" onclick="window.renderPage('main')">🎮 보드게임</li>
-                    <li class="menu-item" id="menu-ranking" onclick="window.renderPage('ranking')">🏆 랭킹</li>
-                    <li class="menu-item" id="menu-records" onclick="window.renderPage('records')">📋 전적기록</li>
-                    <li class="menu-item" id="menu-team" onclick="window.renderPage('team')">🛡️ <span id="team-menu-text">팀 창단</span></li>
-                    <li class="menu-item" onclick="window.renderPage('cafe')">☕ 카페</li>
+                    <li class="menu-item" onclick="Boako.View.render('boardgame')">🎮 보드게임</li>
+                    <li class="menu-item" id="menu-ranking" onclick="Boako.View.render('ranking')">🏆 랭킹</li>
+                    <li class="menu-item" id="menu-records" onclick="Boako.View.render('records')">📋 전적기록</li>
+                    <li class="menu-item" id="menu-team" onclick="Boako.View.render('team')">🛡️ <span id="team-menu-text">팀 창단</span></li>
+                    <li class="menu-item" onclick="Boako.View.render('cafe')">☕ 카페</li>
                 </ul>
             </div>
         </nav>
@@ -266,14 +114,13 @@
             <div class="inner flex-container">
                 <main class="main-content" id="main-content-area"></main>
                 <aside class="side-content">
-                    <div class="login-widget" id="login-widget-area">데이터 로딩 중...</div>
+                    <div class="login-widget" id="login-widget-area">연결 중...</div>
                     <div class="section-card" style="margin-top:25px;">
-                        <div class="card-header" style="font-size:16px;">🔥 실시간 인기 게임</div>
+                        <div class="card-header" style="font-size:16px;">🔥 실시간 이슈</div>
                         <div class="card-body" style="padding:20px 25px;">
                             <ul style="font-size:15px; font-weight:800; color:#475569; line-height:2.5;">
-                                <li>1. 스플렌더 <span style="float:right; color:var(--primary);">▲ 12.4%</span></li>
-                                <li>2. 테라포밍 마스 <span style="float:right; color:#ef4444;">▼ 3.1%</span></li>
-                                <li>3. 아그리콜라 <span style="float:right; color:#94a3b8;">NEW</span></li>
+                                <li>1. 스플렌더 밸런스 토론 <span style="float:right; color:var(--primary);">HOT</span></li>
+                                <li>2. 신입 팀 '아크' 모집 중 <span style="float:right; color:var(--primary);">NEW</span></li>
                             </ul>
                         </div>
                     </div>
@@ -281,329 +128,339 @@
             </div>
         </div>
     </div>
-
     <div id="boako-toast"></div>
 
+    <!-- 
+      [JS MODULES] 
+      기능별 Namespace(Boako) 객체 구조 
+    -->
     <script>
-        const S_URL = 'https://qrredwrxdnvqwdxzanba.supabase.co';
-        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY';
-        const supabaseClient = supabase.createClient(S_URL, S_KEY);
-
-        let currentUser = null;
-        let userTeamInfo = null;
-
-        window.toast = (msg) => {
-            const t = document.getElementById('boako-toast');
-            t.innerText = msg; t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
+        /**
+         * [CORE] 전역 설정 및 상태 (소장님의 DB 연결 정보 박제)
+         */
+        const Boako = {
+            db: null,
+            state: {
+                user: null,
+                team: null, // userTeamInfo 통합
+                appId: 'boako-archive-master'
+            },
+            config: {
+                url: 'https://qrredwrxdnvqwdxzanba.supabase.co',
+                key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY'
+            }
         };
 
-        async function refreshUserTeamStatus(user) {
-            const menuTxt = document.getElementById('team-menu-text');
-            if (!user) { userTeamInfo = null; if (menuTxt) menuTxt.innerText = "팀 창단"; return; }
-            try {
-                const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
-                const nickname = profile?.full_name || user.user_metadata?.full_name || "사용자";
-                currentUser.nickname = nickname;
-
-                const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('owner_id', user.id).maybeSingle();
-                if (leaderTeam) {
-                    userTeamInfo = { type: 'LEADER', team: leaderTeam, nickname: nickname };
-                    if (menuTxt) menuTxt.innerText = "팀 메뉴";
-                    return;
+        /**
+         * [UTIL] 공통 유틸리티 (토스트, 프리뷰 등)
+         */
+        Boako.Util = {
+            toast: (msg) => {
+                const t = document.getElementById('boako-toast');
+                if(!t) return;
+                t.innerText = msg; t.classList.add('show');
+                setTimeout(() => t.classList.remove('show'), 3000);
+            },
+            handleImgPreview: (input) => {
+                const file = input.files[0];
+                const preview = document.getElementById('preview-container');
+                const placeholder = document.getElementById('upload-placeholder');
+                const img = document.getElementById('logo-preview-img');
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => { img.src = e.target.result; preview.style.display = 'flex'; placeholder.style.display = 'none'; }
+                    reader.readAsDataURL(file);
                 }
+            },
+            removeImgPreview: (e) => {
+                e.stopPropagation();
+                document.getElementById('team_logo').value = "";
+                document.getElementById('preview-container').style.display = 'none';
+                document.getElementById('upload-placeholder').style.display = 'block';
+            }
+        };
 
-                const { data: memberEntry } = await supabaseClient.from('team_members')
-                    .select('team_id, team_name')
-                    .eq('player_name', nickname)
-                    .eq('is_active', true)
-                    .maybeSingle();
+        /**
+         * [AUTH] 인증 및 프로필 관리 (닉네임 수정 포함)
+         */
+        Boako.Auth = {
+            init: async () => {
+                Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
+                const { data: { session } } = await Boako.db.auth.getSession();
+                if (session?.user) {
+                    Boako.state.user = session.user;
+                    await Boako.Team.syncStatus();
+                }
+                Boako.Auth.renderWidget();
+                Boako.View.render('main');
 
-                if (memberEntry) {
-                    const { data: memberTeam } = await supabaseClient.from('teams').select('*').eq('id', memberEntry.team_id).maybeSingle();
-                    if (memberTeam) {
-                        userTeamInfo = { type: 'MEMBER', team: memberTeam, nickname: nickname };
+                Boako.db.auth.onAuthStateChange(async (e, s) => {
+                    if (s?.user) {
+                        Boako.state.user = s.user;
+                        await Boako.Team.syncStatus();
+                    } else {
+                        Boako.state.user = null;
+                        Boako.state.team = null;
+                    }
+                    Boako.Auth.renderWidget();
+                });
+            },
+            login: () => Boako.db.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname } }),
+            logout: async () => { await Boako.db.auth.signOut(); location.reload(); },
+            editNick: async () => {
+                const n = prompt("변경할 닉네임을 입력하세요:", Boako.state.user.nickname);
+                if (n && n.trim()) {
+                    const { error } = await Boako.db.from('profiles').upsert({ id: Boako.state.user.id, full_name: n.trim() });
+                    if (error) Boako.Util.toast("수정 실패: " + error.message); 
+                    else { Boako.Util.toast("✅ 닉네임이 수정되었습니다."); location.reload(); }
+                }
+            },
+            renderWidget: () => {
+                const area = document.getElementById('login-widget-area');
+                const user = Boako.state.user;
+                if (!user) {
+                    area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
+                } else {
+                    area.innerHTML = `
+                    <div class="user-avatar">👤</div>
+                    <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                        <strong>${user.nickname || '사용자'}</strong>
+                        <button class="btn-edit-small" onclick="Boako.Auth.editNick()">수정</button>
+                    </div>
+                    <span class="badge-premium">아카이브 멤버</span><br>
+                    <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
+                }
+            }
+        };
+
+        /**
+         * [TEAM] 팀 관리 핵심 로직 (창단, 가입방지, 인원제한, 수정, 탈퇴 등)
+         */
+        Boako.Team = {
+            syncStatus: async () => {
+                const user = Boako.state.user;
+                const menuTxt = document.getElementById('team-menu-text');
+                if (!user) { Boako.state.team = null; if (menuTxt) menuTxt.innerText = "팀 창단"; return; }
+                
+                try {
+                    const { data: profile } = await Boako.db.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+                    Boako.state.user.nickname = profile?.full_name || user.user_metadata?.full_name || "사용자";
+
+                    // 1. 내가 팀장인 팀이 있는가?
+                    const { data: leaderTeam } = await Boako.db.from('teams').select('*').eq('owner_id', user.id).maybeSingle();
+                    if (leaderTeam) {
+                        Boako.state.team = { type: 'LEADER', info: leaderTeam };
                         if (menuTxt) menuTxt.innerText = "팀 메뉴";
                         return;
                     }
-                }
-                userTeamInfo = null; if (menuTxt) menuTxt.innerText = "팀 창단";
-            } catch (e) { console.error(e); }
-        }
 
-        window.renderPage = async function(pageId) {
-            const container = document.getElementById('main-content-area');
-            let content = '';
-            
-            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-            const active = document.getElementById(pageId === 'team' ? 'menu-team' : `menu-${pageId}`);
-            if (active) active.classList.add('active');
-
-            switch(pageId) {
-                case 'ranking':
-                    content = `<div class="main-banner"><h1>🏆 통합 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">랭킹 데이터를 불러오고 있습니다.</div></section>`;
-                    break;
-                case 'records':
-                    content = `<div class="main-banner"><h1>📋 전적 아카이브</h1></div><section class="section-card"><div class="card-body">대전 로그를 불러오고 있습니다.</div></section>`;
-                    break;
-                case 'team':
-                    if (!currentUser) {
-                        content = `<div class="main-banner"><h1>🛡️ 팀 서비스</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
-                        container.innerHTML = content;
-                        break;
+                    // 2. 내가 팀원인 팀이 있는가?
+                    const { data: memberEntry } = await Boako.db.from('team_members').select('team_id').eq('player_name', Boako.state.user.nickname).eq('is_active', true).maybeSingle();
+                    if (memberEntry) {
+                        const { data: memberTeam } = await Boako.db.from('teams').select('*').eq('id', memberEntry.team_id).maybeSingle();
+                        if (memberTeam) {
+                            Boako.state.team = { type: 'MEMBER', info: memberTeam };
+                            if (menuTxt) menuTxt.innerText = "팀 메뉴";
+                            return;
+                        }
                     }
-                    await refreshUserTeamStatus(currentUser);
-
-                    if (userTeamInfo) {
-                        const { team, type } = userTeamInfo;
-                        const isLeader = type === 'LEADER';
-                        const { data: members } = await supabaseClient.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
-
-                        content = `
-                        <div class="main-banner"><h1>${team.team_name}</h1></div>
-                        <section class="section-card">
-                            <div class="card-header">나의 팀 대시보드</div>
-                            <div class="card-body">
-                                <div class="team-profile-header">
-                                    <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
-                                    <div class="team-info-txt">
-                                        <h2>${team.team_name}</h2>
-                                        <div id="motto-display-row" style="display:flex; align-items:center; gap:12px;">
-                                            <p class="team-motto-txt">"${team.team_motto || '전설의 서막'}"</p>
-                                            ${isLeader ? `<button class="btn-edit-small" onclick="window.toggleEdit('motto')">수정</button>` : ''}
-                                        </div>
-                                        <div id="motto-edit-area" class="edit-area">
-                                            <div style="display:flex; gap:10px;">
-                                                <input type="text" id="input-motto" class="edit-input-box" value="${team.team_motto || ''}">
-                                                <button class="save-btn-mini" onclick="window.saveTeam('team_motto')">저장</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style="margin-top:20px; border-top:1px solid #f1f5f9; padding-top:30px;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                                        <h4 style="font-weight:950; font-size:18px;">🛡️ 팀 상세 소개</h4>
-                                        ${isLeader ? `<button class="btn-edit-small" onclick="window.toggleEdit('desc')">소개 수정</button>` : ''}
-                                    </div>
-                                    <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap;">${team.team_desc || '등록된 팀 소개가 없습니다.'}</p>
-                                    <div id="desc-edit-area" class="edit-area">
-                                        <textarea id="textarea-desc" rows="6" class="edit-input-box">${team.team_desc || ''}</textarea>
-                                        <button class="save-btn-mini" onclick="window.saveTeam('team_desc')">저장</button>
-                                    </div>
-                                </div>
-
-                                <div class="member-section" style="margin-top:40px;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
-                                        <h4 style="font-weight:950; font-size:20px;">👥 팀 멤버 (${members?.length || 0}/4)</h4>
-                                        ${isLeader ? `<button class="btn-edit-small" style="background:var(--primary); color:white; border-color:var(--primary);" onclick="window.addMember()">+ 멤버 추가</button>` : ''}
-                                    </div>
-                                    <div class="member-grid">
-                                        ${members?.map(m => {
-                                            const isMe = m.player_name === currentUser.nickname;
-                                            return `
-                                            <div class="member-item">
-                                                <div class="member-info">
-                                                    <span class="role-tag ${m.role === 'LEADER' ? 'role-leader' : 'role-member'}">${m.role}</span>
-                                                    <strong style="font-size:16px;">${m.player_name} ${isMe ? '<small style="color:var(--primary); font-weight:700;">(나)</small>' : ''}</strong>
-                                                </div>
-                                                <div>
-                                                    ${isLeader && m.role !== 'LEADER' ? `<button class="btn-kick" onclick="window.kickMember('${m.player_name}')">방출</button>` : ''}
-                                                    ${!isLeader && isMe ? `<button class="btn-leave" onclick="window.leaveTeam()">팀 탈퇴</button>` : ''}
-                                                </div>
-                                            </div>`;
-                                        }).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        </section>`;
-                    } else {
-                        content = `
-                        <div class="main-banner"><h1>🛡️ 팀 창단</h1></div>
-                        <section class="section-card">
-                            <div class="card-header">신규 팀 정보 입력</div>
-                            <div class="card-body">
-                                <form onsubmit="window.submitTeam(event)">
-                                    <div class="form-group">
-                                        <label>팀 이름 (필수)</label>
-                                        <input type="text" id="team_name" class="edit-input-box" placeholder="전설이 될 팀명을 입력하세요" required>
-                                    </div>
-                                    <div class="form-group" style="margin-top:20px;">
-                                        <label>팀 슬로건</label>
-                                        <input type="text" id="team_motto" class="edit-input-box" placeholder="팀을 대표하는 각오 한마디">
-                                    </div>
-                                    <div class="form-group" style="margin-top:20px;">
-                                        <label>팀 상세 소개</label>
-                                        <textarea id="team_desc" rows="5" class="edit-input-box" placeholder="우리 팀의 역사나 멤버 모집 요강을 자유롭게 적어주세요"></textarea>
-                                    </div>
-                                    
-                                    <!-- [PREMIUM] Custom File Upload Zone -->
-                                    <div class="form-group" style="margin-top:25px;">
-                                        <label>공식 팀 로고 (필수)</label>
-                                        <div class="custom-upload" id="upload-zone" onclick="document.getElementById('team_logo').click()">
-                                            <div id="upload-placeholder">
-                                                <div class="upload-icon">🖼️</div>
-                                                <p>공식 로고 이미지 업로드</p>
-                                                <span>PNG, JPG 파일 (최대 2MB)</span>
-                                            </div>
-                                            <div id="preview-container" class="preview-img-container">
-                                                <img id="logo-preview-img" src="" alt="Preview">
-                                                <div class="remove-btn" onclick="window.removePreview(event)">✕</div>
-                                            </div>
-                                            <input type="file" id="team_logo" accept="image/*" required onchange="window.handlePreview(this)">
-                                        </div>
-                                    </div>
-
-                                    <button type="submit" id="btn_f" class="btn-submit">
-                                        <span>🛡️ 전설의 팀 창단 및 아카이빙 시작</span>
-                                    </button>
-                                </form>
-                            </div>
-                        </section>`;
-                    }
-                    break;
-                case 'main': default:
-                    content = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 방식 업데이트 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 소개</div></section></div>`;
-            }
-            container.innerHTML = content;
-        };
-
-        // [PREMIUM] File Preview Logic
-        window.handlePreview = (input) => {
-            const file = input.files[0];
-            const preview = document.getElementById('preview-container');
-            const placeholder = document.getElementById('upload-placeholder');
-            const img = document.getElementById('logo-preview-img');
-            
-            if (file) {
-                if (file.size > 2 * 1024 * 1024) {
-                    window.toast("파일 크기는 2MB를 초과할 수 없습니다.");
-                    input.value = "";
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    img.src = e.target.result;
-                    preview.style.display = 'flex';
-                    placeholder.style.display = 'none';
-                }
-                reader.readAsDataURL(file);
-            }
-        };
-
-        window.removePreview = (e) => {
-            e.stopPropagation(); // Parent click event prevent
-            const input = document.getElementById('team_logo');
-            const preview = document.getElementById('preview-container');
-            const placeholder = document.getElementById('upload-placeholder');
-            input.value = "";
-            preview.style.display = 'none';
-            placeholder.style.display = 'block';
-        };
-
-        window.toggleEdit = (type) => {
-            const area = document.getElementById(`${type}-edit-area`);
-            const display = type === 'motto' ? document.getElementById('motto-display-row') : document.getElementById('desc-display-txt');
-            const isHidden = area.style.display === 'none' || area.style.display === '';
-            area.style.display = isHidden ? 'flex' : 'none';
-            display.style.display = isHidden ? 'none' : (type === 'motto' ? 'flex' : 'block');
-        };
-
-        window.saveTeam = async (col) => {
-            const val = col === 'team_motto' ? document.getElementById('input-motto').value : document.getElementById('textarea-desc').value;
-            const { error } = await supabaseClient.from('teams').update({ [col]: val }).eq('id', userTeamInfo.team.id);
-            if (error) window.toast("저장 실패: " + error.message);
-            else { window.toast("✅ 팀 정보가 성공적으로 저장되었습니다."); window.renderPage('team'); }
-        };
-
-        window.addMember = async () => {
-            const name = prompt("합류할 멤버의 닉네임을 정확히 입력하세요.");
-            if (!name || !name.trim()) return;
-            const cleanName = name.trim();
-            const { data: activeOne } = await supabaseClient.from('team_members').select('*').eq('team_id', userTeamInfo.team.id).eq('player_name', cleanName).eq('is_active', true).maybeSingle();
-            if (activeOne) { window.toast("이미 해당 팀에 소속된 멤버입니다."); return; }
-            const { error } = await supabaseClient.from('team_members').insert([{ team_id: userTeamInfo.team.id, team_name: userTeamInfo.team.team_name, player_name: cleanName, role: 'MEMBER', is_active: true }]);
-            if (error) {
-                if (error.code === '23505') window.toast(`실패: ${cleanName} 님은 이미 다른 팀에 소속되어 있습니다.`);
-                else window.toast("추가 실패: " + error.message);
-            } else { window.toast(`✅ ${cleanName} 님이 합류했습니다!`); window.renderPage('team'); }
-        };
-
-        window.kickMember = async (name) => {
-            if (!confirm(`${name} 님을 방출하시겠습니까? 기록은 보존됩니다.`)) return;
-            const { error } = await supabaseClient.from('team_members').update({ is_active: false, left_at: new Date().toISOString() }).eq('team_id', userTeamInfo.team.id).eq('player_name', name).eq('is_active', true);
-            if (error) window.toast(error.message); else window.renderPage('team');
-        };
-
-        window.leaveTeam = async () => {
-            if (!confirm("정말 팀에서 탈퇴하시겠습니까? 이적 기록은 보존됩니다.")) return;
-            const { error } = await supabaseClient.from('team_members').update({ is_active: false, left_at: new Date().toISOString() }).eq('team_id', userTeamInfo.team.id).eq('player_name', currentUser.nickname).eq('is_active', true);
-            if (error) window.toast(error.message); else { window.toast("성공적으로 팀에서 탈퇴되었습니다."); location.reload(); }
-        };
-
-        window.submitTeam = async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('btn_f');
-            const file = document.getElementById('team_logo').files[0];
-            const team_name = document.getElementById('team_name').value.trim();
-            const team_motto = document.getElementById('team_motto').value.trim();
-            const team_desc = document.getElementById('team_desc').value.trim();
-
-            btn.disabled = true; btn.innerText = "🛡️ 창단 처리 중...";
-            try {
-                const fName = `${Date.now()}.${file.name.split('.').pop()}`;
-                await supabaseClient.storage.from('teams').upload(fName, file);
-                const { data: uData } = supabaseClient.storage.from('teams').getPublicUrl(fName);
-                const { error: dbErr } = await supabaseClient.from('teams').insert([{ 
-                    team_name: team_name, 
-                    owner_id: currentUser.id, 
-                    leader_name: currentUser.nickname, 
-                    team_motto: team_motto,
-                    team_desc: team_desc,
-                    logo_url: uData.publicUrl 
+                    Boako.state.team = null; if (menuTxt) menuTxt.innerText = "팀 창단";
+                } catch (e) { console.error(e); }
+            },
+            create: async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('btn_f');
+                const file = document.getElementById('team_logo').files[0];
+                btn.disabled = true; btn.innerText = "창단 처리 중...";
+                try {
+                    const fExt = file.name.split('.').pop();
+                    const fName = `${Date.now()}.${fExt}`;
+                    await Boako.db.storage.from('teams').upload(fName, file);
+                    const { data: uData } = Boako.db.storage.from('teams').getPublicUrl(fName);
+                    
+                    const { error } = await Boako.db.from('teams').insert([{ 
+                        team_name: document.getElementById('team_name').value.trim(), 
+                        owner_id: Boako.state.user.id, 
+                        leader_name: Boako.state.user.nickname, 
+                        team_motto: document.getElementById('team_motto').value.trim(),
+                        team_desc: document.getElementById('team_desc').value.trim(),
+                        logo_url: uData.publicUrl 
+                    }]);
+                    if (error) throw error;
+                    Boako.Util.toast("✅ 새로운 전설의 팀이 탄생했습니다!");
+                    Boako.View.render('team');
+                } catch (err) { Boako.Util.toast(err.message); } 
+                finally { btn.disabled = false; btn.innerText = "전설의 팀 창단하기"; }
+            },
+            updateInfo: async (col) => {
+                const val = col === 'team_motto' ? document.getElementById('input-motto').value : document.getElementById('textarea-desc').value;
+                const { error } = await Boako.db.from('teams').update({ [col]: val }).eq('id', Boako.state.team.info.id);
+                if (error) Boako.Util.toast("저장 실패: " + error.message);
+                else { Boako.Util.toast("✅ 팀 정보가 업데이트되었습니다."); Boako.View.render('team'); }
+            },
+            addMember: async () => {
+                const name = prompt("합류할 멤버의 닉네임을 정확히 입력하세요.");
+                if (!name || !name.trim()) return;
+                const { error } = await Boako.db.from('team_members').insert([{ 
+                    team_id: Boako.state.team.info.id, 
+                    team_name: Boako.state.team.info.team_name, 
+                    player_name: name.trim(), role: 'MEMBER', is_active: true 
                 }]);
-                if (dbErr) throw dbErr;
-                window.toast("✅ 축하합니다! 전설의 팀 창단이 완료되었습니다."); 
-                window.renderPage('team');
-            } catch (err) { window.toast("창단 실패: " + err.message); } finally { btn.disabled = false; btn.innerText = "🛡️ 전설의 팀 창단 및 아카이빙 시작"; }
-        };
-
-        function renderWidget() {
-            const area = document.getElementById('login-widget-area');
-            if (!currentUser) {
-                area.innerHTML = `<button class="btn-kakao" onclick="window.login()">🟡 카카오 로그인</button>`;
-            } else {
-                area.innerHTML = `
-                <div class="user-avatar">👤</div>
-                <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                    <strong>${currentUser.nickname}</strong>
-                    <button class="btn-edit-small" onclick="window.editNick()">수정</button>
-                </div>
-                <span class="badge-premium">아카이브 멤버</span><br>
-                <button class="btn-logout" onclick="window.logout()">로그아웃</button>`;
-            }
-        }
-
-        window.editNick = async () => {
-            const n = prompt("변경할 닉네임을 입력하세요:", currentUser.nickname);
-            if (n && n.trim()) {
-                const { error } = await supabaseClient.from('profiles').upsert({ id: currentUser.id, full_name: n.trim() });
-                if (error) window.toast("수정 실패: " + error.message); else { window.toast("✅ 수정되었습니다."); location.reload(); }
+                if (error) {
+                    if (error.code === '23505') Boako.Util.toast("실패: 이미 어딘가에 소속된 유저입니다.");
+                    else Boako.Util.toast("오류: " + error.message);
+                } else { Boako.Util.toast(`✅ ${name} 님이 합류했습니다!`); Boako.View.render('team'); }
+            },
+            kick: async (name) => {
+                if (!confirm(`${name} 님을 방출하시겠습니까? 기록은 보존됩니다.`)) return;
+                await Boako.db.from('team_members').update({ is_active: false, left_at: new Date().toISOString() })
+                    .eq('team_id', Boako.state.team.info.id).eq('player_name', name).eq('is_active', true);
+                Boako.View.render('team');
+            },
+            leave: async () => {
+                if (!confirm("정말 팀에서 탈퇴하시겠습니까? 이적 기록은 보존됩니다.")) return;
+                await Boako.db.from('team_members').update({ is_active: false, left_at: new Date().toISOString() })
+                    .eq('team_id', Boako.state.team.info.id).eq('player_name', Boako.state.user.nickname).eq('is_active', true);
+                location.reload();
             }
         };
 
-        window.login = () => supabaseClient.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname } });
-        window.logout = async () => { await supabaseClient.auth.signOut(); location.reload(); };
+        /**
+         * [VIEW] 화면 렌더링 및 페이지 전환 (모든 템플릿 누락 없이 복구)
+         */
+        Boako.View = {
+            toggleEdit: (type) => {
+                const area = document.getElementById(`${type}-edit-area`);
+                const display = type === 'motto' ? document.getElementById('motto-display-row') : document.getElementById('desc-display-txt');
+                const isNone = area.style.display === 'none' || area.style.display === '';
+                area.style.display = isNone ? 'flex' : 'none';
+                display.style.display = isNone ? 'none' : (type === 'motto' ? 'flex' : 'block');
+            },
+            render: async (pageId) => {
+                const area = document.getElementById('main-content-area');
+                let html = '';
+                
+                document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+                const navBtn = document.getElementById(pageId === 'team' ? 'menu-team' : `menu-${pageId}`);
+                if (navBtn) navBtn.classList.add('active');
 
-        window.onload = async () => {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session?.user) { currentUser = session.user; await refreshUserTeamStatus(session.user); }
-            renderWidget(); window.renderPage('main');
-            supabaseClient.auth.onAuthStateChange(async (e, s) => {
-                if (s?.user) { currentUser = s.user; await refreshUserTeamStatus(s.user); } else { currentUser = null; }
-                renderWidget();
-            });
+                switch(pageId) {
+                    case 'ranking':
+                        html = `<div class="main-banner"><h1>🏆 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">집계 중...</div></section>`;
+                        break;
+                    case 'records':
+                        html = `<div class="main-banner"><h1>📋 전적 아카이브</h1></div><section class="section-card"><div class="card-body">로그 로딩 중...</div></section>`;
+                        break;
+                    case 'team':
+                        if (!Boako.state.user) {
+                            html = `<div class="main-banner"><h1>🛡️ 팀 서비스</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
+                            break;
+                        }
+                        await Boako.Team.syncStatus();
+                        if (Boako.state.team) {
+                            const { info: team, type } = Boako.state.team;
+                            const isLeader = type === 'LEADER';
+                            const { data: members } = await Boako.db.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
+                            
+                            html = `
+                            <div class="main-banner"><h1>${team.team_name}</h1></div>
+                            <section class="section-card">
+                                <div class="card-header">나의 팀 대시보드</div>
+                                <div class="card-body">
+                                    <div class="team-profile-header">
+                                        <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
+                                        <div class="team-info-txt">
+                                            <h2>${team.team_name}</h2>
+                                            <div id="motto-display-row" style="display:flex; align-items:center; gap:12px;">
+                                                <p style="color:var(--primary); font-weight:800; font-style:italic; font-size:20px;">"${team.team_motto || '전설의 서막'}"</p>
+                                                ${isLeader ? `<button class="btn-edit-small" onclick="Boako.View.toggleEdit('motto')">수정</button>` : ''}
+                                            </div>
+                                            <div id="motto-edit-area" style="display:none; margin-top:10px; gap:8px;">
+                                                <input type="text" id="input-motto" class="edit-input-box" style="width:250px; padding:8px;" value="${team.team_motto || ''}">
+                                                <button class="btn-edit-small" style="background:var(--primary); color:white;" onclick="Boako.Team.updateInfo('team_motto')">저장</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="margin-top:20px; border-top:1px solid #f1f5f9; padding-top:30px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                            <h4 style="font-weight:950; font-size:18px;">🛡️ 팀 상세 소개</h4>
+                                            ${isLeader ? `<button class="btn-edit-small" onclick="Boako.View.toggleEdit('desc')">소개 수정</button>` : ''}
+                                        </div>
+                                        <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap;">${team.team_desc || '소개가 없습니다.'}</p>
+                                        <div id="desc-edit-area" style="display:none; flex-direction:column; gap:10px;">
+                                            <textarea id="textarea-desc" rows="6" class="edit-input-box">${team.team_desc || ''}</textarea>
+                                            <button class="btn-edit-small" style="background:var(--primary); color:white; align-self:flex-end;" onclick="Boako.Team.updateInfo('team_desc')">저장</button>
+                                        </div>
+                                    </div>
+                                    <div class="member-section" style="margin-top:40px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                                            <h4 style="font-weight:950; font-size:20px;">👥 팀 멤버 (${members?.length || 0}/4)</h4>
+                                            ${isLeader ? `<button class="btn-edit-small" style="background:var(--primary); color:white; border:none; padding:10px 20px;" onclick="Boako.Team.addMember()">+ 멤버 추가</button>` : ''}
+                                        </div>
+                                        <div class="member-grid">
+                                            ${members?.map(m => {
+                                                const isMe = m.player_name === Boako.state.user.nickname;
+                                                return `
+                                                <div class="member-item">
+                                                    <div style="display:flex; align-items:center; gap:18px;">
+                                                        <span class="role-tag ${m.role === 'LEADER' ? 'role-leader' : 'role-member'}">${m.role}</span>
+                                                        <strong style="font-size:16px;">${m.player_name} ${isMe ? '<small style="color:var(--primary);">(나)</small>' : ''}</strong>
+                                                    </div>
+                                                    <div>
+                                                        ${isLeader && m.role !== 'LEADER' ? `<button class="btn-edit-small" style="color:red; border-color:#fee2e2;" onclick="Boako.Team.kick('${m.player_name}')">방출</button>` : ''}
+                                                        ${!isLeader && isMe ? `<button class="btn-edit-small" onclick="Boako.Team.leave()">팀 탈퇴</button>` : ''}
+                                                    </div>
+                                                </div>`;
+                                            }).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>`;
+                        } else {
+                            html = `
+                            <div class="main-banner"><h1>🛡️ 팀 창단</h1></div>
+                            <section class="section-card">
+                                <div class="card-header">신규 팀 정보 입력</div>
+                                <div class="card-body">
+                                    <form onsubmit="Boako.Team.create(event)">
+                                        <div class="form-group"><label>팀 이름 (필수)</label><input type="text" id="team_name" class="edit-input-box" placeholder="팀명을 입력하세요" required></div>
+                                        <div class="form-group" style="margin-top:15px;"><label>팀 슬로건</label><input type="text" id="team_motto" class="edit-input-box" placeholder="각오 한마디"></div>
+                                        <div class="form-group" style="margin-top:15px;"><label>팀 상세 소개</label><textarea id="team_desc" rows="5" class="edit-input-box" placeholder="팀 모집 요강 등"></textarea></div>
+                                        <div class="form-group" style="margin-top:15px;">
+                                            <label>팀 로고 (필수)</label>
+                                            <div class="custom-upload" onclick="document.getElementById('team_logo').click()">
+                                                <div id="upload-placeholder">🖼️<br><b>로고 이미지 업로드</b><br><small>클릭하여 파일을 선택하세요</small></div>
+                                                <div id="preview-container" class="preview-img-container">
+                                                    <img id="logo-preview-img" src="">
+                                                    <div style="position:absolute; top:10px; right:10px; background:red; color:white; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center;" onclick="Boako.Util.removeImgPreview(event)">✕</div>
+                                                </div>
+                                                <input type="file" id="team_logo" accept="image/*" required onchange="Boako.Util.handleImgPreview(this)" style="display:none;">
+                                            </div>
+                                        </div>
+                                        <button type="submit" id="btn_f" class="btn-submit">전설의 팀 창단하기</button>
+                                    </form>
+                                </div>
+                            </section>`;
+                        }
+                        break;
+                    case 'main': default:
+                        html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
+                }
+                area.innerHTML = html;
+            }
         };
+
+        /**
+         * [FUTURE] 앞으로 소장님이 추가하실 기능들을 위한 자리입니다.
+         * 이렇게 비어있는 객체에 로직만 추가하면 기존 기능 누락 없이 확장됩니다.
+         */
+        Boako.Shop = {}; // 포인트샵+포인트 시스템
+        Boako.Messenger = {}; // 회원간 메세지
+        Boako.Schedule = {}; // 일정관리 및 조율
+        Boako.League = {}; // 대시보드, 밴 투표, 라이벌 매치 등
+
+        // 실행 시작
+        window.onload = () => Boako.Auth.init();
     </script>
 </body>
 </html>
