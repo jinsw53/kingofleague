@@ -9,7 +9,7 @@ Boako.Shop = {
         { id: 'item_ticket_rename', name: '팀명 변경권', price: 2000, icon: '🎫', desc: '소속 팀의 이름을 1회 변경할 수 있는 희귀 아이템입니다.' }
     ],
     
-    // 2. 구매 로직
+  // 2. 구매 로직 (shop.js의 buyItem 부분을 이걸로 교체하세요)
     buyItem: async (itemId, price, itemName) => {
         const user = Boako.state.user;
         if (!user) return Boako.Util.toast("🔒 로그인이 필요합니다.");
@@ -28,14 +28,23 @@ Boako.Shop = {
 
             // 구매 확인 및 포인트 차감
             if (confirm(`[${itemName}] 아이템을 ${price} P에 구매하시겠습니까?`)) {
+                // 1) 프로필 테이블 포인트 차감
                 const { error: updateErr } = await Boako.db.from('profiles')
                     .update({ points: currentPoints - price })
                     .eq('id', user.id);
-                    
                 if (updateErr) throw updateErr;
                 
+                // 2) ★ 포인트 내역 테이블에 기록 남기기 (추가된 부분) ★
+                const { error: historyErr } = await Boako.db.from('point_history')
+                    .insert([{
+                        user_id: user.id,
+                        point_change: -price, // 썼으니까 마이너스
+                        description: `[아이템 구매] ${itemName}`
+                    }]);
+                if (historyErr) console.error("내역 기록 실패:", historyErr);
+                
                 Boako.Util.toast("🎁 구매가 완료되었습니다!");
-                // 화면 리렌더링하여 포인트 갱신
+                // 화면 리렌더링하여 포인트 및 내역 갱신
                 Boako.View.render('shop'); 
             }
         } catch (err) {
