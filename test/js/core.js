@@ -1,0 +1,21 @@
+/**
+ * [CORE] 전역 설정 및 상태 객체 선언
+ */
+const Boako = {
+    db: null,
+    state: {
+        user: null,
+        team: null,
+        appId: 'boako-archive-master'
+    },
+    config: {
+        url: 'https://qrredwrxdnvqwdxzanba.supabase.co',
+        key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY'
+    }
+};
+
+// 추후 추가될 기능들을 위한 빈 객체 선언 (이후 해당 파일만 생성해서 연결하면 됨)
+Boako.Shop = {};       // 포인트샵+포인트 시스템
+Boako.Messenger = {};  // 회원간 메세지
+Boako.Schedule = {};   // 일정관리 및 조율
+Boako.League = {};     // 대시보드, 밴 투표, 라이벌 매치 등

@@ -1,0 +1,124 @@
+/**
+ * [VIEW] 화면 렌더링 및 페이지 템플릿 관리
+ */
+Boako.View = {
+    toggleEdit: (type) => {
+        const area = document.getElementById(`${type}-edit-area`);
+        const display = type === 'motto' ? document.getElementById('motto-display-row') : document.getElementById('desc-display-txt');
+        const isNone = area.style.display === 'none' || area.style.display === '';
+        area.style.display = isNone ? 'flex' : 'none';
+        display.style.display = isNone ? 'none' : (type === 'motto' ? 'flex' : 'block');
+    },
+    render: async (pageId) => {
+        const area = document.getElementById('main-content-area');
+        let html = '';
+        
+        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+        const navBtn = document.getElementById(pageId === 'team' ? 'menu-team' : `menu-${pageId}`);
+        if (navBtn) navBtn.classList.add('active');
+
+        switch(pageId) {
+            case 'ranking':
+                html = `<div class="main-banner"><h1>🏆 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">집계 중...</div></section>`;
+                break;
+            case 'records':
+                html = `<div class="main-banner"><h1>📋 전적 아카이브</h1></div><section class="section-card"><div class="card-body">로그 로딩 중...</div></section>`;
+                break;
+            case 'team':
+                if (!Boako.state.user) {
+                    html = `<div class="main-banner"><h1>🛡️ 팀 서비스</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
+                    break;
+                }
+                await Boako.Team.syncStatus();
+                if (Boako.state.team) {
+                    const { info: team, type } = Boako.state.team;
+                    const isLeader = type === 'LEADER';
+                    const { data: members } = await Boako.db.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
+                    
+                    html = `
+                    <div class="main-banner"><h1>${team.team_name}</h1></div>
+                    <section class="section-card">
+                        <div class="card-header">나의 팀 대시보드</div>
+                        <div class="card-body">
+                            <div class="team-profile-header">
+                                <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
+                                <div class="team-info-txt">
+                                    <h2>${team.team_name}</h2>
+                                    <div id="motto-display-row" style="display:flex; align-items:center; gap:12px;">
+                                        <p style="color:var(--primary); font-weight:800; font-style:italic; font-size:20px;">"${team.team_motto || '전설의 서막'}"</p>
+                                        ${isLeader ? `<button class="btn-edit-small" onclick="Boako.View.toggleEdit('motto')">수정</button>` : ''}
+                                    </div>
+                                    <div id="motto-edit-area" style="display:none; margin-top:10px; gap:8px;">
+                                        <input type="text" id="input-motto" class="edit-input-box" style="width:250px; padding:8px;" value="${team.team_motto || ''}">
+                                        <button class="btn-edit-small" style="background:var(--primary); color:white;" onclick="Boako.Team.updateInfo('team_motto')">저장</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="margin-top:20px; border-top:1px solid #f1f5f9; padding-top:30px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                    <h4 style="font-weight:950; font-size:18px;">🛡️ 팀 상세 소개</h4>
+                                    ${isLeader ? `<button class="btn-edit-small" onclick="Boako.View.toggleEdit('desc')">소개 수정</button>` : ''}
+                                </div>
+                                <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap;">${team.team_desc || '소개가 없습니다.'}</p>
+                                <div id="desc-edit-area" style="display:none; flex-direction:column; gap:10px;">
+                                    <textarea id="textarea-desc" rows="6" class="edit-input-box">${team.team_desc || ''}</textarea>
+                                    <button class="btn-edit-small" style="background:var(--primary); color:white; align-self:flex-end;" onclick="Boako.Team.updateInfo('team_desc')">저장</button>
+                                </div>
+                            </div>
+                            <div class="member-section" style="margin-top:40px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                                    <h4 style="font-weight:950; font-size:20px;">👥 팀 멤버 (${members?.length || 0}/4)</h4>
+                                    ${isLeader ? `<button class="btn-edit-small" style="background:var(--primary); color:white; border:none; padding:10px 20px;" onclick="Boako.Team.addMember()">+ 멤버 추가</button>` : ''}
+                                </div>
+                                <div class="member-grid">
+                                    ${members?.map(m => {
+                                        const isMe = m.player_name === Boako.state.user.nickname;
+                                        return `
+                                        <div class="member-item">
+                                            <div style="display:flex; align-items:center; gap:18px;">
+                                                <span class="role-tag ${m.role === 'LEADER' ? 'role-leader' : 'role-member'}">${m.role}</span>
+                                                <strong style="font-size:16px;">${m.player_name} ${isMe ? '<small style="color:var(--primary);">(나)</small>' : ''}</strong>
+                                            </div>
+                                            <div>
+                                                ${isLeader && m.role !== 'LEADER' ? `<button class="btn-edit-small" style="color:red; border-color:#fee2e2;" onclick="Boako.Team.kick('${m.player_name}')">방출</button>` : ''}
+                                                ${!isLeader && isMe ? `<button class="btn-edit-small" onclick="Boako.Team.leave()">팀 탈퇴</button>` : ''}
+                                            </div>
+                                        </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </section>`;
+                } else {
+                    html = `
+                    <div class="main-banner"><h1>🛡️ 팀 창단</h1></div>
+                    <section class="section-card">
+                        <div class="card-header">신규 팀 정보 입력</div>
+                        <div class="card-body">
+                            <form onsubmit="Boako.Team.create(event)">
+                                <div class="form-group"><label>팀 이름 (필수)</label><input type="text" id="team_name" class="edit-input-box" placeholder="팀명을 입력하세요" required></div>
+                                <div class="form-group" style="margin-top:15px;"><label>팀 슬로건</label><input type="text" id="team_motto" class="edit-input-box" placeholder="각오 한마디"></div>
+                                <div class="form-group" style="margin-top:15px;"><label>팀 상세 소개</label><textarea id="team_desc" rows="5" class="edit-input-box" placeholder="팀 모집 요강 등"></textarea></div>
+                                <div class="form-group" style="margin-top:15px;">
+                                    <label>팀 로고 (필수)</label>
+                                    <div class="custom-upload" onclick="document.getElementById('team_logo').click()">
+                                        <div id="upload-placeholder">🖼️<br><b>로고 이미지 업로드</b><br><small>클릭하여 파일을 선택하세요</small></div>
+                                        <div id="preview-container" class="preview-img-container">
+                                            <img id="logo-preview-img" src="">
+                                            <div style="position:absolute; top:10px; right:10px; background:red; color:white; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center;" onclick="Boako.Util.removeImgPreview(event)">✕</div>
+                                        </div>
+                                        <input type="file" id="team_logo" accept="image/*" required onchange="Boako.Util.handleImgPreview(this)" style="display:none;">
+                                    </div>
+                                </div>
+                                <button type="submit" id="btn_f" class="btn-submit">전설의 팀 창단하기</button>
+                            </form>
+                        </div>
+                    </section>`;
+                }
+                break;
+            case 'main': default:
+                html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
+        }
+        area.innerHTML = html;
+    }
+};
