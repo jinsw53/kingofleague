@@ -78,7 +78,6 @@
             border-radius: 4px; 
             overflow: hidden; 
             box-shadow: var(--shadow-md); 
-            transition: box-shadow 0.2s; 
         }
         .search-box input { flex: 1; border: none; padding: 0 24px; outline: none; font-size: 18px; font-weight: 600; color: #1e293b; }
         .btn-search { width: 68px; background: var(--primary); color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; }
@@ -102,7 +101,6 @@
         .main-content { flex: 1; min-width: 0; }
         .side-content { width: 340px; flex-shrink: 0; position: sticky; top: 90px; }
 
-        /* Banner Style */
         .main-banner { 
             height: 200px; 
             background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); 
@@ -118,19 +116,20 @@
             animation: fadeIn 0.8s ease-out; 
         }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .main-banner h1 { font-size: 38px; font-weight: 900; text-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .main-banner h1 { font-size: 38px; font-weight: 900; text-shadow: 0 4px 8px rgba(0,0,0,0.2); letter-spacing: -1px; }
 
         /* Card System */
-        .section-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; margin-bottom: 30px; box-shadow: var(--shadow-md); transition: transform 0.3s; }
+        .section-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; margin-bottom: 30px; box-shadow: var(--shadow-md); }
         .card-header { padding: 24px 30px; font-size: 20px; font-weight: 900; border-bottom: 1px solid #f1f5f9; color: #1e293b; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
         .card-body { padding: 35px; }
 
-        /* Member Management UI */
+        /* Dashboard UI */
         .team-profile-header { display: flex; align-items: center; gap: 35px; margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid #f1f5f9; }
         .team-logo-preview { width: 160px; height: 160px; border-radius: 24px; object-fit: contain; background: #fff; border: 2px solid var(--border-color); padding: 15px; box-shadow: var(--shadow-lg); }
         .team-info-txt h2 { font-size: 36px; font-weight: 950; color: #0f172a; letter-spacing: -1.5px; }
         .team-motto-txt { color: var(--primary); font-weight: 800; font-style: italic; font-size: 20px; margin-top: 5px; }
-        
+        .btn-edit-small { font-size: 12px; padding: 5px 14px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 800; color: #64748b; }
+
         .member-grid { display: grid; gap: 15px; margin-top: 20px; }
         .member-item { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 16px; transition: all 0.3s; }
         .member-item:hover { transform: scale(1.02); box-shadow: var(--shadow-lg); background: #fff; border-color: var(--primary-light); }
@@ -139,14 +138,17 @@
         .role-member { background: #94a3b8; }
         .btn-kick { font-size: 12px; font-weight: 900; color: #ef4444; border: 1.5px solid #fee2e2; padding: 8px 16px; border-radius: 10px; }
 
-        /* [8. SIDEBAR] */
+        /* Login Widget */
         .login-widget { background: #fff; border: 1px solid var(--border-color); padding: 40px 30px; border-radius: 20px; box-shadow: var(--shadow-lg); text-align: center; }
         .user-avatar { width: 85px; height: 85px; background: #f5f3ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 44px; color: var(--primary); margin: 0 auto 20px; border: 4px solid #fff; box-shadow: 0 0 25px rgba(124, 58, 237, 0.25); }
         .btn-kakao { width: 100%; height: 58px; background-color: #FEE500; border-radius: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 17px; color: #3c1e1e; }
+        .btn-logout { width: 100%; padding: 15px; color: #94a3b8; font-size: 14px; font-weight: 700; border: 1px solid var(--border-color); border-radius: 10px; margin-top: 25px; }
 
-        /* [9. NOTIFICATION UI] */
+        /* Notification */
         #boako-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 16px 32px; border-radius: 50px; font-weight: 700; box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 10000; opacity: 0; pointer-events: none; transition: all 0.3s; }
         #boako-toast.show { opacity: 1; bottom: 50px; }
+
+        @media (max-width: 960px) { .flex-container { flex-direction: column; } .side-content { width: 100%; order: -1; position: static; margin-bottom: 30px; } }
     </style>
 </head>
 <body>
@@ -220,7 +222,6 @@
                 const nickname = profile?.full_name || user.user_metadata?.full_name || "사용자";
                 currentUser.nickname = nickname;
 
-                // 1. 팀장 체크
                 const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('owner_id', user.id).maybeSingle();
                 if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam, nickname: nickname };
@@ -228,7 +229,6 @@
                     return;
                 }
 
-                // 2. 활동 멤버 체크 (is_active = true)
                 const { data: memberEntry } = await supabaseClient.from('team_members')
                     .select('team_id, team_name')
                     .eq('player_name', nickname)
@@ -257,10 +257,10 @@
 
             switch(pageId) {
                 case 'ranking':
-                    content = `<div class="main-banner"><h1>🏆 통합 랭킹</h1></div><section class="section-card"><div class="card-body">랭킹 데이터를 불러오고 있습니다...</div></section>`;
+                    content = `<div class="main-banner"><h1>🏆 통합 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">랭킹 데이터를 불러오고 있습니다.</div></section>`;
                     break;
                 case 'records':
-                    content = `<div class="main-banner"><h1>📋 전적기록</h1></div><section class="section-card"><div class="card-body">전적 로그를 불러오고 있습니다...</div></section>`;
+                    content = `<div class="main-banner"><h1>📋 전적 아카이브</h1></div><section class="section-card"><div class="card-body">대전 로그를 불러오고 있습니다.</div></section>`;
                     break;
                 case 'team':
                     if (!currentUser) {
@@ -273,7 +273,6 @@
                     if (userTeamInfo) {
                         const { team, type } = userTeamInfo;
                         const isLeader = type === 'LEADER';
-                        // 현재 활동 중인 멤버만 표시
                         const { data: members } = await supabaseClient.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
 
                         content = `
@@ -285,13 +284,13 @@
                                     <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
                                     <div class="team-info-txt">
                                         <h2>${team.team_name}</h2>
-                                        <p class="team-motto-txt">"${team.team_motto || '전설을 써내려가는 중'}"</p>
+                                        <p class="team-motto-txt">"${team.team_motto || '전설의 서막'}"</p>
                                     </div>
                                 </div>
                                 <div class="member-section">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
                                         <h4 style="font-weight:950; font-size:20px;">👥 팀 멤버 (${members?.length || 0}/4)</h4>
-                                        ${isLeader ? `<button class="btn-kick" style="background:var(--primary); color:white; border-color:var(--primary);" onclick="window.addMember()">+ 멤버 추가</button>` : ''}
+                                        ${isLeader ? `<button class="btn-edit-small" style="background:var(--primary); color:white; border-color:var(--primary); padding:10px 20px;" onclick="window.addMember()">+ 멤버 추가</button>` : ''}
                                     </div>
                                     <div class="member-grid">
                                         ${members?.map(m => {
@@ -303,7 +302,6 @@
                                                     <strong style="font-size:16px;">${m.player_name} ${isMe ? '<small>(나)</small>' : ''}</strong>
                                                 </div>
                                                 ${isLeader && m.role !== 'LEADER' ? `<button class="btn-kick" onclick="window.kickMember('${m.player_name}')">방출</button>` : ''}
-                                                ${!isLeader && isMe ? `<button class="btn-kick" style="color:#64748b; border-color:#e2e8f0;" onclick="window.leaveTeam()">팀 탈퇴</button>` : ''}
                                             </div>`;
                                         }).join('')}
                                     </div>
@@ -311,23 +309,23 @@
                             </div>
                         </section>`;
                     } else {
-                        content = `<div class="main-banner"><h1>🛡️ 팀 창단</h1></div><section class="section-card"><div class="card-body"><form onsubmit="window.submitTeam(event)"><div class="form-group"><label>팀 이름</label><input type="text" id="team_name" required></div><div class="form-group"><label>팀 슬로건</label><input type="text" id="team_motto"></div><div class="form-group"><label>팀 로고</label><input type="file" id="team_logo" accept="image/*" required></div><button type="submit" id="btn_f" class="btn-submit">팀 창단 신청</button></form></div></section>`;
+                        content = `<div class="main-banner"><h1>🛡️ 팀 창단</h1></div><section class="section-card"><div class="card-body"><form onsubmit="window.submitTeam(event)"><div class="form-group"><label>팀 이름</label><input type="text" id="team_name" required></div><div class="form-group"><label>팀 로고</label><input type="file" id="team_logo" accept="image/*" required></div><button type="submit" id="btn_f" class="btn-submit">팀 창단 신청</button></form></div></section>`;
                     }
                     break;
                 case 'main': default:
-                    content = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 5월 시즌 리그가 곧 시작됩니다!</div></section><section class="section-card"><div class="card-header">자유 게시판</div><div class="card-body" style="min-height:180px;">스플렌더 공략글이 인기를 얻고 있습니다.</div></section></div>`;
+                    content = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 방식 업데이트 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 소개</div></section></div>`;
             }
             container.innerHTML = content;
         };
 
-        // [핵심] 입단 로직: 무조건 새로운 행 삽입 (이전 기록은 is_active=false로 남음)
+        // [입단 로직] '이중 국적 방지' 제약 조건 대응
         window.addMember = async () => {
-            const name = prompt("추가할 팀원의 닉네임을 정확히 입력하세요.");
+            const name = prompt("합류할 멤버의 닉네임을 정확히 입력하세요.");
             if (!name || !name.trim()) return;
             const cleanName = name.trim();
 
-            // 현재 활동 중인 멤버인지 확인 (중복 방지)
-            const { data: activeOne } = await supabaseClient
+            // 1. 논리적 체크 (현재 이 팀에 있는지)
+            const { data: alreadyInThisTeam } = await supabaseClient
                 .from('team_members')
                 .select('*')
                 .eq('team_id', userTeamInfo.team.id)
@@ -335,12 +333,12 @@
                 .eq('is_active', true)
                 .maybeSingle();
 
-            if (activeOne) {
-                window.toast("이미 해당 팀에 소속된 멤버입니다.");
+            if (alreadyInThisTeam) {
+                window.toast("해당 유저는 이미 우리 팀원입니다.");
                 return;
             }
 
-            // [소장님 지시대로] 무조건 새로운 행으로 가입 (History 기록)
+            // 2. INSERT 시도 (DB의 Partial Unique Index가 이중 가입을 막아줌)
             const { error } = await supabaseClient.from('team_members').insert([{
                 team_id: userTeamInfo.team.id,
                 team_name: userTeamInfo.team.team_name,
@@ -349,8 +347,18 @@
                 is_active: true
             }]);
 
-            if (error) window.toast("추가 실패 (정원초과 가능성): " + error.message);
-            else { window.toast(`✅ ${cleanName} 님이 성공적으로 합류했습니다!`); window.renderPage('team'); }
+            if (error) {
+                console.error("Join Error:", error);
+                // 409 Conflict는 '동시 가입 방지' 제약 조건에 걸렸을 때 발생
+                if (error.code === '23505') {
+                    window.toast(`실패: ${cleanName} 님은 이미 다른 팀에 소속되어 있습니다.`);
+                } else {
+                    window.toast("추가 실패: " + error.message);
+                }
+            } else {
+                window.toast(`✅ ${cleanName} 님이 성공적으로 합류했습니다!`);
+                window.renderPage('team');
+            }
         };
 
         window.kickMember = async (name) => {
@@ -361,16 +369,6 @@
                 .eq('player_name', name)
                 .eq('is_active', true);
             if (error) window.toast(error.message); else window.renderPage('team');
-        };
-
-        window.leaveTeam = async () => {
-            if (!confirm("정말 탈퇴하시겠습니까? 이적 기록은 보존됩니다.")) return;
-            const { error } = await supabaseClient.from('team_members')
-                .update({ is_active: false, left_at: new Date().toISOString() })
-                .eq('team_id', userTeamInfo.team.id)
-                .eq('player_name', currentUser.nickname)
-                .eq('is_active', true);
-            if (error) window.toast(error.message); else { window.toast("탈퇴 완료."); location.reload(); }
         };
 
         window.submitTeam = async (e) => {
@@ -386,7 +384,6 @@
                     team_name: document.getElementById('team_name').value.trim(),
                     owner_id: currentUser.id,
                     leader_name: currentUser.nickname,
-                    team_motto: document.getElementById('team_motto').value.trim(),
                     logo_url: uData.publicUrl
                 }]);
                 if (dbErr) throw dbErr;
@@ -399,7 +396,7 @@
             if (!currentUser) {
                 area.innerHTML = `<button class="btn-kakao" onclick="window.login()">🟡 카카오 로그인</button>`;
             } else {
-                area.innerHTML = `<div class="user-avatar">👤</div><strong>${currentUser.nickname}</strong><br><span class="badge-premium">아카이브 멤버</span><br><button class="btn-logout" onclick="window.logout()">로그아웃</button>`;
+                area.innerHTML = `<div class="user-avatar">👤</div><strong>${currentUser.nickname}</strong><br><button class="btn-logout" onclick="window.logout()">로그아웃</button>`;
             }
         }
 
