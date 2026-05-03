@@ -203,7 +203,7 @@
         .member-role-tag { 
             font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;
         }
-        .role-leader { background: #7c3aed; color: #white; color: white; }
+        .role-leader { background: #7c3aed; color: white; }
         .role-member { background: #94a3b8; color: white; }
         .btn-kick { 
             font-size: 11px; font-weight: 800; color: #ef4444; background: #fff; 
@@ -310,12 +310,10 @@
             }
 
             try {
-                // 1. 닉네임 가져오기
                 const { data: profile } = await supabaseClient.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
                 const nickname = profile?.full_name || user.user_metadata?.full_name || "사용자";
                 currentUser.nickname = nickname;
 
-                // 2. 내가 팀장인가? (owner_id 기준)
                 const { data: leaderTeam } = await supabaseClient.from('teams').select('*').eq('owner_id', user.id).maybeSingle();
                 if (leaderTeam) {
                     userTeamInfo = { type: 'LEADER', team: leaderTeam, nickname: nickname };
@@ -323,7 +321,6 @@
                     return;
                 }
 
-                // 3. 내가 팀원인가? (team_members 기준)
                 const { data: memberEntry } = await supabaseClient.from('team_members').select('team_name').eq('player_name', nickname).maybeSingle();
                 if (memberEntry) {
                     const { data: memberTeam } = await supabaseClient.from('teams').select('*').eq('team_name', memberEntry.team_name).maybeSingle();
@@ -342,7 +339,7 @@
         }
 
         /**
-         * 페이지 렌더링 (디자인 보존 및 기능 삽입)
+         * 페이지 렌더링
          */
         window.renderPage = async function(pageId) {
             const container = document.getElementById('main-content-area');
@@ -370,8 +367,6 @@
                     if (userTeamInfo) {
                         const { team, type } = userTeamInfo;
                         const isLeader = type === 'LEADER';
-                        
-                        // 멤버 목록 실시간 조회
                         const { data: members } = await supabaseClient.from('team_members').select('*').eq('team_name', team.team_name);
 
                         content = `
@@ -406,7 +401,6 @@
                                     </div>
                                 </div>
 
-                                <!-- 팀 멤버 관리 섹션 (복구 및 추가) -->
                                 <div class="member-section">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                                         <h4 style="font-weight:900;">👥 팀 멤버 (${members?.length || 0})</h4>
@@ -513,7 +507,7 @@
         };
 
         /**
-         * 팀 창단 처리
+         * 팀 창단 처리 (logo_url_origin 저장 로직 추가)
          */
         window.submitTeamFounding = async function(e) {
             e.preventDefault();
@@ -530,9 +524,15 @@
                 if (upErr) throw upErr;
                 const { data: uData } = supabaseClient.storage.from('teams').getPublicUrl(fName);
                 
+                // [수정 포인트] logo_url과 logo_url_origin 모두에 주소를 넣어줍니다.
                 const { error: dbErr } = await supabaseClient.from('teams').insert([{
-                    team_name: teamName, owner_id: currentUser.id, leader_name: currentUser.nickname,
-                    team_motto: motto, team_desc: desc, logo_url: uData.publicUrl
+                    team_name: teamName, 
+                    owner_id: currentUser.id, 
+                    leader_name: currentUser.nickname,
+                    team_motto: motto, 
+                    team_desc: desc, 
+                    logo_url: uData.publicUrl,
+                    logo_url_origin: uData.publicUrl
                 }]);
                 if (dbErr) throw dbErr;
                 
@@ -543,7 +543,7 @@
         };
 
         /**
-         * 로그인 위젯 렌더링 (사이드바 복구)
+         * 로그인 위젯 렌더링
          */
         function renderLoginWidget() {
             const area = document.getElementById('login-widget-area');
