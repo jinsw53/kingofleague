@@ -185,6 +185,7 @@
         /* 인라인 수정 UI */
         .editable-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
         .btn-edit-small { font-size: 11px; padding: 3px 8px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; color: #64748b; font-weight: bold; }
+        .btn-edit-small:hover { background: #e2e8f0; color: #7c3aed; }
         
         .edit-mode-container { margin-top: 10px; display: none; gap: 8px; width: 100%; }
         .edit-input { flex: 1; padding: 10px; border: 2px solid #7c3aed; border-radius: 8px; font-size: 14px; outline: none; }
@@ -309,7 +310,6 @@
                 }
 
                 // 2. 팀원 여부 확인 (team_members 테이블 기준)
-                // player_name 컬럼이 실제 DB에 존재하는지 확인 필요 (400 오류 대비 로그 강화)
                 const { data: memberEntry, error: mErr } = await supabaseClient.from('team_members').select('team_name').eq('player_name', nickname).maybeSingle();
                 if (mErr) {
                     console.error("Team_members 조회 에러 (400 확인용):", mErr);
@@ -503,7 +503,10 @@
                 area.innerHTML = `
                     <div class="user-profile" style="display:block; text-align:center;">
                         <div class="user-avatar" style="margin:0 auto 15px;">👤</div>
-                        <div style="margin-bottom:5px;"><strong>${currentUser.nickname}</strong></div>
+                        <div style="margin-bottom:5px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <strong>${currentUser.nickname}</strong>
+                            <button onclick="window.changeNickname()" class="btn-edit-small">수정</button>
+                        </div>
                         <span class="badge">정식 멤버</span>
                         <div style="margin-top:20px;">
                             <button class="btn-logout" onclick="window.handleLogout()">로그아웃</button>
@@ -522,9 +525,24 @@
             location.reload(); 
         };
 
+        /**
+         * 닉네임 수정 기능
+         */
         window.changeNickname = async () => {
-            const n = prompt("새 닉네임 입력", currentUser.nickname);
-            if (n) { await supabaseClient.from('profiles').upsert({ id: currentUser.id, full_name: n.trim() }); location.reload(); }
+            const n = prompt("새로운 닉네임을 입력하세요", currentUser.nickname);
+            if (n && n.trim()) { 
+                const newNick = n.trim();
+                const { error } = await supabaseClient.from('profiles').upsert({ 
+                    id: currentUser.id, 
+                    full_name: newNick 
+                });
+                if (error) {
+                    alert("닉네임 수정 실패: " + error.message);
+                } else {
+                    alert("✅ 닉네임이 수정되었습니다.");
+                    location.reload(); 
+                }
+            }
         };
 
         // 초기 구동 로직
