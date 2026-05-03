@@ -135,7 +135,7 @@
         .edit-area { display: none; margin-top: 15px; flex-direction: column; gap: 12px; animation: slideDown 0.3s ease-out; }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .save-btn-mini { background: var(--primary); color: white; padding: 12px 24px; border-radius: 10px; font-weight: 900; font-size: 14px; align-self: flex-end; }
-        .edit-input-box { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; outline: none; font-size: 15px; }
+        .edit-input-box { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; outline: none; font-size: 15px; background: #fff; }
         .edit-input-box:focus { border-color: var(--primary); }
 
         .member-grid { display: grid; gap: 15px; margin-top: 20px; }
@@ -346,7 +346,32 @@
                             </div>
                         </section>`;
                     } else {
-                        content = `<div class="main-banner"><h1>🛡️ 팀 창단</h1></div><section class="section-card"><div class="card-body"><form onsubmit="window.submitTeam(event)"><div class="form-group"><label>팀 이름</label><input type="text" id="team_name" class="edit-input-box" required></div><div class="form-group" style="margin-top:15px;"><label>로고</label><input type="file" id="team_logo" accept="image/*" required></div><button type="submit" id="btn_f" class="btn-submit" style="margin-top:20px;">팀 창단 신청</button></form></div></section>`;
+                        content = `
+                        <div class="main-banner"><h1>🛡️ 팀 창단</h1></div>
+                        <section class="section-card">
+                            <div class="card-header">신규 팀 정보 입력</div>
+                            <div class="card-body">
+                                <form onsubmit="window.submitTeam(event)">
+                                    <div class="form-group">
+                                        <label>팀 이름 (필수)</label>
+                                        <input type="text" id="team_name" class="edit-input-box" placeholder="팀명을 입력하세요" required>
+                                    </div>
+                                    <div class="form-group" style="margin-top:15px;">
+                                        <label>팀 슬로건</label>
+                                        <input type="text" id="team_motto" class="edit-input-box" placeholder="팀을 대표하는 각오 한마디">
+                                    </div>
+                                    <div class="form-group" style="margin-top:15px;">
+                                        <label>팀 상세 소개</label>
+                                        <textarea id="team_desc" rows="5" class="edit-input-box" placeholder="우리 팀의 역사나 모집 요강을 적어주세요"></textarea>
+                                    </div>
+                                    <div class="form-group" style="margin-top:15px;">
+                                        <label>팀 로고 (필수)</label>
+                                        <input type="file" id="team_logo" accept="image/*" required>
+                                    </div>
+                                    <button type="submit" id="btn_f" class="btn-submit" style="margin-top:20px;">팀 창단 신청하기</button>
+                                </form>
+                            </div>
+                        </section>`;
                     }
                     break;
                 case 'main': default:
@@ -399,15 +424,26 @@
             e.preventDefault();
             const btn = document.getElementById('btn_f');
             const file = document.getElementById('team_logo').files[0];
+            const team_name = document.getElementById('team_name').value.trim();
+            const team_motto = document.getElementById('team_motto').value.trim();
+            const team_desc = document.getElementById('team_desc').value.trim();
+
             btn.disabled = true; btn.innerText = "처리 중...";
             try {
                 const fName = `${Date.now()}.${file.name.split('.').pop()}`;
                 await supabaseClient.storage.from('teams').upload(fName, file);
                 const { data: uData } = supabaseClient.storage.from('teams').getPublicUrl(fName);
-                const { error: dbErr } = await supabaseClient.from('teams').insert([{ team_name: document.getElementById('team_name').value.trim(), owner_id: currentUser.id, leader_name: currentUser.nickname, logo_url: uData.publicUrl }]);
+                const { error: dbErr } = await supabaseClient.from('teams').insert([{ 
+                    team_name: team_name, 
+                    owner_id: currentUser.id, 
+                    leader_name: currentUser.nickname, 
+                    team_motto: team_motto,
+                    team_desc: team_desc,
+                    logo_url: uData.publicUrl 
+                }]);
                 if (dbErr) throw dbErr;
                 window.toast("✅ 팀 창단 완료!"); window.renderPage('team');
-            } catch (err) { window.toast(err.message); } finally { btn.disabled = false; btn.innerText = "팀 창단 신청"; }
+            } catch (err) { window.toast("창단 실패: " + err.message); } finally { btn.disabled = false; btn.innerText = "팀 창단 신청"; }
         };
 
         function renderWidget() {
