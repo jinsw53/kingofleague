@@ -116,16 +116,28 @@ Boako.View = {
                     </section>`;
                 }
                 break;
-                // 기존 switch문 안에 추가해주세요!
+                // 포인트샵 관련
             case 'shop':
                 if (!Boako.state.user) {
                     html = `<div class="main-banner" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);"><h1>🛒 포인트 샵</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
                     break;
                 }
                 
-                // 포인트 조회 (UI 렌더링용)
+                // 1. 내 포인트와 영수증 내역 조회
                 const { data: myProfile } = await Boako.db.from('profiles').select('points').eq('id', Boako.state.user.id).single();
                 const myPoints = myProfile?.points || 0;
+                
+                const { data: pointHistory } = await Boako.db.from('point_history')
+                    .select('*')
+                    .eq('user_id', Boako.state.user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                // 2. DB에서 판매 중인 아이템 목록 가져오기
+                const { data: shopItems } = await Boako.db.from('shop_items')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('price', { ascending: true });
 
                 html = `
                 <div class="main-banner" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
@@ -134,22 +146,52 @@ Boako.View = {
                         내 지갑: <span style="color:#fde047;">${myPoints.toLocaleString()} P</span>
                     </p>
                 </div>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:25px;">
-                    ${Boako.Shop.items.map(item => `
+                
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:25px; margin-bottom:40px;">
+                    ${(shopItems || []).map(item => `
                         <div class="section-card" style="margin-bottom:0; display:flex; flex-direction:column; text-align:center; transition:0.3s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                             <div class="card-body" style="flex:1;">
                                 <div style="font-size:60px; margin-bottom:15px;">${item.icon}</div>
                                 <h3 style="font-size:20px; font-weight:900; margin-bottom:10px;">${item.name}</h3>
-                                <p style="color:#64748b; font-size:14px; word-break:keep-all;">${item.desc}</p>
+                                <p style="color:#64748b; font-size:14px; word-break:keep-all;">${item.description}</p>
                             </div>
                             <div style="padding:20px; border-top:1px solid #f1f5f9; background:#fafafa;">
-                                <button class="btn-submit" style="padding:15px; font-size:16px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 10px 20px rgba(245, 158, 11, 0.2);" onclick="Boako.Shop.buyItem('${item.id}', ${item.price}, '${item.name}')">
+                                <button class="btn-submit" style="padding:15px; font-size:16px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 10px 20px rgba(245, 158, 11, 0.2);" onclick="Boako.Shop.buyItem('${item.item_id}')">
                                     💎 ${item.price.toLocaleString()} P 구매
                                 </button>
                             </div>
                         </div>
                     `).join('')}
-                </div>`;
+                </div>
+
+                <!-- 영수증 UI -->
+                <section class="section-card">
+                    <div class="card-header" style="font-size:18px;">🧾 최근 포인트 이용 내역</div>
+                    <div class="card-body" style="padding:0;">
+                        ${(!pointHistory || pointHistory.length === 0) 
+                            ? `<div style="padding:40px; text-align:center; color:#94a3b8; font-weight:700;">이용 내역이 없습니다.</div>`
+                            : `<ul style="list-style:none; margin:0; padding:0;">
+                                ${pointHistory.map(log => {
+                                    const date = new Date(log.created_at).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+                                    const isPlus = log.point_change > 0;
+                                    const color = isPlus ? '#10b981' : '#ef4444';
+                                    const sign = isPlus ? '+' : '';
+                                    return `
+                                    <li style="display:flex; justify-content:space-between; align-items:center; padding:18px 30px; border-bottom:1px solid #f1f5f9;">
+                                        <div>
+                                            <div style="font-size:13px; color:#94a3b8; font-weight:600; margin-bottom:4px;">${date}</div>
+                                            <div style="font-size:16px; font-weight:800; color:#334155;">${log.description}</div>
+                                        </div>
+                                        <div style="font-size:18px; font-weight:900; color:${color};">
+                                            ${sign}${log.point_change.toLocaleString()} P
+                                        </div>
+                                    </li>`;
+                                }).join('')}
+                               </ul>`
+                        }
+                    </div>
+                </section>
+                `;
                 break;
             case 'main': default:
                 html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
