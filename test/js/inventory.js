@@ -21,7 +21,7 @@ Boako.Inventory = {
                     is_equipped,
                     item_id,
                     quantity,
-                    shop_items ( name, icon, type )
+                    shop_items ( name, icon, item_type )
                 `)
                 .eq('user_id', Boako.state.user.id);
 
@@ -45,7 +45,7 @@ Boako.Inventory = {
                         item_id: row.item_id,
                         name: info.name, 
                         icon: info.icon, 
-                        type: info.type,
+                        type: info.item_type,
                         quantity: row.quantity
                     });
                 }
