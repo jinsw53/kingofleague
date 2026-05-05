@@ -10,6 +10,10 @@ Boako.View = {
         display.style.display = isNone ? 'none' : (type === 'motto' ? 'flex' : 'block');
     },
     render: async (pageId) => {
+        // 🌟 이 줄을 맨 위에 추가해 보세요! 🌟
+        console.log("👉 전달받은 페이지 이름: ", page);
+
+        if (this.isRendering) return;
         const area = document.getElementById('main-content-area');
         let html = '';
         
