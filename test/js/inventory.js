@@ -15,7 +15,7 @@ Boako.Inventory = {
         try {
             // 🌟 1. 진짜 Supabase DB에서 내 아이템 가져오기 (수량 quantity 포함!)
             const { data: myItems, error } = await Boako.db
-                .from('user_items') // 👈 소장님의 진짜 '유저 인벤토리' 테이블 이름
+                .from('inventory') // 👈 소장님의 진짜 '유저 인벤토리' 테이블 이름
                 .select(`
                     id,
                     is_equipped,
