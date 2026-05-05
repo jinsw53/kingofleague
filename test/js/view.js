@@ -102,7 +102,7 @@ Boako.View = {
                                 <div class="form-group" style="margin-top:15px;">
                                     <label>팀 로고 (필수)</label>
                                     <div class="custom-upload" onclick="document.getElementById('team_logo').click()">
-                                        <div id="upload-placeholder">🖼️<br><b>로고 이미지 업로드</b><br><small>클릭하여 파일을 선택하세요</small></div>
+                                        <div id="upload-placeholder">🖼️<br><b>로고 이미지 업로드</b><br><small>클릭하여 파일을 선택하세요</small><br><small>해상도 500 X 500 이하의 배경이 없는 Png 파일이여야 합니다</small></div>
                                         <div id="preview-container" class="preview-img-container">
                                             <img id="logo-preview-img" src="">
                                             <div style="position:absolute; top:10px; right:10px; background:red; color:white; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center;" onclick="Boako.Util.removeImgPreview(event)">✕</div>
