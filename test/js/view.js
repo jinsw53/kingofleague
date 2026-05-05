@@ -110,7 +110,7 @@ Boako.View = {
                                         <input type="file" id="team_logo" accept="image/*" required onchange="Boako.Util.handleImgPreview(this)" style="display:none;">
                                     </div>
                                 </div>
-                                <button type="submit" id="btn_f" class="btn-submit">전설의 팀 창단하기</button>
+                                <button type="submit" id="btn_f" class="btn-submit" style="margin-top: 30px;">전설의 팀 창단하기</button>
                             </form>
                         </div>
                     </section>`;
