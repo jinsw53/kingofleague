@@ -151,7 +151,12 @@ Boako.View = {
                     ${(shopItems || []).map(item => `
                         <div class="section-card" style="margin-bottom:0; display:flex; flex-direction:column; text-align:center; transition:0.3s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                             <div class="card-body" style="flex:1;">
-                                <div style="font-size:60px; margin-bottom:15px;">${item.icon}</div>
+                                <div style="width: 80px; height: 80px; font-size: 60px; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+    ${item.icon && item.icon.startsWith('http') 
+        ? `<img src="${item.icon}" style="width: 100%; height: 100%; object-fit: contain;">` 
+        : (item.icon || '❓')
+    }
+</div>
                                 <h3 style="font-size:20px; font-weight:900; margin-bottom:10px;">${item.name}</h3>
                                 <p style="color:#64748b; font-size:14px; word-break:keep-all;">${item.description}</p>
                             </div>
