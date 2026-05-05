@@ -193,30 +193,32 @@ Boako.View = {
                 </section>
                 `;
                 break;
-                // 🎒 [2] 내 인벤토리 버튼을 눌렀을 때
+               // 🎒 [2] 내 인벤토리 버튼을 눌렀을 때
                 case 'inventory':
-                    const contentArea = document.querySelector('.section-card');
-                    contentArea.innerHTML = `
-                        <div class="inventory-container">
-                            <h2 style="margin-bottom: 20px;">🎒 내 인벤토리 및 배지 관리</h2>
-                            
-                            <!-- 장착된 배지 슬롯 영역 -->
-                            <div class="badge-slots-area" style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                                <h3>✨ 장착 중인 배지</h3>
-                                <div id="equipped-badges">로딩 중...</div>
-                            </div>
+                    // contentArea 찾는 부분 삭제하고, 바로 html 변수에 덮어씌웁니다!
+                    html = `
+                        <div class="main-banner"><h1>🎒 내 인벤토리</h1></div>
+                        <section class="section-card">
+                            <div class="card-header">배지 및 아이템 관리</div>
+                            <div class="card-body">
+                                
+                                <!-- 장착된 배지 슬롯 영역 -->
+                                <div class="badge-slots-area" style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
+                                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 15px;">✨ 장착 중인 배지</h3>
+                                    <div id="equipped-badges">로딩 중...</div>
+                                </div>
 
-                            <!-- 보유 중인 아이템 가방 영역 -->
-                            <div class="inventory-items-area">
-                                <h3>📦 내 가방</h3>
-                                <div id="inventory-list">로딩 중...</div>
+                                <!-- 보유 중인 아이템 가방 영역 -->
+                                <div class="inventory-items-area">
+                                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 15px;">📦 내 가방</h3>
+                                    <div id="inventory-list">로딩 중...</div>
+                                </div>
+
                             </div>
-                        </div>
+                        </section>
                     `;
-                    // 화면을 다 그렸으니, DB에서 아이템을 가져와서 채우는 함수 실행 (앞으로 만들 부분!)
-                    // Boako.Inventory.loadItems();
-                    
-                    break; // 👈 inventory 다 그렸으면 여기서 탈출!
+                    // 화면을 다 그렸으니 DB에서 아이템 가져오는 함수는 나중에 여기서 실행!
+                    break;
             case 'main': default:
                 html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
         }
