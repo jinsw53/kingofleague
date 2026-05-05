@@ -195,7 +195,7 @@ Boako.View = {
                 break;
                 // 🎒 [2] 내 인벤토리 버튼을 눌렀을 때
                 case 'inventory':
-                    const contentArea = document.getElementById('section-card');
+                    const contentArea = document.getElementById('main-content-area');
                     contentArea.innerHTML = `
                         <div class="inventory-container">
                             <h2 style="margin-bottom: 20px;">🎒 내 인벤토리 및 배지 관리</h2>
