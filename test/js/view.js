@@ -217,7 +217,7 @@ Boako.View = {
                             </div>
                         </section>
                     `;
-                    // 화면을 다 그렸으니 DB에서 아이템 가져오는 함수는 나중에 여기서 실행!
+                    setTimeout(() => Boako.Inventory.loadItems(), 0);
                     break;
             case 'main': default:
                 html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
