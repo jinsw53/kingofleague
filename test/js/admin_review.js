@@ -122,7 +122,7 @@ Boako.AdminReview = {
 
             if (error) throw error;
 
-            alert("✅ 업데이트 성공! (가상 뷰 조건에 맞으면 목록에서 사라집니다.)");
+            alert("✅ 업데이트 성공!");
 
             // 🌟 DB가 업데이트 되었으므로 가상 뷰에서 해당 항목이 빠졌는지 다시 확인하러 갑니다.
             await this.loadQueue(); 
