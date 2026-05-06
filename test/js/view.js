@@ -224,6 +224,26 @@ Boako.View = {
                     `;
                     setTimeout(() => Boako.Inventory.loadItems(), 0);
                     break;
+                // 🌟 [추가] 아카이브 검수센터 (이 위치에 넣어주세요!)
+            case 'admin_review':
+                html = `
+                    <div class="main-banner" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
+                        <h1>🛠️ 아카이브 검수센터</h1>
+                        <p>수정이 필요한 데이터를 검토하고 승인합니다.</p>
+                    </div>
+                    <section class="section-card">
+                        <div class="card-header">데이터 검수 대기 리스트</div>
+                        <div class="card-body" style="min-height: 400px; background: #f8fafc;">
+                            <div id="review-container">
+                                <!-- 여기에 admin_review.js의 카드 UI가 그려집니다 -->
+                                <div style="text-align:center; padding:50px; color:#94a3b8;">데이터를 불러오는 중...</div>
+                            </div>
+                        </div>
+                    </section>
+                `;
+                // 인벤토리와 마찬가지로, HTML이 화면에 박힌 직후에 데이터를 불러오도록 타이머 설정
+                setTimeout(() => Boako.AdminReview.init(), 0);
+                break;
             case 'main': default:
                 html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
         }
