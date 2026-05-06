@@ -67,13 +67,14 @@ Boako.Auth = {
         }
     }, // 👈 여기에 콤마(,)가 있어야 다음 함수를 쓸 수 있습니다!
 
-    /**
-     * 🌟 [추가] 관리자 메뉴 권한 체크 함수
+  /**
+     * 🌟 [업그레이드] 관리자 메뉴 권한 체크 및 실시간 스타일링
      */
     checkAdminMenu: async function() {
         if (!Boako.state.user) return;
 
         try {
+            // 1. 관리자 권한 확인
             const { data: profile } = await Boako.db
                 .from('profiles')
                 .select('is_admin')
@@ -83,11 +84,30 @@ Boako.Auth = {
             if (profile && profile.is_admin) {
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) {
-                    adminMenu.style.display = 'list-item'; // 메뉴 보이기
+                    // 메뉴는 일단 노출
+                    adminMenu.style.display = 'list-item'; 
+                    
+                    // 2. 검수할 데이터 건수 확인 (head: true 옵션으로 데이터 없이 개수만 빠르게 조회)
+                    const { count } = await Boako.db
+                        .from('view_pending_review_games')
+                        .select('*', { count: 'exact', head: true });
+                    
+                    // 3. 건수에 따른 조건부 스타일링
+                    if (count > 0) {
+                        // 검수 대기 항목이 있을 때만 붉은색 포인트
+                        adminMenu.style.background = '#fff1f2';
+                        adminMenu.style.borderLeft = '4px solid #f43f5e';
+                        adminMenu.style.fontWeight = '800';
+                    } else {
+                        // 검수할 게 없으면 일반 메뉴처럼 투명하게
+                        adminMenu.style.background = 'transparent';
+                        adminMenu.style.borderLeft = 'none';
+                        adminMenu.style.fontWeight = 'normal';
+                    }
                 }
             }
-        } catch (err) {
-            console.error("관리자 메뉴 로드 오류:", err);
+        } catch (err) { 
+            console.error("관리자 메뉴 로드 오류:", err); 
         }
-    } // 👈 마지막 함수 뒤에는 콤마가 없어도 됩니다.
+    }
 }; // 👈 여기서 딱 한 번만 닫아주면 끝!
