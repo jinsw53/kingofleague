@@ -18,15 +18,30 @@ Boako.AdminReview = {
         this.loadQueue();
     },
 
-    loadQueue: async function() {
+   loadQueue: async function() {
         const { data, error } = await Boako.db
-            .from('view_pending_review_games') // 여기서 이미 빈틈 있는 게임만 필터링됨
+            .from('view_pending_review_games')
             .select('*');
 
         if (error) return console.error("데이터 로드 실패:", error);
 
         this.pendingGames = data || [];
-        this.currentIndex = 0; // 항상 첫 번째 카드부터 시작
+        
+        // 🎨 [스타일 업데이트 로직] - 검수 건수에 따라 메뉴 색상 변경
+        const menu = document.getElementById('menu-admin-review');
+        if (menu) {
+            if (this.pendingGames.length > 0) {
+                menu.style.background = '#fff1f2';
+                menu.style.borderLeft = '4px solid #f43f5e';
+                menu.style.fontWeight = '800';
+            } else {
+                menu.style.background = 'transparent';
+                menu.style.borderLeft = 'none';
+                menu.style.fontWeight = 'normal';
+            }
+        }
+
+        this.currentIndex = 0;
         this.render();
     },
 
