@@ -57,17 +57,18 @@ Boako.AdminReview = {
         this.selectedFile = null; // 카드 바뀔 때마다 선택 파일 초기화
 
         container.innerHTML = `
-            <div style="max-width:550px; margin:20px auto; background:white; border-radius:24px; box-shadow:0 20px 40px rgba(0,0,0,0.1); border:1px solid #f1f5f9; overflow:hidden;">
-                <div style="background:#1e293b; padding:15px 25px; color:white; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:12px; font-weight:800;">ARCHIVE ID #${game.id}</span>
-                    <span style="font-size:12px; background:#10b981; padding:4px 10px; border-radius:20px;">${this.currentIndex + 1} / ${this.pendingGames.length}</span>
-                </div>
-                
-                <div style="padding:30px;">
+    <div style="max-width:550px; margin:20px auto; background:white; border-radius:24px; box-shadow:0 20px 40px rgba(0,0,0,0.1); border:1px solid #f1f5f9; overflow:hidden;">
+        <div style="background:#1e293b; padding:15px 25px; color:white; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; font-weight:800;">ARCHIVE ID #${game.id}</span>
+            <span style="font-size:12px; background:#10b981; padding:4px 10px; border-radius:20px;">${this.currentIndex + 1} / ${this.pendingGames.length}</span>
+        </div>
+        
+        <div style="padding:30px;">
             <!-- 🖼️ 이미지 업로드 구역 -->
-            <div style="...">
-                <!-- 짝꿍 완료! -->
-                <label for="file-upload" style="cursor:pointer; ...">
+            <div style="margin-bottom:25px; text-align:center; border:2px dashed #e2e8f0; padding:20px; border-radius:16px; background:#f8fafc;">
+                <img id="image-preview" src="${game.image_url || ''}" 
+                     style="max-width:150px; margin:0 auto 15px; border-radius:12px; display:${game.image_url ? 'block' : 'none'}; box-shadow:0 8px 15px rgba(0,0,0,0.1);">
+                <label for="file-upload" style="cursor:pointer; background:#fff; padding:8px 16px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:700; color:#64748b;">
                     📷 이미지 선택 (WebP 권장)
                 </label>
                 <input id="file-upload" type="file" accept="image/*" style="display:none;" onchange="Boako.AdminReview.handleFileSelect(event)">
@@ -75,34 +76,34 @@ Boako.AdminReview = {
 
             <div style="margin-bottom:20px;">
                 <label for="edit-game-name" style="font-size:11px; font-weight:900; color:#64748b; display:block; margin-bottom:8px;">게임명</label>
-                <input id="edit-game-name" type="text" value="${game.game_name || ''}" style="...">
+                <input id="edit-game-name" type="text" value="${game.game_name || ''}" style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:12px; font-weight:800;">
             </div>
 
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:20px;">
                 <div>
                     <label for="edit-min-players" style="font-size:11px; font-weight:900; color:#64748b;">최소</label>
-                    <input id="edit-min-players" type="number" value="${game.min_players || 0}" style="...">
+                    <input id="edit-min-players" type="number" value="${game.min_players || 0}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px;">
                 </div>
                 <div>
                     <label for="edit-max-players" style="font-size:11px; font-weight:900; color:#64748b;">최대</label>
-                    <input id="edit-max-players" type="number" value="${game.max_players || 0}" style="...">
+                    <input id="edit-max-players" type="number" value="${game.max_players || 0}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px;">
                 </div>
                 <div>
                     <label for="edit-playtime" style="font-size:11px; font-weight:900; color:#64748b;">시간(분)</label>
-                    <input id="edit-playtime" type="number" value="${game.playtime || 0}" style="...">
+                    <input id="edit-playtime" type="number" value="${game.playtime || 0}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px;">
                 </div>
             </div>
 
             <div style="margin-bottom:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <label for="edit-weight" style="font-size:11px; font-weight:900; color:#64748b;">웨이트 (Weight)</label>
-                    <!-- 체크박스용 별도 라벨 -->
                     <label for="edit-weight-unknown" style="font-size:12px; font-weight:800; color:#ef4444; cursor:pointer; display:flex; align-items:center; gap:5px;">
                         <input type="checkbox" id="edit-weight-unknown" ${game.is_weight_unknown ? 'checked' : ''} 
-                            onchange="..."> 웨이트 미정
+                            onchange="const wInput = document.getElementById('edit-weight'); wInput.disabled = this.checked; if(this.checked) wInput.value = 1;"> 웨이트 미정
                     </label>
                 </div>
-                <input id="edit-weight" type="number" step="0.1" value="..." style="...">
+                <input id="edit-weight" type="number" step="0.1" value="${game.is_weight_unknown ? 1 : (game.weight || 0)}" 
+                       ${game.is_weight_unknown ? 'disabled' : ''} style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:12px; font-weight:700;">
             </div>
 
             <div style="margin-bottom:30px; background:#f8fafc; padding:15px; border-radius:12px;">
