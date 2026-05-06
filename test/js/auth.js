@@ -8,6 +8,7 @@ Boako.Auth = {
         if (session?.user) {
             Boako.state.user = session.user;
             await Boako.Team.syncStatus();
+            await Boako.Auth.checkAdminMenu();
         }
         Boako.Auth.renderWidget();
         Boako.View.render('main');
@@ -16,6 +17,7 @@ Boako.Auth = {
             if (s?.user) {
                 Boako.state.user = s.user;
                 await Boako.Team.syncStatus();
+                await Boako.Auth.checkAdminMenu();
             } else {
                 Boako.state.user = null;
                 Boako.state.team = null;
@@ -48,6 +50,30 @@ Boako.Auth = {
             <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="margin-left: 10px; cursor: pointer;">🎒 내 인벤토리</button><br>
             <span class="badge-premium">아카이브 멤버</span><br>
             <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
+        }
+    }
+};
+/**
+     * 🌟 [추가 3] 관리자 메뉴 권한 체크 함수
+     */
+    checkAdminMenu: async function() {
+        if (!Boako.state.user) return;
+
+        try {
+            const { data: profile } = await Boako.db
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', Boako.state.user.id)
+                .single();
+
+            if (profile && profile.is_admin) {
+                const adminMenu = document.getElementById('menu-admin-review');
+                if (adminMenu) {
+                    adminMenu.style.display = 'list-item'; // 메뉴 보이기
+                }
+            }
+        } catch (err) {
+            console.error("관리자 메뉴 로드 오류:", err);
         }
     }
 };
