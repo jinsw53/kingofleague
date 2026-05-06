@@ -1,13 +1,11 @@
 /**
- * [ADMIN REVIEW SYSTEM - V6.0]
- * 1. is_reviewed 컬럼 없이 가상 뷰의 필터링에만 의존
- * 2. updated_by 기록 유지
- * 3. 웨이트 미정 시 1 저장
- * 4. 승인 후 목록 자동 갱신(다음 카드 전환)
+ * [ADMIN REVIEW SYSTEM - V7.0]
+ * 이미지 업로드 및 미리보기 기능 추가
  */
 Boako.AdminReview = {
     pendingGames: [],
     currentIndex: 0,
+    selectedFile: null, // 선택된 파일을 임시 저장
 
     init: async function() {
         if (!Boako.db) {
@@ -18,47 +16,45 @@ Boako.AdminReview = {
         this.loadQueue();
     },
 
-   loadQueue: async function() {
-        const { data, error } = await Boako.db
-            .from('view_pending_review_games')
-            .select('*');
-
+    loadQueue: async function() {
+        const { data, error } = await Boako.db.from('view_pending_review_games').select('*');
         if (error) return console.error("데이터 로드 실패:", error);
-
         this.pendingGames = data || [];
         
-        // 🎨 [스타일 업데이트 로직] - 검수 건수에 따라 메뉴 색상 변경
+        // 메뉴 스타일 업데이트 (기존 로직 유지)
         const menu = document.getElementById('menu-admin-review');
         if (menu) {
-            if (this.pendingGames.length > 0) {
-                menu.style.background = '#fff1f2';
-                menu.style.borderLeft = '4px solid #f43f5e';
-                menu.style.fontWeight = '800';
-            } else {
-                menu.style.background = 'transparent';
-                menu.style.borderLeft = 'none';
-                menu.style.fontWeight = 'normal';
-            }
+            menu.style.background = this.pendingGames.length > 0 ? '#fff1f2' : 'transparent';
+            menu.style.borderLeft = this.pendingGames.length > 0 ? '4px solid #f43f5e' : 'none';
         }
 
         this.currentIndex = 0;
         this.render();
     },
 
+    // 파일 선택 시 미리보기 처리
+    handleFileSelect: function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        this.selectedFile = file;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('image-preview').src = e.target.result;
+            document.getElementById('image-preview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    },
+
     render: function() {
         const container = document.getElementById('review-container');
-        if (!container) return;
-
-        if (this.pendingGames.length === 0) {
-            container.innerHTML = `
-                <div style="text-align:center; padding:100px 20px;">
-                    <h2 style="color:#cbd5e1;">☕ 모든 검수가 완료되었습니다!</h2>
-                    <p style="color:#94a3b8; margin-top:10px;">가상 뷰의 모든 빈틈이 채워졌습니다.</p>
-                </div>`;
+        if (!container || this.pendingGames.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:100px 20px;"><h2 style="color:#cbd5e1;">☕ 모든 검수가 완료되었습니다!</h2></div>`;
             return;
         }
 
         const game = this.pendingGames[this.currentIndex];
+        this.selectedFile = null; // 카드 바뀔 때마다 선택 파일 초기화
 
         container.innerHTML = `
             <div style="max-width:550px; margin:20px auto; background:white; border-radius:24px; box-shadow:0 20px 40px rgba(0,0,0,0.1); border:1px solid #f1f5f9; overflow:hidden;">
@@ -68,11 +64,22 @@ Boako.AdminReview = {
                 </div>
                 
                 <div style="padding:30px;">
+                    <!-- 🖼️ 이미지 업로드 구역 -->
+                    <div style="margin-bottom:25px; text-align:center; border:2px dashed #e2e8f0; padding:20px; border-radius:16px; background:#f8fafc;">
+                        <img id="image-preview" src="${game.image_url || ''}" 
+                             style="max-width:150px; margin:0 auto 15px; border-radius:12px; display:${game.image_url ? 'block' : 'none'}; box-shadow:0 8px 15px rgba(0,0,0,0.1);">
+                        <label for="file-upload" style="cursor:pointer; background:#fff; padding:8px 16px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:700; color:#64748b;">
+                            📷 이미지 선택 (WebP 권장)
+                        </label>
+                        <input id="file-upload" type="file" accept="image/*" style="display:none;" onchange="Boako.AdminReview.handleFileSelect(event)">
+                    </div>
+
                     <div style="margin-bottom:20px;">
                         <label style="font-size:11px; font-weight:900; color:#64748b; display:block; margin-bottom:8px;">게임명</label>
                         <input id="edit-game-name" type="text" value="${game.game_name || ''}" style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:12px; font-weight:800;">
                     </div>
 
+                    <!-- ... 중략 (인원, 시간, 웨이트 입력창은 기존과 동일) ... -->
                     <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:20px;">
                         <div><label style="font-size:11px; font-weight:900; color:#64748b;">최소</label>
                         <input id="edit-min-players" type="number" value="${game.min_players || 0}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px;"></div>
@@ -91,8 +98,7 @@ Boako.AdminReview = {
                             </label>
                         </div>
                         <input id="edit-weight" type="number" step="0.1" value="${game.is_weight_unknown ? 1 : (game.weight || 0)}" 
-                               ${game.is_weight_unknown ? 'disabled' : ''}
-                               style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:12px; font-weight:700;">
+                               ${game.is_weight_unknown ? 'disabled' : ''} style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:12px; font-weight:700;">
                     </div>
 
                     <div style="margin-bottom:30px; background:#f8fafc; padding:15px; border-radius:12px;">
@@ -111,10 +117,33 @@ Boako.AdminReview = {
     },
 
     submit: async function(gameId) {
-        if (!confirm("데이터를 업데이트하시겠습니까?")) return;
+        if (!confirm("이미지를 포함하여 업데이트하시겠습니까?")) return;
 
+        let imageUrl = this.pendingGames[this.currentIndex].image_url;
+
+        // 1. 이미지가 새로 선택되었다면 Storage에 업로드
+        if (this.selectedFile) {
+            const file = this.selectedFile;
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${gameId}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { data: uploadData, error: uploadError } = await Boako.db.storage
+                .from('game-images')
+                .upload(filePath, file);
+
+            if (uploadError) return alert("이미지 업로드 실패: " + uploadError.message);
+
+            // 공용 URL 가져오기
+            const { data: publicUrlData } = Boako.db.storage
+                .from('game-images')
+                .getPublicUrl(filePath);
+            
+            imageUrl = publicUrlData.publicUrl;
+        }
+
+        // 2. DB 업데이트
         const isUnknown = document.getElementById('edit-weight-unknown').checked;
-
         const updateData = {
             game_name: document.getElementById('edit-game-name').value,
             weight: isUnknown ? 1 : parseFloat(document.getElementById('edit-weight').value),
@@ -123,28 +152,17 @@ Boako.AdminReview = {
             min_players: parseInt(document.getElementById('edit-min-players').value),
             max_players: parseInt(document.getElementById('edit-max-players').value),
             is_cooperative: document.getElementById('edit-cooperative').checked,
-            
-            // 🌟 is_reviewed 항목 삭제됨 (DB에 없으므로 에러 방지)
+            image_url: imageUrl, // 🌟 이미지 주소 저장!
             updated_by: Boako.state.user.id,
             updated_at: new Date()
         };
 
         try {
-            const { error } = await Boako.db
-                .from('games')
-                .update(updateData)
-                .eq('id', gameId);
-
+            const { error } = await Boako.db.from('games').update(updateData).eq('id', gameId);
             if (error) throw error;
-
-            alert("✅ 업데이트 성공!");
-
-            // 🌟 DB가 업데이트 되었으므로 가상 뷰에서 해당 항목이 빠졌는지 다시 확인하러 갑니다.
-            await this.loadQueue(); 
-
-        } catch (err) {
-            alert("오류 발생: " + err.message);
-        }
+            alert("업데이트 완료! 📸");
+            await this.loadQueue();
+        } catch (err) { alert("오류: " + err.message); }
     },
 
     next: function() {
