@@ -1,7 +1,9 @@
 /**
- * [ADMIN REVIEW SYSTEM - V5.0]
- * 1. 웨이트 미정 시 기본값 1 저장
- * 2. 승인 후 다음 카드 전환 로직 보강
+ * [ADMIN REVIEW SYSTEM - V6.0]
+ * 1. is_reviewed 컬럼 없이 가상 뷰의 필터링에만 의존
+ * 2. updated_by 기록 유지
+ * 3. 웨이트 미정 시 1 저장
+ * 4. 승인 후 목록 자동 갱신(다음 카드 전환)
  */
 Boako.AdminReview = {
     pendingGames: [],
@@ -13,19 +15,18 @@ Boako.AdminReview = {
             return;
         }
         if (!Boako.state.user) return;
-
         this.loadQueue();
     },
 
     loadQueue: async function() {
         const { data, error } = await Boako.db
-            .from('view_pending_review_games')
+            .from('view_pending_review_games') // 여기서 이미 빈틈 있는 게임만 필터링됨
             .select('*');
 
         if (error) return console.error("데이터 로드 실패:", error);
 
         this.pendingGames = data || [];
-        this.currentIndex = 0; // 로드 시 인덱스 초기화
+        this.currentIndex = 0; // 항상 첫 번째 카드부터 시작
         this.render();
     },
 
@@ -33,12 +34,11 @@ Boako.AdminReview = {
         const container = document.getElementById('review-container');
         if (!container) return;
 
-        // 1. 대기 리스트가 없으면 종료 화면
         if (this.pendingGames.length === 0) {
             container.innerHTML = `
                 <div style="text-align:center; padding:100px 20px;">
                     <h2 style="color:#cbd5e1;">☕ 모든 검수가 완료되었습니다!</h2>
-                    <button onclick="Boako.AdminReview.loadQueue()" style="margin-top:20px; padding:10px 20px; border-radius:10px; border:1px solid #e2e8f0; cursor:pointer;">새로고침</button>
+                    <p style="color:#94a3b8; margin-top:10px;">가상 뷰의 모든 빈틈이 채워졌습니다.</p>
                 </div>`;
             return;
         }
@@ -63,7 +63,7 @@ Boako.AdminReview = {
                         <input id="edit-min-players" type="number" value="${game.min_players || 0}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px;"></div>
                         <div><label style="font-size:11px; font-weight:900; color:#64748b;">최대</label>
                         <input id="edit-max-players" type="number" value="${game.max_players || 0}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px;"></div>
-                        <div><label style="font-size:11px; font-weight:900; color:#64748b;">시간</label>
+                        <div><label style="font-size:11px; font-weight:900; color:#64748b;">시간(분)</label>
                         <input id="edit-playtime" type="number" value="${game.playtime || 0}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px;"></div>
                     </div>
 
@@ -96,41 +96,36 @@ Boako.AdminReview = {
     },
 
     submit: async function(gameId) {
-        if (!confirm("검수를 완료하고 아카이브에 반영할까요?")) return;
+        if (!confirm("데이터를 업데이트하시겠습니까?")) return;
 
         const isUnknown = document.getElementById('edit-weight-unknown').checked;
 
         const updateData = {
             game_name: document.getElementById('edit-game-name').value,
-            // 🌟 미정일 때 소장님 요청대로 1로 저장!
             weight: isUnknown ? 1 : parseFloat(document.getElementById('edit-weight').value),
             is_weight_unknown: isUnknown,
             playtime: parseInt(document.getElementById('edit-playtime').value),
             min_players: parseInt(document.getElementById('edit-min-players').value),
             max_players: parseInt(document.getElementById('edit-max-players').value),
             is_cooperative: document.getElementById('edit-cooperative').checked,
-            is_reviewed: true,
+            
+            // 🌟 is_reviewed 항목 삭제됨 (DB에 없으므로 에러 방지)
             updated_by: Boako.state.user.id,
             updated_at: new Date()
         };
 
         try {
-            const { error } = await Boako.db.from('games').update(updateData).eq('id', gameId);
+            const { error } = await Boako.db
+                .from('games')
+                .update(updateData)
+                .eq('id', gameId);
+
             if (error) throw error;
 
-            alert("성공적으로 승인되었습니다! ✅");
+            alert("✅ 업데이트 성공! (가상 뷰 조건에 맞으면 목록에서 사라집니다.)");
 
-            // 🌟 [다음 카드로 넘기기 로직]
-            // 현재 배열에서 처리한 항목을 삭제
-            this.pendingGames.splice(this.currentIndex, 1);
-
-            // 마지막 장을 지웠다면 인덱스를 앞으로 당김
-            if (this.currentIndex >= this.pendingGames.length) {
-                this.currentIndex = 0;
-            }
-
-            // UI 갱신 (리스트가 비었으면 종료화면이 뜸)
-            this.render();
+            // 🌟 DB가 업데이트 되었으므로 가상 뷰에서 해당 항목이 빠졌는지 다시 확인하러 갑니다.
+            await this.loadQueue(); 
 
         } catch (err) {
             alert("오류 발생: " + err.message);
