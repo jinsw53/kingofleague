@@ -8,6 +8,14 @@ Boako.AdminReview = {
 
     // [A] 검수 대기 리스트 로드
     init: async function() {
+        // 🛡️ [추가] DB 연결이 안 되어 있으면 잠시 기다리거나 로드하지 않음
+        if (!Boako.db) {
+            console.log("DB가 아직 로드되지 않았습니다. 0.5초 후 다시 시도합니다...");
+            setTimeout(() => this.init(), 500);
+            return;
+        }
+
+        if (!Boako.state.user) return; // 유저 정보 없으면 중단
         // 관리자 권한 최종 확인 (보안)
         const { data: profile } = await Boako.db
             .from('profiles')
