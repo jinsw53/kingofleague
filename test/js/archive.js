@@ -49,9 +49,6 @@ Boako.Archive = {
                             <i data-lucide="layers" class="text-indigo-500 w-4 h-4"></i>
                             <select id="archive-round" onchange="Boako.Archive.filterData()" class="bg-transparent border-none text-xs font-black outline-none cursor-pointer">
                                 <option value="all">전체 라운드</option>
-                                <option value="1">1 라운드</option>
-                                <option value="2">2 라운드</option>
-                                <option value="3">3 라운드</option>
                             </select>
                         </div>
                     </div>
@@ -82,7 +79,7 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    // 🔍 archive.js 내 loadData 함수 수정본
+    // 🔍 archive.js 내 loadData 함수 최종본 (시즌/라운드 빌더 동시 가동)
 loadData: async function() {
     try {
         const { data, error } = await Boako.db
@@ -94,8 +91,9 @@ loadData: async function() {
         
         this.allRecords = data || [];
 
-        // 🌟 [추가] 데이터 로드가 끝나면 시즌 드롭다운을 자동으로 갱신하는 팩토리 함수 가동
+        // 🌟 데이터 로드 직후 시즌과 라운드 드롭다운 메뉴를 동시에 자동 생성합니다.
         this.updateSeasonOptions();
+        this.updateRoundOptions(); // 👈 이 줄을 추가하세요!
 
         this.filterData(); 
     } catch (err) {
@@ -169,6 +167,30 @@ loadData: async function() {
         // 셀렉트 박스 구역에 완성된 HTML 옵션들을 최종 주입
         seasonSelect.innerHTML = optionsHTML;
     }, // 👈 다음 함수(renderRecords)로 넘어가야 하므로 여기에 콤마(,)가 반드시 필요합니다!
+    /**
+ * 🌟 [새로 추가하는 구역] DB 내 round_no를 분석해서 라운드 드롭다운 옵션을 동적으로 늘려주는 빌더
+ */
+updateRoundOptions: function() {
+    const roundSelect = document.getElementById('archive-round');
+    if (!roundSelect) return;
+
+    // 전체 레코드에서 round_no 데이터만 중복 없이 수집 (예: [3, 1, 2, 3] -> [1, 2, 3])
+    const rounds = [...new Set(this.allRecords.map(rec => rec.round_no).filter(Boolean))];
+    
+    // 라운드 번호 순서대로 오름차순 정렬 (1 라운드 -> 2 라운드 -> 3 라운드...)
+    rounds.sort((a, b) => a - b);
+
+    // 기본 선택지인 '전체 라운드' 장착
+    let optionsHTML = `<option value="all">전체 라운드</option>`;
+    
+    // 찾아낸 라운드 숫자 개수만큼 반복하며 옵션 도자기 빚기
+    rounds.forEach(r => {
+        optionsHTML += `<option value="${r}">${r} 라운드</option>`;
+    });
+
+    // 라운드 셀렉트 박스 구역에 최종 결과물 이식 완료
+    roundSelect.innerHTML = optionsHTML;
+}, // 👈 다음 함수(renderRecords)로 넘어가야 하므로 닫는 괄호 뒤에 콤마(,) 마감을 확실히 해줍니다!
     // 5. 기록실 테이블 렌더링 (Tailwind 디자인 원상 복구)
     renderRecords: function() {
         const area = document.getElementById('archive-content-area');
