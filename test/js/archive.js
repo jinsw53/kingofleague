@@ -237,7 +237,16 @@ updateRoundOptions: function() {
                 <td class="px-4 py-4">
                     <div class="flex flex-col leading-tight">
                         <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
-                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">${rec.b_all_team || 'Free Agent'}</span>
+                        
+                        <div class="flex items-center gap-1.5 mt-1">
+                            ${
+                                // logo_url 칼럼에 값이 있고 무소속(Free Agent)이 아닐 때만 이미지를 출력
+                                rec.logo_url && rec.b_all_team !== 'Free Agent'
+                                    ? `<img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">`
+                                    : `<span class="text-[10px]">👤</span>` // 로고가 없거나 FA면 기본 아이콘 표시
+                            }
+                            <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${rec.b_all_team || 'Free Agent'}</span>
+                        </div>
                     </div>
                 </td>
                 
