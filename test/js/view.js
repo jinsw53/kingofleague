@@ -21,17 +21,15 @@ Boako.View = {
             case 'ranking':
                 html = `<div class="main-banner"><h1>🏆 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">집계 중...</div></section>`;
                 break;
-            case 'records':
-                html = `
-                <div class="main-banner" style="background: linear-gradient(135deg, #4f46e5 0%, #312e81 100%);">
-                    <h1>📋 BOAKO 아카이브</h1>
-                    <p>시즌 경기 기록과 점수 산출 근거를 투명하게 공개합니다.</p>
-                </div>
-                <div id="archive-container" class="w-full mt-6">
-                    </div>
-                `;
-                // 화면에 도화지가 꽂힌 직후 archive.js를 깨웁니다.
-                setTimeout(() => Boako.Archive.init(), 0);
+           case 'records':
+                html = `<div id="archive-master-container" class="w-full animate-in fade-in duration-500"></div>`;
+                
+                // HTML 도화지가 렌더링된 직후, archive.js에게 그리는 책임을 넘김
+                setTimeout(() => {
+                    if (Boako.Archive && typeof Boako.Archive.buildUI === 'function') {
+                        Boako.Archive.buildUI('archive-master-container');
+                    }
+                }, 0);
                 break;
             case 'team':
                 if (!Boako.state.user) {
