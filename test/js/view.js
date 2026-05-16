@@ -22,18 +22,17 @@ Boako.View = {
                 html = `<div class="main-banner"><h1>🏆 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">집계 중...</div></section>`;
                 break;
             case 'records':
-    // 이 안에 방금 제가 만들어드린 프리미엄 HTML 뼈대를 문자열(백틱 `)로 감싸서 넣습니다.
-    html = `
-        <div class="main-banner" style="background: linear-gradient(135deg, #4f46e5 0%, #312e81 100%);">
-            <h1>📋 BOAKO 아카이브</h1>
-            <p>시즌 경기 기록과 점수 산출 근거를 투명하게 공개합니다.</p>
-        </div>
-        <div id="archive-container">
-            </div>
-    `;
-    // HTML을 꽂은 직후에 데이터를 불러오는 함수를 실행하도록 세팅합니다.
-    setTimeout(() => Boako.Archive.init(), 0);
-    break;
+                html = `
+                <div class="main-banner" style="background: linear-gradient(135deg, #4f46e5 0%, #312e81 100%);">
+                    <h1>📋 BOAKO 아카이브</h1>
+                    <p>시즌 경기 기록과 점수 산출 근거를 투명하게 공개합니다.</p>
+                </div>
+                <div id="archive-container" class="w-full mt-6">
+                    </div>
+                `;
+                // 화면에 도화지가 꽂힌 직후 archive.js를 깨웁니다.
+                setTimeout(() => Boako.Archive.init(), 0);
+                break;
             case 'team':
                 if (!Boako.state.user) {
                     html = `<div class="main-banner"><h1>🛡️ 팀 서비스</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
