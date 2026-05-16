@@ -236,7 +236,6 @@ updateRoundOptions: function() {
                     </div>
                 </td>
                 
-               // 🔍 archive.js 내 renderRecords 함수의 해당 td 구역을 찾아 아래 코드로 통째로 갈아끼우세요!
 
                 <td class="px-8 py-5">
                     <div class="flex flex-col leading-tight">
