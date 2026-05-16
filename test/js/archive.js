@@ -2,7 +2,7 @@
  * [ARCHIVE] 기록실 및 실시간 랭킹 시스템 
  * DB: v_boako_total_records 가상 뷰 100% 실시간 연동
  * 디자인: Tailwind CSS 기반 프리미엄 디자인 원상 복구본
- * 기능: 첫 진입 시 렌더링 타이틀 꼬임 방지 및 최신 시즌 자동 선택 탑재
+ * 기능: 첫 진입 시 최고 존엄 최신 시즌 자동 기본 선택 기능 탑재 완료
  */
 Boako.Archive = {
     allRecords: [],
@@ -71,8 +71,6 @@ Boako.Archive = {
         `;
 
         if(window.lucide) lucide.createIcons();
-        
-        // ⚠️ [보정 핵심] DOM이 완전히 안착하고 인지할 수 있도록 비동기 루프 태우기 전에 확실히 연결
         this.init();
     },
 
@@ -85,7 +83,7 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    // 아카이브 데이터 로드 완료 후 최신 시즌 강제 매칭 안전벨트 구역
+    // 아카이브 데이터 로드 완료 및 최신 시즌 자동 주입
     loadData: async function() {
         try {
             const { data, error } = await Boako.db
@@ -97,33 +95,24 @@ Boako.Archive = {
             
             this.allRecords = data || [];
 
-            // 1. 드롭다운 메뉴 뼈대를 먼저 빌드해서 채웁니다.
+            // 1. 시즌과 라운드 드롭다운 메뉴 옵션들을 동적으로 빌드
             this.updateSeasonOptions();
             this.updateRoundOptions();
 
-            // 2. 데이터 장부에서 가장 큰 최신 시즌 번호를 추적합니다.
+            // 2. 데이터 장부에서 가장 숫자가 큰 최신 시즌 번호 추적
             if (this.allRecords.length > 0) {
                 const maxSeason = Math.max(...this.allRecords.map(rec => rec.season_no || 0));
                 
-                // 3. 🌟 [타이밍 버그 박멸 방어막]
-                // 혹시라도 브라우저가 셀렉트 박스 그리는 게 늦어졌다면, 그려질 때까지 미세하게 딜레이를 주어 
-                // 무조건 최신 시즌이 선택되도록 안전장치를 치고 필터를 돌립니다.
-                const selectElementSetter = () => {
-                    const seasonSelect = document.getElementById('archive-season');
-                    if (seasonSelect && maxSeason > 0) {
-                        seasonSelect.value = maxSeason.toString();
-                        this.filterData(); // 값 주입 성공 시 필터 가동
-                    } else {
-                        // 엘리먼트가 아직 없으면 10밀리초 뒤에 다시 시도 (0.01초 타임슬롯 위임)
-                        setTimeout(selectElementSetter, 10);
-                    }
-                };
-                
-                selectElementSetter();
-            } else {
-                // 데이터가 아예 없으면 기본 필터 가동
-                this.filterData(); 
+                // 3. 생성 완료된 셀렉트 박스를 찾아 최신 시즌 값 강제 세팅
+                const seasonSelect = document.getElementById('archive-season');
+                if (seasonSelect && maxSeason > 0) {
+                    seasonSelect.value = maxSeason.toString();
+                }
             }
+
+            // 4. 세팅 완료된 상태에서 안전하게 필터 먹이고 렌더링 가동!
+            this.filterData(); 
+            
         } catch (err) {
             console.error("아카이브 데이터 로드 오류:", err);
             Boako.Util.toast("데이터를 불러오는 중 오류가 발생했습니다.");
@@ -206,7 +195,7 @@ Boako.Archive = {
         roundSelect.innerHTML = optionsHTML;
     },
 
-    // 5. 기록실 테이블 렌더링
+    // 5. 기록실 테이블 렌더링 (마우스 오버 대형 팝업 로고 연동본)
     renderRecords: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
@@ -222,7 +211,8 @@ Boako.Archive = {
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                                <th class="px-4 py-5 w-[100px]">Date</th> <th class="px-4 py-5">Player</th>
+                                <th class="px-4 py-5 w-[100px]">Date</th> 
+                                <th class="px-4 py-5">Player</th>
                                 <th class="px-4 py-5">Game Info</th>
                                 <th class="px-4 py-5 text-center w-[160px] leading-tight select-none">
                                     <div class="text-slate-400 text-[10px] font-black uppercase tracking-widest">Logic</div>
