@@ -218,7 +218,7 @@ updateRoundOptions: function() {
                                 <th class="px-4 py-5 w-[100px]">Date</th> <th class="px-4 py-5">Player</th>
                                 <th class="px-4 py-5">Game Info</th>
                                 <th class="px-4 py-5 text-center w-[160px] leading-tight select-none">
-    <div class="text-indigo-950">Logic</div>
+    <div class="text-slate-400">Logic</div>
     <div class="text-[9px] text-slate-400 font-bold mt-0.5 tracking-wider">( 🧠 | ⏳ | 🎲 )</div>
 </th> <th class="px-4 py-5 text-right font-black w-[8px]">RP</th>
                                 <th class="px-4 py-5 text-center w-[70px]">Status</th>
