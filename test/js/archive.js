@@ -43,8 +43,6 @@ Boako.Archive = {
                             <i data-lucide="calendar" class="text-indigo-500 w-4 h-4"></i>
                             <select id="archive-season" onchange="Boako.Archive.filterData()" class="bg-transparent border-none text-xs font-black outline-none cursor-pointer">
                                 <option value="all">전체 시즌</option>
-                                <option value="1">시즌 1</option>
-                                <option value="2">시즌 2</option>
                             </select>
                         </div>
                         <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
@@ -84,23 +82,28 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    loadData: async function() {
-        try {
-            const { data, error } = await Boako.db
-                .from('v_boako_total_records')
-                .select('*')
-                .order('created_at', { ascending: false });
+    // 🔍 archive.js 내 loadData 함수 수정본
+loadData: async function() {
+    try {
+        const { data, error } = await Boako.db
+            .from('v_boako_total_records')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            
-            this.allRecords = data || [];
-            this.filterData(); 
-        } catch (err) {
-            console.error("아카이브 데이터 로드 오류:", err);
-            Boako.Util.toast("데이터를 불러오는 중 오류가 발생했습니다.");
-            document.getElementById('archive-content-area').innerHTML = `<div class="text-center py-20 text-red-400 font-bold">데이터를 불러오지 못했습니다.</div>`;
-        }
-    },
+        if (error) throw error;
+        
+        this.allRecords = data || [];
+
+        // 🌟 [추가] 데이터 로드가 끝나면 시즌 드롭다운을 자동으로 갱신하는 팩토리 함수 가동
+        this.updateSeasonOptions();
+
+        this.filterData(); 
+    } catch (err) {
+        console.error("아카이브 데이터 로드 오류:", err);
+        Boako.Util.toast("데이터를 불러오는 중 오류가 발생했습니다.");
+        document.getElementById('archive-content-area').innerHTML = `<div class="text-center py-20 text-red-400 font-bold">데이터를 불러오지 못했습니다.</div>`;
+    }
+},
 
     // 3. 필터링 로직
     filterData: function() {
@@ -144,7 +147,28 @@ Boako.Archive = {
         const mi = String(d.getMinutes()).padStart(2, '0');
         return `${mo}.${da} ${ho}:${mi}`;
     },
+// 🌟 [새로 추가하는 구역] DB 데이터를 분석해서 시즌 드롭다운 옵션을 동적으로 늘려주는 빌더
+    updateSeasonOptions: function() {
+        const seasonSelect = document.getElementById('archive-season');
+        if (!seasonSelect) return;
 
+        // 전체 레코드에서 season_no만 싹 모은 뒤, 중복 제거 (예: [1, 1, 2, 1] -> [1, 2])
+        const seasons = [...new Set(this.allRecords.map(rec => rec.season_no).filter(Boolean))];
+        
+        // 시즌 번호를 오름차순 정렬 (시즌 1 -> 시즌 2 -> 시즌 3 순서로)
+        seasons.sort((a, b) => a - b);
+
+        // '전체 시즌' 기본 옵션을 먼저 깔아둠
+        let optionsHTML = `<option value="all">전체 시즌</option>`;
+        
+        // 발견된 시즌 개수만큼 반복하며 <option> 태그를 도자기 빚듯 생성
+        seasons.forEach(s => {
+            optionsHTML += `<option value="${s}">시즌 ${s}</option>`;
+        });
+
+        // 셀렉트 박스 구역에 완성된 HTML 옵션들을 최종 주입
+        seasonSelect.innerHTML = optionsHTML;
+    }, // 👈 다음 함수(renderRecords)로 넘어가야 하므로 여기에 콤마(,)가 반드시 필요합니다!
     // 5. 기록실 테이블 렌더링 (Tailwind 디자인 원상 복구)
     renderRecords: function() {
         const area = document.getElementById('archive-content-area');
