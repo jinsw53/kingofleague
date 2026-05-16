@@ -212,13 +212,11 @@ updateRoundOptions: function() {
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                                <th class="px-8 py-5">Date</th>
-                                <th class="px-8 py-5">Player</th>
-                                <th class="px-8 py-5">Game Info</th>
-                                <th class="px-8 py-5 text-center">Logic ($W \\times T \\times M$)</th>
-                                <th class="px-8 py-5 text-right font-black">RP</th>
-                                <th class="px-8 py-5 text-center">Status</th>
-                                <th class="px-8 py-5"></th>
+                                <th class="px-4 py-5 w-[100px]">Date</th> <th class="px-4 py-5">Player</th>
+                                <th class="px-4 py-5">Game Info</th>
+                                <th class="px-4 py-5 text-center w-[160px]">Logic ($W \\times T \\times M$)</th> <th class="px-4 py-5 text-right font-black w-[8px]">RP</th>
+                                <th class="px-4 py-5 text-center w-[70px]">Status</th>
+                                <th class="px-4 py-5 w-[50px]"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-50">
@@ -226,37 +224,27 @@ updateRoundOptions: function() {
 
         // 데이터 매핑 루프 시작
         html += this.filteredRecords.map(rec => `
-            <tr class="hover:bg-indigo-50/20 transition-all group">
-                <td class="px-8 py-5 whitespace-nowrap text-xs font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
+            <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
+                <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
                 
-                <td class="px-8 py-5">
+                <td class="px-4 py-4">
                     <div class="flex flex-col leading-tight">
                         <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
-                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">${rec.b_all_team || 'Free Agent'}</span>
+                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">${rec.b_all_team || 'Free Agent'}</span>
                     </div>
                 </td>
                 
-
-                <td class="px-8 py-5">
+                <td class="px-4 py-4">
                     <div class="flex flex-col leading-tight">
-                        <div class="flex items-center gap-1.5 mb-1">
+                        <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
                             <span class="font-bold text-indigo-900">${rec.game_name || '-'}</span>
-                            ${rec.is_first == 1 ? '<span class="bg-red-500 text-white text-[8px] px-1 rounded font-black tracking-tighter uppercase shadow-sm">1ST WIN</span>' : ''}
+                            ${rec.is_first == 1 ? '<span class="bg-red-500 text-white text-[8px] px-1 rounded font-black tracking-tighter uppercase shadow-sm">1ST</span>' : ''}
                         </div>
-                       <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
-                            S${rec.season_no || 0} R${rec.round_no || 0} · 
-                            ${
-                                // 🌟 딱 3가지 유형만 깔끔하게 처리하는 초고속 사전형 변환기
+                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
+                            S${rec.season_no || 0} R${rec.round_no || 0} · ${
                                 (function(type) {
-                                    if (!type) return '일반 매치';
-                                    
-                                    const typeMap = {
-                                        'TOURNAMENT': '토너먼트',
-                                        'INDIVIDUAL': '개인전',
-                                        'TEAM':       '팀전'
-                                    };
-
-                                    // 대문자로 바꾸어 사전(typeMap)에서 찾고, 없으면 원본 그대로 출력
+                                    if (!type) return '일반';
+                                    const typeMap = { 'TOURNAMENT': '토너먼트', 'INDIVIDUAL': '개인전', 'TEAM': '팀전' };
                                     return typeMap[type.toUpperCase()] || type;
                                 })(rec.match_type)
                             }
@@ -264,24 +252,24 @@ updateRoundOptions: function() {
                     </div>
                 </td>
                 
-                <td class="px-8 py-5">
-                    <div class="flex items-center justify-center gap-1.5">
-                        <div class="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-lg text-xs font-black shadow-sm" title="Weight">${rec.weight || 0}</div>
-                        <span class="text-slate-200 font-bold">×</span>
-                        <div class="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-lg text-xs font-black shadow-sm" title="Playtime">${rec.playtime || 0}</div>
-                        <span class="text-slate-200 font-bold">×</span>
-                        <div class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-xs font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
+                <td class="px-4 py-4 text-center">
+                    <div class="flex items-center justify-center gap-1">
+                        <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Weight">${rec.weight || 0}</div>
+                        <span class="text-slate-300 text-xs">×</span>
+                        <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Playtime">${rec.playtime || 0}</div>
+                        <span class="text-slate-300 text-xs">×</span>
+                        <div class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[11px] font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
                     </div>
                 </td>
                 
-                <td class="px-8 py-5 text-right font-black text-indigo-600 text-xl tracking-tighter">${Math.floor(rec.rp || 0)}</td>
+                <td class="px-4 py-4 text-right font-black text-indigo-600 text-lg tracking-tighter">${Math.floor(rec.rp || 0)}</td>
                 
-                <td class="px-8 py-5 text-center">
-                    ${rec.is_verified == 1 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-5 h-5 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-5 h-5 mx-auto opacity-30"></i>'}
+                <td class="px-4 py-4 text-center">
+                    ${rec.is_verified == 1 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-4 h-4 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-4 h-4 mx-auto opacity-30"></i>'}
                 </td>
                 
-                <td class="px-8 py-5 text-right">
-                    ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" class="p-2.5 hover:bg-indigo-600 hover:text-white bg-slate-50 rounded-xl text-slate-400 transition-all inline-block border border-slate-100 shadow-sm"><i data-lucide="external-link" class="w-4 h-4"></i></a>` : ''}
+                <td class="px-4 py-4 text-right">
+                    ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" class="p-2 hover:bg-indigo-600 hover:text-white bg-slate-50 rounded-lg text-slate-400 transition-all inline-block border border-slate-100 shadow-sm"><i data-lucide="external-link" class="w-3 h-3"></i></a>` : ''}
                 </td>
             </tr>
         `).join('');
