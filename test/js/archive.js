@@ -7,13 +7,6 @@ Boako.Archive = {
     allRecords: [],
     filteredRecords: [],
     currentTab: 'records',
-    
-    // 🌟 [버그 박멸의 핵심] DOM에 의존하지 않고 필터 상태를 완벽하게 관리할 독립 장부를 개설합니다.
-    filters: {
-        season: 'all',
-        round: 'all',
-        search: ''
-    },
 
     // 1. view.js가 호출하는 최초 진입점
     buildUI: function(containerId) {
@@ -89,7 +82,7 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    // 데이터 로드 및 최신 시즌 강제 고정
+    // 🔍 archive.js 내 loadData 함수 원본 규격 (수정 없음)
     loadData: async function() {
         try {
             const { data, error } = await Boako.db
@@ -101,25 +94,9 @@ Boako.Archive = {
             
             this.allRecords = data || [];
 
-            // 🌟 [안전한 최신 시즌 계산] RangeError 및 NaN 버그를 원천 차단하는 정석적인 반복 연산
-            let maxSeasonNum = 0;
-            this.allRecords.forEach(rec => {
-                const s = parseInt(rec.season_no, 10);
-                if (!isNaN(s) && s > maxSeasonNum) maxSeasonNum = s;
-            });
-
-            // 🌟 찾은 최신 시즌 번호를 우리 내부 상태 장부에 먼저 쇳물 붓듯 고정합니다.
-            if (maxSeasonNum > 0) {
-                this.filters.season = maxSeasonNum.toString();
-            } else {
-                this.filters.season = 'all';
-            }
-
-            // 드롭다운 옵션 빌더 호출
             this.updateSeasonOptions();
             this.updateRoundOptions();
 
-            // 필터 가동
             this.filterData(); 
         } catch (err) {
             console.error("아카이브 데이터 로드 오류:", err);
@@ -128,24 +105,16 @@ Boako.Archive = {
         }
     },
 
-    // 3. 필터링 로직
+    // 3. 필터링 로직 원본 규격 (수정 없음)
     filterData: function() {
-        // 🌟 [동기화 마감] 화면에 엘리먼트가 존재하면 그 값을 우리 자바스크립트 내부 상태 장부에 실시간 동기화합니다.
-        if (document.getElementById('archive-search')) {
-            this.filters.search = document.getElementById('archive-search').value.toLowerCase();
-        }
-        if (document.getElementById('archive-season')) {
-            this.filters.season = document.getElementById('archive-season').value;
-        }
-        if (document.getElementById('archive-round')) {
-            this.filters.round = document.getElementById('archive-round').value;
-        }
+        const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
+        const seasonVal = document.getElementById('archive-season')?.value || 'all';
+        const roundVal = document.getElementById('archive-round')?.value || 'all';
 
-        // 🌟 엘리먼트 껍데기가 아닌, 우리 자바스크립트의 고정된 filters 상태값을 기준으로 정밀 필터링합니다.
         this.filteredRecords = this.allRecords.filter(rec => {
-            const matchSearch = !this.filters.search || (rec.nickname?.toLowerCase().includes(this.filters.search) || rec.game_name?.toLowerCase().includes(this.filters.search));
-            const matchSeason = this.filters.season === 'all' || String(rec.season_no) === this.filters.season;
-            const matchRound = this.filters.round === 'all' || String(rec.round_no) === this.filters.round;
+            const matchSearch = (rec.nickname?.toLowerCase().includes(searchVal) || rec.game_name?.toLowerCase().includes(searchVal));
+            const matchSeason = seasonVal === 'all' || String(rec.season_no) === seasonVal;
+            const matchRound = roundVal === 'all' || String(rec.round_no) === roundVal;
             return matchSearch && matchSeason && matchRound;
         });
 
@@ -179,27 +148,33 @@ Boako.Archive = {
         return `${mo}.${da} ${ho}:${mi}`;
     },
 
-    // DB 데이터를 분석해서 시즌 드롭다운 옵션을 동적으로 늘려주는 빌더
+    // 🌟 [정밀 수정 구역] 생성 시점에 가장 숫자가 큰 최신 시즌을 판별하여 자동으로 selected 속성 부여
     updateSeasonOptions: function() {
         const seasonSelect = document.getElementById('archive-season');
         if (!seasonSelect) return;
 
         const seasons = [...new Set(this.allRecords.map(rec => rec.season_no).filter(Boolean))];
+        
+        // 오름차순 정렬 (시즌 1 -> 시즌 2 -> 시즌 3 순서로)
         seasons.sort((a, b) => a - b);
 
-        let optionsHTML = `<option value="all" ${this.filters.season === 'all' ? 'selected' : ''}>전체 시즌</option>`;
+        // 정렬된 배열의 맨 마지막 원소가 무조건 가장 숫자가 큰 '최신 시즌'이 됩니다.
+        const maxSeason = seasons.length > 0 ? seasons[seasons.length - 1] : null;
+
+        let optionsHTML = `<option value="all">전체 시즌</option>`;
+        
         seasons.forEach(s => {
-            const isSelected = String(s) === this.filters.season ? 'selected' : '';
+            // 🔗 현재 그리는 시즌이 최신 시즌(maxSeason)과 일치하면 selected 속성을 마크업에 즉시 박아버립니다.
+            const isSelected = s === maxSeason ? 'selected' : '';
             optionsHTML += `<option value="${s}" ${isSelected}>시즌 ${s}</option>`;
         });
 
         seasonSelect.innerHTML = optionsHTML;
-        
-        // 🌟 [확실한 싱크] HTML 주입 직후 DOM 엘리먼트의 물리적 value를 상태값과 100% 일치시켜 튕김을 방지합니다.
-        seasonSelect.value = this.filters.season;
-    },
+    }, 
 
-    // DB 내 round_no를 분석해서 라운드 드롭다운 옵션을 동적으로 늘려주는 빌더
+    /**
+     * DB 내 round_no를 분석해서 라운드 드롭다운 옵션을 동적으로 늘려주는 빌더
+     */
     updateRoundOptions: function() {
         const roundSelect = document.getElementById('archive-round');
         if (!roundSelect) return;
@@ -213,9 +188,9 @@ Boako.Archive = {
         });
 
         roundSelect.innerHTML = optionsHTML;
-    },
+    }, 
 
-    // 5. 기록실 테이블 렌더링
+    // 5. 기록실 테이블 렌더링 (Logic 헤더 수정 완료 / 마우스 오버 대형 팝업 로고 반영 완료)
     renderRecords: function() {
         const area = document.getElementById('archive-content-area'); 
         if (!area) return;
