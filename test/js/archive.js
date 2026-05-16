@@ -7,6 +7,9 @@ Boako.Archive = {
     allRecords: [],
     filteredRecords: [],
     currentTab: 'records',
+    
+    // 🌟 [버그 박멸의 핵심] 첫 진입 시 'all' 대신 최신 시즌을 임시로 담아둘 상태 변수를 선언합니다.
+    defaultSeason: 'all', 
 
     // 1. view.js가 호출하는 최초 진입점
     buildUI: function(containerId) {
@@ -82,7 +85,7 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    // 🔍 archive.js 내 loadData 함수 최종본 (시즌/라운드 빌더 동시 가동)
+    // archive.js 내 loadData 함수 최종본
     loadData: async function() {
         try {
             const { data, error } = await Boako.db
@@ -94,17 +97,17 @@ Boako.Archive = {
             
             this.allRecords = data || [];
 
-            // 🌟 전체 데이터에서 숫자가 가장 큰 최신 시즌 번호를 구합니다.
-            let maxSeason = 'all';
+            // 🌟 [확실한 필터 고정] 데이터를 읽자마자 가장 큰 최신 시즌 번호를 구해서 상태값에 확실히 박아둡니다.
             if (this.allRecords.length > 0) {
                 const maxNum = Math.max(...this.allRecords.map(rec => rec.season_no || 0));
-                if (maxNum > 0) maxSeason = maxNum.toString();
+                if (maxNum > 0) this.defaultSeason = maxNum.toString();
             }
 
-            // 🌟 빌더를 가동할 때 최신 시즌 값을 인자로 토스하여 HTML 생성 시점에 selected 되게 엮습니다.
-            this.updateSeasonOptions(maxSeason);
+            // 구한 최신 시즌 번호를 기준으로 옵션 빌더들을 가동합니다.
+            this.updateSeasonOptions(this.defaultSeason);
             this.updateRoundOptions();
 
+            // 최초로 필터링 연산을 수행합니다.
             this.filterData(); 
         } catch (err) {
             console.error("아카이브 데이터 로드 오류:", err);
@@ -116,7 +119,9 @@ Boako.Archive = {
     // 3. 필터링 로직
     filterData: function() {
         const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
-        const seasonVal = document.getElementById('archive-season')?.value || 'all';
+        
+        // 🌟 [누락 해결의 열쇠] 엘리먼트가 존재하면 그 값을 읽고, 아직 로딩 전이라 없으면 우리가 전역에 고정해 둔 최신 시즌 번호(this.defaultSeason)를 강제로 읽게 만듭니다!
+        const seasonVal = document.getElementById('archive-season')?.value || this.defaultSeason;
         const roundVal = document.getElementById('archive-round')?.value || 'all';
 
         this.filteredRecords = this.allRecords.filter(rec => {
@@ -156,67 +161,49 @@ Boako.Archive = {
         return `${mo}.${da} ${ho}:${mi}`;
     },
 
-    // 🌟 [새로 추가하는 구역] DB 데이터를 분석해서 시즌 드롭다운 옵션을 동적으로 늘려주는 빌더
+    // DB 데이터를 분석해서 시즌 드롭다운 옵션을 동적으로 늘려주는 빌더
     updateSeasonOptions: function(defaultSeason) {
         const seasonSelect = document.getElementById('archive-season');
         if (!seasonSelect) return;
 
-        // 전체 레코드에서 season_no만 싹 모은 뒤, 중복 제거 (예: [1, 1, 2, 1] -> [1, 2])
         const seasons = [...new Set(this.allRecords.map(rec => rec.season_no).filter(Boolean))];
-        
-        // 시즌 번호를 오름차순 정렬 (시즌 1 -> 시즌 2 -> 시즌 3 순서로)
         seasons.sort((a, b) => a - b);
 
-        // '전체 시즌' 기본 옵션을 먼저 깔아둠 (defaultSeason이 'all'이면 selected)
         let optionsHTML = `<option value="all" ${defaultSeason === 'all' ? 'selected' : ''}>전체 시즌</option>`;
-        
-        // 발견된 시즌 개수만큼 반복하며 <option> 태그를 도자기 빚듯 생성 (최신 시즌 번호에 selected 장착)
         seasons.forEach(s => {
             const isSelected = String(s) === defaultSeason ? 'selected' : '';
             optionsHTML += `<option value="${s}" ${isSelected}>시즌 ${s}</option>`;
         });
 
-        // 셀렉트 박스 구역에 완성된 HTML 옵션들을 최종 주입
         seasonSelect.innerHTML = optionsHTML;
-    }, // 👈 다음 함수(renderRecords)로 넘어가야 하므로 여기에 콤마(,)가 반드시 필요합니다!
+    },
 
-    /**
-     * 🌟 [새로 추가하는 구역] DB 내 round_no를 분석해서 라운드 드롭다운 옵션을 동적으로 늘려주는 빌더
-     */
+    // DB 내 round_no를 분석해서 라운드 드롭다운 옵션을 동적으로 늘려주는 빌더
     updateRoundOptions: function() {
         const roundSelect = document.getElementById('archive-round');
         if (!roundSelect) return;
 
-        // 전체 레코드에서 round_no 데이터만 중복 없이 수집 (예: [3, 1, 2, 3] -> [1, 2, 3])
         const rounds = [...new Set(this.allRecords.map(rec => rec.round_no).filter(Boolean))];
-        
-        // 라운드 번호 순서대로 오름차순 정렬 (1 라운드 -> 2 라운드 -> 3 라운드...)
         rounds.sort((a, b) => a - b);
 
-        // 기본 선택지인 '전체 라운드' 장착
         let optionsHTML = `<option value="all">전체 라운드</option>`;
-        
-        // 찾아낸 라운드 숫자 개수만큼 반복하며 옵션 도자기 빚기
         rounds.forEach(r => {
             optionsHTML += `<option value="${r}">${r} 라운드</option>`;
         });
 
-        // 라운드 셀렉트 박스 구역에 최종 결과물 이식 완료
         roundSelect.innerHTML = optionsHTML;
-    }, // 👈 다음 함수(renderRecords)로 넘어가야 하므로 닫는 괄호 뒤에 콤마(,) 마감을 확실히 해줍니다!
+    },
 
-    // 5. 기록실 테이블 렌더링 (Source 칼럼 완벽 제거 완료)
+    // 5. 기록실 테이블 렌더링
     renderRecords: function() {
-        const area = document.getElementById('archive-content-area'); // 최종 출력용 도화지 확보
+        const area = document.getElementById('archive-content-area'); 
         if (!area) return;
 
-        // 걸러진 결과값이 한 줄도 존재하지 않을 때 스크립트 터짐을 막기 위한 안전장치
         if (this.filteredRecords.length === 0) {
             area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">조건에 맞는 기록이 없습니다.</div>`;
             return;
         }
 
-        // 뼈대 조립 시작 (Source 제목 칸을 날리고 colspan을 8에서 7로 축소)
         let html = `
             <div class="bg-white rounded-[2rem] shadow-xl border border-white overflow-hidden">
                 <div class="overflow-x-auto">
@@ -238,7 +225,6 @@ Boako.Archive = {
                         <tbody class="divide-y divide-slate-50">
         `;
 
-        // 데이터 매핑 루프 시작
         html += this.filteredRecords.map(rec => `
             <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
                 <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
@@ -307,11 +293,11 @@ Boako.Archive = {
         `).join('');
 
         html += `</tbody></table></div></div>`;
-        area.innerHTML = html; // 도화지 영역에 갱신 수술 완료
-        if(window.lucide) lucide.createIcons(); // 아이콘 재그리기
+        area.innerHTML = html; 
+        if(window.lucide) lucide.createIcons(); 
     },
 
-    // 6. 랭킹보드 그리드 렌더링 (Tailwind 디자인 원상 복구)
+    // 6. 랭킹보드 그리드 렌더링
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
