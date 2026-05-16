@@ -192,22 +192,26 @@ updateRoundOptions: function() {
     roundSelect.innerHTML = optionsHTML;
 }, // 👈 다음 함수(renderRecords)로 넘어가야 하므로 닫는 괄호 뒤에 콤마(,) 마감을 확실히 해줍니다!
     // 5. 기록실 테이블 렌더링 (Tailwind 디자인 원상 복구)
+  // -------------------------------------------------------------------------
+    // 5. 기록실 테이블 렌더링 (Source 칼럼 완벽 제거 완료)
+    // -------------------------------------------------------------------------
     renderRecords: function() {
-        const area = document.getElementById('archive-content-area');
+        const area = document.getElementById('archive-content-area'); // 최종 출력용 도화지 확보
         if (!area) return;
 
+        // 걸러진 결과값이 한 줄도 존재하지 않을 때 스크립트 터짐을 막기 위한 안전장치
         if (this.filteredRecords.length === 0) {
             area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">조건에 맞는 기록이 없습니다.</div>`;
             return;
         }
 
+        // 뼈대 조립 시작 (Source 제목 칸을 날리고 colspan을 8에서 7로 축소)
         let html = `
             <div class="bg-white rounded-[2rem] shadow-xl border border-white overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                                <th class="px-8 py-5">Source</th>
                                 <th class="px-8 py-5">Date</th>
                                 <th class="px-8 py-5">Player</th>
                                 <th class="px-8 py-5">Game Info</th>
@@ -220,20 +224,18 @@ updateRoundOptions: function() {
                         <tbody class="divide-y divide-slate-50">
         `;
 
+        // 데이터 매핑 루프 시작
         html += this.filteredRecords.map(rec => `
             <tr class="hover:bg-indigo-50/20 transition-all group">
-                <td class="px-8 py-5">
-                    <span class="px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase ${rec.record_source === 'TOURNAMENT' ? 'bg-amber-100 text-amber-600 border border-amber-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}">
-                        ${rec.record_source || 'BTLDB'}
-                    </span>
-                </td>
                 <td class="px-8 py-5 whitespace-nowrap text-xs font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
+                
                 <td class="px-8 py-5">
                     <div class="flex flex-col leading-tight">
                         <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
                         <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">${rec.b_all_team || 'Free Agent'}</span>
                     </div>
                 </td>
+                
                 <td class="px-8 py-5">
                     <div class="flex flex-col leading-tight">
                         <div class="flex items-center gap-1.5 mb-1">
@@ -243,6 +245,7 @@ updateRoundOptions: function() {
                         <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">S${rec.season_no || 0} R${rec.round_no || 0} · ${rec.match_type || '일반'}</span>
                     </div>
                 </td>
+                
                 <td class="px-8 py-5">
                     <div class="flex items-center justify-center gap-1.5">
                         <div class="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-lg text-xs font-black shadow-sm" title="Weight">${rec.weight || 0}</div>
@@ -252,10 +255,13 @@ updateRoundOptions: function() {
                         <div class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-xs font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
                     </div>
                 </td>
+                
                 <td class="px-8 py-5 text-right font-black text-indigo-600 text-xl tracking-tighter">${(rec.rp || 0).toFixed(1)}</td>
+                
                 <td class="px-8 py-5 text-center">
                     ${rec.is_verified == 1 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-5 h-5 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-5 h-5 mx-auto opacity-30"></i>'}
                 </td>
+                
                 <td class="px-8 py-5 text-right">
                     ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" class="p-2.5 hover:bg-indigo-600 hover:text-white bg-slate-50 rounded-xl text-slate-400 transition-all inline-block border border-slate-100 shadow-sm"><i data-lucide="external-link" class="w-4 h-4"></i></a>` : ''}
                 </td>
@@ -263,8 +269,8 @@ updateRoundOptions: function() {
         `).join('');
 
         html += `</tbody></table></div></div>`;
-        area.innerHTML = html;
-        if(window.lucide) lucide.createIcons();
+        area.innerHTML = html; // 도화지 영역에 갱신 수술 완료
+        if(window.lucide) lucide.createIcons(); // 아이콘 재그리기
     },
 
     // 6. 랭킹보드 그리드 렌더링 (Tailwind 디자인 원상 복구)
