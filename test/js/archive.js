@@ -238,12 +238,19 @@ updateRoundOptions: function() {
                     <div class="flex flex-col leading-tight">
                         <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
                         
-                        <div class="flex items-center gap-1.5 mt-1">
+                        <div class="flex items-center gap-1.5 mt-1 relative group/logo cursor-pointer">
                             ${
-                                // logo_url 칼럼에 값이 있고 무소속(Free Agent)이 아닐 때만 이미지를 출력
                                 rec.logo_url && rec.b_all_team !== 'Free Agent'
-                                    ? `<img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">`
-                                    : `<span class="text-[10px]">👤</span>` // 로고가 없거나 FA면 기본 아이콘 표시
+                                    ? `
+                                        <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
+                                        
+                                        <div class="hidden group-hover/logo:flex absolute bottom-full left-0 mb-2 z-50 bg-white p-3 rounded-2xl shadow-2xl border border-slate-100 flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]">
+                                            <img src="${rec.logo_url}" class="w-16 h-16 object-contain rounded-xl bg-slate-50 p-1" alt="${rec.b_all_team} Large">
+                                            <span class="text-[10px] font-black text-indigo-950 uppercase tracking-wider">${rec.b_all_team}</span>
+                                            <div class="absolute top-full left-4 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-100 rotate-45"></div>
+                                        </div>
+                                      `
+                                    : `<span class="text-[10px]">👤</span>` // 무소속은 팝업 제외
                             }
                             <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${rec.b_all_team || 'Free Agent'}</span>
                         </div>
