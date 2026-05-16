@@ -8,8 +8,12 @@ Boako.Archive = {
     filteredRecords: [],
     currentTab: 'records',
     
-    // 🌟 [버그 박멸의 핵심] 첫 진입 시 'all' 대신 최신 시즌을 임시로 담아둘 상태 변수를 선언합니다.
-    defaultSeason: 'all', 
+    // 🌟 [버그 박멸의 핵심] DOM에 의존하지 않고 필터 상태를 완벽하게 관리할 독립 장부를 개설합니다.
+    filters: {
+        season: 'all',
+        round: 'all',
+        search: ''
+    },
 
     // 1. view.js가 호출하는 최초 진입점
     buildUI: function(containerId) {
@@ -85,7 +89,7 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    // archive.js 내 loadData 함수 최종본
+    // 데이터 로드 및 최신 시즌 강제 고정
     loadData: async function() {
         try {
             const { data, error } = await Boako.db
@@ -97,17 +101,25 @@ Boako.Archive = {
             
             this.allRecords = data || [];
 
-            // 🌟 [확실한 필터 고정] 데이터를 읽자마자 가장 큰 최신 시즌 번호를 구해서 상태값에 확실히 박아둡니다.
-            if (this.allRecords.length > 0) {
-                const maxNum = Math.max(...this.allRecords.map(rec => rec.season_no || 0));
-                if (maxNum > 0) this.defaultSeason = maxNum.toString();
+            // 🌟 [안전한 최신 시즌 계산] RangeError 및 NaN 버그를 원천 차단하는 정석적인 반복 연산
+            let maxSeasonNum = 0;
+            this.allRecords.forEach(rec => {
+                const s = parseInt(rec.season_no, 10);
+                if (!isNaN(s) && s > maxSeasonNum) maxSeasonNum = s;
+            });
+
+            // 🌟 찾은 최신 시즌 번호를 우리 내부 상태 장부에 먼저 쇳물 붓듯 고정합니다.
+            if (maxSeasonNum > 0) {
+                this.filters.season = maxSeasonNum.toString();
+            } else {
+                this.filters.season = 'all';
             }
 
-            // 구한 최신 시즌 번호를 기준으로 옵션 빌더들을 가동합니다.
-            this.updateSeasonOptions(this.defaultSeason);
+            // 드롭다운 옵션 빌더 호출
+            this.updateSeasonOptions();
             this.updateRoundOptions();
 
-            // 최초로 필터링 연산을 수행합니다.
+            // 필터 가동
             this.filterData(); 
         } catch (err) {
             console.error("아카이브 데이터 로드 오류:", err);
@@ -118,16 +130,22 @@ Boako.Archive = {
 
     // 3. 필터링 로직
     filterData: function() {
-        const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
-        
-        // 🌟 [누락 해결의 열쇠] 엘리먼트가 존재하면 그 값을 읽고, 아직 로딩 전이라 없으면 우리가 전역에 고정해 둔 최신 시즌 번호(this.defaultSeason)를 강제로 읽게 만듭니다!
-        const seasonVal = document.getElementById('archive-season')?.value || this.defaultSeason;
-        const roundVal = document.getElementById('archive-round')?.value || 'all';
+        // 🌟 [동기화 마감] 화면에 엘리먼트가 존재하면 그 값을 우리 자바스크립트 내부 상태 장부에 실시간 동기화합니다.
+        if (document.getElementById('archive-search')) {
+            this.filters.search = document.getElementById('archive-search').value.toLowerCase();
+        }
+        if (document.getElementById('archive-season')) {
+            this.filters.season = document.getElementById('archive-season').value;
+        }
+        if (document.getElementById('archive-round')) {
+            this.filters.round = document.getElementById('archive-round').value;
+        }
 
+        // 🌟 엘리먼트 껍데기가 아닌, 우리 자바스크립트의 고정된 filters 상태값을 기준으로 정밀 필터링합니다.
         this.filteredRecords = this.allRecords.filter(rec => {
-            const matchSearch = (rec.nickname?.toLowerCase().includes(searchVal) || rec.game_name?.toLowerCase().includes(searchVal));
-            const matchSeason = seasonVal === 'all' || String(rec.season_no) === seasonVal;
-            const matchRound = roundVal === 'all' || String(rec.round_no) === roundVal;
+            const matchSearch = !this.filters.search || (rec.nickname?.toLowerCase().includes(this.filters.search) || rec.game_name?.toLowerCase().includes(this.filters.search));
+            const matchSeason = this.filters.season === 'all' || String(rec.season_no) === this.filters.season;
+            const matchRound = this.filters.round === 'all' || String(rec.round_no) === this.filters.round;
             return matchSearch && matchSeason && matchRound;
         });
 
@@ -162,20 +180,23 @@ Boako.Archive = {
     },
 
     // DB 데이터를 분석해서 시즌 드롭다운 옵션을 동적으로 늘려주는 빌더
-    updateSeasonOptions: function(defaultSeason) {
+    updateSeasonOptions: function() {
         const seasonSelect = document.getElementById('archive-season');
         if (!seasonSelect) return;
 
         const seasons = [...new Set(this.allRecords.map(rec => rec.season_no).filter(Boolean))];
         seasons.sort((a, b) => a - b);
 
-        let optionsHTML = `<option value="all" ${defaultSeason === 'all' ? 'selected' : ''}>전체 시즌</option>`;
+        let optionsHTML = `<option value="all" ${this.filters.season === 'all' ? 'selected' : ''}>전체 시즌</option>`;
         seasons.forEach(s => {
-            const isSelected = String(s) === defaultSeason ? 'selected' : '';
+            const isSelected = String(s) === this.filters.season ? 'selected' : '';
             optionsHTML += `<option value="${s}" ${isSelected}>시즌 ${s}</option>`;
         });
 
         seasonSelect.innerHTML = optionsHTML;
+        
+        // 🌟 [확실한 싱크] HTML 주입 직후 DOM 엘리먼트의 물리적 value를 상태값과 100% 일치시켜 튕김을 방지합니다.
+        seasonSelect.value = this.filters.season;
     },
 
     // DB 내 round_no를 분석해서 라운드 드롭다운 옵션을 동적으로 늘려주는 빌더
