@@ -256,7 +256,7 @@ updateRoundOptions: function() {
                     </div>
                 </td>
                 
-                <td class="px-8 py-5 text-right font-black text-indigo-600 text-xl tracking-tighter">${(rec.rp || 0).toFixed(1)}</td>
+                <td class="px-8 py-5 text-right font-black text-indigo-600 text-xl tracking-tighter">${Math.floor(rec.rp || 0)}</td>
                 
                 <td class="px-8 py-5 text-center">
                     ${rec.is_verified == 1 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-5 h-5 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-5 h-5 mx-auto opacity-30"></i>'}
