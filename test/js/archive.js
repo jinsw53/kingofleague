@@ -244,17 +244,21 @@ updateRoundOptions: function() {
                             <span class="font-bold text-indigo-900">${rec.game_name || '-'}</span>
                             ${rec.is_first == 1 ? '<span class="bg-red-500 text-white text-[8px] px-1 rounded font-black tracking-tighter uppercase shadow-sm">1ST WIN</span>' : ''}
                         </div>
-                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
+                       <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
                             S${rec.season_no || 0} R${rec.round_no || 0} · 
                             ${
-                                // 🌟 [실시간 매치타입 한글 치환기 가동]
+                                // 🌟 딱 3가지 유형만 깔끔하게 처리하는 초고속 사전형 변환기
                                 (function(type) {
                                     if (!type) return '일반 매치';
-                                    const upperType = type.toUpperCase();
-                                    if (upperType === 'TOURNAMENT') return '토너먼트';
-                                    if (upperType === 'RANK') return '랭크 매치';
-                                    if (upperType === 'NORMAL' || upperType === '일반') return '일반 매치';
-                                    return type; // 혹시 매칭 안 되는 텍스트가 오면 원본 유지
+                                    
+                                    const typeMap = {
+                                        'TOURNAMENT': '토너먼트',
+                                        'INDIVIDUAL': '개인전',
+                                        'TEAM':       '팀전'
+                                    };
+
+                                    // 대문자로 바꾸어 사전(typeMap)에서 찾고, 없으면 원본 그대로 출력
+                                    return typeMap[type.toUpperCase()] || type;
                                 })(rec.match_type)
                             }
                         </span>
