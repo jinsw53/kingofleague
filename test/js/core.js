@@ -20,3 +20,4 @@ Boako.ItemActions = {}; // 아이템 효과
 Boako.Messenger = {};  // 회원간 메세지
 Boako.Schedule = {};   // 일정관리 및 조율
 Boako.League = {};     // 대시보드, 밴 투표, 라이벌 매치 등
+Boako.Archive = {}; // 🌟 기록실 기능 전담 객체 추가
