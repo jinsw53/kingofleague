@@ -36,7 +36,7 @@ Boako.Archive = {
                 <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
                         <h2 id="archive-page-title" class="text-3xl font-black text-slate-900 tracking-tight leading-none">시즌 경기 기록실</h2>
-                        <p class="text-slate-400 mt-3 font-medium text-lg">점수 산출 근거($W \\times T \\times M$)를 투명하게 공개하는 공식 아카이브입니다.</p>
+                        <p class="text-slate-400 mt-3 font-medium text-lg">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
                     </div>
                     <div class="flex gap-2">
                         <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
@@ -214,7 +214,10 @@ updateRoundOptions: function() {
                             <tr class="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                                 <th class="px-4 py-5 w-[100px]">Date</th> <th class="px-4 py-5">Player</th>
                                 <th class="px-4 py-5">Game Info</th>
-                                <th class="px-4 py-5 text-center w-[160px]">Logic ($W \\times T \\times M$)</th> <th class="px-4 py-5 text-right font-black w-[8px]">RP</th>
+                                <th class="px-4 py-5 text-center w-[160px] leading-tight select-none">
+    <div class="text-indigo-950">Logic</div>
+    <div class="text-[9px] text-slate-400 font-bold mt-0.5 tracking-wider">( 🧠 | ⏳ | 🎲 )</div>
+</th> <th class="px-4 py-5 text-right font-black w-[8px]">RP</th>
                                 <th class="px-4 py-5 text-center w-[70px]">Status</th>
                                 <th class="px-4 py-5 w-[50px]"></th>
                             </tr>
