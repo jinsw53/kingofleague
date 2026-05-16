@@ -36,7 +36,10 @@ Boako.Archive = {
                 <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
                         <h2 id="archive-page-title" class="text-3xl font-black text-slate-900 tracking-tight leading-none">시즌 경기 기록실</h2>
-                        <p class="text-slate-400 mt-3 font-medium text-lg">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
+                        
+                        <p class="text-slate-400 mt-2 font-medium text-sm">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
+                        
+                        <p class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )</p>
                     </div>
                     <div class="flex gap-2">
                         <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
