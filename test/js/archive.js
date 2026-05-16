@@ -1,69 +1,89 @@
 /**
- * [ARCHIVE] 기록실 및 실시간 랭킹 시스템
- * DB: v_boako_total_records 가상 뷰 연동
+ * [ARCHIVE] 기록실 및 실시간 랭킹 시스템 
+ * DB: v_boako_total_records 가상 뷰 100% 실시간 연동
+ * 디자인: Tailwind CSS 기반 프리미엄 디자인 원상 복구본
  */
 Boako.Archive = {
     allRecords: [],
     filteredRecords: [],
-    currentTab: 'records', // 'records' | 'rankings'
+    currentTab: 'records',
 
-    // 1. view.js가 깨우는 진입점
+    // 1. view.js가 호출하는 최초 진입점
+    buildUI: function(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        // 전체 뼈대(헤더, 필터, 탭, 결과출력창) 그리기 (Tailwind 100% 복구)
+        container.innerHTML = `
+            <div class="w-full animate-in fade-in duration-500">
+                <div class="flex items-center justify-between mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex items-center gap-2">
+                        <div class="bg-indigo-600 p-1.5 rounded-lg shadow-md">
+                            <i data-lucide="trophy" class="text-white w-5 h-5"></i>
+                        </div>
+                        <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Archive</h1>
+                    </div>
+                    <div class="flex bg-slate-100 p-1 rounded-xl">
+                        <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200">
+                            <i data-lucide="history" class="w-4 h-4"></i> 기록실
+                        </button>
+                        <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div>
+                        <h2 id="archive-page-title" class="text-3xl font-black text-slate-900 tracking-tight leading-none">시즌 경기 기록실</h2>
+                        <p class="text-slate-400 mt-3 font-medium text-lg">점수 산출 근거($W \\times T \\times M$)를 투명하게 공개하는 공식 아카이브입니다.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
+                            <i data-lucide="calendar" class="text-indigo-500 w-4 h-4"></i>
+                            <select id="archive-season" onchange="Boako.Archive.filterData()" class="bg-transparent border-none text-xs font-black outline-none cursor-pointer">
+                                <option value="all">전체 시즌</option>
+                                <option value="1">시즌 1</option>
+                                <option value="2">시즌 2</option>
+                            </select>
+                        </div>
+                        <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
+                            <i data-lucide="layers" class="text-indigo-500 w-4 h-4"></i>
+                            <select id="archive-round" onchange="Boako.Archive.filterData()" class="bg-transparent border-none text-xs font-black outline-none cursor-pointer">
+                                <option value="all">전체 라운드</option>
+                                <option value="1">1 라운드</option>
+                                <option value="2">2 라운드</option>
+                                <option value="3">3 라운드</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative mb-8">
+                    <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5"></i>
+                    <input type="text" id="archive-search" oninput="Boako.Archive.filterData()" placeholder="닉네임이나 게임 종목 검색..."
+                        class="w-full pl-12 pr-6 py-4 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500 bg-white text-lg font-medium outline-none transition-all">
+                </div>
+
+                <div id="archive-content-area">
+                    <div class="text-center py-20 text-slate-400 font-bold">데이터 동기화 중...</div>
+                </div>
+            </div>
+        `;
+
+        if(window.lucide) lucide.createIcons();
+        this.init();
+    },
+
+    // 2. DB 초기화 및 데이터 로드
     init: async function() {
         if (!Boako.db) {
             setTimeout(() => this.init(), 500);
             return;
         }
-        
-        // 도화지에 기본 UI 프레임(필터, 검색바, 결과 구역)을 얹습니다.
-        this.renderFrame();
-        
-        // 실전 DB 데이터를 땡겨옵니다.
         await this.loadData();
     },
 
-    // 2. 도화지 위에 고정 프레임 그리기
-    renderFrame: function() {
-        const container = document.getElementById('archive-container');
-        if (!container) return;
-
-        container.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; background:#fff; padding:15px; border-radius:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
-                <div style="font-size:18px; font-weight:900; color:#1e1b4b;">LEAGUE ARCHIVE</div>
-                <div style="display:flex; background:#f1f5f9; padding:5px; border-radius:10px;">
-                    <button onclick="Boako.Archive.switchTab('records')" id="tab-btn-records" style="background:#fff; color:#4f46e5; box-shadow:0 2px 5px rgba(0,0,0,0.05); font-weight:800; padding:8px 20px; border-radius:8px; font-size:14px; transition:all 0.2s;">📋 기록실</button>
-                    <button onclick="Boako.Archive.switchTab('rankings')" id="tab-btn-rankings" style="background:transparent; color:#64748b; font-weight:800; padding:8px 20px; border-radius:8px; font-size:14px; transition:all 0.2s;">🔥 랭킹보드</button>
-                </div>
-            </div>
-
-            <div style="display:flex; flex-direction:column; gap:20px; margin-bottom:30px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
-                    <div style="font-size:22px; font-weight:900; color:#0f172a;" id="archive-dynamic-title">시즌 경기 기록실</div>
-                    <div style="display:flex; gap:10px;">
-                        <select id="archive-filter-season" onchange="Boako.Archive.filterData()" style="background:#fff; border:1px solid #e2e8f0; padding:10px 15px; border-radius:12px; font-weight:800; font-size:13px; outline:none; cursor:pointer;">
-                            <option value="all">전체 시즌</option>
-                            <option value="1">시즌 1</option>
-                            <option value="2">시즌 2</option>
-                        </select>
-                        <select id="archive-filter-round" onchange="Boako.Archive.filterData()" style="background:#fff; border:1px solid #e2e8f0; padding:10px 15px; border-radius:12px; font-weight:800; font-size:13px; outline:none; cursor:pointer;">
-                            <option value="all">전체 라운드</option>
-                            <option value="1">1 라운드</option>
-                            <option value="2">2 라운드</option>
-                            <option value="3">3 라운드</option>
-                        </select>
-                    </div>
-                </div>
-                <div style="position:relative; width:100%;">
-                    <input type="text" id="archive-filter-search" oninput="Boako.Archive.filterData()" placeholder="플레이어 닉네임이나 보드게임 종목을 검색하세요..." style="width:100%; padding:15px 20px; border-radius:16px; border:1px solid #e2e8f0; background:#fff; font-size:16px; font-weight:500; outline:none; box-shadow:0 4px 6px -1px rgba(0,0,0,0.02);">
-                </div>
-            </div>
-
-            <div id="archive-core-box">
-                <div style="text-align:center; padding:50px; color:#94a3b8; font-weight:700;">가상 뷰 동기화 중...</div>
-            </div>
-        `;
-    },
-
-    // 3. Supabase v_boako_total_records 연동
     loadData: async function() {
         try {
             const { data, error } = await Boako.db
@@ -72,143 +92,139 @@ Boako.Archive = {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            this.allRecords = data || [];
             
-            // 실시간 필터링 및 렌더링 시작
-            this.filterData();
+            this.allRecords = data || [];
+            this.filterData(); 
         } catch (err) {
-            console.error("아카이브 로드 에러:", err);
-            Boako.Util.toast("🚨 기록을 불러오지 못했습니다.");
+            console.error("아카이브 데이터 로드 오류:", err);
+            Boako.Util.toast("데이터를 불러오는 중 오류가 발생했습니다.");
+            document.getElementById('archive-content-area').innerHTML = `<div class="text-center py-20 text-red-400 font-bold">데이터를 불러오지 못했습니다.</div>`;
         }
     },
 
-    // 4. 메모리 내 실시간 필터링 실무 로직
+    // 3. 필터링 로직
     filterData: function() {
-        const seasonVal = document.getElementById('archive-filter-season')?.value || 'all';
-        const roundVal = document.getElementById('archive-filter-round')?.value || 'all';
-        const searchVal = (document.getElementById('archive-filter-search')?.value || '').toLowerCase();
+        const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
+        const seasonVal = document.getElementById('archive-season')?.value || 'all';
+        const roundVal = document.getElementById('archive-round')?.value || 'all';
 
         this.filteredRecords = this.allRecords.filter(rec => {
+            const matchSearch = (rec.nickname?.toLowerCase().includes(searchVal) || rec.game_name?.toLowerCase().includes(searchVal));
             const matchSeason = seasonVal === 'all' || String(rec.season_no) === seasonVal;
             const matchRound = roundVal === 'all' || String(rec.round_no) === roundVal;
-            const matchSearch = (rec.nickname?.toLowerCase().includes(searchVal) || rec.game_name?.toLowerCase().includes(searchVal));
-            return matchSeason && matchRound && matchSearch;
+            return matchSearch && matchSeason && matchRound;
         });
 
         if (this.currentTab === 'records') this.renderRecords();
         else this.renderRankings();
     },
 
-    // 5. 내부 탭 전환 스위치
+    // 4. 탭 전환 로직
     switchTab: function(tabName) {
         this.currentTab = tabName;
         const isRec = tabName === 'records';
         
-        const btnRec = document.getElementById('tab-btn-records');
-        const btnRank = document.getElementById('tab-btn-rankings');
-        const titleText = document.getElementById('archive-dynamic-title');
-
-        if(btnRec && btnRank) {
-            btnRec.style.background = isRec ? '#fff' : 'transparent';
-            btnRec.style.color = isRec ? '#4f46e5' : '#64748b';
-            btnRec.style.boxShadow = isRec ? '0 2px 5px rgba(0,0,0,0.05)' : 'none';
-            btnRec.style.border = isRec ? '1px solid #e2e8f0' : '1px solid transparent';
-
-            btnRank.style.background = !isRec ? '#fff' : 'transparent';
-            btnRank.style.color = !isRec ? '#4f46e5' : '#64748b';
-            btnRank.style.boxShadow = !isRec ? '0 2px 5px rgba(0,0,0,0.05)' : 'none';
-            btnRank.style.border = !isRec ? '1px solid #e2e8f0' : '1px solid transparent';
-        }
-
-        if(titleText) {
-            titleText.innerText = isRec ? '시즌 경기 기록실' : '종합 리그 순위표';
-        }
-
+        const activeClass = 'flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200';
+        const inactiveClass = 'flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all';
+        
+        document.getElementById('tab-records').className = isRec ? activeClass : inactiveClass;
+        document.getElementById('tab-rankings').className = !isRec ? activeClass : inactiveClass;
+        document.getElementById('archive-page-title').innerText = isRec ? '시즌 경기 기록실' : '종합 리그 순위표';
+        
         this.filterData();
     },
 
-    // 6. [디자인 모듈] 기록실 데이터 테이블 시각화
+    // 날짜 포맷터
+    formatDate: function(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        const mo = String(d.getMonth() + 1).padStart(2, '0');
+        const da = String(d.getDate()).padStart(2, '0');
+        const ho = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        return `${mo}.${da} ${ho}:${mi}`;
+    },
+
+    // 5. 기록실 테이블 렌더링 (Tailwind 디자인 원상 복구)
     renderRecords: function() {
-        const box = document.getElementById('archive-core-box');
-        if (!box) return;
+        const area = document.getElementById('archive-content-area');
+        if (!area) return;
 
         if (this.filteredRecords.length === 0) {
-            box.innerHTML = `<div style="text-align:center; padding:60px; color:#94a3b8; font-weight:800; background:#fff; border-radius:24px;">매칭되는 경기 기록이 없습니다.</div>`;
+            area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">조건에 맞는 기록이 없습니다.</div>`;
             return;
         }
 
-        let tableHtml = `
-            <div style="background:#fff; border-radius:24px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.05); border:1px solid #fff; overflow:hidden;">
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; text-align:left; border-collapse:collapse; font-size:14px;">
+        let html = `
+            <div class="bg-white rounded-[2rem] shadow-xl border border-white overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
                         <thead>
-                            <tr style="background:#f8fafc; text-color:#94a3b8; font-weight:900; border-b:1px solid #e2e8f0; text-transform:uppercase;">
-                                <th style="padding:15px 20px;">Source</th>
-                                <th style="padding:15px 20px;">Player</th>
-                                <th style="padding:15px 20px;">Game Info</th>
-                                <th style="padding:15px 20px; text-align:center;">Logic (W × T × M)</th>
-                                <th style="padding:15px 20px; text-align:right;">RP</th>
-                                <th style="padding:15px 20px; text-align:center;">Status</th>
-                                <th style="padding:15px 20px;"></th>
+                            <tr class="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                                <th class="px-8 py-5">Source</th>
+                                <th class="px-8 py-5">Date</th>
+                                <th class="px-8 py-5">Player</th>
+                                <th class="px-8 py-5">Game Info</th>
+                                <th class="px-8 py-5 text-center">Logic ($W \\times T \\times M$)</th>
+                                <th class="px-8 py-5 text-right font-black">RP</th>
+                                <th class="px-8 py-5 text-center">Status</th>
+                                <th class="px-8 py-5"></th>
                             </tr>
                         </thead>
-                        <tbody style="color:#334155;">
+                        <tbody class="divide-y divide-slate-50">
         `;
 
-        tableHtml += this.filteredRecords.map(rec => {
-            const isTour = rec.record_source === 'TOURNAMENT';
-            const sourceBadge = isTour 
-                ? `background:#fef3c7; color:#d97706; border:1px solid #fde68a;` 
-                : `background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;`;
-
-            return `
-                <tr style="border-bottom:1px solid #f1f5f9; transition:all 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-                    <td style="padding:20px;">
-                        <span style="padding:3px 8px; border-radius:9999px; font-size:10px; font-weight:900; ${sourceBadge}">${rec.record_source || 'BTLDB'}</span>
-                    </td>
-                    <td style="padding:20px;">
-                        <div style="font-weight:900; color:#0f172a; font-size:16px;">${rec.nickname || '무명'}</div>
-                        <div style="font-size:10px; color:#94a3b8; font-weight:800; margin-top:2px;">${rec.b_all_team || '무소속'}</div>
-                    </td>
-                    <td style="padding:20px;">
-                        <div style="display:flex; align-items:center; gap:6px;">
-                            <span style="font-weight:800; color:#312e81;">${rec.game_name || '-'}</span>
-                            ${rec.is_first == 1 ? '<span style="background:#ef4444; color:#fff; font-size:9px; font-weight:900; padding:1px 4px; border-radius:4px;">1ST</span>' : ''}
+        html += this.filteredRecords.map(rec => `
+            <tr class="hover:bg-indigo-50/20 transition-all group">
+                <td class="px-8 py-5">
+                    <span class="px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase ${rec.record_source === 'TOURNAMENT' ? 'bg-amber-100 text-amber-600 border border-amber-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}">
+                        ${rec.record_source || 'BTLDB'}
+                    </span>
+                </td>
+                <td class="px-8 py-5 whitespace-nowrap text-xs font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
+                <td class="px-8 py-5">
+                    <div class="flex flex-col leading-tight">
+                        <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
+                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">${rec.b_all_team || 'Free Agent'}</span>
+                    </div>
+                </td>
+                <td class="px-8 py-5">
+                    <div class="flex flex-col leading-tight">
+                        <div class="flex items-center gap-1.5 mb-1">
+                            <span class="font-bold text-indigo-900">${rec.game_name || '-'}</span>
+                            ${rec.is_first == 1 ? '<span class="bg-red-500 text-white text-[8px] px-1 rounded font-black tracking-tighter uppercase shadow-sm">1ST WIN</span>' : ''}
                         </div>
-                        <div style="font-size:11px; color:#64748b; margin-top:2px; font-weight:500;">S${rec.season_no} R${rec.round_no} · ${rec.match_type || '일반'}</div>
-                    </td>
-                    <td style="padding:20px;">
-                        <div style="display:flex; align-items:center; justify-content:center; gap:6px; font-weight:900;">
-                            <div style="width:32px; height:32px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#475569; font-size:12px;">${rec.weight || 0}</div>
-                            <span style="color:#cbd5e1;">×</span>
-                            <div style="width:32px; height:32px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#475569; font-size:12px;">${rec.playtime || 0}</div>
-                            <span style="color:#cbd5e1;">×</span>
-                            <div style="width:32px; height:32px; background:#e0e7ff; border:1px solid #c7d2fe; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#4f46e5; font-size:12px;">${rec.multiplier || 0}</div>
-                        </div>
-                    </td>
-                    <td style="padding:20px; text-align:right; font-weight:900; color:#4f46e5; font-size:18px;">
-                        ${(rec.rp || 0).toFixed(1)} <span style="font-size:11px; font-weight:700; color:#a5b4fc;">RP</span>
-                    </td>
-                    <td style="padding:20px; text-align:center;">
-                        ${rec.is_verified == 1 
-                            ? '<span style="color:#10b981; font-weight:900; font-size:18px;">✓</span>' 
-                            : '<span style="color:#cbd5e1; font-weight:900; font-size:18px;">?</span>'}
-                    </td>
-                    <td style="padding:20px; text-align:right;">
-                        ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" style="display:inline-block; padding:8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; color:#94a3b8; text-decoration:none; transition:all 0.2s;" onmouseover="this.style.color='#4f46e5'; this.style.background='#e0e7ff';" onmouseout="this.style.color='#94a3b8'; this.style.background='#f8fafc';">🔗</a>` : ''}
-                    </td>
-                </tr>
-            `;
-        }).join('');
+                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">S${rec.season_no || 0} R${rec.round_no || 0} · ${rec.match_type || '일반'}</span>
+                    </div>
+                </td>
+                <td class="px-8 py-5">
+                    <div class="flex items-center justify-center gap-1.5">
+                        <div class="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-lg text-xs font-black shadow-sm" title="Weight">${rec.weight || 0}</div>
+                        <span class="text-slate-200 font-bold">×</span>
+                        <div class="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-lg text-xs font-black shadow-sm" title="Playtime">${rec.playtime || 0}</div>
+                        <span class="text-slate-200 font-bold">×</span>
+                        <div class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-xs font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
+                    </div>
+                </td>
+                <td class="px-8 py-5 text-right font-black text-indigo-600 text-xl tracking-tighter">${(rec.rp || 0).toFixed(1)}</td>
+                <td class="px-8 py-5 text-center">
+                    ${rec.is_verified == 1 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-5 h-5 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-5 h-5 mx-auto opacity-30"></i>'}
+                </td>
+                <td class="px-8 py-5 text-right">
+                    ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" class="p-2.5 hover:bg-indigo-600 hover:text-white bg-slate-50 rounded-xl text-slate-400 transition-all inline-block border border-slate-100 shadow-sm"><i data-lucide="external-link" class="w-4 h-4"></i></a>` : ''}
+                </td>
+            </tr>
+        `).join('');
 
-        tableHtml += `</tbody></table></div></div>`;
-        box.innerHTML = tableHtml;
+        html += `</tbody></table></div></div>`;
+        area.innerHTML = html;
+        if(window.lucide) lucide.createIcons();
     },
 
-    // 7. [디자인 모듈] 실시간 종합 랭킹 카드 시각화
+    // 6. 랭킹보드 그리드 렌더링 (Tailwind 디자인 원상 복구)
     renderRankings: function() {
-        const box = document.getElementById('archive-core-box');
-        if (!box) return;
+        const area = document.getElementById('archive-content-area');
+        if (!area) return;
 
         const stats = {};
         this.filteredRecords.forEach(r => {
@@ -221,55 +237,48 @@ Boako.Archive = {
         const sorted = Object.values(stats).sort((a, b) => b.rp - a.rp);
 
         if (sorted.length === 0) {
-            box.innerHTML = `<div style="text-align:center; padding:60px; color:#94a3b8; font-weight:800; background:#fff; border-radius:24px;">집계할 랭킹 데이터가 없습니다.</div>`;
+            area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">집계할 랭킹 데이터가 없습니다.</div>`;
             return;
         }
 
-        const maxRp = sorted[0].rp || 1;
+        let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
 
-        let gridHtml = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:25px;">`;
-
-        gridHtml += sorted.map((p, idx) => {
-            const medal = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤';
-            const rankBg = idx < 3 ? 'background:#4f46e5; color:#fff;' : 'background:#f1f5f9; color:#64748b;';
-            const pct = Math.min(100, (p.rp / maxRp) * 100);
-
-            return `
-                <div class="boako-rank-card" style="background:#fff; border-radius:28px; padding:25px; border:1px solid #fff; box-shadow:0 10px 15px -3px rgba(0,0,0,0.04); position:relative; transition:all 0.3s;" onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='0 20px 25px -5px rgba(0,0,0,0.08)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.04)';">
-                    <div style="position:absolute; top:0; right:0; padding:6px 15px; border-bottom-left-radius:16px; font-size:11px; font-weight:900; tracking-widest:0.1em; ${rankBg}">RANK #${idx + 1}</div>
-                    
-                    <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px; margin-top:10px;">
-                        <div style="width:50px; height:50px; background:#f8fafc; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">${medal}</div>
-                        <div>
-                            <div style="font-size:20px; font-weight:900; color:#0f172a; line-height:1;">${p.name}</div>
-                            <div style="font-size:10px; font-weight:800; color:#94a3b8; text-transform:uppercase; tracking-widest:0.05em; margin-top:5px;">${p.team || 'FREE AGENT'}</div>
-                        </div>
+        html += sorted.map((p, idx) => `
+            <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative overflow-hidden group hover:-translate-y-2 transition-transform duration-300">
+                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}">
+                    RANK #${idx + 1}
+                </div>
+                <div class="flex items-center gap-5 mb-8 pt-2">
+                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl bg-indigo-50 shadow-inner group-hover:scale-110 transition-transform duration-300">
+                        ${idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤'}
                     </div>
-
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
-                        <div style="background:#f8fafc; padding:15px; border-radius:16px; border:1px solid #f1f5f9; text-align:center;">
-                            <div style="font-size:9px; font-weight:900; color:#94a3b8; text-transform:uppercase; tracking-widest:0.05em; margin-bottom:4px;">Total RP</div>
-                            <div style="font-size:22px; font-weight:900; color:#4f46e5;">${Math.floor(p.rp)}</div>
-                        </div>
-                        <div style="background:#f8fafc; padding:15px; border-radius:16px; border:1px solid #f1f5f9; text-align:center;">
-                            <div style="font-size:9px; font-weight:900; color:#94a3b8; text-transform:uppercase; tracking-widest:0.05em; margin-bottom:4px;">Matches</div>
-                            <div style="font-size:22px; font-weight:900; color:#334155;">${p.games}</div>
-                        </div>
-                    </div>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:900; color:#475569; margin-bottom:10px;">
-                        <span style="color:#94a3b8; font-style:italic;">First Win Bonus</span>
-                        <span style="background:#fef2f2; color:#ef4444; padding:2px 8px; border-radius:6px;">+${p.wins} Times</span>
-                    </div>
-
-                    <div style="width:100%; background:#f1f5f9; h:6px; height:6px; border-radius:9999px; overflow:hidden;">
-                        <div style="background:linear-gradient(to right, #6366f1, #4f46e5); height:100%; width:${pct}%; border-radius:9999px; transition:width 0.5s ease-out;"></div>
+                    <div>
+                        <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5">${p.team || 'Free Agent'}</p>
                     </div>
                 </div>
-            `;
-        }).join('');
+                <div class="grid grid-cols-2 gap-4 mb-8">
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center shadow-sm">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total RP</p>
+                        <p class="text-3xl font-black text-indigo-600 tracking-tighter leading-none">${Math.floor(p.rp)}</p>
+                    </div>
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center shadow-sm">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Matches</p>
+                        <p class="text-3xl font-black text-slate-800 tracking-tighter leading-none">${p.games}</p>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center text-[11px] font-black tracking-tight uppercase mb-4">
+                    <span class="text-slate-400 italic">First Win Bonus</span>
+                    <span class="text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100">+${p.wins} Times</span>
+                </div>
+                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
+                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 h-full rounded-full transition-all duration-1000 ease-out" style="width: ${Math.min(100, (p.rp / sorted[0].rp) * 100)}%"></div>
+                </div>
+            </div>
+        `).join('');
 
-        gridHtml += `</div>`;
-        box.innerHTML = gridHtml;
+        html += `</div>`;
+        area.innerHTML = html;
+        if(window.lucide) lucide.createIcons();
     }
 };
