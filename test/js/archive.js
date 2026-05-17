@@ -294,8 +294,7 @@ Boako.Archive = {
     },
 
     // 6. 랭킹보드 그리드 렌더링
-    // 🔍 archive.js 내의 기존 renderRankings: function() { ... } 구역을 찾아 이 코드로 교체하세요!
-    // 🔍 archive.js 맨 밑바닥에 있는 기존 renderRankings 구역부터 파일 끝까지 통째로 덮어쓰세요!
+   // 🔍 archive.js 맨 밑바닥에 있는 기존 renderRankings 구역부터 파일 끝까지 통째로 덮어쓰세요!
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
@@ -349,16 +348,18 @@ Boako.Archive = {
                         </div>
                     </div>
                 </div>
+                
                 <div class="grid grid-cols-2 gap-4 mb-8">
-                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center shadow-sm">
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
                         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total RP</p>
                         <p class="text-3xl font-black text-indigo-600 tracking-tighter leading-none">${Math.floor(p.rp)}</p>
                     </div>
-                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center shadow-sm">
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
                         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Matches</p>
                         <p class="text-3xl font-black text-slate-800 tracking-tighter leading-none">${p.games}</p>
                     </div>
                 </div>
+                
                 <div class="flex justify-between items-center text-[11px] font-black tracking-tight uppercase mb-4">
                     <span class="text-slate-400 italic">First Win Bonus</span>
                     <span class="text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100">+${p.wins} Times</span>
