@@ -294,14 +294,26 @@ Boako.Archive = {
     },
 
     // 6. 랭킹보드 그리드 렌더링
-// 🔍 archive.js 파일 맨 밑바닥에 있는 기존 renderRankings 구역만 찾아서 요걸로 덮어쓰세요!
+// 🔍 archive.js 파일 맨 밑바닥에 있는 기존 renderRankings 구역만 찾아서 요걸로 최종 교체하세요!
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
 
         const stats = {};
         this.filteredRecords.forEach(r => {
-            if (!stats[r.nickname]) stats[r.nickname] = { name: r.nickname, team: r.b_all_team, logo_url: r.logo_url, rp: 0, games: 0, wins: 0 };
+            // 🌟 [연동 완료] 오늘 새로 업데이트한 가상 뷰에서 내려오는 실물 profile_url을 마스터 장부에 바인딩합니다.
+            if (!stats[r.nickname]) {
+                stats[r.nickname] = { 
+                    name: r.nickname, 
+                    team: r.b_all_team, 
+                    logo_url: r.logo_url, 
+                    profile_url: r.profile_url, // 👈 카톡 프로필 사진 주소 실물 매칭 구역!
+                    is_prev_mvp: r.is_prev_mvp || false, // 내일 작업하실 MVP 플래그 대기석
+                    rp: 0, 
+                    games: 0, 
+                    wins: 0 
+                };
+            }
             stats[r.nickname].rp += (r.rp || 0);
             stats[r.nickname].games += 1;
             if (r.is_first == 1) stats[r.nickname].wins += 1;
@@ -324,7 +336,7 @@ Boako.Archive = {
                         idx < 3 
                             ? `
                                 <span class="text-xl select-none leading-none relative -top-[2px]">
-                                    ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
+                                    ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
                                 </span>
                               `
                             : ''
@@ -334,14 +346,16 @@ Boako.Archive = {
                 
                 <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
                     <div class="relative group-hover:scale-105 transition-transform duration-300">
-                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" 
-                             class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5" 
+                        <img src="${p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}" 
+                             class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
+                             onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
                              alt="${p.name}">
+                        
                         ${
-                            idx < 3 
+                            p.is_prev_mvp 
                                 ? `
                                     <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">
-                                        ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
+                                        👑
                                     </div>
                                   ` 
                                 : ''
