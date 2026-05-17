@@ -49,14 +49,22 @@ Boako.Auth = {
         }
     },
 
-    renderWidget: () => {
+   renderWidget: () => {
         const area = document.getElementById('login-widget-area');
         const user = Boako.state.user;
         if (!user) {
             area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
         } else {
+            // 🌟 수파베이스 라이브 세션에 담긴 카카오톡 프로필 이미지 주소 추출
+            const avatarUrl = user.user_metadata?.avatar_url;
+
             area.innerHTML = `
-            <div class="user-avatar">👤</div>
+            <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
+                ${avatarUrl 
+                    ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` 
+                    : '👤'
+                }
+            </div>
             <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
                 <strong>${user.nickname || '사용자'}</strong>
                 <button class="btn-edit-small" onclick="Boako.Shop.buyItem('item_ticket_nick')">수정</button>
@@ -65,7 +73,7 @@ Boako.Auth = {
             <span class="badge-premium">아카이브 멤버</span><br>
             <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
         }
-    }, // 👈 여기에 콤마(,)가 있어야 다음 함수를 쓸 수 있습니다!
+    },
 
   /**
      * 🌟 [업그레이드] 관리자 메뉴 권한 체크 및 실시간 스타일링
