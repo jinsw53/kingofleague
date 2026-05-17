@@ -295,13 +295,13 @@ Boako.Archive = {
 
     // 6. 랭킹보드 그리드 렌더링
     // 🔍 archive.js 내의 기존 renderRankings: function() { ... } 구역을 찾아 이 코드로 교체하세요!
+    // 🔍 archive.js 맨 밑바닥에 있는 기존 renderRankings 구역부터 파일 끝까지 통째로 덮어쓰세요!
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
 
         const stats = {};
         this.filteredRecords.forEach(r => {
-            // 🌟 [포인트 1] 집계 데이터를 모을 때 백엔드 가상 뷰에서 넘어온 logo_url도 누락 없이 같이 저장합니다.
             if (!stats[r.nickname]) stats[r.nickname] = { name: r.nickname, team: r.b_all_team, logo_url: r.logo_url, rp: 0, games: 0, wins: 0 };
             stats[r.nickname].rp += (r.rp || 0);
             stats[r.nickname].games += 1;
@@ -318,10 +318,12 @@ Boako.Archive = {
         let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
 
         html += sorted.map((p, idx) => `
-            <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative overflow-hidden group hover:-translate-y-2 transition-transform duration-300">
-                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}">
+            <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
+                
+                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}">
                     RANK #${idx + 1}
                 </div>
+                
                 <div class="flex items-center gap-5 mb-8 pt-2">
                     <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl bg-indigo-50 shadow-inner group-hover:scale-110 transition-transform duration-300">
                         ${idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤'}
