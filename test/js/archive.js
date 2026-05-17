@@ -294,7 +294,7 @@ Boako.Archive = {
     },
 
     // 6. 랭킹보드 그리드 렌더링
-   // 🔍 archive.js 맨 밑바닥에 있는 기존 renderRankings 구역부터 파일 끝까지 통째로 덮어쓰세요!
+   // 🔍 archive.js 파일 맨 밑바닥에 있는 기존 renderRankings 구역만 찾아서 요걸로 덮어쓰세요!
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
@@ -319,23 +319,42 @@ Boako.Archive = {
         html += sorted.map((p, idx) => `
             <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
                 
-                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}">
-                    RANK #${idx + 1}
+                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-center gap-1.5">
+                    ${
+                        idx < 3 
+                            ? `
+                                <div class="w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">
+                                    ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
+                                </div>
+                              `
+                            : ''
+                    }
+                    <span>RANK #${idx + 1}</span>
                 </div>
                 
-                <div class="flex items-center gap-5 mb-8 pt-2">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl bg-indigo-50 shadow-inner group-hover:scale-110 transition-transform duration-300">
-                        ${idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤'}
+                <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
+                    <div class="relative group-hover:scale-105 transition-transform duration-300">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" 
+                             class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5" 
+                             alt="${p.name}">
+                        ${
+                            idx < 3 
+                                ? `
+                                    <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">
+                                        ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
+                                    </div>
+                                  ` 
+                                : ''
+                        }
                     </div>
                     <div>
                         <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
                         
-                        <div class="flex items-center gap-1.5 mt-1.5 relative group/logo cursor-pointer">
+                        <div class="flex items-center gap-1.5 mt-1.5 relative group/logo cursor-pointer overflow-visible">
                             ${
                                 p.logo_url && p.team !== 'Free Agent'
                                     ? `
                                         <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
-                                        
                                         <div class="hidden group-hover/logo:flex absolute bottom-full left-0 mb-2 z-50 bg-white p-3 rounded-2xl shadow-2xl border border-slate-100 flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]">
                                             <img src="${p.logo_url}" class="w-16 h-16 object-contain rounded-xl bg-slate-50 p-1" alt="${p.team} Large">
                                             <span class="text-[10px] font-black text-indigo-950 uppercase tracking-wider">${p.team}</span>
@@ -360,9 +379,9 @@ Boako.Archive = {
                     </div>
                 </div>
                 
-                <div class="flex justify-between items-center text-[11px] font-black tracking-tight uppercase mb-4">
+                <div class="flex justify-between items-center text-[11px] font-black tracking-tight uppercase mb-4 overflow-visible">
                     <span class="text-slate-400 italic">First Win Bonus</span>
-                    <span class="text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100">+${p.wins} Times</span>
+                    <span class="text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100 overflow-visible">+${p.wins} Times</span>
                 </div>
                 <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
                     <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 h-full rounded-full transition-all duration-1000 ease-out" style="width: ${Math.min(100, (p.rp / sorted[0].rp) * 100)}%"></div>
