@@ -323,7 +323,7 @@ Boako.Archive = {
                     ${
                         idx < 3 
                             ? `
-                                <span class="text-lg select-none leading-none relative -top-[1px]">
+                                <span class="text-lg select-none leading-none relative top-[2px]">
                                     ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
                                 </span>
                               `
