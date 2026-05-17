@@ -29,21 +29,20 @@
 
         /* Header & Nav */
         .header { background-color: #fff; border-bottom: 1px solid var(--border-color); padding: 24px 0; }
-        .header .inner { display: flex; align-items: center; gap: 32px; }
-        .logo { font-size: 44px; font-weight: 950; color: var(--primary); letter-spacing: -3px; cursor: pointer; margin-left: -5px; }
+        .header .inner { display: flex; align-items: center; gap: 45px; }
+        .logo { font-size: 44px; font-weight: 950; color: var(--primary); letter-spacing: -3px; cursor: pointer; }
         .search-box { width: 100%; max-width: 600px; height: 56px; border: 2px solid var(--primary); display: flex; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: var(--shadow-md); }
         .search-box input { flex: 1; border: none; padding: 0 24px; outline: none; font-size: 18px; font-weight: 600; }
         .btn-search { width: 68px; background: var(--primary); color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; }
         .nav { background-color: #fff; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 900; }
-        .menu-list { display: flex; gap: 32px; height: 60px; align-items: center; }
+        .menu-list { display: flex; gap: 40px; height: 60px; align-items: center; }
         .menu-item { font-size: 16px; font-weight: 800; color: #444; padding: 10px 0; border-bottom: 3px solid transparent; cursor: pointer; }
-/* 🌟 첫 번째 메뉴 아이템의 글자 시작선을 로고 기둥선과 일직선으로 정렬 */
-.menu-list .menu-item:first-child { padding-left: 2px; }
         .menu-item.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
 
         /* Layout */
-        .container { padding: 30px 0 120px 0; }
-        .flex-container { display: flex; gap: 32px; align-items: flex-start; }
+        /* 🌟 이름을 변경하여 테일윈드의 강제 왼쪽 정렬 레이아웃을 완전히 무력화합니다 */
+.main-container-wrap { padding: 30px 0 120px 0; }
+        .flex-container { display: flex; gap: 30px; align-items: flex-start; }
         .main-content { flex: 1; min-width: 0; }
         .side-content { width: 340px; flex-shrink: 0; position: sticky; top: 90px; }
         .main-banner { height: 200px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-radius: 20px; margin-bottom: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; box-shadow: 0 15px 30px rgba(124, 58, 237, 0.25); text-align: center; }
@@ -124,7 +123,7 @@
             </div>
         </nav>
 
-        <div class="container">
+        <div class="main-container-wrap">
             <div class="inner flex-container">
                 <main class="main-content" id="main-content-area"></main>
                 <aside class="side-content">
