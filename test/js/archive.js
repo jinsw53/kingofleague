@@ -323,9 +323,7 @@ Boako.Archive = {
                     ${
                         idx < 3 
                             ? `
-                                <div class="w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">
-                                    ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
-                                </div>
+                                ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
                               `
                             : ''
                     }
