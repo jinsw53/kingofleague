@@ -294,13 +294,15 @@ Boako.Archive = {
     },
 
     // 6. 랭킹보드 그리드 렌더링
+    // 🔍 archive.js 내의 기존 renderRankings: function() { ... } 구역을 찾아 이 코드로 교체하세요!
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
 
         const stats = {};
         this.filteredRecords.forEach(r => {
-            if (!stats[r.nickname]) stats[r.nickname] = { name: r.nickname, team: r.b_all_team, rp: 0, games: 0, wins: 0 };
+            // 🌟 [포인트 1] 집계 데이터를 모을 때 백엔드 가상 뷰에서 넘어온 logo_url도 누락 없이 같이 저장합니다.
+            if (!stats[r.nickname]) stats[r.nickname] = { name: r.nickname, team: r.b_all_team, logo_url: r.logo_url, rp: 0, games: 0, wins: 0 };
             stats[r.nickname].rp += (r.rp || 0);
             stats[r.nickname].games += 1;
             if (r.is_first == 1) stats[r.nickname].wins += 1;
@@ -326,7 +328,23 @@ Boako.Archive = {
                     </div>
                     <div>
                         <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5">${p.team || 'Free Agent'}</p>
+                        
+                        <div class="flex items-center gap-1.5 mt-1.5 relative group/logo cursor-pointer">
+                            ${
+                                p.logo_url && p.team !== 'Free Agent'
+                                    ? `
+                                        <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
+                                        
+                                        <div class="hidden group-hover/logo:flex absolute bottom-full left-0 mb-2 z-50 bg-white p-3 rounded-2xl shadow-2xl border border-slate-100 flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]">
+                                            <img src="${p.logo_url}" class="w-16 h-16 object-contain rounded-xl bg-slate-50 p-1" alt="${p.team} Large">
+                                            <span class="text-[10px] font-black text-indigo-950 uppercase tracking-wider">${p.team}</span>
+                                            <div class="absolute top-full left-4 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-100 rotate-45"></div>
+                                        </div>
+                                      `
+                                    : `<span class="text-[10px]">👤</span>`
+                            }
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4 mb-8">
