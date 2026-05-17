@@ -319,17 +319,17 @@ Boako.Archive = {
         html += sorted.map((p, idx) => `
             <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
                 
-                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-center gap-1.5">
+                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-end gap-1">
                     ${
                         idx < 3 
                             ? `
-                                <span class="text-lg select-none leading-none relative top-[2px]">
+                                <span class="text-lg select-none leading-none">
                                     ${idx === 0 ? '👑' : idx === 1 ? '🥈' : '🥉'}
                                 </span>
                               `
                             : ''
                     }
-                    <span>RANK #${idx + 1}</span>
+                    <span class="leading-none">RANK #${idx + 1}</span>
                 </div>
                 
                 <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
