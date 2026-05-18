@@ -85,48 +85,64 @@ Boako.RecordVerify = {
         container.innerHTML = html;
     },
 
-    // 4. 승인 버튼 눌렀을 때 실물 원본 테이블에 서명 주입 (트리거 연동 연쇄 반응)
+   // 4. 승인 버튼 눌렀을 때 DB 업데이트 (프로필 테이블 매칭 방식)
     approve: async function(recordId, matchType) {
         if (!confirm("이 기록을 정상적인 경기로 승인하시겠습니까?")) return;
         
         try {
-            // 🌟 match_type에 따라 실물 원본 테이블 자동 추적 이정표 설정
-            let targetTable = matchType === 'TOURNAMENT' ? 'boako_tournaments' : 'BTLDB';
-
-            // 유저 세션 상태에 따른 UUID 추출 안전망 전개
-            const leaderUuid = Boako.state.user?.id || Boako.state.user?.user_id;
-            const nowTimestamp = new Date().toISOString();
-
-            if (!leaderUuid) {
-                Boako.Util.toast("❌ 리더 인증 정보(UUID)를 가져올 수 없습니다. 재로그인이 필요합니다.");
+            // 1. 현재 로그인한 유저의 닉네임 확인
+            const myNickname = Boako.state.user?.nickname;
+            if (!myNickname) {
+                alert("❌ [인증 실패] 현재 유저의 닉네임(상태 정보)이 장부에 없습니다.");
                 return;
             }
 
-            // 🎯 해당 원본 실물 테이블의 정확한 ID 행에 결재 도장 각인
-            const { error } = await Boako.db
+            // 🌟 2. [소장님 기획 반영] profiles 테이블에서 내 닉네임과 full_name이 일치하는 진짜 고유 ID 조회
+            const { data: profile, error: profileError } = await Boako.db
+                .from('profiles')
+                .select('id')
+                .eq('full_name', myNickname)
+                .maybeSingle();
+
+            if (profileError || !profile) {
+                alert(`❌ [매칭 실패] profiles 테이블에서 full_name이 '${myNickname}'인 유저의 ID를 찾을 수 없습니다.`);
+                return;
+            }
+
+            const leaderId = profile.id; // 🎯 프로필 장부에서 찾아낸 진짜 고유 ID
+            const nowTimestamp = new Date().toISOString();
+            
+            // 출신 성분에 따른 타겟 테이블 결정
+            let targetTable = matchType === 'TOURNAMENT' ? 'boako_tournaments' : 'BTLDB';
+
+            // 🎯 3. 찾아낸 프로필 ID와 타임스탬프를 실물 테이블에 확실하게 주입!
+            const { data, error } = await Boako.db
                 .from(targetTable) 
                 .update({ 
-                    verified_by: leaderUuid,   // 결재한 리더 UUID
-                    verified_at: nowTimestamp   // 결재 승인 타임스탬프
-                    // 💡 is_verified 상태는 소장님이 심어두신 DB BEFORE UPDATE 트리거가 0으로 처리!
+                    verified_by: leaderId,   // 👈 프로필 테이블의 고유 ID 주입!
+                    verified_at: nowTimestamp   
                 })
-                .eq('id', recordId);
+                .eq('id', isNaN(recordId) ? recordId : Number(recordId))
+                .select(); // 실제 반영 결과를 받아오기 위해 추가
 
             if (error) throw error;
 
-            // 후속 동기화 자동화 로직 가동
+            // 4. 안전 검증: 실제로 업데이트가 일어났는지 체크
+            if (!data || data.length === 0) {
+                alert(`❌ [DB 반영 실패] '${targetTable}' 테이블에 ID가 [ ${recordId} ]인 데이터가 존재하지 않거나 수정되지 않았습니다.`);
+                return;
+            }
+
+            // 5. 완벽하게 성공 시 후속 오토메이션 작동
             Boako.Util.toast("✅ 서명이 완료되어 기록이 정상 승인되었습니다.");
-            
-            // 1) 대기열 리스트 리로드 (가상뷰 조건 필터에 의해 승인건 자동 제외)
             await this.loadPendingData();
 
-            // 2) 좌측 메뉴바의 실시간 미인증 경고등 알림 상태 갱신
             if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
                 Boako.Auth.checkLeaderMenu();
             }
 
         } catch (err) {
-            console.error("승인 처리 에러:", err);
+            console.error("승인 처리 정밀 검증 에러:", err);
             Boako.Util.toast("승인 처리 중 오류가 발생했습니다.");
         }
     }
