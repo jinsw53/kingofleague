@@ -171,9 +171,9 @@ case 'record_verify':
                     <div class="card-header" style="font-size:16px;">📋 리더 인증 수칙</div>
                     <div class="card-body" style="padding:20px 25px;">
                         <ul class="text-slate-600 text-xs font-bold space-y-4 leading-relaxed">
-                            <li>1. 경기 결과와 <span class="text-emerald-600">BGA 테이블 스크린샷</span> 정보가 일치하는지 대조하십시오.</li>
-                            <li>2. 고의 패배, 점수 몰아주기 등 어뷰징 정황이 있다면 즉시 <span class="text-red-500">인증 반려</span> 처리를 하십시오.</li>
-                            <li>3. 인증 완료 시 해당 점수가 팀 스코어 및 랭킹보드에 실시간 즉시 반영됩니다.</li>
+                            <li>1. 옆에 보이는 기록을 살펴봐주세요! <span class="text-red-500">클릭</span>하면, 해당 테이블이 새 창으로 열립니다.</li>
+                            <li>2. 기록 정보와 <span class="text-emerald-600">BGA 테이블</span> 정보가 일치하는지 대조해주세요.</li>
+                            <li>3. 승인 완료 시 해당 점수가 팀 스코어 및 랭킹보드에 실시간 즉시 반영됩니다.</li>
                         </ul>
                     </div>
                 </div>
