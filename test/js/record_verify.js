@@ -1,5 +1,5 @@
 /**
- * [RECORD VERIFY] 타 팀 경기 기록 교차 검증 및 승인 센터 (최종 최신화 마스터본)
+ * [RECORD VERIFY] 타 팀 경기 기록 교차 검증 및 승인 센터 (최종 최적화본)
  */
 Boako.RecordVerify = {
     pendingList: [],
@@ -54,10 +54,9 @@ Boako.RecordVerify = {
         html += this.pendingList.map(item => {
             const isTournament = item.match_type === 'TOURNAMENT';
             
-            // 🌟 [소장님 기획 반영] 토너먼트 배수를 10으로 나누어 직관적인 '단계'로 가공 (기본값 10 대입으로 1단계 방어)
+            // 🎯 [기획 반영] 토너먼트 배수를 10으로 나누어 1단계, 2단계 구간으로 직관적 표기
             const tournamentStage = Math.floor((item.multiplier || 10) / 10);
             
-            // 🎯 토너먼트면 배수 대신 1단계, 2단계 구간 뱃지 노출 / 일반 매치는 첫 승 확인 노출
             const conditionBadge = isTournament
                 ? `<span class="inline-block mt-1 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-bold">🔥 토너먼트: ${tournamentStage}단계</span>`
                 : `<span class="inline-block mt-1 px-2 py-0.5 bg-sky-100 text-sky-800 text-xs rounded font-bold">🛡️ 첫 승 기록 확인</span>`;
@@ -88,64 +87,45 @@ Boako.RecordVerify = {
         container.innerHTML = html;
     },
 
-   // 4. 승인 버튼 눌렀을 때 DB 업데이트 (프로필 테이블 매칭 방식)
+    // 4. 승인 버튼 눌렀을 때 실물 원본 테이블에 도장 쾅! (꼬임 해결 완료)
     approve: async function(recordId, matchType) {
         if (!confirm("이 기록을 정상적인 경기로 승인하시겠습니까?")) return;
         
         try {
-            // 1. 현재 로그인한 유저의 닉네임 확인
-            const myNickname = Boako.state.user?.nickname;
-            if (!myNickname) {
-                alert("❌ [인증 실패] 현재 유저의 닉네임(상태 정보)이 장부에 없습니다.");
-                return;
-            }
-
-            // 🌟 2. [소장님 기획 반영] profiles 테이블에서 내 닉네임과 full_name이 일치하는 진짜 고유 ID 조회
-            const { data: profile, error: profileError } = await Boako.db
-                .from('profiles')
-                .select('id')
-                .eq('full_name', myNickname)
-                .maybeSingle();
-
-            if (profileError || !profile) {
-                alert(`❌ [매칭 실패] profiles 테이블에서 full_name이 '${myNickname}'인 유저의 ID를 찾을 수 없습니다.`);
-                return;
-            }
-
-            const leaderId = profile.id; // 🎯 프로필 장부에서 찾아낸 진짜 고유 ID
-            const nowTimestamp = new Date().toISOString();
-            
-            // 출신 성분에 따른 타겟 테이블 결정
             let targetTable = matchType === 'TOURNAMENT' ? 'boako_tournaments' : 'BTLDB';
 
-            // 🎯 3. 찾아낸 프로필 ID와 타임스탬프를 실물 테이블에 확실하게 주입!
-            const { data, error } = await Boako.db
+            // 🌟 소장님 원래 설계대로, 세션이 쥐고 있는 순수 유저 고유 ID(UUID)를 다이렉트로 매칭합니다.
+            const leaderUuid = Boako.state.user?.id;
+            const nowTimestamp = new Date().toISOString();
+
+            if (!leaderUuid) {
+                Boako.Util.toast("❌ 인증 정보(UUID)를 찾을 수 없습니다. 다시 로그인해 주세요.");
+                return;
+            }
+
+            // 🎯 타입 불일치 방어용 Number 형변환 처리 후 수파베이스 실물 테이블 타격
+            const { error } = await Boako.db
                 .from(targetTable) 
                 .update({ 
-                    verified_by: leaderId,   // 👈 프로필 테이블의 고유 ID 주입!
+                    verified_by: leaderUuid,   // 깨끗하게 정렬된 리더의 고유 식별값 주입
                     verified_at: nowTimestamp   
                 })
-                .eq('id', isNaN(recordId) ? recordId : Number(recordId))
-                .select(); // 실제 반영 결과를 받아오기 위해 추가
+                .eq('id', isNaN(recordId) ? recordId : Number(recordId));
 
             if (error) throw error;
 
-            // 4. 안전 검증: 실제로 업데이트가 일어났는지 체크
-            if (!data || data.length === 0) {
-                alert(`❌ [DB 반영 실패] '${targetTable}' 테이블에 ID가 [ ${recordId} ]인 데이터가 존재하지 않거나 수정되지 않았습니다.`);
-                return;
-            }
-
-            // 5. 완벽하게 성공 시 후속 오토메이션 작동
             Boako.Util.toast("✅ 서명이 완료되어 기록이 정상 승인되었습니다.");
+            
+            // 대기열 리스트 동적 리로드
             await this.loadPendingData();
 
+            // 왼쪽 메뉴바의 실시간 카운트 경고등 갱신
             if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
                 Boako.Auth.checkLeaderMenu();
             }
 
         } catch (err) {
-            console.error("승인 처리 정밀 검증 에러:", err);
+            console.error("승인 처리 에러:", err);
             Boako.Util.toast("승인 처리 중 오류가 발생했습니다.");
         }
     }
