@@ -9,8 +9,10 @@ Boako.Auth = {
         if (session?.user) {
             Boako.state.user = session.user;
             await Boako.Team.syncStatus();
-            // 🌟 관리자 권한 확인
+            
+            // 🌟 권한 메뉴 체크 세트 실행
             await Boako.Auth.checkAdminMenu();
+            await Boako.Auth.checkLeaderMenu(); // [추가]
         }
         
         Boako.Auth.renderWidget();
@@ -20,14 +22,20 @@ Boako.Auth = {
             if (s?.user) {
                 Boako.state.user = s.user;
                 await Boako.Team.syncStatus();
-                // 🌟 로그인/변경 시 관리자 권한 재확인
+                
+                // 🌟 로그인/변경 시 권한 메뉴 재확인
                 await Boako.Auth.checkAdminMenu();
+                await Boako.Auth.checkLeaderMenu(); // [추가]
             } else {
                 Boako.state.user = null;
                 Boako.state.team = null;
-                // 로그아웃 시 관리자 메뉴 숨기기
+                
+                // 로그아웃 시 권한 메뉴 일제히 숨기기
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) adminMenu.style.display = 'none';
+                
+                const verifyMenu = document.getElementById('menu-record-verify'); // [추가]
+                if (verifyMenu) verifyMenu.style.display = 'none'; // [추가]
             }
             Boako.Auth.renderWidget();
         });
@@ -49,13 +57,12 @@ Boako.Auth = {
         }
     },
 
-   renderWidget: () => {
+    renderWidget: () => {
         const area = document.getElementById('login-widget-area');
         const user = Boako.state.user;
         if (!user) {
             area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
         } else {
-            // 🌟 수파베이스 라이브 세션에 담긴 카카오톡 프로필 이미지 주소 추출
             const avatarUrl = user.user_metadata?.avatar_url;
 
             area.innerHTML = `
@@ -75,14 +82,13 @@ Boako.Auth = {
         }
     },
 
-  /**
+    /**
      * 🌟 [업그레이드] 관리자 메뉴 권한 체크 및 실시간 스타일링
      */
     checkAdminMenu: async function() {
         if (!Boako.state.user) return;
 
         try {
-            // 1. 관리자 권한 확인
             const { data: profile } = await Boako.db
                 .from('profiles')
                 .select('is_admin')
@@ -92,22 +98,17 @@ Boako.Auth = {
             if (profile && profile.is_admin) {
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) {
-                    // 메뉴는 일단 노출
                     adminMenu.style.display = 'list-item'; 
                     
-                    // 2. 검수할 데이터 건수 확인 (head: true 옵션으로 데이터 없이 개수만 빠르게 조회)
                     const { count } = await Boako.db
                         .from('view_pending_review_games')
                         .select('*', { count: 'exact', head: true });
                     
-                    // 3. 건수에 따른 조건부 스타일링
                     if (count > 0) {
-                        // 검수 대기 항목이 있을 때만 붉은색 포인트
                         adminMenu.style.background = '#fff1f2';
                         adminMenu.style.borderLeft = '4px solid #f43f5e';
                         adminMenu.style.fontWeight = '800';
                     } else {
-                        // 검수할 게 없으면 일반 메뉴처럼 투명하게
                         adminMenu.style.background = 'transparent';
                         adminMenu.style.borderLeft = 'none';
                         adminMenu.style.fontWeight = 'normal';
@@ -117,5 +118,35 @@ Boako.Auth = {
         } catch (err) { 
             console.error("관리자 메뉴 로드 오류:", err); 
         }
+    }, // 🌟 다음 함수로 이어지므로 쉼표 필수!
+
+    /**
+     * 🌟 [신설] 팀 리더(LEADER & is_active) 메뉴 권한 체크 엔진
+     */
+    checkLeaderMenu: async function() {
+        if (!Boako.state.user) return;
+
+        try {
+            // 1. team_members 테이블에서 활성화 상태인 정식 팀장인지 압축 조회
+            const { data: isLeader } = await Boako.db
+                .from('team_members')
+                .select('id')
+                .eq('player_name', Boako.state.user.nickname)
+                .eq('is_active', true)
+                .eq('role', 'LEADER')
+                .maybeSingle();
+
+            const verifyMenu = document.getElementById('menu-record-verify');
+            if (verifyMenu) {
+                // 2. 조건 만족 시 메뉴바 노출 (Tailwind li 기본형태인 list-item 적용)
+                if (isLeader) {
+                    verifyMenu.style.display = 'list-item';
+                } else {
+                    verifyMenu.style.display = 'none';
+                }
+            }
+        } catch (err) {
+            console.error("팀 리더 메뉴 로드 오류:", err);
+        }
     }
-}; // 👈 여기서 딱 한 번만 닫아주면 끝!
+};
