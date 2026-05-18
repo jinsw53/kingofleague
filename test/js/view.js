@@ -163,7 +163,7 @@ case 'record_verify':
         html = `
             <div class="main-banner" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
                 <h1>✅ 팀 리그 기록 인증 센터</h1>
-                <p>소속 팀원들의 경기 기록을 최종 검증하고 서명합니다.</p>
+                <p>다른 팀원들의 경기 기록을 최종 검증하고 서명합니다.</p>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
