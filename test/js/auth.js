@@ -123,30 +123,55 @@ Boako.Auth = {
     /**
      * 🌟 [신설] 팀 리더(LEADER & is_active) 메뉴 권한 체크 엔진
      */
+   /**
+     * 🌟 [업그레이드] 팀 리더 메뉴 권한 체크 및 타 팀 미인증 건수 알림 엔진 (상호 감시 룰)
+     */
     checkLeaderMenu: async function() {
         if (!Boako.state.user) return;
 
         try {
-            // 1. team_members 테이블에서 활성화 상태인 정식 팀장인지 압축 조회
-            const { data: isLeader } = await Boako.db
+            // 1. team_members 테이블에서 활성화 상태인 정식 팀장인지 확인
+            const { data: leaderInfo } = await Boako.db
                 .from('team_members')
-                .select('id')
+                .select('team_id')
                 .eq('player_name', Boako.state.user.nickname)
                 .eq('is_active', true)
                 .eq('role', 'LEADER')
                 .maybeSingle();
 
             const verifyMenu = document.getElementById('menu-record-verify');
-            if (verifyMenu) {
-                // 2. 조건 만족 시 메뉴바 노출 (Tailwind li 기본형태인 list-item 적용)
-                if (isLeader) {
-                    verifyMenu.style.display = 'list-item';
-                } else {
-                    verifyMenu.style.display = 'none';
-                }
+            if (!verifyMenu) return;
+
+            // 2. 팀장이 아니라면 메뉴 숨김
+            if (!leaderInfo) {
+                verifyMenu.style.display = 'none';
+                return;
             }
+
+            // 3. 정식 팀장이 맞다면 메뉴바 노출
+            verifyMenu.style.display = 'list-item';
+
+            // 4. 🎯 [크로스 체크 알림 기믹]
+            // v_boako_total_records에서 '우리 팀이 아닌(neq)' 다른 팀의 미인증(is_verified = 1) 전적만 카운팅!
+            const { count } = await Boako.db
+                .from('v_boako_total_records')
+                .select('*', { count: 'exact', head: true })
+                .neq('team_id', leaderInfo.team_id) // 👈 바로 여기! eq(같음) 대신 neq(다름) 사용!
+                .eq('is_verified', 1);
+
+            // 5. 타 팀의 밀린 결재 서류가 있다면 경고등 점등
+            if (count > 0) {
+                verifyMenu.style.background = '#fff1f2';
+                verifyMenu.style.borderLeft = '4px solid #10b981';
+                verifyMenu.style.fontWeight = '800';
+            } else {
+                verifyMenu.style.background = 'transparent';
+                verifyMenu.style.borderLeft = 'none';
+                verifyMenu.style.fontWeight = 'normal';
+            }
+
         } catch (err) {
-            console.error("팀 리더 메뉴 로드 오류:", err);
+            console.error("팀 리더 타 팀 검증 알림 연동 오류:", err);
         }
     }
 };
