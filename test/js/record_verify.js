@@ -151,7 +151,7 @@ Boako.RecordVerify = {
                 await Boako.db.from('point_history').insert([{
                     user_id: leaderUuid,
                     point_change: 10, // 🎯 points가 아니라 point_change가 맞았네요!
-                    description: `[경기 승인] 교차 검증 완료 보상 (ID: ${recordId})` // 🎯 reason이 아니라 description이 맞았습니다!
+                    description: `[기록 승인] 교차 검증 완료 보상 (ID: ${recordId})` // 🎯 reason이 아니라 description이 맞았습니다!
                 }]);
 
             } catch (pointErr) {
