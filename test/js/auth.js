@@ -120,46 +120,39 @@ Boako.Auth = {
         }
     }, // 🌟 다음 함수로 이어지므로 쉼표 필수!
 
-    /**
-     * 🌟 [신설] 팀 리더(LEADER & is_active) 메뉴 권한 체크 엔진
-     */
-   /**
-     * 🌟 [업그레이드] 팀 리더 메뉴 권한 체크 및 타 팀 미인증 건수 알림 엔진 (상호 감시 룰)
+  /**
+     * 🌟 [업그레이드] 팀 리더 메뉴 권한 체크 및 타 팀 미인증 알림 (b_all_team 다이렉트 매칭)
      */
     checkLeaderMenu: async function() {
-        if (!Boako.state.user) return;
+        // 1. 로그인 안 했거나, 소속 팀이 아예 없으면 볼 필요도 없이 컷!
+        if (!Boako.state.user || !Boako.state.team) return;
 
         try {
-            // 1. team_members 테이블에서 활성화 상태인 정식 팀장인지 확인
-            const { data: leaderInfo } = await Boako.db
-                .from('team_members')
-                .select('team_id')
-                .eq('player_name', Boako.state.user.nickname)
-                .eq('is_active', true)
-                .eq('role', 'LEADER')
-                .maybeSingle();
+            // 2. 이미 글로벌 상태에 저장된 내 팀 정보 바로 꺼내 쓰기
+            const myTeamName = Boako.state.team.info.team_name;
+            const isLeader = Boako.state.team.type === 'LEADER';
 
             const verifyMenu = document.getElementById('menu-record-verify');
             if (!verifyMenu) return;
 
-            // 2. 팀장이 아니라면 메뉴 숨김
-            if (!leaderInfo) {
+            // 3. 리더가 아니면 메뉴 숨김
+            if (!isLeader) {
                 verifyMenu.style.display = 'none';
                 return;
             }
 
-            // 3. 정식 팀장이 맞다면 메뉴바 노출
+            // 4. 정식 팀장(LEADER)이 맞다면 메뉴바 노출
             verifyMenu.style.display = 'list-item';
 
-            // 4. 🎯 [크로스 체크 알림 기믹]
-            // v_boako_total_records에서 '우리 팀이 아닌(neq)' 다른 팀의 미인증(is_verified = 1) 전적만 카운팅!
+            // 5. 🎯 [크로스 체크 알림 기믹]
+            // 복잡한 과정 없이, 가상 뷰에서 b_all_team이 '내 팀명'과 다른(neq) 미결재 전적만 핀셋 카운팅!
             const { count } = await Boako.db
                 .from('v_boako_total_records')
                 .select('*', { count: 'exact', head: true })
-                .neq('team_id', leaderInfo.team_id) // 👈 바로 여기! eq(같음) 대신 neq(다름) 사용!
+                .neq('b_all_team', myTeamName) // 👈 바로 텍스트 팀명 대 텍스트 팀명으로 다이렉트 비교!
                 .eq('is_verified', 1);
 
-            // 5. 타 팀의 밀린 결재 서류가 있다면 경고등 점등
+            // 6. 타 팀의 밀린 결재 서류가 있다면 경고등 점등
             if (count > 0) {
                 verifyMenu.style.background = '#fff1f2';
                 verifyMenu.style.borderLeft = '4px solid #10b981';
