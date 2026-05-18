@@ -63,7 +63,7 @@ Boako.Auth = {
         if (!user) {
             area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
         } else {
-            const avatarUrl = user.user_metadata?.avatar_url;
+            const avatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://');
 
             area.innerHTML = `
             <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
