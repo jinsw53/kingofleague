@@ -60,8 +60,10 @@ Boako.RecordVerify = {
                     <p class="text-sm font-bold text-indigo-600 mt-1">${Math.floor(item.rp)} RP</p>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="Boako.RecordVerify.approve('${item.id}')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-all">✅ 승인</button>
-                    <button onclick="Boako.RecordVerify.reject('${item.id}')" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-all">❌ 반려</button>
+                    // (기존) <button onclick="Boako.RecordVerify.approve('${item.id}')">
+// 🔥 (변경) 출신 성분(match_type)을 같이 넘겨줍니다!
+<button onclick="Boako.RecordVerify.approve('${item.id}', '${item.match_type}')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-all">✅ 승인</button>
+<button onclick="Boako.RecordVerify.reject('${item.id}', '${item.match_type}')" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-all">❌ 반려</button>
                 </div>
             </div>
         `).join('');
@@ -70,40 +72,42 @@ Boako.RecordVerify = {
         container.innerHTML = html;
     },
 
-  // 4. 승인 버튼 눌렀을 때 DB 업데이트 (인증자 UUID 및 인증 일시 기입)
-    approve: async function(recordId) {
+ // 4. 승인 버튼 눌렀을 때 DB 업데이트
+    approve: async function(recordId, matchType) {
         if (!confirm("이 기록을 정상적인 경기로 승인하시겠습니까?")) return;
         
         try {
-            // 🌟 글로벌 상태 장부에서 현재 로그인한 리더의 UUID와 현재 시간(ISO) 확보
+            // 🌟 1. 출신 성분(matchType)에 따라 원본 테이블 이름을 결정하는 스위치
+            let targetTable = '';
+            if (matchType === 'TOURNAMENT') {
+                targetTable = 'boako_tournaments';
+            } else {
+                targetTable = 'BTLDB'; // 👈 소장님의 두 번째 원본 테이블명 적어주세요! (예: boako_matches)
+            }
+
             const leaderUuid = Boako.state.user.id;
             const nowTimestamp = new Date().toISOString();
 
-            // 가상 뷰의 바탕이 되는 원본 테이블을 타격합니다.
+            // 🌟 2. 결정된 targetTable로 수파베이스 타격!
             const { error } = await Boako.db
-                .from('원본_테이블명_입력') // 👈 여기에 실제 전적 행이 쌓이는 원본 테이블명 적어주세요!
+                .from(targetTable) 
                 .update({ 
-                    verified_by: leaderUuid,   // 승인 버튼을 누른 리더의 고유 UUID
-                    verified_at: nowTimestamp   // 승인 도장이 찍힌 실시간 날짜/시간
-                    // 💡 is_verified: 0 은 DB 내부 트리거가 알아서 처리하므로 전송 안 함!
+                    verified_by: leaderUuid,   
+                    verified_at: nowTimestamp   
                 })
                 .eq('id', recordId);
 
             if (error) throw error;
 
-            // 1. 성공 토스트 팝업
             Boako.Util.toast("✅ 서명이 완료되어 기록이 정상 승인되었습니다.");
-
-            // 2. 대기열 화면 새로고침 (트리거에 의해 상태가 변했으므로 대기열 뷰에서 알아서 샥 빠집니다)
             await this.loadPendingData();
 
-            // 3. 상단 메뉴바의 타 팀 결재 경고등 불빛 실시간 갱신
             if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
                 Boako.Auth.checkLeaderMenu();
             }
 
         } catch (err) {
-            console.error("승인 처리(서명 기입) 에러:", err);
+            console.error("승인 처리 에러:", err);
             Boako.Util.toast("승인 처리 중 오류가 발생했습니다.");
         }
     },
