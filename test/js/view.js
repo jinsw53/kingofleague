@@ -190,7 +190,7 @@ case 'record_verify':
         `;
 
         // 컴포넌트 후속 로직 실행 대기선
-        // setTimeout(() => Boako.RecordVerify.init(), 0);
+         setTimeout(() => Boako.RecordVerify.init(), 0);
 
     } catch (err) {
         console.error("리더 권한 검증 중 치명적 오류:", err);
