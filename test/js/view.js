@@ -123,6 +123,80 @@ Boako.View = {
                     </section>`;
                 }
                 break;
+                // 🔍 js/view.js 파일의 switch(pageId) 문 안에 새로운 case로 통째로 삽입하세요!
+case 'record_verify':
+    // 1. 비로그인 유저 컷
+    if (!Boako.state.user) {
+        html = `<div class="main-banner"><h1>✅ 기록 인증 센터</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
+        break;
+    }
+
+    // 2. 🔐 [핵심 보안 가드] team_members 테이블에서 활성화(is_active)된 리더(LEADER)인지 핀셋 검증
+    try {
+        const { data: leaderCheck, error: authError } = await Boako.db
+            .from('team_members')
+            .select('*')
+            .eq('player_name', Boako.state.user.nickname) // 소장님 시스템 규격인 nickname 매칭
+            .eq('is_active', true)
+            .eq('role', 'LEADER')
+            .maybeSingle();
+
+        if (authError) throw authError;
+
+        // 리더 인증 실패 시 프리미엄 거부 화면 출력 (접근 원천 차단)
+        if (!leaderCheck) {
+            html = `
+                <div class="main-banner" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);">
+                    <h1>🚫 접근 권한 없음</h1>
+                    <p>팀 리더 전용 보안 구역입니다.</p>
+                </div>
+                <div style="text-align:center; padding:100px 0;">
+                    <i data-lucide="shield-alert" class="text-red-400 w-16 h-16 mx-auto mb-4 animate-bounce"></i>
+                    <h3 class="text-slate-500 font-bold text-lg">현재 소속된 팀의 'LEADER'가 아니거나, 비활성화 상태입니다.</h3>
+                    <p class="text-slate-400 text-sm mt-1">기록 인증 권한은 정식 팀장에게만 부여됩니다.</p>
+                </div>
+            `;
+            break;
+        }
+
+        // 3. 🎉 검증 통과 시 보여줄 프리미엄 기록 인증 대시보드 템플릿
+        html = `
+            <div class="main-banner" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                <h1>✅ 팀 리그 기록 인증 센터</h1>
+                <p>소속 팀원들의 경기 기록을 최종 검증하고 서명합니다.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="section-card col-span-1">
+                    <div class="card-header" style="font-size:16px;">📋 리더 인증 수칙</div>
+                    <div class="card-body" style="padding:20px 25px;">
+                        <ul class="text-slate-600 text-xs font-bold space-y-4 leading-relaxed">
+                            <li>1. 경기 결과와 <span class="text-emerald-600">BGA 테이블 스크린샷</span> 정보가 일치하는지 대조하십시오.</li>
+                            <li>2. 고의 패배, 점수 몰아주기 등 어뷰징 정황이 있다면 즉시 <span class="text-red-500">인증 반려</span> 처리를 하십시오.</li>
+                            <li>3. 인증 완료 시 해당 점수가 팀 스코어 및 랭킹보드에 실시간 즉시 반영됩니다.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="section-card col-span-2">
+                    <div class="card-header" style="font-size:16px;">⏳ 우리 팀 기록 인증 대기열</div>
+                    <div class="card-body" style="min-height: 300px; background: #f8fafc; padding: 30px;">
+                        <div id="team-verify-list-container" class="text-center text-slate-400 font-bold py-20">
+                            인증 대기 중인 팀 전적이 없습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 컴포넌트 후속 로직 실행 대기선
+        // setTimeout(() => Boako.RecordVerify.init(), 0);
+
+    } catch (err) {
+        console.error("리더 권한 검증 중 치명적 오류:", err);
+        html = `<div class="text-center py-20 text-red-400 font-bold">권한 시스템 동기화에 실패했습니다.</div>`;
+    }
+    break;
                 // 포인트샵 관련
             case 'shop':
                 if (!Boako.state.user) {
