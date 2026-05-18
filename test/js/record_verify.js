@@ -60,8 +60,6 @@ Boako.RecordVerify = {
                     <p class="text-sm font-bold text-indigo-600 mt-1">${Math.floor(item.rp)} RP</p>
                 </div>
                 <div class="flex gap-2">
-                    // (기존) <button onclick="Boako.RecordVerify.approve('${item.id}')">
-// 🔥 (변경) 출신 성분(match_type)을 같이 넘겨줍니다!
 <button onclick="Boako.RecordVerify.approve('${item.id}', '${item.match_type}')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-all">✅ 승인</button>
 <button onclick="Boako.RecordVerify.reject('${item.id}', '${item.match_type}')" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-all">❌ 반려</button>
                 </div>
