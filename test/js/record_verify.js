@@ -87,22 +87,32 @@ Boako.RecordVerify = {
         container.innerHTML = html;
     },
 
-    // 4. 승인 버튼 눌렀을 때 실물 원본 테이블에 도장 쾅! (꼬임 해결 완료)
-    // js/record_verify.js 의 approve 함수 내부 수정
+   // 🌟 [추가] 연속 타격(더블 클릭)으로 인한 데이터 꼬임 방어용 락 플래그
+    isApproving: false,
+
+    // 4. 승인 버튼 눌렀을 때 실물 원본 테이블에 도장 쾅! (연속 씹힘 해결 및 레이다 제거 완료)
     approve: async function(recordId, matchType) {
+        // 이미 승인 프로세스가 가동 중이면 중복 클릭을 원천 차단
+        if (this.isApproving) return;
+
         if (!confirm("이 기록을 정상적인 경기로 승인하시겠습니까?")) return;
         
         try {
+            this.isApproving = true; // 🔒 진입과 동시에 락 걸기
+
             let targetTable = matchType === 'TOURNAMENT' ? 'boako_tournaments' : 'BTLDB';
+            
+            // 🎯 [최적화] 무거운 서버 API 호출을 제거하고, 검증된 로컬 세션 UUID를 다이렉트로 꽂아 병목을 없앱니다.
             const leaderUuid = Boako.state.user?.id;
             const nowTimestamp = new Date().toISOString();
 
             if (!leaderUuid) {
                 Boako.Util.toast("❌ 인증 정보(UUID)를 찾을 수 없습니다. 다시 로그인해 주세요.");
+                this.isApproving = false;
                 return;
             }
 
-            // 🎯 여기 .select() 를 붙여서 진짜 DB가 고친 실물 데이터를 화면에 팝업으로 강제 소환합니다.
+            // DB 실물 테이블 타격
             const { data, error } = await Boako.db
                 .from(targetTable) 
                 .update({ 
@@ -110,15 +120,21 @@ Boako.RecordVerify = {
                     verified_at: nowTimestamp   
                 })
                 .eq('id', isNaN(recordId) ? recordId : Number(recordId))
-                .select(); // 🌟 [필수 부착] DB의 대답을 들으라는 명령
+                .select(); 
 
             if (error) throw error;
 
-            // 🚨 [자백 모니터링]
-            // 데이터가 성공이라고 구라를 쳤는지, 진짜 고쳤는지 판정합니다.
-            alert(`[소장님 검증 레이더]\n- 조준한 테이블: ${targetTable}\n- 던진 ID값: ${recordId} (타입: ${typeof recordId})\n- 실제 수정된 행 개수: ${data ? data.length : 0}개`);
+            // 실물 반영 최종 확인 검문소
+            if (!data || data.length === 0) {
+                Boako.Util.toast("❌ RLS 권한이 없거나 대상을 찾을 수 없어 승인에 실패했습니다.");
+                this.isApproving = false;
+                return;
+            }
 
-            Boako.Util.toast("✅ 서명이 완료되어 기록이 정상 승인되었습니다.");
+            // 사기 알림창 제거 후 깔끔한 토스트만 발송
+            Boako.Util.toast("✅ 기록이 정상 승인되었습니다.");
+            
+            // 대기열 리스트 리로드 및 화면 갱신
             await this.loadPendingData();
 
             if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
@@ -128,6 +144,8 @@ Boako.RecordVerify = {
         } catch (err) {
             console.error("승인 처리 에러:", err);
             Boako.Util.toast("승인 처리 중 오류가 발생했습니다.");
+        } finally {
+            this.isApproving = false; // 🔓 성공하든 실패하든 작업이 완전히 끝나면 락 해제
         }
     }
 };
