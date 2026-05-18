@@ -39,7 +39,7 @@ Boako.RecordVerify = {
         }
     },
 
-    // 3. 긁어온 데이터를 화면에 렌더링 (카드 클릭 시 새 창 작동 / 반려 버튼 제거)
+    // 3. 긁어온 데이터를 화면에 렌더링 (카드 클릭 시 새 창 / 토너먼트 단계 표기법 도입)
     renderList: function() {
         const container = document.getElementById('team-verify-list-container');
         if (!container) return;
@@ -54,9 +54,12 @@ Boako.RecordVerify = {
         html += this.pendingList.map(item => {
             const isTournament = item.match_type === 'TOURNAMENT';
             
-            // 🎯 토너먼트면 multiplier 배수 노출, 아니면 첫 승 기록 확인 뱃지 생성
+            // 🌟 [소장님 기획 반영] 토너먼트 배수를 10으로 나누어 직관적인 '단계'로 가공 (기본값 10 대입으로 1단계 방어)
+            const tournamentStage = Math.floor((item.multiplier || 10) / 10);
+            
+            // 🎯 토너먼트면 배수 대신 1단계, 2단계 구간 뱃지 노출 / 일반 매치는 첫 승 확인 노출
             const conditionBadge = isTournament
-                ? `<span class="inline-block mt-1 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-bold">🔥 배수: ${item.multiplier || 1}배</span>`
+                ? `<span class="inline-block mt-1 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-bold">🔥 토너먼트: ${tournamentStage}단계</span>`
                 : `<span class="inline-block mt-1 px-2 py-0.5 bg-sky-100 text-sky-800 text-xs rounded font-bold">🛡️ 첫 승 기록 확인</span>`;
 
             return `
