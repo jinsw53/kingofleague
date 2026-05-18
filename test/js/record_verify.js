@@ -88,13 +88,12 @@ Boako.RecordVerify = {
     },
 
     // 4. 승인 버튼 눌렀을 때 실물 원본 테이블에 도장 쾅! (꼬임 해결 완료)
+    // js/record_verify.js 의 approve 함수 내부 수정
     approve: async function(recordId, matchType) {
         if (!confirm("이 기록을 정상적인 경기로 승인하시겠습니까?")) return;
         
         try {
             let targetTable = matchType === 'TOURNAMENT' ? 'boako_tournaments' : 'BTLDB';
-
-            // 🌟 소장님 원래 설계대로, 세션이 쥐고 있는 순수 유저 고유 ID(UUID)를 다이렉트로 매칭합니다.
             const leaderUuid = Boako.state.user?.id;
             const nowTimestamp = new Date().toISOString();
 
@@ -103,23 +102,25 @@ Boako.RecordVerify = {
                 return;
             }
 
-            // 🎯 타입 불일치 방어용 Number 형변환 처리 후 수파베이스 실물 테이블 타격
-            const { error } = await Boako.db
+            // 🎯 여기 .select() 를 붙여서 진짜 DB가 고친 실물 데이터를 화면에 팝업으로 강제 소환합니다.
+            const { data, error } = await Boako.db
                 .from(targetTable) 
                 .update({ 
-                    verified_by: leaderUuid,   // 깨끗하게 정렬된 리더의 고유 식별값 주입
+                    verified_by: leaderUuid,   
                     verified_at: nowTimestamp   
                 })
-                .eq('id', isNaN(recordId) ? recordId : Number(recordId));
+                .eq('id', isNaN(recordId) ? recordId : Number(recordId))
+                .select(); // 🌟 [필수 부착] DB의 대답을 들으라는 명령
 
             if (error) throw error;
 
+            // 🚨 [자백 모니터링]
+            // 데이터가 성공이라고 구라를 쳤는지, 진짜 고쳤는지 판정합니다.
+            alert(`[소장님 검증 레이더]\n- 조준한 테이블: ${targetTable}\n- 던진 ID값: ${recordId} (타입: ${typeof recordId})\n- 실제 수정된 행 개수: ${data ? data.length : 0}개`);
+
             Boako.Util.toast("✅ 서명이 완료되어 기록이 정상 승인되었습니다.");
-            
-            // 대기열 리스트 동적 리로드
             await this.loadPendingData();
 
-            // 왼쪽 메뉴바의 실시간 카운트 경고등 갱신
             if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
                 Boako.Auth.checkLeaderMenu();
             }
