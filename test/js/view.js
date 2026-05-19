@@ -1,5 +1,5 @@
 /**
- * [VIEW] 화면 렌더링 및 페이지 템플릿 관리
+ * [VIEW] 화면 렌더링 및 페이지 템플릿 관리 (인덱스 다이어트 최종 최적화본)
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -19,9 +19,25 @@ Boako.View = {
 
         switch(pageId) {
             case 'ranking':
+                // 🚚 [랭킹 수송선] ranking.js가 없으면 실시간 배달
+                if (!Boako.Ranking.init) {
+                    await Boako.Util.loadScript('js/ranking.js');
+                }
                 html = `<div class="main-banner"><h1>🏆 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">집계 중...</div></section>`;
+                
+                // 랭킹은 껍데기만 있었으니 나중에 아래처럼 init 연동하시면 됩니다.
+                setTimeout(() => {
+                    if (Boako.Ranking && typeof Boako.Ranking.init === 'function') {
+                        Boako.Ranking.init();
+                    }
+                }, 0);
                 break;
-           case 'records':
+
+            case 'records':
+                // 🚚 [기록실 수송선] archive.js가 없으면 실시간 배달
+                if (!Boako.Archive.buildUI) {
+                    await Boako.Util.loadScript('js/archive.js');
+                }
                 html = `<div id="archive-master-container" class="w-full animate-in fade-in duration-500"></div>`;
                 
                 // HTML 도화지가 렌더링된 직후, archive.js에게 그리는 책임을 넘김
@@ -31,12 +47,19 @@ Boako.View = {
                     }
                 }, 0);
                 break;
+
             case 'team':
                 if (!Boako.state.user) {
                     html = `<div class="main-banner"><h1>🛡️ 팀 서비스</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
                     break;
                 }
+                
+                // 🚚 [팀 서비스 수송선] team.js가 없으면 실시간 배달
+                if (!Boako.Team.syncStatus) {
+                    await Boako.Util.loadScript('js/team.js');
+                }
                 await Boako.Team.syncStatus();
+
                 if (Boako.state.team) {
                     const { info: team, type } = Boako.state.team;
                     const isLeader = type === 'LEADER';
@@ -123,88 +146,92 @@ Boako.View = {
                     </section>`;
                 }
                 break;
-                // 🔍 js/view.js 파일의 switch(pageId) 문 안에 새로운 case로 통째로 삽입하세요!
-case 'record_verify':
-    // 1. 비로그인 유저 컷
-    if (!Boako.state.user) {
-        html = `<div class="main-banner"><h1>✅ 기록 인증 센터</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
-        break;
-    }
 
-    // 2. 🔐 [핵심 보안 가드] team_members 테이블에서 활성화(is_active)된 리더(LEADER)인지 핀셋 검증
-    try {
-        const { data: leaderCheck, error: authError } = await Boako.db
-            .from('team_members')
-            .select('*')
-            .eq('player_name', Boako.state.user.nickname) // 소장님 시스템 규격인 nickname 매칭
-            .eq('is_active', true)
-            .eq('role', 'LEADER')
-            .maybeSingle();
+            case 'record_verify':
+                if (!Boako.state.user) {
+                    html = `<div class="main-banner"><h1>✅ 기록 인증 센터</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
+                    break;
+                }
 
-        if (authError) throw authError;
+                try {
+                    const { data: leaderCheck, error: authError } = await Boako.db
+                        .from('team_members')
+                        .select('*')
+                        .eq('player_name', Boako.state.user.nickname)
+                        .eq('is_active', true)
+                        .eq('role', 'LEADER')
+                        .maybeSingle();
 
-        // 리더 인증 실패 시 프리미엄 거부 화면 출력 (접근 원천 차단)
-        if (!leaderCheck) {
-            html = `
-                <div class="main-banner" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);">
-                    <h1>🚫 접근 권한 없음</h1>
-                    <p>팀 리더 전용 보안 구역입니다.</p>
-                </div>
-                <div style="text-align:center; padding:100px 0;">
-                    <i data-lucide="shield-alert" class="text-red-400 w-16 h-16 mx-auto mb-4 animate-bounce"></i>
-                    <h3 class="text-slate-500 font-bold text-lg">현재 소속된 팀의 'LEADER'가 아니거나, 비활성화 상태입니다.</h3>
-                    <p class="text-slate-400 text-sm mt-1">기록 인증 권한은 정식 팀장에게만 부여됩니다.</p>
-                </div>
-            `;
-            break;
-        }
+                    if (authError) throw authError;
 
-        // 3. 🎉 검증 통과 시 보여줄 프리미엄 기록 인증 대시보드 템플릿
-        html = `
-            <div class="main-banner" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
-                <h1>✅ 팀 리그 기록 인증 센터</h1>
-                <p>다른 팀원들의 경기 기록을 최종 검증하고 서명합니다.</p>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="section-card col-span-1">
-                    <div class="card-header" style="font-size:16px;">📋 리더 인증 수칙</div>
-                    <div class="card-body" style="padding:20px 25px;">
-                        <ul class="text-slate-600 text-xs font-bold space-y-4 leading-relaxed">
-                            <li>1. 옆에 보이는 기록을 살펴봐주세요! <span class="text-red-500">클릭</span>하면, 해당 테이블이 새 창으로 열립니다.</li>
-                            <li>2. 기록 정보와 <span class="text-emerald-600">BGA 테이블</span> 정보가 일치하는지 대조해주세요.</li>
-                            <li>3. 승인 완료 시 해당 점수가 팀 스코어 및 랭킹보드에 실시간 즉시 반영됩니다.</li>
-                        </ul>
-                    </div>
-                </div>
+                    if (!leaderCheck) {
+                        html = `
+                            <div class="main-banner" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);">
+                                <h1>🚫 접근 권한 없음</h1>
+                                <p>팀 리더 전용 보안 구역입니다.</p>
+                            </div>
+                            <div style="text-align:center; padding:100px 0;">
+                                <i data-lucide="shield-alert" class="text-red-400 w-16 h-16 mx-auto mb-4 animate-bounce"></i>
+                                <h3 class="text-slate-500 font-bold text-lg">현재 소속된 팀의 'LEADER'가 아니거나, 비활성화 상태입니다.</h3>
+                                <p class="text-slate-400 text-sm mt-1">기록 인증 권한은 정식 팀장에게만 부여됩니다.</p>
+                            </div>
+                        `;
+                        break;
+                    }
 
-                <div class="section-card col-span-2">
-                    <div class="card-header" style="font-size:16px;">⏳ 우리 팀 기록 인증 대기열</div>
-                    <div class="card-body" style="min-height: 300px; background: #f8fafc; padding: 30px;">
-                        <div id="team-verify-list-container" class="text-center text-slate-400 font-bold py-20">
-                            인증 대기 중인 팀 전적이 없습니다.
+                    // 🚚 [기록 인증 수송선] 인증 수칙 가드 통과 후 record_verify.js 호출 직전 배달!
+                    if (!Boako.RecordVerify.init) {
+                        await Boako.Util.loadScript('js/record_verify.js');
+                    }
+
+                    html = `
+                        <div class="main-banner" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                            <h1>✅ 팀 리그 기록 인증 센터</h1>
+                            <p>다른 팀원들의 경기 기록을 최종 검증하고 서명합니다.</p>
                         </div>
-                    </div>
-                </div>
-            </div>
-        `;
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="section-card col-span-1">
+                                <div class="card-header" style="font-size:16px;">📋 리더 인증 수칙</div>
+                                <div class="card-body" style="padding:20px 25px;">
+                                    <ul class="text-slate-600 text-xs font-bold space-y-4 leading-relaxed">
+                                        <li>1. 옆에 보이는 기록을 살펴봐주세요! <span class="text-red-500">클릭</span>하면, 해당 테이블이 새 창으로 열립니다.</li>
+                                        <li>2. 기록 정보와 <span class="text-emerald-600">BGA 테이블</span> 정보가 일치하는지 대조해주세요.</li>
+                                        <li>3. 승인 완료 시 해당 점수가 팀 스코어 및 랭킹보드에 실시간 즉시 반영됩니다.</li>
+                                    </ul>
+                                </div>
+                            </div>
 
-        // 컴포넌트 후속 로직 실행 대기선
-         setTimeout(() => Boako.RecordVerify.init(), 0);
+                            <div class="section-card col-span-2">
+                                <div class="card-header" style="font-size:16px;">⏳ 우리 팀 기록 인증 대기열</div>
+                                <div class="card-body" style="min-height: 300px; background: #f8fafc; padding: 30px;">
+                                    <div id="team-verify-list-container" class="text-center text-slate-400 font-bold py-20">
+                                        인증 대기 중인 팀 전적이 없습니다.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
 
-    } catch (err) {
-        console.error("리더 권한 검증 중 치명적 오류:", err);
-        html = `<div class="text-center py-20 text-red-400 font-bold">권한 시스템 동기화에 실패했습니다.</div>`;
-    }
-    break;
-                // 포인트샵 관련
+                    setTimeout(() => Boako.RecordVerify.init(), 0);
+
+                } catch (err) {
+                    console.error("리더 권한 검증 중 치명적 오류:", err);
+                    html = `<div class="text-center py-20 text-red-400 font-bold">권한 시스템 동기화에 실패했습니다.</div>`;
+                }
+                break;
+
             case 'shop':
                 if (!Boako.state.user) {
                     html = `<div class="main-banner" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);"><h1>🛒 포인트 샵</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
                     break;
                 }
                 
-                // 1. 내 포인트와 영수증 내역 조회
+                // 🚚 [포인트 상점 수송선] shop.js가 없으면 실시간 배달
+                if (!Boako.Shop.buyItem) {
+                    await Boako.Util.loadScript('js/shop.js');
+                }
+
                 const { data: myProfile } = await Boako.db.from('profiles').select('points').eq('id', Boako.state.user.id).single();
                 const myPoints = myProfile?.points || 0;
                 
@@ -214,7 +241,6 @@ case 'record_verify':
                     .order('created_at', { ascending: false })
                     .limit(10);
 
-                // 2. DB에서 판매 중인 아이템 목록 가져오기
                 const { data: shopItems } = await Boako.db.from('shop_items')
                     .select('*')
                     .eq('is_active', true)
@@ -233,11 +259,11 @@ case 'record_verify':
                         <div class="section-card" style="margin-bottom:0; display:flex; flex-direction:column; text-align:center; transition:0.3s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                             <div class="card-body" style="flex:1;">
                                 <div style="width: 80px; height: 80px; font-size: 60px; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-    ${item.icon && item.icon.startsWith('http') 
-        ? `<img src="${item.icon}" style="width: 100%; height: 100%; object-fit: contain;">` 
-        : (item.icon || '❓')
-    }
-</div>
+                                    ${item.icon && item.icon.startsWith('http') 
+                                        ? `<img src="${item.icon}" style="width: 100%; height: 100%; object-fit: contain;">` 
+                                        : (item.icon || '❓')
+                                    }
+                                </div>
                                 <h3 style="font-size:20px; font-weight:900; margin-bottom:10px;">${item.name}</h3>
                                 <p style="color:#64748b; font-size:14px; word-break:keep-all;">${item.description}</p>
                             </div>
@@ -250,7 +276,6 @@ case 'record_verify':
                     `).join('')}
                 </div>
 
-                <!-- 영수증 UI -->
                 <section class="section-card">
                     <div class="card-header" style="font-size:18px;">🧾 최근 포인트 이용 내역</div>
                     <div class="card-body" style="padding:0;">
@@ -279,34 +304,41 @@ case 'record_verify':
                 </section>
                 `;
                 break;
-               // 🎒 [2] 내 인벤토리 버튼을 눌렀을 때
-                case 'inventory':
-                    // contentArea 찾는 부분 삭제하고, 바로 html 변수에 덮어씌웁니다!
-                    html = `
-                        <div class="main-banner"><h1>🎒 내 인벤토리</h1></div>
-                        <section class="section-card">
-                            <div class="card-header">배지 및 아이템 관리</div>
-                            <div class="card-body">
-                                
-                                <!-- 장착된 배지 슬롯 영역 -->
-                                <div class="badge-slots-area" style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 15px;">✨ 장착 중인 배지</h3>
-                                    <div id="equipped-badges">로딩 중...</div>
-                                </div>
 
-                                <!-- 보유 중인 아이템 가방 영역 -->
-                                <div class="inventory-items-area">
-                                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 15px;">📦 내 가방</h3>
-                                    <div id="inventory-list">로딩 중...</div>
-                                </div>
+            case 'inventory':
+                // 🚚 [내 인벤토리 수송선] inventory.js가 없으면 실시간 배달
+                if (!Boako.Inventory.loadItems) {
+                    await Boako.Util.loadScript('js/inventory.js');
+                }
 
+                html = `
+                    <div class="main-banner"><h1>🎒 내 인벤토리</h1></div>
+                    <section class="section-card">
+                        <div class="card-header">배지 및 아이템 관리</div>
+                        <div class="card-body">
+                            
+                            <div class="badge-slots-area" style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
+                                <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 15px;">✨ 장착 중인 배지</h3>
+                                <div id="equipped-badges">로딩 중...</div>
                             </div>
-                        </section>
-                    `;
-                    setTimeout(() => Boako.Inventory.loadItems(), 0);
-                    break;
-                // 🌟 [추가] 아카이브 검수센터 (이 위치에 넣어주세요!)
+
+                            <div class="inventory-items-area">
+                                <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 15px;">📦 내 가방</h3>
+                                <div id="inventory-list">로딩 중...</div>
+                            </div>
+
+                        </div>
+                    </section>
+                `;
+                setTimeout(() => Boako.Inventory.loadItems(), 0);
+                break;
+
             case 'admin_review':
+                // 🚚 [아카이브 검수센터 수송선] admin_review.js가 없으면 실시간 배달
+                if (!Boako.AdminReview.init) {
+                    await Boako.Util.loadScript('js/admin_review.js');
+                }
+
                 html = `
                     <div class="main-banner" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
                         <h1>🛠️ 아카이브 검수센터</h1>
@@ -316,15 +348,14 @@ case 'record_verify':
                         <div class="card-header">데이터 검수 대기 리스트</div>
                         <div class="card-body" style="min-height: 400px; background: #f8fafc;">
                             <div id="review-container">
-                                <!-- 여기에 admin_review.js의 카드 UI가 그려집니다 -->
                                 <div style="text-align:center; padding:50px; color:#94a3b8;">데이터를 불러오는 중...</div>
                             </div>
                         </div>
                     </section>
                 `;
-                // 인벤토리와 마찬가지로, HTML이 화면에 박힌 직후에 데이터를 불러오도록 타이머 설정
                 setTimeout(() => Boako.AdminReview.init(), 0);
                 break;
+
             case 'main': default:
                 html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
         }
