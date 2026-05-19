@@ -1,5 +1,5 @@
 /**
- * [AUTH] 인증 및 프로필 관리
+ * [AUTH] 인증 및 프로필 관리 (인덱스 다이어트 대응 최종본)
  */
 Boako.Auth = {
     init: async () => {
@@ -8,11 +8,16 @@ Boako.Auth = {
         
         if (session?.user) {
             Boako.state.user = session.user;
+
+            // 🚚 [1번째 방어막] 팀 실무 파일이 메모리에 없다면 즉시 실시간 배달 받기!
+            if (!Boako.Team.syncStatus) {
+                await Boako.Util.loadScript('js/team.js');
+            }
             await Boako.Team.syncStatus();
             
             // 🌟 권한 메뉴 체크 세트 실행
             await Boako.Auth.checkAdminMenu();
-            await Boako.Auth.checkLeaderMenu(); // [추가]
+            await Boako.Auth.checkLeaderMenu();
         }
         
         Boako.Auth.renderWidget();
@@ -21,11 +26,16 @@ Boako.Auth = {
         Boako.db.auth.onAuthStateChange(async (e, s) => {
             if (s?.user) {
                 Boako.state.user = s.user;
+
+                // 🚚 [2번째 방어막] 실시간 로그인 상태 변화 대응 배달 검문
+                if (!Boako.Team.syncStatus) {
+                    await Boako.Util.loadScript('js/team.js');
+                }
                 await Boako.Team.syncStatus();
                 
                 // 🌟 로그인/변경 시 권한 메뉴 재확인
                 await Boako.Auth.checkAdminMenu();
-                await Boako.Auth.checkLeaderMenu(); // [추가]
+                await Boako.Auth.checkLeaderMenu();
             } else {
                 Boako.state.user = null;
                 Boako.state.team = null;
@@ -34,8 +44,8 @@ Boako.Auth = {
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) adminMenu.style.display = 'none';
                 
-                const verifyMenu = document.getElementById('menu-record-verify'); // [추가]
-                if (verifyMenu) verifyMenu.style.display = 'none'; // [추가]
+                const verifyMenu = document.getElementById('menu-record-verify');
+                if (verifyMenu) verifyMenu.style.display = 'none';
             }
             Boako.Auth.renderWidget();
         });
@@ -83,7 +93,7 @@ Boako.Auth = {
     },
 
     /**
-     * 🌟 [업그레이드] 관리자 메뉴 권한 체크 및 실시간 스타일링
+     * 🌟 관리자 메뉴 권한 체크 및 실시간 스타일링
      */
     checkAdminMenu: async function() {
         if (!Boako.state.user) return;
@@ -118,41 +128,34 @@ Boako.Auth = {
         } catch (err) { 
             console.error("관리자 메뉴 로드 오류:", err); 
         }
-    }, // 🌟 다음 함수로 이어지므로 쉼표 필수!
+    },
 
-  /**
-     * 🌟 [업그레이드] 팀 리더 메뉴 권한 체크 및 타 팀 미인증 알림 (b_all_team 다이렉트 매칭)
+    /**
+     * 🌟 팀 리더 메뉴 권한 체크 및 타 팀 미인증 알림 (b_all_team 다이렉트 매칭)
      */
     checkLeaderMenu: async function() {
-        // 1. 로그인 안 했거나, 소속 팀이 아예 없으면 볼 필요도 없이 컷!
         if (!Boako.state.user || !Boako.state.team) return;
 
         try {
-            // 2. 이미 글로벌 상태에 저장된 내 팀 정보 바로 꺼내 쓰기
             const myTeamName = Boako.state.team.info.team_name;
             const isLeader = Boako.state.team.type === 'LEADER';
 
             const verifyMenu = document.getElementById('menu-record-verify');
             if (!verifyMenu) return;
 
-            // 3. 리더가 아니면 메뉴 숨김
             if (!isLeader) {
                 verifyMenu.style.display = 'none';
                 return;
             }
 
-            // 4. 정식 팀장(LEADER)이 맞다면 메뉴바 노출
             verifyMenu.style.display = 'list-item';
 
-            // 5. 🎯 [크로스 체크 알림 기믹]
-            // 복잡한 과정 없이, 가상 뷰에서 b_all_team이 '내 팀명'과 다른(neq) 미결재 전적만 핀셋 카운팅!
             const { count } = await Boako.db
                 .from('v_boako_total_records')
                 .select('*', { count: 'exact', head: true })
-                .neq('b_all_team', myTeamName) // 👈 바로 텍스트 팀명 대 텍스트 팀명으로 다이렉트 비교!
+                .neq('b_all_team', myTeamName)
                 .eq('is_verified', 1);
 
-            // 6. 타 팀의 밀린 결재 서류가 있다면 경고등 점등
             if (count > 0) {
                 verifyMenu.style.background = '#fff1f2';
                 verifyMenu.style.borderLeft = '4px solid #10b981';
