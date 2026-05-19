@@ -23,3 +23,4 @@ Boako.League = {};     // 대시보드, 밴 투표, 라이벌 매치 등
 Boako.Archive = {}; // 🌟 기록실 기능 전담 객체 추가
 Boako.RecordVerify = {}; // 경기 기록 인증 전담
 Boako.Ranking = {};      // 실시간 팀 리더보드 전담
+Boako.Inventory = {};    // [가방] 🌟 인벤토리 및 배지 장착 시스템 전담 (체포 완료)
