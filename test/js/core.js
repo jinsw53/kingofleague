@@ -14,13 +14,19 @@ const Boako = {
     }
 };
 
-// 추후 추가될 기능들을 위한 빈 객체 선언 (이후 해당 파일만 생성해서 연결하면 됨)
-Boako.Shop = {};       // 포인트샵+포인트 시스템
-Boako.ItemActions = {}; // 아이템 효과
-Boako.Messenger = {};  // 회원간 메세지
-Boako.Schedule = {};   // 일정관리 및 조율
-Boako.League = {};     // 대시보드, 밴 투표, 라이벌 매치 등
-Boako.Archive = {}; // 🌟 기록실 기능 전담 객체 추가
-Boako.RecordVerify = {}; // 경기 기록 인증 전담
-Boako.Ranking = {};      // 실시간 팀 리더보드 전담
-Boako.Inventory = {};    // [가방] 🌟 인벤토리 및 배지 장착 시스템 전담 (체포 완료)
+Boako.Util = {};         // util.js 전담 (토스트 및 공통 유틸)
+Boako.Auth = {};         // auth.js 전담 (로그인, 세션 및 위젯)
+Boako.Main = {};         // main.js 전담 (메인 페이지 제어)
+Boako.View = {};         // view.js 전담 (화면 전환 라우터)
+Boako.Shop = {};         // shop.js 전담 (포인트 샵 및 구매)
+Boako.Inventory = {};    // inventory.js 전담 (가방 및 배지 장착)
+Boako.Team = {};         // team.js 전담 (팀 창단 및 관리)
+Boako.Ranking = {};      // ranking.js 전담 (실시간 팀 리더보드)
+Boako.Archive = {};      // archive.js 전담 (기록실 및 역사 장부)
+Boako.AdminReview = {};  // admin_review.js 전담 (검수 센터 관리자 기능)
+Boako.RecordVerify = {}; // record_verify.js 전담 (교차 검증 및 보상 지급)
+
+// 💡 추후 추가 예정인 기능 서랍들
+Boako.ItemActions = {};  // 아이템 효과 상세 로직
+Boako.Messenger = {};    // 회원간 메세지 시스템
+Boako.Schedule = {};     // 일정 관리 및 조율
