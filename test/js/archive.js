@@ -438,13 +438,13 @@ Boako.Archive = {
                 </div>
                 
                 <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
-                    <div class="relative group-hover:scale-105 transition-transform duration-300">
-                        <img src="${p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}" 
-                             class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
-                             onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
-                             alt="${p.name}">
-                        ${p.is_prev_mvp ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">👑</div>` : ''}
-                    </div>
+                   <div class="relative group-hover:scale-105 transition-transform duration-300">
+    <img src="${(p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80').replace('http://', 'https://')}" 
+         class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
+         onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
+         alt="${p.name}">
+    ${p.is_prev_mvp ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">👑</div>` : ''}
+</div>
                     <div>
                         <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
                         <div class="flex items-center gap-1.5 mt-1.5 relative group/logo cursor-pointer overflow-visible">
