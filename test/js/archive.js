@@ -33,7 +33,7 @@ Boako.Archive = {
                         <div class="bg-indigo-600 p-1.5 rounded-lg shadow-md">
                             <i data-lucide="trophy" class="text-white w-5 h-5"></i>
                         </div>
-                        <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Archive</h1>
+                        <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Team League</h1>
                     </div>
                     <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1">
                         <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap">
