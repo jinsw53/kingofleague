@@ -27,17 +27,17 @@ Boako.Archive = {
                         </div>
                         <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Archive</h1>
                     </div>
-                    <div class="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
-                        <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200 whitespace-nowrap">
-                            <i data-lucide="history" class="w-4 h-4"></i> 기록실
-                        </button>
-                        <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all whitespace-nowrap">
-                            <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
-                        </button>
-                        <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all whitespace-nowrap">
-                            <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
-                        </button>
-                    </div>
+<div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1">
+    <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap">
+        <i data-lucide="history" class="w-4 h-4"></i> 기록실
+    </button>
+    <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
+        <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
+    </button>
+    <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
+        <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
+    </button>
+</div>
                 </div>
 
                 <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
