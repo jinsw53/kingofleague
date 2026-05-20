@@ -1,10 +1,11 @@
 /**
  * [ARCHIVE] 기록실 및 실시간 랭킹 시스템 
- * DB: v_boako_total_records 가상 뷰 서버사이드 페이징 연동 완결본
+ * DB: v_boako_total_records 및 v_game_popularity_all_players 가상 뷰 연동 완결본
  * 디자인: Tailwind CSS 기반 프리미엄 디자인 완벽 보존
  */
 Boako.Archive = {
     filteredRecords: [],
+    gameRankings: [], // 👈 [신설] 게임별 대세 랭킹 데이터를 담을 전용 장부
     currentTab: 'records',
     
     // 🌟 [서버 페이징용 핵심 상태 장부]
@@ -19,19 +20,22 @@ Boako.Archive = {
 
         container.innerHTML = `
             <div class="w-full animate-in fade-in duration-500">
-                <div class="flex items-center justify-between mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 gap-4">
                     <div class="flex items-center gap-2">
                         <div class="bg-indigo-600 p-1.5 rounded-lg shadow-md">
                             <i data-lucide="trophy" class="text-white w-5 h-5"></i>
                         </div>
                         <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Archive</h1>
                     </div>
-                    <div class="flex bg-slate-100 p-1 rounded-xl">
-                        <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200">
+                    <div class="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+                        <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200 whitespace-nowrap">
                             <i data-lucide="history" class="w-4 h-4"></i> 기록실
                         </button>
-                        <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all">
+                        <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all whitespace-nowrap">
                             <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
+                        </button>
+                        <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all whitespace-nowrap">
+                            <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
                         </button>
                     </div>
                 </div>
@@ -39,8 +43,8 @@ Boako.Archive = {
                 <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
                         <h2 id="archive-page-title" class="text-3xl font-black text-slate-900 tracking-tight leading-none">시즌 경기 기록실</h2>
-                        <p class="text-slate-400 mt-2 font-medium text-sm">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
-                        <p class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )</p>
+                        <p id="archive-page-desc" class="text-slate-400 mt-2 font-medium text-sm">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
+                        <p id="archive-page-subdesc" class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )</p>
                     </div>
                     <div class="flex gap-2">
                         <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
@@ -49,7 +53,7 @@ Boako.Archive = {
                                 <option value="all">전체 시즌</option>
                             </select>
                         </div>
-                        <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
+                        <div id="round-filter-wrapper" class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
                             <i data-lucide="layers" class="text-indigo-500 w-4 h-4"></i>
                             <select id="archive-round" onchange="Boako.Archive.filterData()" class="bg-transparent border-none text-xs font-black outline-none cursor-pointer">
                                 <option value="all">전체 라운드</option>
@@ -83,19 +87,18 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    // 🌟 [트래픽 최적화 개혁] 드롭다운 옵션 구성을 위해 '오직 필터용 컬럼'만 초경량으로 가져옵니다.
+    // 드롭다운 옵션 구성을 위해 필터용 컬럼만 초경량 리딩
     loadData: async function() {
         try {
             const { data, error } = await Boako.db
                 .from('v_boako_total_records')
-                .select('season_no, round_no'); // 👈 대용량 텍스트, URL 다 빼고 숫자만 땡겨서 트래픽 99% 절감
+                .select('season_no, round_no');
 
             if (error) throw error;
             
             this.updateSeasonOptions(data || []);
             this.updateRoundOptions(data || []);
 
-            // 드롭다운 준비 완료 후 실물 데이터 첫 페이지 타격
             this.fetchAndRender(); 
         } catch (err) {
             console.error("아카이브 메타데이터 로드 오류:", err);
@@ -103,7 +106,7 @@ Boako.Archive = {
         }
     },
 
-    // 🌟 [핵심: 서버사이드 페이징 & 필터 통합 엔진]
+    // 🌟 [엔진 튜닝: 3번 탭 연동을 위한 분기 가동]
     fetchAndRender: async function() {
         const area = document.getElementById('archive-content-area');
         if (area) area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">데이터 요청 중...</div>`;
@@ -112,24 +115,49 @@ Boako.Archive = {
         const seasonVal = document.getElementById('archive-season')?.value || 'all';
         const roundVal = document.getElementById('archive-round')?.value || 'all';
 
-        // 1. 수파베이스 쿼리 조립 및 정확한 토탈 레코드 카운팅 세팅
+        // 💡 [분기점] 새로 만든 '게임별 통계' 탭일 때는 타겟 뷰를 완전히 다르게 정격 타격합니다!
+        if (this.currentTab === 'games') {
+            let query = Boako.db.from('v_game_popularity_all_players').select('*');
+            
+            // 아카이브 전용 드롭다운 시즌 필터 연동 (전체 시즌이 아닐 때만)
+            if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
+            
+            // 검색어 필터링 (게임명 또는 유저 닉네임)
+            if (searchVal) {
+                query = query.or(`game_name.ilike.%${searchVal}%,player_nickname.ilike.%${searchVal}%`);
+            }
+            
+            // 대세 순위 및 인게임 유저 순위 정렬 고정
+            query = query.order('game_popularity_rank', { ascending: true })
+                         .order('player_rank', { ascending: true });
+
+            try {
+                const { data, error } = await query;
+                if (error) throw error;
+                this.gameRankings = data || [];
+                this.renderGames(); // 게임 전용 프리미엄 렌더러 호출
+            } catch (err) {
+                console.error("게임별 아카이브 뷰 데이터 로드 실패:", err);
+                if (area) area.innerHTML = `<div class="text-center py-20 text-red-400 font-bold">게임 통계 로드에 실패했습니다.</div>`;
+            }
+            return; // 게임 연산 끝났으므로 탈출
+        }
+
+        // --- 1번(기록실) & 2번(랭킹보드) 기존 정석 로직 유지 ---
         let query = Boako.db.from('v_boako_total_records').select('*', { count: 'exact' });
 
-        // 2. 조건부 서버사이드 필터링 타격
         if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
         if (roundVal !== 'all') query = query.eq('round_no', roundVal);
         if (searchVal) {
             query = query.or(`nickname.ilike.%${searchVal}%,game_name.ilike.%${searchVal}%`);
         }
 
-        // 최신순 정렬 기본 장착
         query = query.order('created_at', { ascending: false });
 
-        // 3. [2안의 심장] 기록실 탭일 때만 정확하게 범위를 슬라이싱하여 트래픽 전송 차단
         if (this.currentTab === 'records') {
             const from = (this.currentPage - 1) * this.itemsPerPage;
             const to = from + this.itemsPerPage - 1;
-            query = query.range(from, to); // 👈 딱 20개만 핀셋 조회
+            query = query.range(from, to);
         }
 
         try {
@@ -137,9 +165,8 @@ Boako.Archive = {
             if (error) throw error;
 
             this.filteredRecords = data || [];
-            this.totalCount = count || 0; // 서버가 보낸 실제 조건 만족하는 전체 행 개수 저장
+            this.totalCount = count || 0;
 
-            // 탭 상태에 맞춰 실물 장부 출력
             if (this.currentTab === 'records') this.renderRecords();
             else this.renderRankings();
         } catch (err) {
@@ -148,7 +175,6 @@ Boako.Archive = {
         }
     },
 
-    // 필터나 검색 시 무조건 1페이지로 스코어 복구 후 서버 재호출
     filterData: function() {
         this.currentPage = 1;
         this.fetchAndRender();
@@ -157,20 +183,42 @@ Boako.Archive = {
     // 4. 탭 전환 로직
     switchTab: function(tabName) {
         this.currentTab = tabName;
-        this.currentPage = 1; // 탭 바꿀 때도 페이지 초기화
-        const isRec = tabName === 'records';
+        this.currentPage = 1;
         
-        const activeClass = 'flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200';
-        const inactiveClass = 'flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all';
+        const activeClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200 whitespace-nowrap';
+        const inactiveClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all whitespace-nowrap';
         
-        document.getElementById('tab-records').className = isRec ? activeClass : inactiveClass;
-        document.getElementById('tab-rankings').className = !isRec ? activeClass : inactiveClass;
-        document.getElementById('archive-page-title').innerText = isRec ? '시즌 경기 기록실' : '종합 리그 순위표';
+        document.getElementById('tab-records').className = tabName === 'records' ? activeClass : inactiveClass;
+        document.getElementById('tab-rankings').className = tabName === 'rankings' ? activeClass : inactiveClass;
+        document.getElementById('tab-games').className = tabName === 'games' ? activeClass : inactiveClass;
+        
+        // 🎯 [UI 분기] 선택된 탭에 맞는 대제목과 설명 문구 및 서브필터 가시성 핸들링
+        const titleEl = document.getElementById('archive-page-title');
+        const descEl = document.getElementById('archive-page-desc');
+        const subDescEl = document.getElementById('archive-page-subdesc');
+        const roundFilter = document.getElementById('round-filter-wrapper');
+
+        if (tabName === 'records') {
+            titleEl.innerText = '시즌 경기 기록실';
+            descEl.innerText = '시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.';
+            if (subDescEl) subDescEl.style.display = 'block';
+            if (roundFilter) roundFilter.style.display = 'flex';
+        } else if (tabName === 'rankings') {
+            titleEl.innerText = '종합 리그 순위표';
+            descEl.innerText = '이번 시즌 누적 RP 기준 전체 유저들의 랭킹 스코어보드입니다.';
+            if (subDescEl) subDescEl.style.display = 'none';
+            if (roundFilter) roundFilter.style.display = 'flex';
+        } else if (tabName === 'games') {
+            titleEl.innerText = '시즌 대세 게임 & MVP';
+            descEl.innerText = '시즌별로 가장 활성화된 인기 게임 종목과 해당 게임의 플레이어 랭킹을 한눈에 확인합니다.';
+            if (subDescEl) subDescEl.style.display = 'none';
+            // 💡 게임별 통계는 9개 라운드가 통산 누적 집계되므로 라운드 필터를 숨겨 억까 방지!
+            if (roundFilter) roundFilter.style.display = 'none';
+        }
         
         this.fetchAndRender();
     },
 
-    // 페이지 이동 처리 전담 함수 (부드러운 상단 스크롤 마감)
     changePage: function(page) {
         const totalPages = Math.ceil(this.totalCount / this.itemsPerPage);
         if (page < 1 || page > totalPages) return;
@@ -178,12 +226,10 @@ Boako.Archive = {
         this.currentPage = page;
         this.fetchAndRender();
 
-        // 🌟 페이지 넘겼을 때 리스트 최상단으로 유저 시야를 부드럽게 고정
         const area = document.getElementById('archive-content-area');
         if (area) area.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
 
-    // 날짜 포맷터
     formatDate: function(dateStr) {
         if (!dateStr) return '';
         const d = new Date(dateStr);
@@ -315,29 +361,24 @@ Boako.Archive = {
         `).join('');
 
         html += `</tbody></table></div></div>`;
-        
-        // 🌟 [하단 페이지 번호 네비게이션 주입 구역]
         html += this.renderPagination();
 
         area.innerHTML = html; 
         if(window.lucide) lucide.createIcons(); 
     },
 
-    // 🌟 [서버사이드 전용 [◀ 1 2 3 ▶] 컴포넌트 렌더러]
     renderPagination: function() {
         const totalPages = Math.ceil(this.totalCount / this.itemsPerPage);
-        if (totalPages <= 1) return ''; // 1페이지 이하면 네비게이션 숨김
+        if (totalPages <= 1) return '';
 
         let pHTML = `<div class="flex items-center justify-center gap-2 mt-8 select-none animate-in fade-in duration-300">`;
 
-        // ◀ 이전 페이지 버튼
         pHTML += `
             <button onclick="Boako.Archive.changePage(${this.currentPage - 1})" ${this.currentPage === 1 ? 'disabled class="p-2 rounded-xl text-slate-300 bg-slate-50 border border-slate-100 cursor-not-allowed"' : 'class="p-2 rounded-xl text-slate-600 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all"'}>
                 <i data-lucide="chevron-left" class="w-4 h-4"></i>
             </button>
         `;
 
-        // 숫자 번호 버튼 리스트 생성
         for (let i = 1; i <= totalPages; i++) {
             if (i === this.currentPage) {
                 pHTML += `<button class="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-xs shadow-md border border-indigo-600">${i}</button>`;
@@ -346,7 +387,6 @@ Boako.Archive = {
             }
         }
 
-        // ▶ 다음 페이지 버튼
         pHTML += `
             <button onclick="Boako.Archive.changePage(${this.currentPage + 1})" ${this.currentPage === totalPages ? 'disabled class="p-2 rounded-xl text-slate-300 bg-slate-50 border border-slate-100 cursor-not-allowed"' : 'class="p-2 rounded-xl text-slate-600 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all"'}>
                 <i data-lucide="chevron-right" class="w-4 h-4"></i>
@@ -357,7 +397,7 @@ Boako.Archive = {
         return pHTML;
     },
 
-    // 6. 랭킹보드 그리드 렌더링 (전수 조사 모드)
+    // 6. 랭킹보드 그리드 렌더링
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
@@ -393,11 +433,7 @@ Boako.Archive = {
         html += sorted.map((p, idx) => `
             <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
                 <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
-                    ${
-                        idx < 3 
-                            ? `<span class="text-xl select-none leading-none relative -top-[2px]">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>`
-                            : ''
-                    }
+                    ${idx < 3 ? `<span class="text-xl select-none leading-none relative -top-[2px]">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>` : ''}
                     <span>RANK #${idx + 1}</span>
                 </div>
                 
@@ -407,11 +443,7 @@ Boako.Archive = {
                              class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
                              onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
                              alt="${p.name}">
-                        ${
-                            p.is_prev_mvp 
-                                ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">👑</div>` 
-                                : ''
-                        }
+                        ${p.is_prev_mvp ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">👑</div>` : ''}
                     </div>
                     <div>
                         <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
@@ -453,6 +485,102 @@ Boako.Archive = {
                 </div>
             </div>
         `).join('');
+
+        html += `</div>`;
+        area.innerHTML = html;
+        if(window.lucide) lucide.createIcons();
+    },
+
+    // 🌟 [신설 핵심 엔진: 대세 게임 & 인게임 전원 출력 프리미엄 렌더러]
+    renderGames: function() {
+        const area = document.getElementById('archive-content-area');
+        if (!area) return;
+
+        if (this.gameRankings.length === 0) {
+            area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">집계할 게임별 통계 데이터가 없습니다.</div>`;
+            return;
+        }
+
+        // 1층 뷰가 던져준 쿼리를 Map으로 완벽 폴더 정리 (순서 보장)
+        const gameMap = new Map();
+        this.gameRankings.forEach(row => {
+            if (!gameMap.has(row.game_name)) {
+                gameMap.set(row.game_name, {
+                    popularityRank: row.game_popularity_rank,
+                    playersCount: row.total_unique_players,
+                    recordsCount: row.total_records_count,
+                    playersList: []
+                });
+            }
+            gameMap.get(row.game_name).playersList.push({
+                rank: row.player_rank,
+                name: row.player_nickname,
+                team: row.player_team_name,
+                rp: row.player_total_rp
+            });
+        });
+
+        // 소장님의 하이엔드 럭셔리 컴포넌트 렌더링 시동
+        let html = `<div class="flex flex-col gap-6 animate-in fade-in duration-500">`;
+
+        gameMap.forEach((game, gameName) => {
+            html += `
+                <div class="bg-white rounded-[2rem] shadow-xl border border-white p-6 overflow-hidden transition-all duration-300 hover:shadow-2xl">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-4 cursor-pointer group" 
+                         onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${
+                                game.popularityRank === 1 ? 'bg-amber-500 text-white shadow-amber-200' :
+                                game.popularityRank === 2 ? 'bg-slate-400 text-white shadow-slate-200' :
+                                game.popularityRank === 3 ? 'bg-amber-700 text-white shadow-amber-900/20' : 'bg-slate-100 text-slate-500'
+                            } shadow-md">
+                                ${game.popularityRank}
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">${gameName}</h3>
+                                <p class="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">Game Popularity Rank</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 self-end sm:self-center">
+                            <span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-3 py-1.5 rounded-xl text-xs font-black">👥 유저 ${game.playersCount}명</span>
+                            <span class="bg-slate-50 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-black">📝 기록 ${game.recordsCount}개</span>
+                            <i data-lucide="chevron-down" class="text-slate-400 w-5 h-5 transition-transform group-hover:translate-y-0.5"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="players-list-wrapper mt-4 pt-2 hidden animate-in slide-in-from-top-2 duration-200">
+                        <div class="overflow-x-auto rounded-xl border border-slate-100 shadow-inner bg-slate-50/50">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr class="bg-slate-100/70 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200">
+                                        <th class="px-5 py-3 w-[80px]">순위</th>
+                                        <th class="px-5 py-3 w-[150px]">소속 팀</th>
+                                        <th class="px-5 py-3">닉네임</th>
+                                        <th class="px-5 py-3 text-right w-[120px]">획득 RP</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100/60 bg-white">
+                                    ${game.playersList.map(p => `
+                                        <tr class="hover:bg-slate-50 transition-colors font-medium">
+                                            <td class="px-5 py-3.5 font-black text-xs">
+                                                ${
+                                                    p.rank === 1 ? '<span class="text-amber-500">🥇 1위</span>' :
+                                                    p.rank === 2 ? '<span class="text-slate-400">🥈 2위</span>' :
+                                                    p.rank === 3 ? '<span class="text-amber-700">🥉 3위</span>' : `<span class="text-slate-400 pl-1">${p.rank}위</span>`
+                                                }
+                                            </td>
+                                            <td class="px-5 py-3.5 text-xs font-black text-slate-400 uppercase tracking-tight">${p.team || 'Free Agent'}</td>
+                                            <td class="px-5 py-3.5 font-black text-slate-800">${p.name}</td>
+                                            <td class="px-5 py-3.5 text-right font-mono font-black text-indigo-600">${Math.floor(p.rp).toLocaleString()} P</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
 
         html += `</div>`;
         area.innerHTML = html;
