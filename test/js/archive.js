@@ -562,7 +562,7 @@ Boako.Archive = {
                             </div>
                             <div>
                                 <h3 class="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">${gameName}</h3>
-                                <p class="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">Game Popularity Rank</p>
+                                <p class="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">클릭하시면 상세정보가 보입니다.</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-3 self-end sm:self-center">
