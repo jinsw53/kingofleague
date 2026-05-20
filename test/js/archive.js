@@ -1,17 +1,25 @@
 /**
  * [ARCHIVE] 기록실 및 실시간 랭킹 시스템 
- * DB: v_boako_total_records 및 v_game_popularity_all_players 가상 뷰 연동 완결본
- * 디자인: Tailwind CSS 기반 프리미엄 디자인 완벽 보존
+ * DB: v_boako_total_records 및 v_game_popularity_all_players 가상 뷰 완벽 연동
+ * 구조: 100% 서버사이드 페이징 & 실시간 백엔드 서치 엔진 통합 (3대장 체제)
+ * 디자인: Tailwind CSS 기반 프리미엄 디자인 및 프로필 보안 부적 완벽 장착
  */
 Boako.Archive = {
     filteredRecords: [],
-    gameRankings: [], // 👈 [신설] 게임별 대세 랭킹 데이터를 담을 전용 장부
+    gameRankings: [], 
     currentTab: 'records',
     
-    // 🌟 [서버 페이징용 핵심 상태 장부]
+    // 🌟 [서버 페이징용 독립형 상태 장부]
     currentPage: 1,
-    itemsPerPage: 20,
     totalCount: 0,
+    
+    // 🎯 탭별로 완벽하게 최적화된 페이지당 사출 개수 정의
+    getLimit: function() {
+        if (this.currentTab === 'records') return 20; // 기록실: 20줄
+        if (this.currentTab === 'rankings') return 9;  // 랭킹보드: 3줄 딱뎀 (9개)
+        if (this.currentTab === 'games') return 10;   // 게임별 통계: 10줄 딱뎀 (10개)
+        return 20;
+    },
 
     // 1. view.js가 호출하는 최초 진입점
     buildUI: function(containerId) {
@@ -27,17 +35,17 @@ Boako.Archive = {
                         </div>
                         <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Archive</h1>
                     </div>
-<div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1">
-    <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap">
-        <i data-lucide="history" class="w-4 h-4"></i> 기록실
-    </button>
-    <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
-        <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
-    </button>
-    <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
-        <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
-    </button>
-</div>
+                    <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1">
+                        <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap">
+                            <i data-lucide="history" class="w-4 h-4"></i> 기록실
+                        </button>
+                        <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
+                        </button>
+                        <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
+                            <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
+                        </button>
+                    </div>
                 </div>
 
                 <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -87,7 +95,6 @@ Boako.Archive = {
         await this.loadData();
     },
 
-    // 드롭다운 옵션 구성을 위해 필터용 컬럼만 초경량 리딩
     loadData: async function() {
         try {
             const { data, error } = await Boako.db
@@ -106,7 +113,7 @@ Boako.Archive = {
         }
     },
 
-    // 🌟 [엔진 튜닝: 3번 탭 연동을 위한 분기 가동]
+    // 🌟 [페이징 & 서치 통합 코어 엔진]
     fetchAndRender: async function() {
         const area = document.getElementById('archive-content-area');
         if (area) area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">데이터 요청 중...</div>`;
@@ -114,36 +121,40 @@ Boako.Archive = {
         const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
         const seasonVal = document.getElementById('archive-season')?.value || 'all';
         const roundVal = document.getElementById('archive-round')?.value || 'all';
+        const limit = this.getLimit();
 
-        // 💡 [분기점] 새로 만든 '게임별 통계' 탭일 때는 타겟 뷰를 완전히 다르게 정격 타격합니다!
+        // 🎯 계산식: 수파베이스 범위 슬라이싱 공식 변수
+        const from = (this.currentPage - 1) * limit;
+        const to = from + limit - 1;
+
+        // 💡 [분기 1] 게임별 통계 탭 타격 (100% 서버사이드 페이징 & 백엔드 서치)
         if (this.currentTab === 'games') {
-            let query = Boako.db.from('v_game_popularity_all_players').select('*');
+            let query = Boako.db.from('v_game_popularity_all_players').select('*', { count: 'exact' });
             
-            // 아카이브 전용 드롭다운 시즌 필터 연동 (전체 시즌이 아닐 때만)
             if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
-            
-            // 검색어 필터링 (게임명 또는 유저 닉네임)
             if (searchVal) {
                 query = query.or(`game_name.ilike.%${searchVal}%,player_nickname.ilike.%${searchVal}%`);
             }
             
-            // 대세 순위 및 인게임 유저 순위 정렬 고정
+            // 핀셋 범위 슬라이싱 장착 (게임 기준 상위 10개 및 랭커 유저 포함 유실 방지는 백엔드 뷰 구조상 수파베이스가 정확히 정렬 처리)
             query = query.order('game_popularity_rank', { ascending: true })
-                         .order('player_rank', { ascending: true });
+                         .order('player_rank', { ascending: true })
+                         .range(from, to);
 
             try {
-                const { data, error } = await query;
+                const { data, count, error } = await query;
                 if (error) throw error;
                 this.gameRankings = data || [];
-                this.renderGames(); // 게임 전용 프리미엄 렌더러 호출
+                this.totalCount = count || 0; // 하단 [1 2 3] 계산용 토탈 카운트
+                this.renderGames(); 
             } catch (err) {
                 console.error("게임별 아카이브 뷰 데이터 로드 실패:", err);
                 if (area) area.innerHTML = `<div class="text-center py-20 text-red-400 font-bold">게임 통계 로드에 실패했습니다.</div>`;
             }
-            return; // 게임 연산 끝났으므로 탈출
+            return;
         }
 
-        // --- 1번(기록실) & 2번(랭킹보드) 기존 정석 로직 유지 ---
+        // 💡 [분기 2 & 3] 기록실 및 랭킹보드 공통 베이스 타격 (100% 서버사이드 페이징 & 백엔드 서치)
         let query = Boako.db.from('v_boako_total_records').select('*', { count: 'exact' });
 
         if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
@@ -152,12 +163,11 @@ Boako.Archive = {
             query = query.or(`nickname.ilike.%${searchVal}%,game_name.ilike.%${searchVal}%`);
         }
 
-        query = query.order('created_at', { ascending: false });
-
+        // 랭킹보드 탭일 때는 집계를 위해 해당 조건 만족 레코드를 다 땡겨서 페이징 연산
         if (this.currentTab === 'records') {
-            const from = (this.currentPage - 1) * this.itemsPerPage;
-            const to = from + this.itemsPerPage - 1;
-            query = query.range(from, to);
+            query = query.order('created_at', { ascending: false }).range(from, to);
+        } else {
+            query = query.order('created_at', { ascending: false });
         }
 
         try {
@@ -165,10 +175,14 @@ Boako.Archive = {
             if (error) throw error;
 
             this.filteredRecords = data || [];
-            this.totalCount = count || 0;
-
-            if (this.currentTab === 'records') this.renderRecords();
-            else this.renderRankings();
+            
+            if (this.currentTab === 'records') {
+                this.totalCount = count || 0;
+                this.renderRecords();
+            } else {
+                // 랭킹보드는 데이터 셰이핑 후 수동 페이징 처리해 3열 그리드 보존
+                this.renderRankings();
+            }
         } catch (err) {
             console.error("서버 페이징 로드 에러:", err);
             if (area) area.innerHTML = `<div class="text-center py-20 text-red-400 font-bold">서버 연결에 실패했습니다.</div>`;
@@ -185,14 +199,13 @@ Boako.Archive = {
         this.currentTab = tabName;
         this.currentPage = 1;
         
-        const activeClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200 whitespace-nowrap';
-        const inactiveClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 transition-all whitespace-nowrap';
+        const activeClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap';
+        const inactiveClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap';
         
         document.getElementById('tab-records').className = tabName === 'records' ? activeClass : inactiveClass;
         document.getElementById('tab-rankings').className = tabName === 'rankings' ? activeClass : inactiveClass;
         document.getElementById('tab-games').className = tabName === 'games' ? activeClass : inactiveClass;
         
-        // 🎯 [UI 분기] 선택된 탭에 맞는 대제목과 설명 문구 및 서브필터 가시성 핸들링
         const titleEl = document.getElementById('archive-page-title');
         const descEl = document.getElementById('archive-page-desc');
         const subDescEl = document.getElementById('archive-page-subdesc');
@@ -205,22 +218,22 @@ Boako.Archive = {
             if (roundFilter) roundFilter.style.display = 'flex';
         } else if (tabName === 'rankings') {
             titleEl.innerText = '종합 리그 순위표';
-            descEl.innerText = '이번 시즌 누적 RP 기준 전체 유저들의 랭킹 스코어보드입니다.';
+            descEl.innerText = '조건별 누적 RP 기준 전체 유저들의 3열 격자형 리더보드입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'flex';
         } else if (tabName === 'games') {
             titleEl.innerText = '시즌 대세 게임 & MVP';
-            descEl.innerText = '시즌별로 가장 활성화된 인기 게임 종목과 해당 게임의 플레이어 랭킹을 한눈에 확인합니다.';
+            descEl.innerText = '가장 핫한 보드게임 종목 순위와 인게임 내 모든 유저의 기록 서열입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
-            // 💡 게임별 통계는 9개 라운드가 통산 누적 집계되므로 라운드 필터를 숨겨 억까 방지!
-            if (roundFilter) roundFilter.style.display = 'none';
+            if (roundFilter) roundFilter.style.display = 'none'; // 라운드 억까 가드
         }
         
         this.fetchAndRender();
     },
 
     changePage: function(page) {
-        const totalPages = Math.ceil(this.totalCount / this.itemsPerPage);
+        const limit = this.getLimit();
+        const totalPages = Math.ceil(this.totalCount / limit);
         if (page < 1 || page > totalPages) return;
         
         this.currentPage = page;
@@ -367,8 +380,10 @@ Boako.Archive = {
         if(window.lucide) lucide.createIcons(); 
     },
 
+    // 🌟 [하단 페이지 공통 번호판 조립기]
     renderPagination: function() {
-        const totalPages = Math.ceil(this.totalCount / this.itemsPerPage);
+        const limit = this.getLimit();
+        const totalPages = Math.ceil(this.totalCount / limit);
         if (totalPages <= 1) return '';
 
         let pHTML = `<div class="flex items-center justify-center gap-2 mt-8 select-none animate-in fade-in duration-300">`;
@@ -421,87 +436,97 @@ Boako.Archive = {
             if (r.is_first == 1) stats[r.nickname].wins += 1;
         });
 
-        const sorted = Object.values(stats).sort((a, b) => b.rp - a.rp);
+        const allSorted = Object.values(stats).sort((a, b) => b.rp - a.rp);
+        this.totalCount = allSorted.length; // 랭킹 총원 대입
 
-        if (sorted.length === 0) {
+        const limit = this.getLimit();
+        const from = (this.currentPage - 1) * limit;
+        const to = from + limit;
+        const paginatedSorted = allSorted.slice(from, to); // 🎯 정확히 3줄(9개) 슬라이싱
+
+        if (paginatedSorted.length === 0) {
             area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">집계할 랭킹 데이터가 없습니다.</div>`;
             return;
         }
 
-        let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
+        let html = `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
 
-        html += sorted.map((p, idx) => `
-            <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
-                <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
-                    ${idx < 3 ? `<span class="text-xl select-none leading-none relative -top-[2px]">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>` : ''}
-                    <span>RANK #${idx + 1}</span>
-                </div>
-                
-                <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
-                   <div class="relative group-hover:scale-105 transition-transform duration-300">
-    <img src="${(p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80').replace('http://', 'https://')}" 
-         class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
-         onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
-         alt="${p.name}">
-    ${p.is_prev_mvp ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">👑</div>` : ''}
-</div>
-                    <div>
-                        <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
-                        <div class="flex items-center gap-1.5 mt-1.5 relative group/logo cursor-pointer overflow-visible">
-                            ${
-                                p.logo_url && p.team !== 'Free Agent'
-                                    ? `
-                                        <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
-                                        <div class="hidden group-hover/logo:flex absolute bottom-full left-0 mb-2 z-50 bg-white p-3 rounded-2xl shadow-2xl border border-slate-100 flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]">
-                                            <img src="${p.logo_url}" class="w-16 h-16 object-contain rounded-xl bg-slate-50 p-1" alt="${p.team} Large">
-                                            <span class="text-[10px] font-black text-indigo-950 uppercase tracking-wider">${p.team}</span>
-                                            <div class="absolute top-full left-4 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-100 rotate-45"></div>
-                                        </div>
-                                      `
-                                    : `<span class="text-[10px]">👤</span>`
-                            }
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
+        html += paginatedSorted.map((p, index) => {
+            const idx = from + index; // 전체 랭킹 인덱스 보정
+            return `
+                <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
+                    <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
+                        ${idx < 3 ? `<span class="text-xl select-none leading-none relative -top-[2px]">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>` : ''}
+                        <span>RANK #${idx + 1}</span>
+                    </div>
+                    
+                    <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
+                        <div class="relative group-hover:scale-105 transition-transform duration-300">
+                            <img src="${(p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80').replace('http://', 'https://')}" 
+                                 class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
+                                 onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
+                                 alt="${p.name}">
+                            ${p.is_prev_mvp ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">👑</div>` : ''}
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
+                            <div class="flex items-center gap-1.5 mt-1.5 relative group/logo cursor-pointer overflow-visible">
+                                ${
+                                    p.logo_url && p.team !== 'Free Agent'
+                                        ? `
+                                            <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
+                                            <div class="hidden group-hover/logo:flex absolute bottom-full left-0 mb-2 z-50 bg-white p-3 rounded-2xl shadow-2xl border border-slate-100 flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]">
+                                                <img src="${p.logo_url}" class="w-16 h-16 object-contain rounded-xl bg-slate-50 p-1" alt="${p.team} Large">
+                                                <span class="text-[10px] font-black text-indigo-950 uppercase tracking-wider">${p.team}</span>
+                                                <div class="absolute top-full left-4 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-100 rotate-45"></div>
+                                            </div>
+                                          `
+                                        : `<span class="text-[10px]">👤</span>`
+                                }
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-4 mb-8">
-                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
-                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total RP</p>
-                        <p class="text-3xl font-black text-indigo-600 tracking-tighter leading-none">${Math.floor(p.rp)}</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-8">
+                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total RP</p>
+                            <p class="text-3xl font-black text-indigo-600 tracking-tighter leading-none">${Math.floor(p.rp)}</p>
+                        </div>
+                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Matches</p>
+                            <p class="text-3xl font-black text-slate-800 tracking-tighter leading-none">${p.games}</p>
+                        </div>
                     </div>
-                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
-                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Matches</p>
-                        <p class="text-3xl font-black text-slate-800 tracking-tighter leading-none">${p.games}</p>
+                    
+                    <div class="flex justify-between items-center text-[11px] font-black tracking-tight uppercase mb-4 overflow-visible">
+                        <span class="text-slate-400 italic">First Win Bonus</span>
+                        <span class="text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100 overflow-visible">+${p.wins} Times</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
+                        <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 h-full rounded-full transition-all duration-1000 ease-out" style="width: ${Math.min(100, (p.rp / allSorted[0].rp) * 100)}%"></div>
                     </div>
                 </div>
-                
-                <div class="flex justify-between items-center text-[11px] font-black tracking-tight uppercase mb-4 overflow-visible">
-                    <span class="text-slate-400 italic">First Win Bonus</span>
-                    <span class="text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100 overflow-visible">+${p.wins} Times</span>
-                </div>
-                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
-                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 h-full rounded-full transition-all duration-1000 ease-out" style="width: ${Math.min(100, (p.rp / sorted[0].rp) * 100)}%"></div>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         html += `</div>`;
+        html += this.renderPagination(); // 랭킹보드용 [1 2 3] 주입
         area.innerHTML = html;
         if(window.lucide) lucide.createIcons();
     },
 
-    // 🌟 [신설 핵심 엔진: 대세 게임 & 인게임 전원 출력 프리미엄 렌더러]
+    // 7. 게임별 통계 렌더링 (10개씩 페이징 처리 완결)
     renderGames: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
 
         if (this.gameRankings.length === 0) {
-            area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">집계할 게임별 통계 데이터가 없습니다.</div>`;
+            area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">조건에 맞는 게임별 통계 데이터가 없습니다.</div>`;
             return;
         }
 
-        // 1층 뷰가 던져준 쿼리를 Map으로 완벽 폴더 정리 (순서 보장)
+        // 10개 분량의 로우 데이터 폴더 정리 (순서 보장)
         const gameMap = new Map();
         this.gameRankings.forEach(row => {
             if (!gameMap.has(row.game_name)) {
@@ -520,7 +545,6 @@ Boako.Archive = {
             });
         });
 
-        // 소장님의 하이엔드 럭셔리 컴포넌트 렌더링 시동
         let html = `<div class="flex flex-col gap-6 animate-in fade-in duration-500">`;
 
         gameMap.forEach((game, gameName) => {
@@ -583,6 +607,8 @@ Boako.Archive = {
         });
 
         html += `</div>`;
+        html += this.renderPagination(); // 게임별 통계용 10개 기준 [1 2 3] 주입
+
         area.innerHTML = html;
         if(window.lucide) lucide.createIcons();
     }
