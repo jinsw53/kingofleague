@@ -104,7 +104,7 @@
 <nav class="nav" style="position: sticky; top: 0; z-index: 900; background-color: #fff; border-bottom: 1px solid var(--border-color);">
     <div class="inner" style="display: flex; align-items: center; width: 100%; position: relative;">
         
-        <div id="nav-arrow-left" style="display: none; position: absolute; left: 10px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.2); cursor: pointer; transition: color 0.2s; user-select: none;" onmouseover="this.style.color='rgba(0,0,0,0.6)'" onmouseout="this.style.color='rgba(0,0,0,0.2)'">
+        <div id="nav-arrow-left" style="display: none; position: absolute; left: 0px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.2); cursor: pointer; transition: color 0.2s; user-select: none;" onmouseover="this.style.color='rgba(0,0,0,0.6)'" onmouseout="this.style.color='rgba(0,0,0,0.2)'">
             ◀
         </div>
 
@@ -119,14 +119,18 @@
             scrollbar-width: none;
             flex-grow: 1;
             margin-right: 16px;
-            padding: 0 35px;
+            /* ❌ 기존 padding: 0 35px; 을 삭제하여 첫 메뉴 정렬 라인을 본래대로 회복합니다! */
         ">
             <style>
                 .menu-list::-webkit-scrollbar { display: none; }
                 .menu-item { flex-shrink: 0; }
+                
+                /* 🎯 소식지와 팀 목록 양 끝단에만 화살표 방어용 가변 마진 주입 */
+                #menu-first-item { margin-left: 0px; transition: margin 0.2s; }
+                #menu-last-item { margin-right: 35px; }
             </style>
 
-            <li class="menu-item" onclick="Boako.View.render('boardgame')">📰 소식지</li>
+            <li class="menu-item" id="menu-first-item" onclick="Boako.View.render('boardgame')">📰 소식지</li>
             <li class="menu-item" id="menu-ranking" onclick="Boako.View.render('ranking')">🏆 랭킹</li>
             <li class="menu-item" id="menu-match" onclick="Boako.View.render('match')">⚔️ 대항전</li>
             <li class="menu-item" id="menu-rival" onclick="Boako.View.render('rival')">⚡ 라이벌 매치</li>
@@ -137,7 +141,7 @@
             <li class="menu-item" id="menu-team" onclick="Boako.View.render('team')">🛡️ <span id="team-menu-text">팀 창단</span></li>
             <li class="menu-item" id="menu-team-list" onclick="Boako.View.render('team_list')">👥 팀 목록</li>
             <li class="menu-item" onclick="Boako.View.render('cafe')">☕ 카페</li>
-            <li class="menu-item" id="menu-shop" onclick="Boako.View.render('shop')">🛒 포인트 샵</li>
+            <li class="menu-item" id="menu-shop" id="menu-last-item" onclick="Boako.View.render('shop')">🛒 포인트 샵</li>
             <li class="menu-item" id="menu-admin-review" onclick="Boako.View.render('admin_review')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">🛠️ 검수센터</li>
             <li class="menu-item" id="menu-record-verify" onclick="Boako.View.render('record_verify')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">✅ 기록 인증</li>
         </ul>
@@ -163,17 +167,21 @@ document.addEventListener("DOMContentLoaded", function() {
     const navBar = document.getElementById("boako-main-nav-bar");
     const arrowLeft = document.getElementById("nav-arrow-left");
     const arrowRight = document.getElementById("nav-arrow-right");
+    const firstItem = document.getElementById("menu-first-item");
 
-    if (!navBar || !arrowLeft || !arrowRight) return;
+    if (!navBar || !arrowLeft || !arrowRight || !firstItem) return;
 
     function updateArrows() {
         const scrollLeft = navBar.scrollLeft;
         const maxScroll = navBar.scrollWidth - navBar.clientWidth;
 
+        // 💡 핵심 기믹: 오른쪽으로 스크롤이 움직였을 때만 소식지 왼쪽에 30px 여백을 주어 화살표와 안 겹치게 피합니다!
         if (scrollLeft > 5) {
             arrowLeft.style.display = "flex";
+            firstItem.style.marginLeft = "30px";
         } else {
             arrowLeft.style.display = "none";
+            firstItem.style.marginLeft = "0px"; // 맨 왼쪽일 땐 본래 칼정렬 위치 복귀!
         }
 
         if (scrollLeft >= maxScroll - 5) {
