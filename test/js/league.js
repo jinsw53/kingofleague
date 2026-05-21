@@ -49,21 +49,25 @@ Boako.League.buildUI = function(containerId) {
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto">
-                    <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🎲 5x5 팀 빙고전</span>
-                    </button>
-                    <button id="tab-provocation" onclick="Boako.League.switchTab('provocation')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🔥 야너나 매치룸</span>
-                    </button>
-                    <button id="tab-champion" onclick="Boako.League.switchTab('champion')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>👑 킹 오브 리그</span>
-                    </button>
-                    <button id="tab-tournament" onclick="Boako.League.switchTab('tournament')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🏅 토너먼트 대진</span>
-                    </button>
-                </div>
-            </div>
+              <div class="grid grid-cols-2 sm:flex items-center gap-2 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto">
+    
+    <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" title="5x5 팀 빙고전" class="flex items-center justify-center rounded-xl transition-all duration-200" style="width: 72px; height: 32px; padding: 0; overflow: hidden;">
+        <img src="리그의 게임 챔피언 벨트.png" alt="BINGO" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2270%22>🎲</text></svg>';">
+    </button>
+    
+    <button id="tab-provocation" onclick="Boako.League.switchTab('provocation')" title="야, 너네 나와! 챌린지" class="flex items-center justify-center rounded-xl transition-all duration-200" style="width: 72px; height: 32px; padding: 0; overflow: hidden;">
+        <img src="야, 너네 나와! 챌린지.jpg" alt="MATCH" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2270%22>🔥</text></svg>';">
+    </button>
+    
+    <button id="tab-champion" onclick="Boako.League.switchTab('champion')" title="챔피언" class="flex items-center justify-center rounded-xl transition-all duration-200" style="width: 72px; height: 32px; padding: 0; overflow: hidden;">
+        <img src="킹 오브 리그.png" alt="CHAMPION" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2270%22>👑</text></svg>';">
+    </button>
+    
+    <button id="tab-tournament" onclick="Boako.League.switchTab('tournament')" title="킹 오브 리그" class="flex items-center justify-center rounded-xl transition-all duration-200 text-slate-500 hover:text-slate-800" style="width: 72px; height: 32px; padding: 0;">
+        <i data-lucide="git-fork" class="w-5 h-5"></i>
+    </button>
+
+</div>
 
             <div id="league-view-container" class="p-6 sm:p-8"></div>
         </div>
