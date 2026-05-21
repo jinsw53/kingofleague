@@ -56,11 +56,11 @@ Boako.League.buildUI = function(containerId) {
     </button>
     
     <button id="tab-provocation" onclick="Boako.League.switchTab('provocation')" title="야, 너네 나와! 챌린지" class="flex items-center justify-center rounded-xl transition-all duration-200" style="width: 72px; height: 32px; padding: 0; overflow: hidden;">
-        <img src="야, 너네 나와! 챌린지.jpg" alt="MATCH" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2270%22>🔥</text></svg>';">
+        <img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png" alt="MATCH" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2270%22>🔥</text></svg>';">
     </button>
     
     <button id="tab-champion" onclick="Boako.League.switchTab('champion')" title="챔피언" class="flex items-center justify-center rounded-xl transition-all duration-200" style="width: 72px; height: 32px; padding: 0; overflow: hidden;">
-        <img src="킹 오브 리그.png" alt="CHAMPION" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2270%22>👑</text></svg>';">
+        <img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png" alt="CHAMPION" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2270%22>👑</text></svg>';">
     </button>
     
     <button id="tab-tournament" onclick="Boako.League.switchTab('tournament')" title="킹 오브 리그" class="flex items-center justify-center rounded-xl transition-all duration-200 text-slate-500 hover:text-slate-800" style="width: 72px; height: 32px; padding: 0;">
