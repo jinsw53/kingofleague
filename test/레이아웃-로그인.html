@@ -102,11 +102,13 @@
         </header>
 
 <nav class="nav" style="position: relative;">
-    <div class="boako-nav-fade-right"></div>
-
     <div class="inner" style="display: flex; align-items: center; width: 100%; position: relative;">
         
-        <ul class="menu-list" style="
+        <div id="nav-arrow-left" style="display: none; position: absolute; left: 0; z-index: 850; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255,255,255,0.92); border: 1px solid var(--border-color); border-radius: 50%; shadow: var(--shadow-md); color: var(--primary); font-weight: 900; pointer-events: none; animation: pulse 2s infinite;">
+            ◀
+        </div>
+
+        <ul class="menu-list" id="boako-main-nav-bar" style="
             display: flex; 
             align-items: center; 
             flex-wrap: nowrap; 
@@ -117,29 +119,14 @@
             scrollbar-width: none;     /* 파이어폭스용 스크롤바 숨기기 */
             flex-grow: 1;
             margin-right: 16px;        /* 기록기 설치 버튼과의 안전거리 */
-            padding-right: 40px;       /* 🎯 그라데이션 그림자 밑으로 글자가 자연스럽게 지나가도록 여백 주입 */
+            padding: 0 10px;           /* 화살표 공간 확보용 좌우 버퍼 */
         ">
             <style>
                 .menu-list::-webkit-scrollbar { display: none; }
-                .menu-item { flex-shrink: 0; } /* 💡 메뉴 글자가 찌그러지지 않게 방어 */
-                
-                /* 🎨 1안 작동을 위한 프리미엄 그라데이션 부적 스타일 */
-                .boako-nav-fade-right {
-                    position: absolute;
-                    top: 0;
-                    /* 🧩 기록기 설치 버튼 바로 왼쪽(정확히는 스크롤 상자 우측 끝)에 걸치도록 우측 여백 보정 */
-                    right: 160px; 
-                    width: 45px; /* 안개 효과가 먹힐 부드러운 가로 너비 */
-                    height: 100%;
-                    /* 오른쪽 끝으로 갈수록 네비바 배경색(흰색)과 100% 흡수되어 글자가 스르륵 잘려 보이게 만듭니다 */
-                    background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 100%);
-                    pointer-events: none; /* 그라데이션 막 때문에 아래 깔린 메뉴 클릭 안 되는 억까 원천 차단 */
-                    z-index: 800; /* menu-item 보다는 위, 고정 헤더보다는 아래로 우선순위 황금 밸런스 */
-                }
-                
-                /* 📱 모바일 해상도에서 기록기 설치 버튼이 밀릴 때 그라데이션 막 위치 동적 대응 */
-                @media (max-width: 640px) {
-                    .boako-nav-fade-right { right: 140px; width: 35px; }
+                .menu-item { flex-shrink: 0; }
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); opacity: 0.6; }
+                    50% { transform: scale(1.08); opacity: 1; }
                 }
             </style>
 
@@ -149,7 +136,7 @@
             <li class="menu-item" id="menu-rival" onclick="Boako.View.render('rival')">⚡ 라이벌 매치</li>
             <li class="menu-item" id="menu-league" onclick="Boako.View.render('league')">🎯 리그 콘텐츠</li>
             <li class="menu-item" id="menu-records" onclick="Boako.View.render('records')">📋 전적기록</li>
-            <li class="menu-item" id="menu-tournament" onclick="Boako.View.render('tournament')">📊 토너먼트</li>
+            <li class="menu-item" id="menu-tournament" onclick="Boako.View.render('tournament')">🏅 토너먼트</li>
             <li class="menu-item" id="menu-together" onclick="Boako.View.render('together')">🤝 같이 하자</li>
             <li class="menu-item" id="menu-team" onclick="Boako.View.render('team')">🛡️ <span id="team-menu-text">팀 창단</span></li>
             <li class="menu-item" id="menu-team-list" onclick="Boako.View.render('team_list')">👥 팀 목록</li>
@@ -159,7 +146,11 @@
             <li class="menu-item" id="menu-record-verify" onclick="Boako.View.render('record_verify')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">✅ 기록 인증</li>
         </ul>
 
-        <div style="flex-shrink: 0; margin-left: auto; z-index: 810;">
+        <div id="nav-arrow-right" style="display: flex; position: absolute; right: 155px; z-index: 850; align-items: center; justify-content: center; width: 32px; height: 32px; background: rgba(255,255,255,0.92); border: 1px solid var(--border-color); border-radius: 50%; shadow: var(--shadow-md); color: var(--primary); font-weight: 900; pointer-events: none; animation: pulse 2s infinite;">
+            ▶
+        </div>
+
+        <div style="flex-shrink: 0; margin-left: auto; z-index: 860;">
             <a href="https://chromewebstore.google.com/detail/boako-%ED%8C%80-%EB%A6%AC%EA%B7%B8-%EA%B8%B0%EB%A1%9D-%EC%A0%80%EC%9E%A5/ieeaooigcejnffgcmcaannlpkbejniil" 
                target="_blank" 
                rel="noopener noreferrer" 
@@ -170,6 +161,44 @@
 
     </div>
 </nav>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const navBar = document.getElementById("boako-main-nav-bar");
+    const arrowLeft = document.getElementById("nav-arrow-left");
+    const arrowRight = document.getElementById("nav-arrow-right");
+
+    if (!navBar || !arrowLeft || !arrowRight) return;
+
+    function updateArrows() {
+        const scrollLeft = navBar.scrollLeft;
+        // scrollWidth(전체길이) - clientWidth(눈에보이는길이) = 최대 스크롤 가능 수치
+        const maxScroll = navBar.scrollWidth - navBar.clientWidth;
+
+        // 1. 왼쪽 끝 검사 (수치가 2보다 크면 왼쪽 탈출한 거니까 ◀ 등장)
+        if (scrollLeft > 2) {
+            arrowLeft.style.display = "flex";
+        } else {
+            arrowLeft.style.display = "none";
+        }
+
+        // 2. 오른쪽 끝 검사 (최대치에 다다르면 ▶ 숨김, 오차범위 3px 방어벽)
+        if (scrollLeft >= maxScroll - 3) {
+            arrowRight.style.display = "none";
+        } else {
+            arrowRight.style.display = "flex";
+        }
+    }
+
+    // 유저가 손가락으로 스윕할 때마다 실시간으로 수치 계산기 작동
+    navBar.addEventListener("scroll", updateArrows);
+    // 창 크기 바뀔 때나 모바일 회전할 때 대비 최적화 레이아웃 리프레시
+    window.addEventListener("resize", updateArrows);
+    
+    // 최초 구동 시 오른쪽 화살표 노출 여부 바로 판단 (만약 PC 넓은 모니터라 스크롤 안 필요하면 ▶ 자동 소멸)
+    setTimeout(updateArrows, 300);
+});
+</script>
 
         <div class="main-container-wrap">
             <div class="inner flex-container">
