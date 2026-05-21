@@ -104,7 +104,7 @@
 <nav class="nav" style="position: sticky; top: 0; z-index: 900; background-color: #fff; border-bottom: 1px solid var(--border-color);">
     <div class="inner" style="display: flex; align-items: center; width: 100%; position: relative;">
         
-        <div id="nav-arrow-left" style="display: none; position: absolute; left: 10px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.25); cursor: pointer; transition: color 0.2s, transform 0.2s; user-select: none;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+        <div id="nav-arrow-left" style="display: none; position: absolute; left: 10px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.2); cursor: pointer; transition: color 0.2s; user-select: none;" onmouseover="this.style.color='rgba(0,0,0,0.6)'" onmouseout="this.style.color='rgba(0,0,0,0.2)'">
             ◀
         </div>
 
@@ -115,11 +115,11 @@
             overflow-x: auto; 
             white-space: nowrap; 
             scroll-behavior: smooth;
-            -ms-overflow-style: none;  /* IE, 엣지용 스크롤바 숨기기 */
-            scrollbar-width: none;     /* 파이어폭스용 스크롤바 숨기기 */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
             flex-grow: 1;
-            margin-right: 16px;        /* 기록기 설치 버튼과의 안전거리 */
-            padding: 0 35px;           /* 화살표와 글자가 겹치지 않게 가드 내부 여백 */
+            margin-right: 16px;
+            padding: 0 35px;
         ">
             <style>
                 .menu-list::-webkit-scrollbar { display: none; }
@@ -142,7 +142,7 @@
             <li class="menu-item" id="menu-record-verify" onclick="Boako.View.render('record_verify')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">✅ 기록 인증</li>
         </ul>
 
-        <div id="nav-arrow-right" style="display: flex; position: absolute; right: 155px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.25); cursor: pointer; transition: color 0.2s, transform 0.2s; user-select: none;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='rgba(0,0,0,0.25)'">
+        <div id="nav-arrow-right" style="display: flex; position: absolute; right: 155px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.2); cursor: pointer; transition: color 0.2s; user-select: none;" onmouseover="this.style.color='rgba(0,0,0,0.6)'" onmouseout="this.style.color='rgba(0,0,0,0.2)'">
             ▶
         </div>
 
@@ -170,14 +170,12 @@ document.addEventListener("DOMContentLoaded", function() {
         const scrollLeft = navBar.scrollLeft;
         const maxScroll = navBar.scrollWidth - navBar.clientWidth;
 
-        // 왼쪽 끝 감사
         if (scrollLeft > 5) {
             arrowLeft.style.display = "flex";
         } else {
             arrowLeft.style.display = "none";
         }
 
-        // 오른쪽 끝 검사 (오차범위 5px 방어)
         if (scrollLeft >= maxScroll - 5) {
             arrowRight.style.display = "none";
         } else {
@@ -189,16 +187,13 @@ document.addEventListener("DOMContentLoaded", function() {
     window.addEventListener("resize", updateArrows);
     setTimeout(updateArrows, 300);
 
-    // 💡 [소장님 주문형] 마우스 대면 스르륵 밀어주는 자동 스크롤 연산
     let scrollInterval = null;
 
     function startScroll(direction) {
         if (scrollInterval) clearInterval(scrollInterval);
-        
         scrollInterval = setInterval(() => {
-            // 자연스럽고 부드러운 스크롤링 가속 (1프레임당 4px씩 미끄러짐)
             navBar.scrollLeft += direction * 4; 
-        }, 8); // 8ms 간격으로 정밀 밀기
+        }, 8);
     }
 
     function stopScroll() {
@@ -208,11 +203,8 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // 왼쪽 화살표 호버 액션 연결
     arrowLeft.addEventListener("mouseenter", () => startScroll(-1));
     arrowLeft.addEventListener("mouseleave", stopScroll);
-
-    // 오른쪽 화살표 호버 액션 연결
     arrowRight.addEventListener("mouseenter", () => startScroll(1));
     arrowRight.addEventListener("mouseleave", stopScroll);
 });
