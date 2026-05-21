@@ -217,13 +217,13 @@ Boako.Archive = {
             if (subDescEl) subDescEl.style.display = 'block';
             if (roundFilter) roundFilter.style.display = 'flex';
         } else if (tabName === 'rankings') {
-            titleEl.innerText = '종합 리그 순위표';
-            descEl.innerText = '조건별 누적 RP 기준 전체 유저들의 3열 격자형 리더보드입니다.';
+            titleEl.innerText = '리그 개인 순위표';
+            descEl.innerText = '누적 RP 기준 전체 유저들의 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'flex';
         } else if (tabName === 'games') {
-            titleEl.innerText = '시즌 대세 게임 & MVP';
-            descEl.innerText = '가장 핫한 보드게임 종목 순위와 인게임 내 모든 유저의 기록 서열입니다.';
+            titleEl.innerText = '시즌 대세 게임 & 게임별 순위';
+            descEl.innerText = '가장 핫한 보드게임 종목 순위와 게임별 모든 유저의 기록 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'none'; // 라운드 억까 가드
         }
