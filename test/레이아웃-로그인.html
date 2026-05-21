@@ -101,8 +101,10 @@
             </div>
         </header>
 
-<nav class="nav" style="overflow: hidden;">
-    <div class="inner" style="display: flex; align-items: center; width: 100%;">
+<nav class="nav" style="position: relative;">
+    <div class="boako-nav-fade-right"></div>
+
+    <div class="inner" style="display: flex; align-items: center; width: 100%; position: relative;">
         
         <ul class="menu-list" style="
             display: flex; 
@@ -115,10 +117,30 @@
             scrollbar-width: none;     /* 파이어폭스용 스크롤바 숨기기 */
             flex-grow: 1;
             margin-right: 16px;        /* 기록기 설치 버튼과의 안전거리 */
+            padding-right: 40px;       /* 🎯 그라데이션 그림자 밑으로 글자가 자연스럽게 지나가도록 여백 주입 */
         ">
             <style>
                 .menu-list::-webkit-scrollbar { display: none; }
                 .menu-item { flex-shrink: 0; } /* 💡 메뉴 글자가 찌그러지지 않게 방어 */
+                
+                /* 🎨 1안 작동을 위한 프리미엄 그라데이션 부적 스타일 */
+                .boako-nav-fade-right {
+                    position: absolute;
+                    top: 0;
+                    /* 🧩 기록기 설치 버튼 바로 왼쪽(정확히는 스크롤 상자 우측 끝)에 걸치도록 우측 여백 보정 */
+                    right: 160px; 
+                    width: 45px; /* 안개 효과가 먹힐 부드러운 가로 너비 */
+                    height: 100%;
+                    /* 오른쪽 끝으로 갈수록 네비바 배경색(흰색)과 100% 흡수되어 글자가 스르륵 잘려 보이게 만듭니다 */
+                    background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 100%);
+                    pointer-events: none; /* 그라데이션 막 때문에 아래 깔린 메뉴 클릭 안 되는 억까 원천 차단 */
+                    z-index: 800; /* menu-item 보다는 위, 고정 헤더보다는 아래로 우선순위 황금 밸런스 */
+                }
+                
+                /* 📱 모바일 해상도에서 기록기 설치 버튼이 밀릴 때 그라데이션 막 위치 동적 대응 */
+                @media (max-width: 640px) {
+                    .boako-nav-fade-right { right: 140px; width: 35px; }
+                }
             </style>
 
             <li class="menu-item" onclick="Boako.View.render('boardgame')">📰 소식지</li>
@@ -135,10 +157,9 @@
             <li class="menu-item" id="menu-shop" onclick="Boako.View.render('shop')">🛒 포인트 샵</li>
             <li class="menu-item" id="menu-admin-review" onclick="Boako.View.render('admin_review')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">🛠️ 검수센터</li>
             <li class="menu-item" id="menu-record-verify" onclick="Boako.View.render('record_verify')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">✅ 기록 인증</li>
-            
-            </ul>
+        </ul>
 
-        <div style="flex-shrink: 0; margin-left: auto;">
+        <div style="flex-shrink: 0; margin-left: auto; z-index: 810;">
             <a href="https://chromewebstore.google.com/detail/boako-%ED%8C%80-%EB%A6%AC%EA%B7%B8-%EA%B8%B0%EB%A1%9D-%EC%A0%80%EC%9E%A5/ieeaooigcejnffgcmcaannlpkbejniil" 
                target="_blank" 
                rel="noopener noreferrer" 
