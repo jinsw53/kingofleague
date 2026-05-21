@@ -1,5 +1,6 @@
 /**
  * [VIEW] 화면 렌더링 및 페이지 템플릿 관리 (인덱스 다이어트 최종 최적화본)
+ * 구조: 신설 6대장 메뉴 수송선 라인 확장 완료 (match, rival, league, tournament, together, team_list)
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -20,12 +21,11 @@ Boako.View = {
         switch(pageId) {
             case 'ranking':
                 // 🚚 [랭킹 수송선] ranking.js가 없으면 실시간 배달
-                if (!Boako.Ranking.init) {
+                if (!Boako.Ranking || !Boako.Ranking.init) {
                     await Boako.Util.loadScript('js/ranking.js');
                 }
                 html = `<div class="main-banner"><h1>🏆 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">집계 중...</div></section>`;
                 
-                // 랭킹은 껍데기만 있었으니 나중에 아래처럼 init 연동하시면 됩니다.
                 setTimeout(() => {
                     if (Boako.Ranking && typeof Boako.Ranking.init === 'function') {
                         Boako.Ranking.init();
@@ -33,17 +33,86 @@ Boako.View = {
                 }, 0);
                 break;
 
+            // 🎯 [신설 1] ⚔️ 대항전 수송선 라인 가동
+            case 'match':
+                if (!Boako.Match || !Boako.Match.init) {
+                    await Boako.Util.loadScript('js/match.js');
+                }
+                html = `<div id="match-master-container" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.Match && typeof Boako.Match.init === 'function') {
+                        Boako.Match.init('match-master-container');
+                    }
+                }, 0);
+                break;
+
+            // 🎯 [신설 2] ⚡ 라이벌 매치 수송선 라인 가동 (대항전-리그 콘텐츠 사이 황금 배치 완료)
+            case 'rival':
+                if (!Boako.Rival || !Boako.Rival.init) {
+                    await Boako.Util.loadScript('js/rival.js');
+                }
+                html = `<div id="rival-master-container" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.Rival && typeof Boako.Rival.init === 'function') {
+                        Boako.Rival.init('rival-master-container');
+                    }
+                }, 0);
+                break;
+
+            // 🎯 [신설 3] 🎯 리그 콘텐츠 수송선 라인 가동 (Boako.League 코어 연동)
+            case 'league':
+                if (!Boako.League || !Boako.League.buildUI) {
+                    await Boako.Util.loadScript('js/league.js'); // 미션 4대장 패키지 스크립트 리딩
+                }
+                html = `<div id="league-master-container" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.League && typeof Boako.League.buildUI === 'function') {
+                        Boako.League.buildUI('league-master-container'); // 챔피언/빙고/챌린지/킹오브리그 현황판 사출
+                    }
+                }, 0);
+                break;
+
             case 'records':
                 // 🚚 [기록실 수송선] archive.js가 없으면 실시간 배달
-                if (!Boako.Archive.buildUI) {
+                if (!Boako.Archive || !Boako.Archive.buildUI) {
                     await Boako.Util.loadScript('js/archive.js');
                 }
                 html = `<div id="archive-master-container" class="w-full animate-in fade-in duration-500"></div>`;
                 
-                // HTML 도화지가 렌더링된 직후, archive.js에게 그리는 책임을 넘김
                 setTimeout(() => {
                     if (Boako.Archive && typeof Boako.Archive.buildUI === 'function') {
                         Boako.Archive.buildUI('archive-master-container');
+                    }
+                }, 0);
+                break;
+
+            // 🎯 [신설 4] 🏅 공식 토너먼트 수송선 라인 가동
+            case 'tournament':
+                if (!Boako.Tournament || !Boako.Tournament.init) {
+                    await Boako.Util.loadScript('js/tournament.js');
+                }
+                html = `<div id="tournament-master-container" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.Tournament && typeof Boako.Tournament.init === 'function') {
+                        Boako.Tournament.init('tournament-master-container');
+                    }
+                }, 0);
+                break;
+
+            // 🎯 [신설 5] 🤝 같이 하자 자율 커뮤니티 수송선 라인 가동
+            case 'together':
+                if (!Boako.Together || !Boako.Together.init) {
+                    await Boako.Util.loadScript('js/together.js');
+                }
+                html = `<div id="together-master-container" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.Together && typeof Boako.Together.init === 'function') {
+                        Boako.Together.init('together-master-container');
                     }
                 }, 0);
                 break;
@@ -54,8 +123,7 @@ Boako.View = {
                     break;
                 }
                 
-                // 🚚 [팀 서비스 수송선] team.js가 없으면 실시간 배달
-                if (!Boako.Team.syncStatus) {
+                if (!Boako.Team || !Boako.Team.syncStatus) {
                     await Boako.Util.loadScript('js/team.js');
                 }
                 await Boako.Team.syncStatus();
@@ -92,7 +160,7 @@ Boako.View = {
                                 <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap;">${team.team_desc || '소개가 없습니다.'}</p>
                                 <div id="desc-edit-area" style="display:none; flex-direction:column; gap:10px;">
                                     <textarea id="textarea-desc" rows="6" class="edit-input-box">${team.team_desc || ''}</textarea>
-                                    <button class="btn-edit-small" style="background:var(--primary); color:white; align-self:flex-end;" onclick="Boako.Team.updateInfo('team_desc')">저장</button>
+                                    <button class="btn-edit-small" style="background:var(--primary); color:white; align-wide:flex-end;" onclick="Boako.Team.updateInfo('team_desc')">저장</button>
                                 </div>
                             </div>
                             <div class="member-section" style="margin-top:40px;">
@@ -147,6 +215,20 @@ Boako.View = {
                 }
                 break;
 
+            // 🎯 [신설 6] 👥 참가 팀 프로필 갤러리 수송선 라인 가동
+            case 'team_list':
+                if (!Boako.TeamList || !Boako.TeamList.init) {
+                    await Boako.Util.loadScript('js/team_list.js');
+                }
+                html = `<div id="team-list-master-container" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.TeamList && typeof Boako.TeamList.init === 'function') {
+                        Boako.TeamList.init('team-list-master-container');
+                    }
+                }, 0);
+                break;
+
             case 'record_verify':
                 if (!Boako.state.user) {
                     html = `<div class="main-banner"><h1>✅ 기록 인증 센터</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
@@ -179,8 +261,7 @@ Boako.View = {
                         break;
                     }
 
-                    // 🚚 [기록 인증 수송선] 인증 수칙 가드 통과 후 record_verify.js 호출 직전 배달!
-                    if (!Boako.RecordVerify.init) {
+                    if (!Boako.RecordVerify || !Boako.RecordVerify.init) {
                         await Boako.Util.loadScript('js/record_verify.js');
                     }
 
@@ -213,7 +294,11 @@ Boako.View = {
                         </div>
                     `;
 
-                    setTimeout(() => Boako.RecordVerify.init(), 0);
+                    setTimeout(() => {
+                        if (Boako.RecordVerify && typeof Boako.RecordVerify.init === 'function') {
+                            Boako.RecordVerify.init();
+                        }
+                    }, 0);
 
                 } catch (err) {
                     console.error("리더 권한 검증 중 치명적 오류:", err);
@@ -227,8 +312,7 @@ Boako.View = {
                     break;
                 }
                 
-                // 🚚 [포인트 상점 수송선] shop.js가 없으면 실시간 배달
-                if (!Boako.Shop.buyItem) {
+                if (!Boako.Shop || !Boako.Shop.buyItem) {
                     await Boako.Util.loadScript('js/shop.js');
                 }
 
@@ -306,8 +390,7 @@ Boako.View = {
                 break;
 
             case 'inventory':
-                // 🚚 [내 인벤토리 수송선] inventory.js가 없으면 실시간 배달
-                if (!Boako.Inventory.loadItems) {
+                if (!Boako.Inventory || !Boako.Inventory.loadItems) {
                     await Boako.Util.loadScript('js/inventory.js');
                 }
 
@@ -330,12 +413,15 @@ Boako.View = {
                         </div>
                     </section>
                 `;
-                setTimeout(() => Boako.Inventory.loadItems(), 0);
+                setTimeout(() => {
+                    if (Boako.Inventory && typeof Boako.Inventory.loadItems === 'function') {
+                        Boako.Inventory.loadItems();
+                    }
+                }, 0);
                 break;
 
             case 'admin_review':
-                // 🚚 [아카이브 검수센터 수송선] admin_review.js가 없으면 실시간 배달
-                if (!Boako.AdminReview.init) {
+                if (!Boako.AdminReview || !Boako.AdminReview.init) {
                     await Boako.Util.loadScript('js/admin_review.js');
                 }
 
@@ -353,7 +439,11 @@ Boako.View = {
                         </div>
                     </section>
                 `;
-                setTimeout(() => Boako.AdminReview.init(), 0);
+                setTimeout(() => {
+                    if (Boako.AdminReview && typeof Boako.AdminReview.init === 'function') {
+                        Boako.AdminReview.init();
+                    }
+                }, 0);
                 break;
 
             case 'main': default:
