@@ -472,14 +472,24 @@ Boako.League.drawChampionRows = function(dataList) {
             </div>
         </td>
         
-        <td class="p-4 text-slate-500 font-bold">
+       <td class="p-4 text-slate-500 font-bold relative group/handler">
             <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-full border border-slate-200/80 bg-slate-50 flex items-center justify-center shadow-sm shrink-0 relative">
+                
+                <div class="w-6 h-6 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center shadow-sm shrink-0 relative cursor-pointer">
                     <img src="${row.mvp_team_logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" 
                          alt="TEAM LOGO" 
-                         class="w-full h-full object-contain transition-transform duration-200 transform hover:scale-150 origin-center cursor-pointer z-10 rounded-full">
+                         class="w-full h-full object-contain rounded-full">
                 </div>
-                <span>${mvpTeam}</span>
+                
+                <span class="cursor-pointer">${mvpTeam}</span>
+
+                <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 transition-all duration-200 pointer-events-none flex items-center justify-center">
+                    <img src="${row.mvp_team_logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" 
+                         alt="LARGE TEAM LOGO" 
+                         class="w-full h-full object-contain">
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
+                </div>
+
             </div>
         </td>
         
