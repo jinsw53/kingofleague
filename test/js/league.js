@@ -430,9 +430,9 @@ Boako.League.drawChampionRows = function(dataList) {
     tbody.innerHTML = '';
     
     if (dataList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-slate-400 font-bold">이번 시즌 집계된 데이터가 없습니다.</td></tr>`;
-        return;
-    }
+    tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400 font-bold">이번 시즌 집계된 데이터가 없습니다.</td></tr>`;
+    return;
+}
     
     let rowsHtml = '';
     dataList.forEach((row, i) => {
@@ -448,33 +448,31 @@ Boako.League.drawChampionRows = function(dataList) {
         const totalPlays = row.total_records_count || 0;
         const uniquePlayers = row.total_unique_players || 0;
 
-        rowsHtml += `
-            <tr class="hover:bg-slate-50/50 transition-colors">
-                <td class="p-4 text-center font-black text-violet-600"><span class="bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100 text-xs">TOP ${gameRank}</span></td>
-                
-                <td class="p-4 font-black text-slate-800 text-sm">
-                    <div>${gameName}</div>
-                    <div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-1.5">
-                        <span class="text-violet-600">🔥 총 ${totalPlays}회 플레이</span>
-                        <span class="w-0.5 h-2 bg-slate-200"></span>
-                        <span class="text-blue-600">👥 ${uniquePlayers}명 참여</span>
-                    </div>
-                </td>
-                
-                <td class="p-4">
-                    <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center font-bold text-amber-600 text-xs">👑</div>
-                        <span class="font-extrabold text-slate-900">${mvpName}</span>
-                    </div>
-                </td>
-                
-                <td class="p-4 text-slate-500 font-bold">${mvpTeam}</td>
-                
-                <td class="p-4"><span class="bg-amber-100 border border-amber-200 text-amber-800 text-[10px] font-black px-2.5 py-0.5 rounded-md tracking-wider">CHAMPION</span></td>
-                
-                <td class="p-4 text-right font-black text-amber-500 text-sm">${totalRp.toLocaleString()} RP</td>
-            </tr>
-        `;
+       rowsHtml += `
+    <tr class="hover:bg-slate-50/50 transition-colors">
+        <td class="p-4 text-center font-black text-violet-600"><span class="bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100 text-xs">TOP ${gameRank}</span></td>
+        
+        <td class="p-4 font-black text-slate-800 text-sm">
+            <div>${gameName}</div>
+            <div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-1.5">
+                <span class="text-violet-600">🔥 총 ${totalPlays}회 플레이</span>
+                <span class="w-0.5 h-2 bg-slate-200"></span>
+                <span class="text-blue-600">👥 ${uniquePlayers}명 참여</span>
+            </div>
+        </td>
+        
+        <td class="p-4">
+            <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center font-bold text-amber-600 text-xs">👑</div>
+                <span class="font-extrabold text-slate-900">${mvpName}</span>
+            </div>
+        </td>
+        
+        <td class="p-4 text-slate-500 font-bold">${mvpTeam}</td>
+        
+        <td class="p-4 text-right font-black text-amber-500 text-sm">${totalRp.toLocaleString()} RP</td>
+    </tr>
+`;
     });
     tbody.innerHTML = rowsHtml;
 };
