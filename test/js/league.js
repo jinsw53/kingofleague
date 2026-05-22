@@ -87,7 +87,7 @@ Boako.League.switchTab = async function(tabId) {
         mainImg.style.objectFit = "contain"; 
 
         if (tabId === 'bingo') {
-            mainImg.src = "league_champion_belt_banner.png";
+            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
         } else if (tabId === 'challenge') {
             mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
         } else if (tabId === 'champion') {
