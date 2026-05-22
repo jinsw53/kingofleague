@@ -1,5 +1,5 @@
 /**
- * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (구문 오류 수정 및 거대 배너 완결본)
+ * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (상단 수평 레이아웃 및 거대 배너 완결본)
  * 관리 책임자: 소장님 MASTER
  */
 
@@ -25,7 +25,7 @@ Boako.League.State = {
     ]
 };
 
-// 💡 2. 메인 UI 사출 엔진 (상단 헤더 전체를 거대 이미지 배너 구역으로 재건축)
+// 💡 2. 메인 UI 사출 엔진 (기존 좌측 텍스트를 날리고 수평 라인을 유지한 채 배너 확장)
 Boako.League.buildUI = function(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -33,14 +33,13 @@ Boako.League.buildUI = function(containerId) {
     container.innerHTML = `
         <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
             
-            <div class="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50">
-                <div id="league-header-img-container" class="w-full h-32 rounded-3xl overflow-hidden border border-slate-200 premium-shadow">
+            <div class="p-6 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50/50">
+                
+                <div id="league-header-img-container" class="flex-1 w-full h-20 rounded-2xl overflow-hidden border border-slate-200/60 shadow-inner bg-slate-100">
                     <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: cover;">
                 </div>
-            </div>
 
-            <div class="px-6 sm:px-8 pt-6">
-                <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto">
+                <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto shrink-0">
                     <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
                         <span>🎲 팀 빙고 쟁탈전</span>
                     </button>
@@ -63,7 +62,7 @@ Boako.League.buildUI = function(containerId) {
     this.switchTab('bingo');
 };
 
-// 💡 3. 서브 탭 제어 및 동적 사출 컨트롤러 (상단 거대 배너 이미지 실시간 스위칭 로직 고도화)
+// 💡 3. 서브 탭 제어 및 동적 사출 컨트롤러 (수평 라인 안에서 배너 이미지만 샥샥 교체)
 Boako.League.switchTab = async function(tabId) {
     if (typeof sfx !== 'undefined') sfx.playClick();
     Boako.League.State.currentTab = tabId;
@@ -79,7 +78,7 @@ Boako.League.switchTab = async function(tabId) {
         }
     });
 
-    // 🎯 버튼을 누르면 상단 'league-header-main-img' 요소를 찾아 src를 동적으로 변환합니다.
+    // 🎯 버튼을 누르면 좌측 확장 구역의 'league-header-main-img' 요소를 찾아 배너를 실시간 변환합니다.
     const mainImg = document.getElementById('league-header-main-img');
     if (mainImg) {
         mainImg.style.objectFit = "cover"; 
@@ -91,7 +90,7 @@ Boako.League.switchTab = async function(tabId) {
         } else if (tabId === 'champion') {
             mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
         } else if (tabId === 'king_of_league') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/king_of_league.png";
+            mainImg.src = "king_of_league_banner.png";
         }
     }
 
