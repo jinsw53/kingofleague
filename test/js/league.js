@@ -31,13 +31,15 @@ Boako.League.buildUI = function(containerId) {
     if (!container) return;
 
     container.innerHTML = `
-        <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
-            
-            <div class="p-6 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50/50">
+    <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
+        
+        <div class="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50">
+            <div id="league-header-img-container" class="w-full h-32 rounded-3xl overflow-hidden border border-slate-200/60 shadow-inner bg-slate-100/50 flex items-center justify-center p-2">
                 
-                <div id="league-header-img-container" class="flex-1 w-full h-20 rounded-2xl overflow-hidden border border-slate-200/60 shadow-inner bg-slate-100">
-                    <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: cover;">
-                </div>
+                <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: contain;">
+            
+            </div>
+        </div>
 
                 <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto shrink-0">
                     <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
@@ -79,20 +81,21 @@ Boako.League.switchTab = async function(tabId) {
     });
 
     // 🎯 버튼을 누르면 좌측 확장 구역의 'league-header-main-img' 요소를 찾아 배너를 실시간 변환합니다.
-    const mainImg = document.getElementById('league-header-main-img');
-    if (mainImg) {
-        mainImg.style.objectFit = "cover"; 
+   const mainImg = document.getElementById('league-header-main-img');
+if (mainImg) {
+    // 🎯 [핵심 변경] 탭이 바뀔 때마다 이미지 핏을 contain(비율 유지 축소)으로 강제 고정
+    mainImg.style.objectFit = "contain"; 
 
-        if (tabId === 'bingo') {
-            mainImg.src = "league_champion_belt_banner.png";
-        } else if (tabId === 'challenge') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
-        } else if (tabId === 'champion') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
-        } else if (tabId === 'king_of_league') {
-            mainImg.src = "king_of_league_banner.png";
-        }
+    if (tabId === 'bingo') {
+        mainImg.src = "league_champion_belt_banner.png";
+    } else if (tabId === 'challenge') {
+        mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
+    } else if (tabId === 'champion') {
+        mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
+    } else if (tabId === 'king_of_league') {
+        mainImg.src = "king_of_league_banner.png";
     }
+}
 
     const container = document.getElementById('league-view-container');
     if (!container) return;
