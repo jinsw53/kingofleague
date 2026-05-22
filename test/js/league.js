@@ -483,8 +483,9 @@ Boako.League.drawChampionRows = function(dataList) {
 Boako.League.filterChampions = function() {
     const query = document.getElementById('champion-search')?.value.toLowerCase() || "";
     const filtered = Boako.League.State.champions.filter(c => {
-        const game = (c.game_name || c.game || '').toLowerCase();
-        const name = (c.mvp_player_name || c.player_name || '').toLowerCase();
+        const game = (c.game_name || '').toLowerCase();
+        // 🎯 원래 player_name이던 검색 타겟을 소장님 족보인 mvp_nickname으로 정밀 세척
+        const name = (c.mvp_nickname || '').toLowerCase(); 
         return game.includes(query) || name.includes(query);
     });
     Boako.League.drawChampionRows(filtered);
