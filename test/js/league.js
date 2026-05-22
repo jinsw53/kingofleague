@@ -468,7 +468,16 @@ Boako.League.drawChampionRows = function(dataList) {
             </div>
         </td>
         
-        <td class="p-4 text-slate-500 font-bold">${mvpTeam}</td>
+        <td class="p-4 text-slate-500 font-bold">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full border border-slate-200/80 bg-slate-50 flex items-center justify-center shadow-sm shrink-0 relative">
+                    <img src="${row.mvp_team_logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" 
+                         alt="TEAM LOGO" 
+                         class="w-full h-full object-contain transition-transform duration-200 transform hover:scale-150 origin-center cursor-pointer z-10 rounded-full">
+                </div>
+                <span>${mvpTeam}</span>
+            </div>
+        </td>
         
         <td class="p-4 text-right font-black text-amber-500 text-sm">${totalRp.toLocaleString()} RP</td>
     </tr>
