@@ -385,11 +385,10 @@ Boako.League.getChampionHTML = function() {
                     <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                         <tr>
                             <th class="p-4 text-center">인기 순위</th>
-                            <th class="p-4">대상 게임 종목</th>
-                            <th class="p-4">최고 RP 보유자 (MVP)</th>
-                            <th class="p-4">소속 가문</th>
-                            <th class="p-4">지위 계급</th>
-                            <th class="p-4 text-right">최고 획득 RP</th>
+                            <th class="p-4">게임 종목</th>
+                            <th class="p-4">챔피언</th>
+                            <th class="p-4">소속 팀</th>
+                            <th class="p-4 text-right">획득 RP</th>
                         </tr>
                     </thead>
                     <tbody id="champion-tbody" class="divide-y divide-slate-100 font-semibold text-slate-700">
