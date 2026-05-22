@@ -30,36 +30,36 @@ Boako.League.buildUI = function(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    container.innerHTML = `
+   container.innerHTML = `
     <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
         
-        <div class="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50">
-            <div id="league-header-img-container" class="w-full h-32 rounded-3xl overflow-hidden border border-slate-200/60 shadow-inner bg-slate-100/50 flex items-center justify-center p-2">
+        <div class="p-6 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50/50">
+            
+            <div id="league-header-img-container" class="flex-1 w-full h-20 rounded-2xl overflow-hidden border border-slate-200/60 shadow-inner bg-slate-100 p-1.5 flex items-center justify-center">
                 
                 <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: contain;">
             
             </div>
-        </div>
 
-                <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto shrink-0">
-                    <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🎲 팀 빙고 쟁탈전</span>
-                    </button>
-                    <button id="tab-challenge" onclick="Boako.League.switchTab('challenge')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🔥 야, 너네 나와! 챌린지</span>
-                    </button>
-                    <button id="tab-champion" onclick="Boako.League.switchTab('champion')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>👑 챔피언</span>
-                    </button>
-                    <button id="tab-king_of_league" onclick="Boako.League.switchTab('king_of_league')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🏅 킹 오브 리그</span>
-                    </button>
-                </div>
+            <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto shrink-0">
+                <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
+                    <span>🎲 팀 빙고 쟁탈전</span>
+                </button>
+                <button id="tab-challenge" onclick="Boako.League.switchTab('challenge')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
+                    <span>🔥 야, 너네 나와! 챌린지</span>
+                </button>
+                <button id="tab-champion" onclick="Boako.League.switchTab('champion')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
+                    <span>👑 챔피언</span>
+                </button>
+                <button id="tab-king_of_league" onclick="Boako.League.switchTab('king_of_league')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
+                    <span>🏅 킹 오브 리그</span>
+                </button>
             </div>
-
-            <div id="league-view-container" class="p-6 sm:p-8"></div>
         </div>
-    `;
+
+        <div id="league-view-container" class="p-6 sm:p-8"></div>
+    </div>
+`;
 
     this.switchTab('bingo');
 };
