@@ -461,9 +461,13 @@ Boako.League.drawChampionRows = function(dataList) {
             </div>
         </td>
         
-        <td class="p-4">
+       <td class="p-4">
             <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center font-bold text-amber-600 text-xs">👑</div>
+                <div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0">
+                    <img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png" 
+                         alt="CHAMPION BADGE" 
+                         class="w-full h-full object-contain">
+                </div>
                 <span class="font-extrabold text-slate-900">${mvpName}</span>
             </div>
         </td>
