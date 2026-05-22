@@ -81,21 +81,22 @@ Boako.League.switchTab = async function(tabId) {
     });
 
     // 🎯 버튼을 누르면 좌측 확장 구역의 'league-header-main-img' 요소를 찾아 배너를 실시간 변환합니다.
-   const mainImg = document.getElementById('league-header-main-img');
-if (mainImg) {
-    // 🎯 [핵심 변경] 탭이 바뀔 때마다 이미지 핏을 contain(비율 유지 축소)으로 강제 고정
-    mainImg.style.objectFit = "contain"; 
+  const mainImg = document.getElementById('league-header-main-img');
+    if (mainImg) {
+        // 🎯 [완전 고정] 2:1 비율 상자 안에서 찌그러짐 없이 완벽하게 축소되도록 contain 유지
+        mainImg.style.objectFit = "contain"; 
 
-    if (tabId === 'bingo') {
-        mainImg.src = "league_champion_belt_banner.png";
-    } else if (tabId === 'challenge') {
-        mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
-    } else if (tabId === 'champion') {
-        mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
-    } else if (tabId === 'king_of_league') {
-        mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/king_of_league.png";
+        if (tabId === 'bingo') {
+            mainImg.src = "league_champion_belt_banner.png";
+        } else if (tabId === 'challenge') {
+            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
+        } else if (tabId === 'champion') {
+            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
+        } else if (tabId === 'king_of_league') {
+            // 🎯 [주소 싱크 완료] 소장님이 세팅하신 찐 수파베이스 주소 그대로 유지
+            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/king_of_league.png";
+        }
     }
-}
 
     const container = document.getElementById('league-view-container');
     if (!container) return;
