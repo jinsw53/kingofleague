@@ -1,5 +1,5 @@
 /**
- * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (상단 거대 배너 동적 변환 완결본)
+ * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (구문 오류 수정 및 거대 배너 완결본)
  * 관리 책임자: 소장님 MASTER
  */
 
@@ -60,7 +60,6 @@ Boako.League.buildUI = function(containerId) {
         </div>
     `;
 
-    // 마스터 껍데기가 완공되었으니 첫 탭인 'bingo' 강제 기동
     this.switchTab('bingo');
 };
 
@@ -80,467 +79,18 @@ Boako.League.switchTab = async function(tabId) {
         }
     });
 
-    // 🎯 [정밀 복구] 버튼을 누르면 상단 'league-header-main-img' 요소를 찾아 src를 동적으로 변환합니다.
+    // 🎯 버튼을 누르면 상단 'league-header-main-img' 요소를 찾아 src를 동적으로 변환합니다.
     const mainImg = document.getElementById('league-header-main-img');
     if (mainImg) {
-        // 모든 배너 이미지는 object-fit: cover로 꽉 차게 고정합니다.
         mainImg.style.objectFit = "cover"; 
 
         if (tabId === 'bingo') {
-            // 팀 빙고 쟁탈전: 전용 거대 배너 이미지 매핑 (주소 없으시면 원하시는 대체 주소나 로컬 경로로 변경 가능합니다)
             mainImg.src = "league_champion_belt_banner.png";
         } else if (tabId === 'challenge') {
-            // 야너나 챌린지: 수파베이스 챌린지용 배너 이미지 주입
             mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
         } else if (tabId === 'champion') {
-            // 챔피언: 수파베이스 MVP 챔피언 배너 이미지 주입
             mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
         } else if (tabId === 'king_of_league') {
-            // 킹 오브 리그: 독립 배너 배정 (추후 주소 매핑 시 주소 변경)
-            mainImg.src = "king_of_league_banner.png";
-        }
-    }
-
-    const container = document.getElementById('league-view-container');
-    if (!container) return;
-
-    if (tabId === 'bingo') {
-        container.innerHTML = Boako.League.getBingoHTML();
-        Boako.League.renderBingoBoard();
-    } else if (tabId === 'challenge') {
-        container.innerHTML = Boako.League.getChallengeHTML();
-        Boako.League.renderChallenges();
-    } else if (tabId === 'champion') {
-        container.innerHTML = Boako.League.getChampionHTML();
-        await Boako.League.fetchAndRenderChampions(); 
-    } else if (tabId === 'king_of_league') {
-        container.innerHTML = Boako.League.getKingOfLeagueHTML();
-    }
-    
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-    }
-};
-
-// ==========================================
-// 🎲 탭 1: 5x5 팀 빙고전 오리지널 순정 로직
-// ==========================================
-Boako.League.getBingoHTML = function() {
-    return `
-        <div class="space-y-6">
-            <div class="p-5 sm:p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h3 class="font-black text-slate-800 text-base">팀 빙고 실시간 영토전</h3>
-                    <p class="text-xs text-slate-500 font-bold mt-1">우리 팀 소유의 타일을 늘려서 가로/세로/대각선 5칸 연결을 완성하세요!</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="Boako.League.randomizeBoard()" class="bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors">무작위 영토 부여</button>
-                    <button onclick="Boako.League.clearBoard()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs px-4 py-2.5 rounded-xl transition-colors">초기화</button>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                <span class="text-xs font-black text-slate-400 mr-2 uppercase tracking-wider">가문 색상 설정:</span>
-                <button onclick="Boako.League.selectTeam('blue')" id="team-sel-blue" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💙 블루 타이거</button>
-                <button onclick="Boako.League.selectTeam('red')" id="team-sel-red" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">❤️ 레드 피닉스</button>
-                <button onclick="Boako.League.selectTeam('emerald')" id="team-sel-emerald" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💚 그린 드래곤</button>
-                <button onclick="Boako.League.selectTeam('amber')" id="team-sel-amber" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💛 골드 세이버</button>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
-                    <div class="grid grid-cols-5 gap-2" id="bingo-grid"></div>
-                </div>
-                <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                    <h5 class="font-black text-slate-800 text-sm border-b border-slate-200 pb-2.5 flex items-center gap-2">
-                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 가문별 실시간 영토 점유 현황
-                    </h5>
-                    <div class="space-y-2 text-xs">
-                        <div class="flex justify-between items-center bg-blue-50/50 border border-blue-100 p-3 rounded-xl">
-                            <span class="font-black text-blue-700">💙 블루 타이거</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-blue-tiles" class="text-blue-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-blue-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-rose-50/50 border border-rose-100 p-3 rounded-xl">
-                            <span class="font-black text-rose-700">❤️ 레드 피닉스</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-red-tiles" class="text-rose-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-red-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-emerald-50/50 border border-emerald-100 p-3 rounded-xl">
-                            <span class="font-black text-emerald-700">💚 그린 드래곤</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-emerald-tiles" class="text-emerald-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-emerald-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-amber-50/50 border border-amber-100 p-3 rounded-xl">
-                            <span class="font-black text-amber-800">💛 골드 세이버</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-amber-tiles" class="text-amber-700 font-extrabold text-sm">0</span>칸소장님, 이번엔 의도를 확실히 파악했습니다! 
-
-상단 헤더의 타이틀 텍스트와 보라색 상자 아이콘 영역을 완전히 날려버리고, **탭 버튼들 바로 위에 가로로 거대한 단일 배너 이미지(`id="league-header-main-img"`)**가 꽉 차게 들어서게 만들고 싶으셨군요. 그리고 그 배너가 탭을 클릭할 때마다 해당 탭에 맞는 거대 이미지로 스위칭되게 하려는 기획이죠.
-
-소장님 오더대로 상단 구조를 **거대 이미지 배너 컨테이너 전용(`h-32`)**으로 전면 재건축하고, 탭 버튼들은 배너 하단에 순정 글씨 메뉴 체제로 배치했습니다. 
-
-단 한 줄의 세부 로직(빙고 연산 및 줄 계산, 챌린지 수락 핸들러 등)도 누락하지 않고 100% 채워 넣은 **350줄짜리 무생략 풀 코드 통합본**입니다. 그대로 복사해서 덮어씌우시면 진입하자마자 빙고전 전용 거대 배너가 시원하게 터질 겁니다!
-
-```javascript
-/**
- * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (상단 거대 배너 동적 변환 완결본)
- * 관리 책임자: 소장님 MASTER
- */
-
-Boako.League = Boako.League || {};
-
-// 💡 1. 리그 전용 로컬 상태 관리 (명칭 일치 및 오염 방지)
-Boako.League.State = {
-    currentTab: 'bingo',
-    selectedTeam: 'blue',
-    bingoBoard: Array(25).fill(null),
-    // ⚔️ challenge 가문 명칭 정돈 완료
-    challenges: [
-        { id: 1, attacker: '블루 타이거', defender: '레드 피닉스', game: '스플렌더', message: '스플렌더 3라운드 안에 귀족 카드 다 털고 챔피언 사수하겠습니다.', accepted: false },
-        { id: 2, attacker: '그린 드래곤', defender: '골드 세이버', game: '아크 노바', message: '대칭 배치 동물원의 참맛을 확실히 교육해 드립니다.', accepted: true }
-    ],
-    champions: [], 
-    boardGames25: [
-        "스플렌더", "아크 노바", "윙스팬", "쿼리도", "티켓 투 라이드", 
-        "카르카손", "캐스케디아", "센추리", "아발론", "한밤의 늑대인간", 
-        "라스베가스", "다빈치코드", "달무티", "젝스님트", "스컬", 
-        "루미큐브", "테라포밍", "코드네임", "카탄", "패치워크", 
-        "러브레터", "딕싯", "가이아", "오를레앙", "하모니즈"
-    ]
-};
-
-// 💡 2. 메인 UI 사출 엔진 (상단 헤더 전체를 거대 이미지 배너 구역으로 재건축)
-Boako.League.buildUI = function(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    container.innerHTML = `
-        <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
-            
-            <div class="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50">
-                <div id="league-header-img-container" class="w-full h-32 rounded-3xl overflow-hidden border border-slate-200 premium-shadow">
-                    <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: cover;">
-                </div>
-            </div>
-
-            <div class="px-6 sm:px-8 pt-6">
-                <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto">
-                    <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🎲 팀 빙고 쟁탈전</span>
-                    </button>
-                    <button id="tab-challenge" onclick="Boako.League.switchTab('challenge')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🔥 야, 너네 나와! 챌린지</span>
-                    </button>
-                    <button id="tab-champion" onclick="Boako.League.switchTab('champion')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>👑 챔피언</span>
-                    </button>
-                    <button id="tab-king_of_league" onclick="Boako.League.switchTab('king_of_league')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🏅 킹 오브 리그</span>
-                    </button>
-                </div>
-            </div>
-
-            <div id="league-view-container" class="p-6 sm:p-8"></div>
-        </div>
-    `;
-
-    this.switchTab('bingo');
-};
-
-// 💡 3. 서브 탭 제어 및 동적 사출 컨트롤러 (상단 거대 배너 이미지 실시간 스위칭 로직 고도화)
-Boako.League.switchTab = async function(tabId) {
-    if (typeof sfx !== 'undefined') sfx.playClick();
-    Boako.League.State.currentTab = tabId;
-
-    const tabs = ['bingo', 'challenge', 'champion', 'king_of_league'];
-    tabs.forEach(t => {
-        const btn = document.getElementById(`tab-${t}`);
-        if (btn) {
-            btn.className = "flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200 " + 
-                            (t === tabId 
-                                ? "bg-violet-600 text-white tab-glow shadow-md" 
-                                : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50");
-        }
-    });
-
-    // 🎯 [정밀 복구] 버튼을 누르면 상단 'league-header-main-img' 요소를 찾아 src를 동적으로 변환합니다.
-    const mainImg = document.getElementById('league-header-main-img');
-    if (mainImg) {
-        // 모든 배너 이미지는 object-fit: cover로 꽉 차게 고정합니다.
-        mainImg.style.objectFit = "cover"; 
-
-        if (tabId === 'bingo') {
-            // 팀 빙고 쟁탈전: 전용 거대 배너 이미지 매핑 (주소 없으시면 원하시는 대체 주소나 로컬 경로로 변경 가능합니다)
-            mainImg.src = "league_champion_belt_banner.png";
-        } else if (tabId === 'challenge') {
-            // 야너나 챌린지: 수파베이스 챌린지용 배너 이미지 주입
-            mainImg.src = "[https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png](https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png)";
-        } else if (tabId === 'champion') {
-            // 챔피언: 수파베이스 MVP 챔피언 배너 이미지 주입
-            mainImg.src = "[https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png](https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png)";
-        } else if (tabId === 'king_of_league') {
-            // 킹 오브 리그: 독립 배너 배정 (추후 주소 매핑 시 주소 변경)
-            mainImg.src = "king_of_league_banner.png";
-        }
-    }
-
-    const container = document.getElementById('league-view-container');
-    if (!container) return;
-
-    if (tabId === 'bingo') {
-        container.innerHTML = Boako.League.getBingoHTML();
-        Boako.League.renderBingoBoard();
-    } else if (tabId === 'challenge') {
-        container.innerHTML = Boako.League.getChallengeHTML();
-        Boako.League.renderChallenges();
-    } else if (tabId === 'champion') {
-        container.innerHTML = Boako.League.getChampionHTML();
-        await Boako.League.fetchAndRenderChampions(); 
-    } else if (tabId === 'king_of_league') {
-        container.innerHTML = Boako.League.getKingOfLeagueHTML();
-    }
-    
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-    }
-};
-
-// ==========================================
-// 🎲 탭 1: 5x5 팀 빙고전 오리지널 순정 로직
-// ==========================================
-Boako.League.getBingoHTML = function() {
-    return `
-        <div class="space-y-6">
-            <div class="p-5 sm:p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h3 class="font-black text-slate-800 text-base">팀 빙고 실시간 영토전</h3>
-                    <p class="text-xs text-slate-500 font-bold mt-1">우리 팀 소유의 타일을 늘려서 가로/세로/대각선 5칸 연결을 완성하세요!</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="Boako.League.randomizeBoard()" class="bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors">무작위 영토 부여</button>
-                    <button onclick="Boako.League.clearBoard()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs px-4 py-2.5 rounded-xl transition-colors">초기화</button>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                <span class="text-xs font-black text-slate-400 mr-2 uppercase tracking-wider">가문 색상 설정:</span>
-                <button onclick="Boako.League.selectTeam('blue')" id="team-sel-blue" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💙 블루 타이거</button>
-                <button onclick="Boako.League.selectTeam('red')" id="team-sel-red" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">❤️ 레드 피닉스</button>
-                <button onclick="Boako.League.selectTeam('emerald')" id="team-sel-emerald" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💚 그린 드래곤</button>
-                <button onclick="Boako.League.selectTeam('amber')" id="team-sel-amber" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💛 골드 세이버</button>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
-                    <div class="grid grid-cols-5 gap-2" id="bingo-grid"></div>
-                </div>
-                <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                    <h5 class="font-black text-slate-800 text-sm border-b border-slate-200 pb-2.5 flex items-center gap-2">
-                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 가문별 실시간 영토 점유 현황
-                    </h5>
-                    <div class="space-y-2 text-xs">
-                        <div class="flex justify-between items-center bg-blue-50/50 border border-blue-100 p-3 rounded-xl">
-                            <span class="font-black text-blue-700">💙 블루 타이거</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-blue-tiles" class="text-blue-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-blue-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-rose-50/50 border border-rose-100 p-3 rounded-xl">
-                            <span class="font-black text-rose-700">❤️ 레드 피닉스</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-red-tiles" class="text-rose-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-red-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-emerald-50/50 border border-emerald-100 p-3 rounded-xl">
-                            <span class="font-black text-emerald-700">💚 그린 드래곤</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-emerald-tiles" class="text-emerald-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-emerald-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-amber-50/50 border border-amber-100 p-3 rounded-xl">
-                            <span class="font-black text-amber-800">💛 골드 세이버</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-amber-tiles" class="text-amber-700 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-amber-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-};
-
-Boako.League.selectTeam = function(teamId) {
-    if (typeof sfx !== 'undefined') sfx.playClick();
-    Boako.League.State.selectedTeam = teamId;
-    const teams = ['blue', 'red', 'emerald', 'amber'];
-    const classConfig = {
-        blue: "bg-blue-600 text-white shadow-md",
-        red: "bg-red-600 text-white shadow-md",
-        emerald: "bg-emerald-600 text-white shadow-md",
-        amber: "bg-amber-500 text-slate-900 shadow-md font-extrabold"
-    };
-    teams.forEach(t => {
-        const btn = document.getElementById(`team-sel-${t}`);
-        if (btn) btn.className = (t === teamId) ? `px-4 py-2 text-xs font-bold rounded-xl transition-all ${classConfig[t]}` : "px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-500 hover:bg-slate-100";
-    });
-};
-
-Boako.League.renderBingoBoard = function() {
-    const grid = document.getElementById('bingo-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    const teamStyles = { blue: 'bg-blue-600 text-white border-blue-400 shadow-inner scale-[0.97]', red: 'bg-red-600 text-white border-red-400 shadow-inner scale-[0.97]', emerald: 'bg-emerald-600 text-white border-emerald-400 shadow-inner scale-[0.97]', amber: 'bg-amber-500 text-slate-950 border-amber-300 font-extrabold shadow-inner scale-[0.97]' };
-    const winCells = Boako.League.calculateWinningCells();
-    Boako.League.State.bingoBoard.forEach((owner, idx) => {
-        const cell = document.createElement('button');
-        const isWinner = winCells.includes(idx);
-        cell.className = `h-20 rounded-2xl border flex flex-col items-center justify-center p-1.5 transition-all text-center relative overflow-hidden group ${owner ? `${teamStyles[owner]} ${isWinner ? 'bingo-won-pulse border-2' : ''}` : 'bg-slate-50 border-slate-200/70 hover:border-violet-500 hover:bg-slate-100/50'}`;
-        cell.onclick = () => Boako.League.toggleTile(idx);
-        const flag = owner ? {blue:'💙', red:'❤️', emerald:'💚', amber:'💛'}[owner] : '';
-        cell.innerHTML = `<span class="text-[9px] font-black tracking-wider text-slate-400 group-hover:text-violet-600 transition-colors uppercase">TILE ${idx+1} ${flag}</span><span class="text-xs font-black truncate w-full tracking-tight mt-1">${Boako.League.State.boardGames25[idx]}</span>${isWinner ? '<span class="absolute bottom-1 right-1.5 text-xs text-amber-400">★</span>' : ''}`;
-        grid.appendChild(cell);
-    });
-    Boako.League.selectTeam(Boako.League.State.selectedTeam);
-    Boako.League.updateStats();
-};
-
-Boako.League.toggleTile = function(index) {
-    if (typeof sfx !== 'undefined') sfx.playClick();
-    if (Boako.League.State.bingoBoard[index] === Boako.League.State.selectedTeam) Boako.League.State.bingoBoard[index] = null;
-    else Boako.League.State.bingoBoard[index] = Boako.League.State.selectedTeam;
-    Boako.League.renderBingoBoard();
-};
-
-Boako.League.calculateWinningCells = function() {
-    const size = 5; const winningSet = new Set(); const board = Boako.League.State.bingoBoard;
-    for (let r = 0; r < size; r++) { let base = board[r * size]; if (base) { let match = true; for (let c = 1; c < size; c++) if (board[r * size + c] !== base) match = false; if (match) for (let c = 0; c < size; c++) winningSet.add(r * size + c); } }
-    for (let c = 0; c < size; c++) { let base = board[c]; if (base) { let match = true; for (let r = 1; r < size; r++) if (board[r * size + c] !== base) match = false; if (match) for (let r = 0; r < size; r++) winningSet.add(r * size + c); } }
-    let baseDiag1 = board[0]; if (baseDiag1) { let match = true; for (let i = 1; i < size; i++) if (board[i * size + i] !== baseDiag1) match = false; if (match) for (let i = 0; i < size; i++) winningSet.add(i * size + i); }
-    let baseDiag2 = board[size - 1]; if (baseDiag2) { let match = true; for (let i = 1; i < size; i++) if (board[i * size + (size - 1 - i)] !== baseDiag2) match = false; if (match) for (let i = 0; i < size; i++) winningSet.add(i * size + (size - 1 - i)); }
-    return Array.from(winningSet);
-};
-
-Boako.League.countLinesForTeam = function(team) {
-    const size = 5; let lines = 0; const board = Boako.League.State.bingoBoard;
-    for (let r = 0; r < size; r++) if (Array(size).fill(0).every((_, c) => board[r * size + c] === team)) lines++;
-    for (let c = 0; c < size; c++) if (Array(size).fill(0).every((_, r) => board[r * size + c] === team)) lines++;
-    if (Array(size).fill(0).every((_, i) => board[i * size + i] === team)) lines++; if (Array(size).fill(0).every((_, i) => board[i * size + (size - 1 - i)] === team)) lines++;
-    return lines;
-};
-
-Boako.League.updateStats = function() {
-    const counts = { blue: 0, red: 0, emerald: 0, amber: 0 }; Boako.League.State.bingoBoard.forEach(owner => { if(owner) counts[owner]++; });
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-    setVal('stat-blue-tiles', counts.blue); setVal('stat-blue-lines', Boako.League.countLinesForTeam('blue'));
-    setVal('stat-red-tiles', counts.red); setVal('stat-red-lines', Boako.League.countLinesForTeam('red'));
-    setVal('stat-emerald-tiles', counts.emerald); setVal('stat-emerald-lines', Boako.League.countLinesForTeam('emerald'));
-    setVal('stat-amber-tiles', counts.amber); setVal('stat-amber-lines', Boako.League.countLinesForTeam('amber'));
-};
-
-Boako.League.randomizeBoard = function() {
-    const options = [null, 'blue', 'red', 'emerald', 'amber', null]; Boako.League.State.bingoBoard = Boako.League.State.bingoBoard.map(() => options[Math.floor(Math.random() * options.length)]);
-    Boako.League.renderBingoBoard();
-};
-
-Boako.League.clearBoard = function() {
-    Boako.League.State.bingoBoard = Array(25소장님, 이번엔 의도를 완벽히 파악했습니다! 뚝배기 그만 깨지고 진짜 결과물로 보여드리겠습니다.
-
-오더 주신 핵심 레이아웃 변경 포인트입니다:
-1.  **상단 간판 텍스트 및 이모지 싹 정리:** 원래 왼쪽에 있던 **"Boako League Hub / 실시간 리그 콘텐츠 전당"** 텍스트 구역과 반짝이 아이콘 영역을 완전히 날려버렸습니다.
-2.  **거대 이미지 배너로 통합:** 텍스트가 사라진 그 자리만큼 **`id="league-header-img-container"` 컨테이너를 가로 전체(`w-full`)와 거대한 높이(`h-32`)로 확장**했습니다.
-3.  **동적 배너 스위칭 엔진 용접:** 이제 우측 서브 탭 버튼들을 누르면 이 **광활해진 거대 배너 이미지(`id="league-header-main-img"`)**가 해당 탭에 맞는 거대 이미지로 실시간으로 샥샥 스위칭됩니다. (빙고전과 킹오브리그는 로컬 배너 주소를 할당해 두었습니다.)
-
-단 한 줄의 세부 로직(빙고 연산 및 줄 계산, 챌린지 수락 핸들러 등)도 누락하지 않고 100% 채워 넣은 **350줄짜리 무생략 풀 코드 통합본**입니다. 그대로 복사해서 덮어씌우시면 진입하자마자 빙고전 전용 거대 배너가 시원하게 터질 겁니다!
-
-```javascript
-/**
- * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (상단 거대 배너 동적 변환 완결본)
- * 관리 책임자: 소장님 MASTER
- */
-
-Boako.League = Boako.League || {};
-
-// 💡 1. 리그 전용 로컬 상태 관리 (명칭 일치 및 오염 방지)
-Boako.League.State = {
-    currentTab: 'bingo',
-    selectedTeam: 'blue',
-    bingoBoard: Array(25).fill(null),
-    // ⚔️ challenge 가문 명칭 정돈 완료
-    challenges: [
-        { id: 1, attacker: '블루 타이거', defender: '레드 피닉스', game: '스플렌더', message: '스플렌더 3라운드 안에 귀족 카드 다 털고 챔피언 사수하겠습니다.', accepted: false },
-        { id: 2, attacker: '그린 드래곤', defender: '골드 세이버', game: '아크 노바', message: '대칭 배치 동물원의 참맛을 확실히 교육해 드립니다.', accepted: true }
-    ],
-    champions: [], 
-    boardGames25: [
-        "스플렌더", "아크 노바", "윙스팬", "쿼리도", "티켓 투 라이드", 
-        "카르카손", "캐스케디아", "센추리", "아발론", "한밤의 늑대인간", 
-        "라스베가스", "다빈치코드", "달무티", "젝스님트", "스컬", 
-        "루미큐브", "테라포밍", "코드네임", "카탄", "패치워크", 
-        "러브레터", "딕싯", "가이아", "오를레앙", "하모니즈"
-    ]
-};
-
-// 💡 2. 메인 UI 사출 엔진 (상단 헤더 전체를 거대 이미지 배너 구역으로 재건축)
-Boako.League.buildUI = function(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    container.innerHTML = `
-        <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
-            
-            <div class="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50">
-                <div id="league-header-img-container" class="w-full h-32 rounded-3xl overflow-hidden border border-slate-200 premium-shadow">
-                    <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: cover;">
-                </div>
-            </div>
-
-            <div class="px-6 sm:px-8 pt-6">
-                <div class="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/50 w-full md:w-auto">
-                    <button id="tab-bingo" onclick="Boako.League.switchTab('bingo')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🎲 팀 빙고 쟁탈전</span>
-                    </button>
-                    <button id="tab-challenge" onclick="Boako.League.switchTab('challenge')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🔥 야, 너네 나와! 챌린지</span>
-                    </button>
-                    <button id="tab-champion" onclick="Boako.League.switchTab('champion')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>👑 챔피언</span>
-                    </button>
-                    <button id="tab-king_of_league" onclick="Boako.League.switchTab('king_of_league')" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200">
-                        <span>🏅 킹 오브 리그</span>
-                    </button>
-                </div>
-            </div>
-
-            <div id="league-view-container" class="p-6 sm:p-8"></div>
-        </div>
-    `;
-
-    this.switchTab('bingo');
-};
-
-// 💡 3. 서브 탭 제어 및 동적 사출 컨트롤러 (상단 거대 배너 이미지 실시간 스위칭 로직 고도화)
-Boako.League.switchTab = async function(tabId) {
-    if (typeof sfx !== 'undefined') sfx.playClick();
-    Boako.League.State.currentTab = tabId;
-
-    const tabs = ['bingo', 'challenge', 'champion', 'king_of_league'];
-    tabs.forEach(t => {
-        const btn = document.getElementById(`tab-${t}`);
-        if (btn) {
-            btn.className = "flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all duration-200 " + 
-                            (t === tabId 
-                                ? "bg-violet-600 text-white tab-glow shadow-md" 
-                                : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50");
-        }
-    });
-
-    // 🎯 [정밀 복구] 버튼을 누르면 상단 'league-header-main-img' 요소를 찾아 src를 동적으로 변환합니다.
-    const mainImg = document.getElementById('league-header-main-img');
-    if (mainImg) {
-        // 모든 배너 이미지는 object-fit: cover로 꽉 차게 고정합니다.
-        mainImg.style.objectFit = "cover"; 
-
-        if (tabId === 'bingo') {
-            // 팀 빙고 쟁탈전: 전용 거대 배너 이미지 매핑 (주소 없으시면 원하시는 대체 주소나 로컬 경로로 변경 가능합니다)
-            mainImg.src = "league_champion_belt_banner.png";
-        } else if (tabId === 'challenge') {
-            // 야너나 챌린지: 수파베이스 챌린지용 배너 이미지 주입
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
-        } else if (tabId === 'champion') {
-            // 챔피언: 수파베이스 MVP 챔피언 배너 이미지 주입
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
-        } else if (tabId === 'king_of_league') {
-            // 킹 오브 리그: 독립 배너 배정 (추후 주소 매핑 시 주소 변경)
             mainImg.src = "king_of_league_banner.png";
         }
     }
@@ -623,6 +173,22 @@ Boako.League.getBingoHTML = function() {
     `;
 };
 
+Boako.League.selectTeam = function(teamId) {
+    if (typeof sfx !== 'undefined') sfx.playClick();
+    Boako.League.State.selectedTeam = teamId;
+    const teams = ['blue', 'red', 'emerald', 'amber'];
+    const classConfig = {
+        blue: "bg-blue-600 text-white shadow-md",
+        red: "bg-red-600 text-white shadow-md",
+        emerald: "bg-emerald-600 text-white shadow-md",
+        amber: "bg-amber-500 text-slate-900 shadow-md font-extrabold"
+    };
+    teams.forEach(t => {
+        const btn = document.getElementById(`team-sel-${t}`);
+        if (btn) btn.className = (t === teamId) ? `px-4 py-2 text-xs font-bold rounded-xl transition-all ${classConfig[t]}` : "px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-500 hover:bg-slate-100";
+    });
+};
+
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
     if (!grid) return;
@@ -651,7 +217,7 @@ Boako.League.toggleTile = function(index) {
 
 Boako.League.calculateWinningCells = function() {
     const size = 5; const winningSet = new Set(); const board = Boako.League.State.bingoBoard;
-    for (let r = 0; r < size; r++) { let base = board[r * size]; if (base) { let match = true; for (let c = 1; c < size; c++) if (board[r * size + c] !== base) match = false; if (match) for (let c = 0; c < size; r++) winningSet.add(r * size + c); } }
+    for (let r = 0; r < size; r++) { let base = board[r * size]; if (base) { let match = true; for (let c = 1; c < size; c++) if (board[r * size + c] !== base) match = false; if (match) for (let c = 0; c < size; c++) winningSet.add(r * size + c); } }
     for (let c = 0; c < size; c++) { let base = board[c]; if (base) { let match = true; for (let r = 1; r < size; r++) if (board[r * size + c] !== base) match = false; if (match) for (let r = 0; r < size; r++) winningSet.add(r * size + c); } }
     let baseDiag1 = board[0]; if (baseDiag1) { let match = true; for (let i = 1; i < size; i++) if (board[i * size + i] !== baseDiag1) match = false; if (match) for (let i = 0; i < size; i++) winningSet.add(i * size + i); }
     let baseDiag2 = board[size - 1]; if (baseDiag2) { let match = true; for (let i = 1; i < size; i++) if (board[i * size + (size - 1 - i)] !== baseDiag2) match = false; if (match) for (let i = 0; i < size; i++) winningSet.add(i * size + (size - 1 - i)); }
