@@ -1,5 +1,5 @@
 /**
- * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (상단 헤더 이미지 동적 변환 완결본)
+ * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (상단 간판 동적 이미지 스위칭 완결 통합본)
  * 관리 책임자: 소장님 MASTER
  */
 
@@ -10,7 +10,7 @@ Boako.League.State = {
     currentTab: 'bingo',
     selectedTeam: 'blue',
     bingoBoard: Array(25).fill(null),
-    // ⚔️ challenge 가문 명칭 정돈 완료
+    // ⚔️challenge 가문 명칭 정돈 완료
     challenges: [
         { id: 1, attacker: '블루 타이거', defender: '레드 피닉스', game: '스플렌더', message: '스플렌더 3라운드 안에 귀족 카드 다 털고 챔피언 사수하겠습니다.', accepted: false },
         { id: 2, attacker: '그린 드래곤', defender: '골드 세이버', game: '아크 노바', message: '대칭 배치 동물원의 참맛을 확실히 교육해 드립니다.', accepted: true }
@@ -25,7 +25,7 @@ Boako.League.State = {
     ]
 };
 
-// 💡 2. 메인 UI 사출 엔진 (상단 아이콘 구역을 img 태그 고정 구조로 대기)
+// 💡 2. 메인 UI 사출 엔진 (상단 왼쪽 이미지 상자를 동적 변환 전용 컨테이너로 세팅)
 Boako.League.buildUI = function(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -35,9 +35,11 @@ Boako.League.buildUI = function(containerId) {
             
             <div class="p-6 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-slate-50/50">
                 <div class="flex items-center gap-3">
+                    
                     <div id="league-header-img-container" class="w-12 h-12 rounded-2xl bg-violet-100 flex items-center justify-center shadow-inner overflow-hidden border border-slate-200/60">
-                        <img id="league-header-main-img" src="league_champion_belt.png" alt="LEAGUE ICON" style="width: 100%; height: 100%; object-fit: contain;">
+                        <i data-lucide="sparkles" class="w-6 h-6 text-violet-600 animate-pulse"></i>
                     </div>
+                    
                     <div>
                         <div class="flex items-center gap-1.5">
                             <span class="w-2 h-2 rounded-full bg-violet-600"></span>
@@ -70,7 +72,7 @@ Boako.League.buildUI = function(containerId) {
     this.switchTab('bingo');
 };
 
-// 💡 3. 서브 탭 제어 및 동적 사출 컨트롤러 (상단 대표 간판 이미지 매핑 로직 탑재)
+// 💡 3. 서브 탭 제어 및 동적 사출 컨트롤러 (왼쪽 이미지 간판 실시간 갈아끼우기 로직 완비)
 Boako.League.switchTab = async function(tabId) {
     if (typeof sfx !== 'undefined') sfx.playClick();
     Boako.League.State.currentTab = tabId;
@@ -86,28 +88,22 @@ Boako.League.switchTab = async function(tabId) {
         }
     });
 
-    // 🎯 [핵심 추가] 탭 클릭 시 상단 메인 간판 이미지 교체 및 핏 조정 엔진
-    const mainImg = document.getElementById('league-header-main-img');
-    if (mainImg) {
+    // 🎯 [핵심 추가] 버튼을 누르면 왼쪽 'league-header-img-container' 박스 안을 실시간으로 변환합니다.
+    const imgContainer = document.getElementById('league-header-img-container');
+    if (imgContainer) {
         if (tabId === 'bingo') {
-            mainImg.src = "league_champion_belt.png";
-            mainImg.style.objectFit = "contain";
+            // 빙고전: 순정 반짝이 아이콘 매핑
+            imgContainer.innerHTML = `<i data-lucide="sparkles" class="w-6 h-6 text-violet-600 animate-pulse"></i>`;
         } else if (tabId === 'challenge') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png";
-            mainImg.style.objectFit = "cover"; // 챌린지 배경 꽉 차게 조율
+            // 챌린지: 찐 수파베이스 업로드 주소 이미지 주입 (object-fit: cover)
+            imgContainer.innerHTML = `<img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png" alt="CHALLENGE" style="width: 100%; height: 100%; object-fit: cover;">`;
         } else if (tabId === 'champion') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
-            mainImg.style.objectFit = "contain";
+            // 챔피언: 찐 수파베이스 업로드 주소 이미지 주입 (object-fit: contain)
+            imgContainer.innerHTML = `<img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png" alt="CHAMPION" style="width: 100%; height: 100%; object-fit: contain;">`;
         } else if (tabId === 'king_of_league') {
-            mainImg.src = "king_of_league.png"; // 킹오브리그 독립 배정 (추후 주소 매핑용)
-            mainImg.style.objectFit = "contain";
+            // 킹 오브 리그: 독립 아이콘 처리 (나중에 파일 등록 시 img 태그 교체 라인)
+            imgContainer.innerHTML = `<i data-lucide="git-fork" class="w-6 h-6 text-violet-600 animate-pulse"></i>`;
         }
-        
-        // 만약 특정 이미지가 로드 실패(404)할 경우 스파크 이모지 백업 처리
-        mainImg.onerror = function() {
-            this.parentNode.innerHTML = `<i data-lucide="sparkles" class="w-6 h-6 text-violet-600 animate-pulse"></i>`;
-            if (window.lucide) window.lucide.createIcons();
-        };
     }
 
     const container = document.getElementById('league-view-container');
@@ -161,7 +157,7 @@ Boako.League.getBingoHTML = function() {
                     <div class="grid grid-cols-5 gap-2" id="bingo-grid"></div>
                 </div>
                 <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                    <h5 class="font-black text-slate-800 text-sm border-b border-violet-100 pb-2.5 flex items-center gap-2">
+                    <h5 class="font-black text-slate-800 text-sm border-b border-slate-200 pb-2.5 flex items-center gap-2">
                         <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 가문별 실시간 영토 점유 현황
                     </h5>
                     <div class="space-y-2 text-xs">
@@ -216,7 +212,7 @@ Boako.League.toggleTile = function(index) {
 
 Boako.League.calculateWinningCells = function() {
     const size = 5; const winningSet = new Set(); const board = Boako.League.State.bingoBoard;
-    for (let r = 0; r < size; r++) { let base = board[r * size]; if (base) { let match = true; for (let c = 1; c < size; c++) if (board[r * size + c] !== base) match = false; if (match) for (let c = 0; c < size; c++) winningSet.add(r * size + c); } }
+    for (let r = 0; r < size; r++) { let base = board[r * size]; if (base) { let match = true; for (let c = 1; c < size; c++) if (board[r * size + c] !== base) match = false; if (match) for (let c = 0; c < size; r++) winningSet.add(r * size + c); } }
     for (let c = 0; c < size; c++) { let base = board[c]; if (base) { let match = true; for (let r = 1; r < size; r++) if (board[r * size + c] !== base) match = false; if (match) for (let r = 0; r < size; r++) winningSet.add(r * size + c); } }
     let baseDiag1 = board[0]; if (baseDiag1) { let match = true; for (let i = 1; i < size; i++) if (board[i * size + i] !== baseDiag1) match = false; if (match) for (let i = 0; i < size; i++) winningSet.add(i * size + i); }
     let baseDiag2 = board[size - 1]; if (baseDiag2) { let match = true; for (let i = 1; i < size; i++) if (board[i * size + (size - 1 - i)] !== baseDiag2) match = false; if (match) for (let i = 0; i < size; i++) winningSet.add(i * size + (size - 1 - i)); }
@@ -250,7 +246,7 @@ Boako.League.clearBoard = function() {
 };
 
 // ==========================================
-// 🔥 탭 2: 야너나 매치룸 (챌린지 핵심 비즈니스단)
+// 🔥 탭 2: 야너나 매치룸 (Challenge 핵심 비즈니스단)
 // ==========================================
 Boako.League.getChallengeHTML = function() {
     return `
@@ -466,7 +462,7 @@ Boako.League.filterChampions = function() {
 // ==========================================
 // 🏅 탭 4: 킹 오브 리그 (토너먼트 껍데기 보존 구역)
 // ==========================================
-Boako.League.getTournamentHTML = function() {
+Boako.League.getKingOfLeagueHTML = function() {
     return `
         <div class="space-y-6">
             <div class="text-center py-4 border-b border-slate-100">
