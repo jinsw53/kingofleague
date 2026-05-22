@@ -91,7 +91,7 @@ Boako.League.switchTab = async function(tabId) {
         } else if (tabId === 'champion') {
             mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
         } else if (tabId === 'king_of_league') {
-            mainImg.src = "king_of_league_banner.png";
+            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/king_of_league.png";
         }
     }
 
