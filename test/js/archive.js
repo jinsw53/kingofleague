@@ -376,10 +376,13 @@ Boako.Archive = {
         html += this.renderPagination();
 
         area.innerHTML = html; 
-        
+
+        // 🎯 [완치] 공포의 슬래시 클래스 억까를 방어하기 위해 dataset.handler 구조로 정밀 수선
         area.querySelectorAll('tr').forEach(tr => {
-            const handler = tr.querySelector('.group\\/handler');
+            const handler = tr.querySelector('[data-handler="tooltip"]');
             if (!handler) return;
+            
+            // 마우스가 들어왔을 때만 fixed 툴팁을 실시간으로 추적합니다
             handler.addEventListener('mousemove', (e) => {
                 const tooltip = handler.querySelector('.fixed');
                 if (tooltip) {
@@ -498,7 +501,8 @@ Boako.Archive = {
         html += this.renderPagination();
         area.innerHTML = html;
         
-        area.querySelectorAll('.group\\/handler').forEach(handler => {
+        // 🎯 [완치] 랭킹보드 카드 구역도 표준 속성 감지 엔진으로 안전하게 치환
+        area.querySelectorAll('[data-handler="tooltip"]').forEach(handler => {
             handler.addEventListener('mousemove', (e) => {
                 const tooltip = handler.querySelector('.fixed');
                 if (tooltip) {
