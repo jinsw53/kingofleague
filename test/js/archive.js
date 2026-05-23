@@ -314,103 +314,98 @@ Boako.Archive = {
                         <tbody class="divide-y divide-slate-50">
         `;
 
-        html += this.filteredRecords.map(rec => `
-    <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
-        <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
-        <td class="px-4 py-4 relative group/handler"> <div class="flex flex-col leading-tight">
-                <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
-                <div class="flex items-center gap-1.5 mt-1 cursor-pointer">
-                    ${
-                        rec.logo_url && rec.b_all_team !== 'Free Agent'
-                            ? `
-                                <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
-                                
-                                <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
-                                     style="top: var(--archive-top, auto); left: var(--archive-left, auto);">
-                                    <img src="${rec.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
-                                    <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
-                                </div>
-                              `
-                            : `<span class="text-[10px]">👤</span>`
-                    }
-                    <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${rec.b_all_team || 'Free Agent'}</span>
-                </div>
-            </div>
-        </td>
-        `).join('');
-                <td class="px-4 py-4">
-                    <div class="flex flex-col leading-tight">
-                        <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                            <span class="font-bold text-indigo-900">${rec.game_name || '-'}</span>
-                            ${rec.is_first == 1 ? '<span class="bg-red-500 text-white text-[8px] px-1 rounded font-black tracking-tighter uppercase shadow-sm">1ST</span>' : ''}
+        html += this.filteredRecords.map(rec => {
+            // 🎯 삼항 연산자 꼬임을 방어하기 위해 로고 마크 및 fixed 툴팁 구역 변수 선제 사출
+            let logoHTML = `<span class="text-[10px]">👤</span>`;
+            
+            if (rec.logo_url && rec.b_all_team !== 'Free Agent') {
+                logoHTML = `
+                    <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
+                    
+                    <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
+                         style="top: var(--archive-top, auto); left: var(--archive-left, auto);">
+                        <img src="${rec.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
+                        <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
+                    </div>
+                `;
+            }
+
+            return `
+                <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
+                    <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
+                    
+                    <td class="px-4 py-4 relative group/handler">
+                        <div class="flex flex-col leading-tight">
+                            <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
+                            <div class="flex items-center gap-1.5 mt-1 cursor-pointer">
+                                ${logoHTML}
+                                <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${rec.b_all_team || 'Free Agent'}</span>
+                            </div>
                         </div>
-                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
-                            S${rec.season_no || 0} R${rec.round_no || 0} · ${
-                                (function(type) {
-                                    if (!type) return '일반';
-                                    const typeMap = { 'TOURNAMENT': '토너먼트', 'INDIVIDUAL': '개인전', 'TEAM': '팀전' };
-                                    return typeMap[type.toUpperCase()] || type;
-                                })(rec.match_type)
-                            }
-                        </span>
-                    </div>
-                </td>
-                <td class="px-4 py-4 text-center">
-                    <div class="flex items-center justify-center gap-1">
-                        <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Weight">${rec.weight || 0}</div>
-                        <span class="text-slate-300 text-xs">×</span>
-                        <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Playtime">${rec.playtime || 0}</div>
-                        <span class="text-slate-300 text-xs">×</span>
-                        <div class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[11px] font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
-                    </div>
-                </td>
-                <td class="px-4 py-4 text-right font-black text-indigo-600 text-lg tracking-tighter">${Math.floor(rec.rp || 0)}</td>
-                <td class="px-4 py-4 text-center">
-                    ${rec.is_verified == 0 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-4 h-4 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-4 h-4 mx-auto opacity-30"></i>'}
-                </td>
-                <td class="px-4 py-4 text-right">
-                    ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" class="p-2 hover:bg-indigo-600 hover:text-white bg-slate-50 rounded-lg text-slate-400 transition-all inline-block border border-slate-100 shadow-sm"><i data-lucide="external-link" class="w-3 h-3"></i></a>` : ''}
-                </td>
-            </tr>
-        `).join('');
+                    </td>
+                    
+                    <td class="px-4 py-4">
+                        <div class="flex flex-col leading-tight">
+                            <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                                <span class="font-bold text-indigo-900">${rec.game_name || '-'}</span>
+                                ${rec.is_first == 1 ? '<span class="bg-red-500 text-white text-[8px] px-1 rounded font-black tracking-tighter uppercase shadow-sm">1ST</span>' : ''}
+                            </div>
+                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
+                                S${rec.season_no || 0} R${rec.round_no || 0} · ${
+                                    (function(type) {
+                                        if (!type) return '일반';
+                                        const typeMap = { 'TOURNAMENT': '토너먼트', 'INDIVIDUAL': '개인전', 'TEAM': '팀전' };
+                                        return typeMap[type.toUpperCase()] || type;
+                                    })(rec.match_type)
+                                }
+                            </span>
+                        </div>
+                    </td>
+                    
+                    <td class="px-4 py-4 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Weight">${rec.weight || 0}</div>
+                            <span class="text-slate-300 text-xs">×</span>
+                            <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Playtime">${rec.playtime || 0}</div>
+                            <span class="text-slate-300 text-xs">×</span>
+                            <div class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[11px] font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
+                        </div>
+                    </td>
+                    
+                    <td class="px-4 py-4 text-right font-black text-indigo-600 text-lg tracking-tighter">${Math.floor(rec.rp || 0)}</td>
+                    
+                    <td class="px-4 py-4 text-center">
+                        ${rec.is_verified == 0 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-4 h-4 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-4 h-4 mx-auto opacity-30"></i>'}
+                    </td>
+                    
+                    <td class="px-4 py-4 text-right">
+                        ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" class="p-2 hover:bg-indigo-600 hover:text-white bg-slate-50 rounded-lg text-slate-400 transition-all inline-block border border-slate-100 shadow-sm"><i data-lucide="external-link" class="w-3 h-3"></i></a>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
 
         html += `</tbody></table></div></div>`;
         html += this.renderPagination();
 
         area.innerHTML = html; 
-        if(window.lucide) lucide.createIcons(); 
-    },
+        
+        // 🎯 [실시간 마우스 좌표 매핑 컨트롤러] fixed 레이어로 사출된 대형 툴팁이 잘림 없이 포인터를 부드럽게 추적하도록 연산식 매핑
+        area.querySelectorAll('tr').forEach(tr => {
+            const handler = tr.querySelector('.group\\/handler');
+            if (!handler) return;
+            handler.addEventListener('mousemove', (e) => {
+                const tooltip = handler.querySelector('.fixed');
+                if (tooltip) {
+                    tooltip.style.setProperty('--archive-top', `${e.clientY - 10}px`);
+                    tooltip.style.setProperty('--archive-left', `${e.clientX}px`);
+                }
+            });
+        });
 
-    // 🌟 [하단 페이지 공통 번호판 조립기]
-    renderPagination: function() {
-        const limit = this.getLimit();
-        const totalPages = Math.ceil(this.totalCount / limit);
-        if (totalPages <= 1) return '';
-
-        let pHTML = `<div class="flex items-center justify-center gap-2 mt-8 select-none animate-in fade-in duration-300">`;
-
-        pHTML += `
-            <button onclick="Boako.Archive.changePage(${this.currentPage - 1})" ${this.currentPage === 1 ? 'disabled class="p-2 rounded-xl text-slate-300 bg-slate-50 border border-slate-100 cursor-not-allowed"' : 'class="p-2 rounded-xl text-slate-600 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all"'}>
-                <i data-lucide="chevron-left" class="w-4 h-4"></i>
-            </button>
-        `;
-
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === this.currentPage) {
-                pHTML += `<button class="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-xs shadow-md border border-indigo-600">${i}</button>`;
-            } else {
-                pHTML += `<button onclick="Boako.Archive.changePage(${i})" class="w-9 h-9 rounded-xl bg-white text-slate-600 font-bold text-xs border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all">${i}</button>`;
-            }
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons(); 
         }
-
-        pHTML += `
-            <button onclick="Boako.Archive.changePage(${this.currentPage + 1})" ${this.currentPage === totalPages ? 'disabled class="p-2 rounded-xl text-slate-300 bg-slate-50 border border-slate-100 cursor-not-allowed"' : 'class="p-2 rounded-xl text-slate-600 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all"'}>
-                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-            </button>
-        `;
-
-        pHTML += `</div>`;
-        return pHTML;
     },
 
     // 6. 랭킹보드 그리드 렌더링
@@ -613,28 +608,36 @@ Boako.Archive = {
         area.innerHTML = html;
         if(window.lucide) lucide.createIcons();
     },
-/* ====================================================================
- * 📐 [기록실 툴팁 개조] 함수 최하단 렌더링 마감 구역
- * ==================================================================== */
-        html += `</tbody></table></div></div>`;
-        html += this.renderPagination();
 
-        area.innerHTML = html; 
-        
-        // 🎯 [마우스 위치 추적 연산식 추가] 
-        // 마우스 무빙 좌표를 fixed 툴팁에 동적으로 할당하여 사방 잘림을 전면 방어합니다.
-        area.querySelectorAll('tr').forEach(tr => {
-            const handler = tr.querySelector('.group\\/handler');
-            if (!handler) return;
-            handler.addEventListener('mousemove', (e) => {
-                const tooltip = handler.querySelector('.fixed');
-                if (tooltip) {
-                    tooltip.style.setProperty('--archive-top', `${e.clientY - 10}px`);
-                    tooltip.style.setProperty('--archive-left', `${e.clientX}px`);
-                }
-            });
-        });
+    // 🌟 [하단 페이지 공통 번호판 조립기]
+    renderPagination: function() {
+        const limit = this.getLimit();
+        const totalPages = Math.ceil(this.totalCount / limit);
+        if (totalPages <= 1) return '';
 
-        if(window.lucide) lucide.createIcons(); 
-    },
+        let pHTML = `<div class="flex items-center justify-center gap-2 mt-8 select-none animate-in fade-in duration-300">`;
+
+        pHTML += `
+            <button onclick="Boako.Archive.changePage(${this.currentPage - 1})" ${this.currentPage === 1 ? 'disabled class="p-2 rounded-xl text-slate-300 bg-slate-50 border border-slate-100 cursor-not-allowed"' : 'class="p-2 rounded-xl text-slate-600 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all"'}>
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            </button>
+        `;
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === this.currentPage) {
+                pHTML += `<button class="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-xs shadow-md border border-indigo-600">${i}</button>`;
+            } else {
+                pHTML += `<button onclick="Boako.Archive.changePage(${i})" class="w-9 h-9 rounded-xl bg-white text-slate-600 font-bold text-xs border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all">${i}</button>`;
+            }
+        }
+
+        pHTML += `
+            <button onclick="Boako.Archive.changePage(${this.currentPage + 1})" ${this.currentPage === totalPages ? 'disabled class="p-2 rounded-xl text-slate-300 bg-slate-50 border border-slate-100 cursor-not-allowed"' : 'class="p-2 rounded-xl text-slate-600 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 shadow-sm transition-all"'}>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+        `;
+
+        pHTML += `</div>`;
+        return pHTML;
+    }
 };
