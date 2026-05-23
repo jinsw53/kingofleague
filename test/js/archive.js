@@ -313,10 +313,11 @@ Boako.Archive = {
         html += this.filteredRecords.map(rec => {
             let logoHTML = `<span class="text-[10px]">👤</span>`;
             if (rec.logo_url && rec.b_all_team !== 'Free Agent') {
+                // 💡 [수정 완치] Tailwind 간섭 명칭인 invisible opacity-0 싹 제거 후 기본 스타일로 완벽 격리
                 logoHTML = `
                     <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
-                    <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
-                         style="top: var(--archive-top, auto); left: var(--archive-left, auto);">
+                    <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
+                         style="display: none; opacity: 0; transform: translate(-50%, -100%); top: var(--archive-top, auto); left: var(--archive-left, auto);">
                         <img src="${rec.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
                         <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
                     </div>
@@ -326,7 +327,7 @@ Boako.Archive = {
             return `
                 <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
                     <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
-                    <td class="px-4 py-4 relative group/handler" data-handler="tooltip">
+                    <td class="px-4 py-4 relative" data-handler="archive-tooltip">
                         <div class="flex flex-col leading-tight">
                             <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
                             <div class="flex items-center gap-1.5 mt-1 cursor-pointer">
@@ -376,19 +377,25 @@ Boako.Archive = {
         html += this.renderPagination();
 
         area.innerHTML = html; 
+        
+        // 🎯 [완치 통합 트래커] JS 제어로 CSS 간섭 없이 정확히 띄우고 붙입니다.
+        area.querySelectorAll('[data-handler="archive-tooltip"]').forEach(handler => {
+            const tooltip = handler.querySelector('.fixed');
+            if (!tooltip) return;
 
-        // 🎯 [완치] 공포의 슬래시 클래스 억까를 방어하기 위해 dataset.handler 구조로 정밀 수선
-        area.querySelectorAll('tr').forEach(tr => {
-            const handler = tr.querySelector('[data-handler="tooltip"]');
-            if (!handler) return;
-            
-            // 마우스가 들어왔을 때만 fixed 툴팁을 실시간으로 추적합니다
+            handler.addEventListener('mouseenter', () => {
+                tooltip.style.display = 'flex';
+                setTimeout(() => { tooltip.style.opacity = '1'; }, 10);
+            });
+
             handler.addEventListener('mousemove', (e) => {
-                const tooltip = handler.querySelector('.fixed');
-                if (tooltip) {
-                    tooltip.style.setProperty('--archive-top', `${e.clientY - 10}px`);
-                    tooltip.style.setProperty('--archive-left', `${e.clientX}px`);
-                }
+                tooltip.style.setProperty('--archive-top', `${e.clientY - 12}px`);
+                tooltip.style.setProperty('--archive-left', `${e.clientX}px`);
+            });
+
+            handler.addEventListener('mouseleave', () => {
+                tooltip.style.opacity = '0';
+                tooltip.style.display = 'none';
             });
         });
 
@@ -441,10 +448,11 @@ Boako.Archive = {
             let logoHTML = `<span class="text-[10px]">👤</span>`;
             
             if (p.logo_url && p.team !== 'Free Agent') {
+                // 💡 [수정 완치] 랭킹보드 툴팁도 Tailwind 유령 명칭 다 날리고 순정 스타일 격리
                 logoHTML = `
                     <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
-                    <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
-                         style="top: var(--ranking-top, auto); left: var(--ranking-left, auto);">
+                    <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
+                         style="top: var(--ranking-top, auto); left: var(--ranking-left, auto); display: none; opacity: 0; transform: translate(-50%, -100%);">
                         <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
                         <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
                     </div>
@@ -468,7 +476,7 @@ Boako.Archive = {
                         </div>
                         <div>
                             <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
-                            <div class="flex items-center gap-1.5 mt-1.5 relative group/handler cursor-pointer overflow-visible" data-handler="tooltip">
+                            <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer overflow-visible" data-handler="ranking-tooltip">
                                 ${logoHTML}
                                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
                             </div>
@@ -501,14 +509,24 @@ Boako.Archive = {
         html += this.renderPagination();
         area.innerHTML = html;
         
-        // 🎯 [완치] 랭킹보드 카드 구역도 표준 속성 감지 엔진으로 안전하게 치환
-        area.querySelectorAll('[data-handler="tooltip"]').forEach(handler => {
+        // 🎯 [완치 통합 트래커] 랭킹보드용 다이렉트 돔 바인딩 스크립트
+        area.querySelectorAll('[data-handler="ranking-tooltip"]').forEach(handler => {
+            const tooltip = handler.querySelector('.fixed');
+            if (!tooltip) return;
+
+            handler.addEventListener('mouseenter', () => {
+                tooltip.style.display = 'flex';
+                setTimeout(() => { tooltip.style.opacity = '1'; }, 10);
+            });
+
             handler.addEventListener('mousemove', (e) => {
-                const tooltip = handler.querySelector('.fixed');
-                if (tooltip) {
-                    tooltip.style.setProperty('--ranking-top', `${e.clientY - 10}px`);
-                    tooltip.style.setProperty('--ranking-left', `${e.clientX}px`);
-                }
+                tooltip.style.setProperty('--ranking-top', `${e.clientY - 12}px`);
+                tooltip.style.setProperty('--ranking-left', `${e.clientX}px`);
+            });
+
+            handler.addEventListener('mouseleave', () => {
+                tooltip.style.opacity = '0';
+                tooltip.style.display = 'none';
             });
         });
 
@@ -587,7 +605,7 @@ Boako.Archive = {
                                             <td class="px-5 py-3.5 font-black text-xs">
                                                 ${
                                                     p.rank === 1 ? '<span class="text-amber-500">🥇 1위</span>' :
-                                                    p.rank === 2 ? '<span class="text-slate-400">🥈 2위</span>' :
+                                                    p.rank === 2 ? '<span class="text-slate-400">🥈 2位</span>' :
                                                     p.rank === 3 ? '<span class="text-amber-700">🥉 3위</span>' : `<span class="text-slate-400 pl-1">${p.rank}위</span>`
                                                 }
                                             </td>
