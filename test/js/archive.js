@@ -246,7 +246,7 @@ Boako.Archive = {
         const da = String(d.getDate()).padStart(2, '0');
         const ho = String(d.getHours()).padStart(2, '0');
         const mi = String(d.getMinutes()).padStart(2, '0');
-        return `${mo}.${da} ${ho}:${mi}`;
+        return `${mo}.${da} ${mo === 'all' ? '' : ho}:${mi}`;
     },
 
     updateSeasonOptions: function(records) {
@@ -443,8 +443,19 @@ Boako.Archive = {
 
         html += paginatedSorted.map((p, index) => {
             const idx = from + index;
+            let logoHTML = `<span class="text-[10px]">👤</span>`;
             
-            // 🎯 [완치 핵심] 무조건 data-handler 속성을 가지는 상위 div 구조를 갖추어 조건부 렌더링 억까 완벽 가드
+            if (p.logo_url && p.team !== 'Free Agent') {
+                logoHTML = `
+                    <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
+                    <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
+                         style="display: none; opacity: 0; transform: translate(-50%, -100%);">
+                        <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
+                        <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
+                    </div>
+                `;
+            }
+
             return `
                 <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
                     <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
@@ -463,18 +474,7 @@ Boako.Archive = {
                         <div>
                             <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
                             <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer overflow-visible" data-handler="ranking-tooltip">
-                                ${
-                                    p.logo_url && p.team !== 'Free Agent'
-                                        ? `
-                                            <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
-                                            <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
-                                                 style="display: none; opacity: 0; transform: translate(-50%, -100%);">
-                                                <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
-                                                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
-                                            </div>
-                                          `
-                                        : `<span class="text-[10px]">👤</span>`
-                                }
+                                ${logoHTML}
                                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
                             </div>
                         </div>
@@ -506,7 +506,7 @@ Boako.Archive = {
         html += this.renderPagination();
         area.innerHTML = html;
         
-        // 🎯 [완치] 공통 데이터셋 속성을 순회하며 내부 엘리먼트 존재 여부를 완벽하게 체크 후 안정적으로 리스너 주입
+        // 🎯 [매칭 완치] 하위 fixed 툴팁 요소 존재 유무 및 예외 가드 완벽 구현
         area.querySelectorAll('[data-handler="ranking-tooltip"]').forEach(handler => {
             const tooltip = handler.querySelector('.fixed');
             if (!tooltip) return;
