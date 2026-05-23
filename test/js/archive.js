@@ -408,7 +408,7 @@ Boako.Archive = {
         }
     },
 
-    // 6. 랭킹보드 그리드 렌더링
+   // 6. 랭킹보드 그리드 렌더링
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
@@ -447,8 +447,24 @@ Boako.Archive = {
 
         let html = `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
 
+        // 🎯 [완벽 정렬 복구 단락] map 함수 백틱 규격 정밀 마감 완료
         html += paginatedSorted.map((p, index) => {
             const idx = from + index; // 전체 랭킹 인덱스 보정
+            
+            // 🎯 템플릿 스트링 내장 오류 예방용 변수 선제 바인딩
+            let logoHTML = `<span class="text-[10px]">👤</span>`;
+            if (p.logo_url && p.team !== 'Free Agent') {
+                logoHTML = `
+                    <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
+                    
+                    <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
+                         style="top: var(--ranking-top, auto); left: var(--ranking-left, auto);">
+                        <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
+                        <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
+                    </div>
+                `;
+            }
+
             return `
                 <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
                     <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
@@ -467,22 +483,11 @@ Boako.Archive = {
                         <div>
                             <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
                             <div class="flex items-center gap-1.5 mt-1.5 relative group/handler cursor-pointer overflow-visible">
-                                ${
-                                    p.logo_url && p.team !== 'Free Agent'
-                                        ? `
-                                            <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
-                                            
-                                            <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
-                                                 style="top: var(--ranking-top, auto); left: var(--ranking-left, auto);">
-                                                <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
-                                                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
-                                            </div>
-                                          `
-                                        : `<span class="text-[10px]">👤</span>`
-                                }
+                                ${logoHTML}
                                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
                             </div>
                         </div>
+                    </div>
                     
                     <div class="grid grid-cols-2 gap-4 mb-8">
                         <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
@@ -506,12 +511,11 @@ Boako.Archive = {
             `;
         }).join('');
 
-       html += `</div>`;
+        html += `</div>`;
         html += this.renderPagination(); // 랭킹보드용 [1 2 3] 주입
         area.innerHTML = html;
         
-        // 🎯 [실시간 랭킹 마우스 좌표 추적 시스템 용접]
-        // fixed 레이어로 뜬 로고가 랭킹 카드 테두리에 잘리지 않고 마우스를 부드럽게 따라오게 매핑합니다.
+        // 🎯 [실시간 랭킹 마우스 무감쇠 트래커] 카드 가두리를 탈출한 fixed 툴팁에 위치 연동
         area.querySelectorAll('.group\\/handler').forEach(handler => {
             handler.addEventListener('mousemove', (e) => {
                 const tooltip = handler.querySelector('.fixed');
