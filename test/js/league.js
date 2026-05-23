@@ -483,7 +483,8 @@ Boako.League.drawChampionRows = function(dataList) {
                 
                 <span class="cursor-pointer">${mvpTeam}</span>
 
-                <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 transition-all duration-200 pointer-events-none flex items-center justify-center">
+                <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
+                     style="top: var(--tooltip-top, auto); left: var(--tooltip-left, auto);">
                     <img src="${row.mvp_team_logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" 
                          alt="LARGE TEAM LOGO" 
                          class="w-full h-full object-contain">
@@ -497,9 +498,23 @@ Boako.League.drawChampionRows = function(dataList) {
     </tr>
 `;
     });
+    
+    // 🎯 [마우스 위치 추적 스크립트 용접]
+    // fixed 툴팁이 마우스 포인터 바로 위 허공에 뜨도록 실시간 위치 좌표만 계산해서 변수로 쏴줍니다.
     tbody.innerHTML = rowsHtml;
+    
+    tbody.querySelectorAll('tr').forEach(tr => {
+        const handler = tr.querySelector('.group\\/handler');
+        if (!handler) return;
+        handler.addEventListener('mousemove', (e) => {
+            const tooltip = handler.querySelector('.fixed');
+            if (tooltip) {
+                tooltip.style.setProperty('--tooltip-top', `${e.clientY - 10}px`);
+                tooltip.style.setProperty('--tooltip-left', `${e.clientX}px`);
+            }
+        });
+    });
 };
-
 Boako.League.filterChampions = function() {
     const query = document.getElementById('champion-search')?.value.toLowerCase() || "";
     const filtered = Boako.League.State.champions.filter(c => {
