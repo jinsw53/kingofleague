@@ -123,11 +123,10 @@ Boako.Archive = {
         const roundVal = document.getElementById('archive-round')?.value || 'all';
         const limit = this.getLimit();
 
-        // 🎯 계산식: 수파베이스 범위 슬라이싱 공식 변수
         const from = (this.currentPage - 1) * limit;
         const to = from + limit - 1;
 
-        // 💡 [분기 1] 게임별 통계 탭 타격 (100% 서버사이드 페이징 & 백엔드 서치)
+        // 💡 [분기 1] 게임별 통계 탭
         if (this.currentTab === 'games') {
             let query = Boako.db.from('v_game_popularity_all_players').select('*', { count: 'exact' });
             
@@ -136,7 +135,6 @@ Boako.Archive = {
                 query = query.or(`game_name.ilike.%${searchVal}%,player_nickname.ilike.%${searchVal}%`);
             }
             
-            // 핀셋 범위 슬라이싱 장착 (게임 기준 상위 10개 및 랭커 유저 포함 유실 방지는 백엔드 뷰 구조상 수파베이스가 정확히 정렬 처리)
             query = query.order('game_popularity_rank', { ascending: true })
                          .order('player_rank', { ascending: true })
                          .range(from, to);
@@ -145,7 +143,7 @@ Boako.Archive = {
                 const { data, count, error } = await query;
                 if (error) throw error;
                 this.gameRankings = data || [];
-                this.totalCount = count || 0; // 하단 [1 2 3] 계산용 토탈 카운트
+                this.totalCount = count || 0;
                 this.renderGames(); 
             } catch (err) {
                 console.error("게임별 아카이브 뷰 데이터 로드 실패:", err);
@@ -154,7 +152,7 @@ Boako.Archive = {
             return;
         }
 
-        // 💡 [분기 2 & 3] 기록실 및 랭킹보드 공통 베이스 타격 (100% 서버사이드 페이징 & 백엔드 서치)
+        // 💡 [분기 2 & 3] 기록실 및 랭킹보드 공통 베이스
         let query = Boako.db.from('v_boako_total_records').select('*', { count: 'exact' });
 
         if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
@@ -163,7 +161,6 @@ Boako.Archive = {
             query = query.or(`nickname.ilike.%${searchVal}%,game_name.ilike.%${searchVal}%`);
         }
 
-        // 랭킹보드 탭일 때는 집계를 위해 해당 조건 만족 레코드를 다 땡겨서 페이징 연산
         if (this.currentTab === 'records') {
             query = query.order('created_at', { ascending: false }).range(from, to);
         } else {
@@ -180,7 +177,6 @@ Boako.Archive = {
                 this.totalCount = count || 0;
                 this.renderRecords();
             } else {
-                // 랭킹보드는 데이터 셰이핑 후 수동 페이징 처리해 3열 그리드 보존
                 this.renderRankings();
             }
         } catch (err) {
@@ -225,7 +221,7 @@ Boako.Archive = {
             titleEl.innerText = '시즌 대세 게임 & 게임별 순위';
             descEl.innerText = '가장 핫한 보드게임 종목 순위와 게임별 모든 유저의 기록 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
-            if (roundFilter) roundFilter.style.display = 'none'; // 라운드 억까 가드
+            if (roundFilter) roundFilter.style.display = 'none';
         }
         
         this.fetchAndRender();
@@ -315,13 +311,10 @@ Boako.Archive = {
         `;
 
         html += this.filteredRecords.map(rec => {
-            // 🎯 삼항 연산자 꼬임을 방어하기 위해 로고 마크 및 fixed 툴팁 구역 변수 선제 사출
             let logoHTML = `<span class="text-[10px]">👤</span>`;
-            
             if (rec.logo_url && rec.b_all_team !== 'Free Agent') {
                 logoHTML = `
                     <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
-                    
                     <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
                          style="top: var(--archive-top, auto); left: var(--archive-left, auto);">
                         <img src="${rec.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
@@ -333,7 +326,6 @@ Boako.Archive = {
             return `
                 <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
                     <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
-                    
                     <td class="px-4 py-4 relative group/handler">
                         <div class="flex flex-col leading-tight">
                             <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
@@ -343,7 +335,6 @@ Boako.Archive = {
                             </div>
                         </div>
                     </td>
-                    
                     <td class="px-4 py-4">
                         <div class="flex flex-col leading-tight">
                             <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
@@ -361,7 +352,6 @@ Boako.Archive = {
                             </span>
                         </div>
                     </td>
-                    
                     <td class="px-4 py-4 text-center">
                         <div class="flex items-center justify-center gap-1">
                             <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Weight">${rec.weight || 0}</div>
@@ -371,13 +361,10 @@ Boako.Archive = {
                             <div class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[11px] font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
                         </div>
                     </td>
-                    
                     <td class="px-4 py-4 text-right font-black text-indigo-600 text-lg tracking-tighter">${Math.floor(rec.rp || 0)}</td>
-                    
                     <td class="px-4 py-4 text-center">
                         ${rec.is_verified == 0 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-4 h-4 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-4 h-4 mx-auto opacity-30"></i>'}
                     </td>
-                    
                     <td class="px-4 py-4 text-right">
                         ${rec.post_url ? `<a href="${rec.post_url}" target="_blank" class="p-2 hover:bg-indigo-600 hover:text-white bg-slate-50 rounded-lg text-slate-400 transition-all inline-block border border-slate-100 shadow-sm"><i data-lucide="external-link" class="w-3 h-3"></i></a>` : ''}
                     </td>
@@ -390,7 +377,6 @@ Boako.Archive = {
 
         area.innerHTML = html; 
         
-        // 🎯 [실시간 마우스 좌표 매핑 컨트롤러] fixed 레이어로 사출된 대형 툴팁이 잘림 없이 포인터를 부드럽게 추적하도록 연산식 매핑
         area.querySelectorAll('tr').forEach(tr => {
             const handler = tr.querySelector('.group\\/handler');
             if (!handler) return;
@@ -408,7 +394,7 @@ Boako.Archive = {
         }
     },
 
-   // 6. 랭킹보드 그리드 렌더링
+    // 6. 랭킹보드 그리드 렌더링
     renderRankings: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
@@ -433,12 +419,12 @@ Boako.Archive = {
         });
 
         const allSorted = Object.values(stats).sort((a, b) => b.rp - a.rp);
-        this.totalCount = allSorted.length; // 랭킹 총원 대입
+        this.totalCount = allSorted.length;
 
         const limit = this.getLimit();
         const from = (this.currentPage - 1) * limit;
         const to = from + limit;
-        const paginatedSorted = allSorted.slice(from, to); // 🎯 정확히 3줄(9개) 슬라이싱
+        const paginatedSorted = allSorted.slice(from, to);
 
         if (paginatedSorted.length === 0) {
             area.innerHTML = `<div class="bg-white rounded-[2rem] shadow-xl border border-white p-20 text-center text-slate-400 font-bold">집계할 랭킹 데이터가 없습니다.</div>`;
@@ -447,16 +433,13 @@ Boako.Archive = {
 
         let html = `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
 
-        // 🎯 [완벽 정렬 복구 단락] map 함수 백틱 규격 정밀 마감 완료
         html += paginatedSorted.map((p, index) => {
-            const idx = from + index; // 전체 랭킹 인덱스 보정
-            
-            // 🎯 템플릿 스트링 내장 오류 예방용 변수 선제 바인딩
+            const idx = from + index;
             let logoHTML = `<span class="text-[10px]">👤</span>`;
+            
             if (p.logo_url && p.team !== 'Free Agent') {
                 logoHTML = `
                     <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
-                    
                     <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
                          style="top: var(--ranking-top, auto); left: var(--ranking-left, auto);">
                         <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
@@ -512,10 +495,9 @@ Boako.Archive = {
         }).join('');
 
         html += `</div>`;
-        html += this.renderPagination(); // 랭킹보드용 [1 2 3] 주입
+        html += this.renderPagination();
         area.innerHTML = html;
         
-        // 🎯 [실시간 랭킹 마우스 무감쇠 트래커] 카드 가두리를 탈출한 fixed 툴팁에 위치 연동
         area.querySelectorAll('.group\\/handler').forEach(handler => {
             handler.addEventListener('mousemove', (e) => {
                 const tooltip = handler.querySelector('.fixed');
@@ -529,7 +511,7 @@ Boako.Archive = {
         if(window.lucide) lucide.createIcons();
     },
 
-    // 7. 게임별 통계 렌더링 (10개씩 페이징 처리 완결)
+    // 7. 게임별 통계 렌더링
     renderGames: function() {
         const area = document.getElementById('archive-content-area');
         if (!area) return;
@@ -539,7 +521,6 @@ Boako.Archive = {
             return;
         }
 
-        // 10개 분량의 로우 데이터 폴더 정리 (순서 보장)
         const gameMap = new Map();
         this.gameRankings.forEach(row => {
             if (!gameMap.has(row.game_name)) {
@@ -620,7 +601,7 @@ Boako.Archive = {
         });
 
         html += `</div>`;
-        html += this.renderPagination(); // 게임별 통계용 10개 기준 [1 2 3] 주입
+        html += this.renderPagination();
 
         area.innerHTML = html;
         if(window.lucide) lucide.createIcons();
