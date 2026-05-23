@@ -313,7 +313,6 @@ Boako.Archive = {
         html += this.filteredRecords.map(rec => {
             let logoHTML = `<span class="text-[10px]">👤</span>`;
             if (rec.logo_url && rec.b_all_team !== 'Free Agent') {
-                // 💡 [수정 완치] Tailwind 간섭 명칭인 invisible opacity-0 싹 제거 후 기본 스타일로 완벽 격리
                 logoHTML = `
                     <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
                     <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
@@ -378,7 +377,6 @@ Boako.Archive = {
 
         area.innerHTML = html; 
         
-        // 🎯 [완치 통합 트래커] JS 제어로 CSS 간섭 없이 정확히 띄우고 붙입니다.
         area.querySelectorAll('[data-handler="archive-tooltip"]').forEach(handler => {
             const tooltip = handler.querySelector('.fixed');
             if (!tooltip) return;
@@ -445,20 +443,8 @@ Boako.Archive = {
 
         html += paginatedSorted.map((p, index) => {
             const idx = from + index;
-            let logoHTML = `<span class="text-[10px]">👤</span>`;
             
-            if (p.logo_url && p.team !== 'Free Agent') {
-                // 💡 [수정 완치] 랭킹보드 툴팁도 Tailwind 유령 명칭 다 날리고 순정 스타일 격리
-                logoHTML = `
-                    <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
-                    <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
-                         style="top: var(--ranking-top, auto); left: var(--ranking-left, auto); display: none; opacity: 0; transform: translate(-50%, -100%);">
-                        <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
-                        <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
-                    </div>
-                `;
-            }
-
+            // 🎯 [완치 핵심] 무조건 data-handler 속성을 가지는 상위 div 구조를 갖추어 조건부 렌더링 억까 완벽 가드
             return `
                 <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
                     <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
@@ -477,7 +463,18 @@ Boako.Archive = {
                         <div>
                             <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
                             <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer overflow-visible" data-handler="ranking-tooltip">
-                                ${logoHTML}
+                                ${
+                                    p.logo_url && p.team !== 'Free Agent'
+                                        ? `
+                                            <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
+                                            <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
+                                                 style="display: none; opacity: 0; transform: translate(-50%, -100%);">
+                                                <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
+                                                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
+                                            </div>
+                                          `
+                                        : `<span class="text-[10px]">👤</span>`
+                                }
                                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
                             </div>
                         </div>
@@ -509,7 +506,7 @@ Boako.Archive = {
         html += this.renderPagination();
         area.innerHTML = html;
         
-        // 🎯 [완치 통합 트래커] 랭킹보드용 다이렉트 돔 바인딩 스크립트
+        // 🎯 [완치] 공통 데이터셋 속성을 순회하며 내부 엘리먼트 존재 여부를 완벽하게 체크 후 안정적으로 리스너 주입
         area.querySelectorAll('[data-handler="ranking-tooltip"]').forEach(handler => {
             const tooltip = handler.querySelector('.fixed');
             if (!tooltip) return;
@@ -605,7 +602,7 @@ Boako.Archive = {
                                             <td class="px-5 py-3.5 font-black text-xs">
                                                 ${
                                                     p.rank === 1 ? '<span class="text-amber-500">🥇 1위</span>' :
-                                                    p.rank === 2 ? '<span class="text-slate-400">🥈 2位</span>' :
+                                                    p.rank === 2 ? '<span class="text-slate-400">🥈 2위</span>' :
                                                     p.rank === 3 ? '<span class="text-amber-700">🥉 3위</span>' : `<span class="text-slate-400 pl-1">${p.rank}위</span>`
                                                 }
                                             </td>
