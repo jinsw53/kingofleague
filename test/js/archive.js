@@ -612,5 +612,29 @@ Boako.Archive = {
 
         area.innerHTML = html;
         if(window.lucide) lucide.createIcons();
-    }
+    },
+/* ====================================================================
+ * 📐 [기록실 툴팁 개조] 함수 최하단 렌더링 마감 구역
+ * ==================================================================== */
+        html += `</tbody></table></div></div>`;
+        html += this.renderPagination();
+
+        area.innerHTML = html; 
+        
+        // 🎯 [마우스 위치 추적 연산식 추가] 
+        // 마우스 무빙 좌표를 fixed 툴팁에 동적으로 할당하여 사방 잘림을 전면 방어합니다.
+        area.querySelectorAll('tr').forEach(tr => {
+            const handler = tr.querySelector('.group\\/handler');
+            if (!handler) return;
+            handler.addEventListener('mousemove', (e) => {
+                const tooltip = handler.querySelector('.fixed');
+                if (tooltip) {
+                    tooltip.style.setProperty('--archive-top', `${e.clientY - 10}px`);
+                    tooltip.style.setProperty('--archive-left', `${e.clientX}px`);
+                }
+            });
+        });
+
+        if(window.lucide) lucide.createIcons(); 
+    },
 };
