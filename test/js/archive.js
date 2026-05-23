@@ -326,7 +326,7 @@ Boako.Archive = {
             return `
                 <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
                     <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
-                    <td class="px-4 py-4 relative group/handler">
+                    <td class="px-4 py-4 relative group/handler" data-handler="tooltip">
                         <div class="flex flex-col leading-tight">
                             <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
                             <div class="flex items-center gap-1.5 mt-1 cursor-pointer">
@@ -468,7 +468,7 @@ Boako.Archive = {
                         </div>
                         <div>
                             <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
-                            <div class="flex items-center gap-1.5 mt-1.5 relative group/handler cursor-pointer overflow-visible">
+                            <div class="flex items-center gap-1.5 mt-1.5 relative group/handler cursor-pointer overflow-visible" data-handler="tooltip">
                                 ${logoHTML}
                                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
                             </div>
