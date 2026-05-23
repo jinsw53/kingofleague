@@ -315,28 +315,29 @@ Boako.Archive = {
         `;
 
         html += this.filteredRecords.map(rec => `
-            <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
-                <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
-                <td class="px-4 py-4">
-                    <div class="flex flex-col leading-tight">
-                        <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
-                        <div class="flex items-center gap-1.5 mt-1 relative group/logo cursor-pointer">
-                            ${
-                                rec.logo_url && rec.b_all_team !== 'Free Agent'
-                                    ? `
-                                        <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
-                                        <div class="hidden group-hover/logo:flex absolute bottom-full left-0 mb-2 z-50 bg-white p-3 rounded-2xl shadow-2xl border border-slate-100 flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]">
-                                            <img src="${rec.logo_url}" class="w-16 h-16 object-contain rounded-xl bg-slate-50 p-1" alt="${rec.b_all_team} Large">
-                                            <span class="text-[10px] font-black text-indigo-950 uppercase tracking-wider">${rec.b_all_team}</span>
-                                            <div class="absolute top-full left-4 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-100 rotate-45"></div>
-                                        </div>
-                                      `
-                                    : `<span class="text-[10px]">👤</span>`
-                            }
-                            <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${rec.b_all_team || 'Free Agent'}</span>
-                        </div>
-                    </div>
-                </td>
+    <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
+        <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
+        <td class="px-4 py-4 relative group/handler"> <div class="flex flex-col leading-tight">
+                <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
+                <div class="flex items-center gap-1.5 mt-1 cursor-pointer">
+                    ${
+                        rec.logo_url && rec.b_all_team !== 'Free Agent'
+                            ? `
+                                <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
+                                
+                                <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center"
+                                     style="top: var(--archive-top, auto); left: var(--archive-left, auto);">
+                                    <img src="${rec.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
+                                    <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
+                                </div>
+                              `
+                            : `<span class="text-[10px]">👤</span>`
+                    }
+                    <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${rec.b_all_team || 'Free Agent'}</span>
+                </div>
+            </div>
+        </td>
+        `).join('');
                 <td class="px-4 py-4">
                     <div class="flex flex-col leading-tight">
                         <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
