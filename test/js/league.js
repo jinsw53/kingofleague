@@ -170,13 +170,18 @@ Boako.League.loadBingoBoardData = async function() {
         const initializedGames = Array(25).fill("미정 종목");
 
         if (data && data.length > 0) {
-            data.forEach(row => {
-                const idx = parseInt(row.coordinate_id) - 1; // 1~25를 0~24 배열 인덱스로 정밀 보정
-                if (idx >= 0 && idx < 25) {
-                    initializedBoard[idx] = row.occupying_team_name; // 정산 조건 통과한 1등 구단명 수송
-                    initializedGames[idx] = row.game_name || "지정 미정";
-                }
-            });
+           data.forEach(row => {
+    const idx = parseInt(row.coordinate_id) - 1;
+    if (idx >= 0 && idx < 25) {
+        initializedBoard[idx] = row.occupying_team_name; 
+        initializedGames[idx] = row.game_name || "지정 미정";
+        
+        // 🌟 아래 2줄이 장부에 추가되어 있으면 신형 렌더러가 완벽하게 주소를 가져옵니다!
+        Boako.League.State.boardLogos25[idx] = row.game_logo_url || null;
+        Boako.League.State.bingoTeamLogos25 = Boako.League.State.bingoTeamLogos25 || Array(25).fill(null);
+        Boako.League.State.bingoTeamLogos25[idx] = row.occupying_team_logo_url || null;
+    }
+});
         }
         
         Boako.League.State.bingoBoard = initializedBoard;
@@ -190,6 +195,9 @@ Boako.League.loadBingoBoardData = async function() {
     }
 };
 
+// ====================================================================
+// 🖼️ [정밀 교체] 빙고 타일 게임 로고 및 점유 팀 로고 레이아웃 고도화
+// ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
     if (!grid) return;
@@ -199,10 +207,11 @@ Boako.League.renderBingoBoard = function() {
     const myTeamName = Boako.state.team?.info?.team_name;
     
     Boako.League.State.bingoBoard.forEach((ownerTeam, idx) => {
-        const cell = document.createElement('div'); // 자동 정산이므로 수동 클릭 이벤트가 차단된 순수 정보 컨테이너로 등급 상향
+        const cell = document.createElement('div');
         const isWinner = winCells.includes(idx);
         const isMyTeam = ownerTeam && ownerTeam === myTeamName;
         
+        // 1) 구단 점유 상태별 배경 및 테두리 프리미엄 테일윈드 클래스 분기
         let bgClass = "bg-slate-50 border-slate-200/60";
         if (ownerTeam) {
             if (isMyTeam) {
@@ -216,18 +225,39 @@ Boako.League.renderBingoBoard = function() {
             }
         }
 
-        cell.className = `h-20 rounded-2xl border flex flex-col items-center justify-center p-1.5 transition-all text-center relative overflow-hidden ${bgClass}`;
+        // 고정 높이 24(96px)로 살짝 확장하여 이미지와 텍스트 공간을 확보하고 완벽한 비율로 통일합니다.
+        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-between p-2 transition-all text-center relative overflow-hidden ${bgClass}`;
         
-        const teamBadge = ownerTeam 
-            ? `<span class="text-[9px] ${isMyTeam ? 'bg-violet-600 text-white' : 'bg-slate-200 text-slate-800'} px-1.5 py-0.5 rounded-md font-black truncate max-w-[90%] block mt-1 shadow-sm">🛡️ ${ownerTeam}</span>` 
-            : '<span class="text-[9px] text-slate-400 font-bold mt-1">🏳️ 공석 영토</span>';
+        // 2) 보드게임 이미지 로고 레이어 (없을 경우 기본 이모지 박스로 대체 및 object-cover로 꽉 차게 조절)
+        const gameLogoUrl = Boako.League.State.boardLogos25[idx];
+        const gameImageHtml = gameLogoUrl 
+            ? `<img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:opacity-40 transition-opacity pointer-events-none">`
+            : `<div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none text-2xl">🎲</div>`;
+
+        // 3) 구단 점유 시 상단에 오버레이될 팀 로고 배지 컴포넌트 (공석일 때는 아무것도 안 뜨게 공백 처리)
+        let teamBadgeHtml = '';
+        if (ownerTeam) {
+            // 소장님 마스터 가상 뷰나 전역 장부에서 가져온 소속 팀 로고 주소가 있으면 바인딩, 없으면 기본 챌린지 껍데기 이미지 활용
+            const teamLogoUrl = Boako.League.State.bingoTeamLogos25 ? Boako.League.State.bingoTeamLogos25[idx] : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
+            
+            teamBadgeHtml = `
+                <div class="absolute top-1.5 left-1.5 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-sm pl-1 pr-1.5 py-0.5 rounded-lg border border-slate-200/80 shadow-sm max-w-[85%]">
+                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-4 h-4 object-contain rounded-full">
+                    <span class="text-[9px] font-black text-slate-800 truncate">${ownerTeam}</span>
+                </div>
+            `;
+        }
         
+        // 4) 최종 레이아웃 드로잉 (타일 번호/공석 텍스트 삭제 ➡️ 상단 이미지+팀로고 / 하단 미니멀 게임 텍스트 구조)
         cell.innerHTML = `
-            <span class="text-[9px] font-black tracking-wider ${isMyTeam ? 'text-violet-400' : 'text-slate-400'} uppercase">TILE ${idx+1}</span>
-            <span class="text-xs font-black truncate w-full tracking-tight mt-0.5">${Boako.League.State.boardGames25[idx]}</span>
-            ${teamBadge}
-            ${isWinner ? '<span class="absolute top-1 right-1.5 text-xs text-amber-400 animate-bounce">👑</span>' : ''}
+            ${gameImageHtml}
+            ${teamBadgeHtml}
+            <div class="w-full mt-auto z-10">
+                <p class="text-[10px] font-black truncate w-full tracking-tight px-0.5 bg-white/60 backdrop-blur-[1px] py-0.5 rounded-md text-slate-800 border border-white/40 shadow-sm">${Boako.League.State.boardGames25[idx]}</p>
+            </div>
+            ${isWinner ? '<span class="absolute top-1.5 right-2 text-xs text-amber-400 animate-bounce z-10">👑</span>' : ''}
         `;
+        
         grid.appendChild(cell);
     });
 
