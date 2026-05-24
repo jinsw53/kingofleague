@@ -301,36 +301,78 @@ Boako.League.countLinesForTeam = function(teamName) {
     return lines;
 };
 
+// ====================================================================
+// 🏅 [스코어보드 혁신] 소장님 뷰 기반 가로/세로/대각선 달성 팀 배지 시각화 엔진
+// ====================================================================
 Boako.League.updateStats = function() {
     const statContainer = document.getElementById('team-stat-rows-container');
     if (!statContainer) return;
 
-    const uniqueTeams = new Set();
-    Boako.League.State.bingoBoard.forEach(team => { if (team) uniqueTeams.add(team); });
+    const scoreData = Boako.League.State.teamBingoScores || [];
 
-    if (uniqueTeams.size === 0) {
-        statContainer.innerHTML = `<div class="text-center py-6 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl">🏳️ 아직 조건을 충족하여 점유한 구단별 영토가 없습니다.</div>`;
+    // 만약 집계된 구단 전적이 아예 없다면 깔끔하게 공백 처리
+    if (scoreData.length === 0) {
+        statContainer.innerHTML = `<div class="text-center py-6 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl">🏳️ 현재 전적 조건에 매칭된 구단별 점수가 없습니다.</div>`;
         return;
     }
 
-    const counts = {};
-    uniqueTeams.forEach(t => counts[t] = 0);
-    Boako.League.State.bingoBoard.forEach(team => { if(team) counts[team]++; });
-
     let html = '';
-    Array.from(uniqueTeams).forEach(teamName => {
-        const lineCount = Boako.League.countLinesForTeam(teamName);
-        const isMyTeam = teamName === Boako.state.team?.info?.team_name;
+    
+    scoreData.forEach(row => {
+        const teamName = row.team_name;
+        const basicSlots = row.basic_slots_score || 0;
+        const totalLines = row.bingo_lines_count || 0;
+        const totalScore = row.bingo_total_score || 0;
         
+        // 🎯 [소장님 뷰 매핑] 달성한 라인 유형별 훈장 배지 실시간 어셈블리
+        let badgesHtml = '';
+        
+        // 1. 가로줄 완성 체크 (Row 1 ~ 5)
+        for (let i = 1; i <= 5; i++) {
+            if (row[`is_row_${i}_completed`] === true) {
+                badgesHtml += `<span class="bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-sm">↔️ 가로 ${i}열</span>`;
+            }
+        }
+        
+        // 2. 세로줄 완성 체크 (Col 1 ~ 5)
+        for (let i = 1; i <= 5; i++) {
+            if (row[`is_col_${i}_completed`] === true) {
+                badgesHtml += `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-sm">↕️ 세로 ${i}행</span>`;
+            }
+        }
+        
+        // 3. 대각선 완성 체크 (Down / Up)
+        if (row.is_diagonal_down_completed === true) {
+            badgesHtml += `<span class="bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-sm">↘️ 대각선 우하</span>`;
+        }
+        if (row.is_diagonal_up_completed === true) {
+            badgesHtml += `<span class="bg-violet-50 text-violet-700 border border-violet-200 text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-sm">↗️ 대각선 우상</span>`;
+        }
+        
+        // 만약 점유 타일은 있으나 완성된 빙고줄이 없다면 기본 안내 문구 출력
+        if (!badgesHtml) {
+            badgesHtml = `<span class="text-slate-400 font-medium text-[10px] italic">현재 빙고 조합 연산 중...</span>`;
+        }
+
+        // 구단 카드 렌더링 구성
         html += `
-            <div class="flex justify-between items-center p-3 rounded-xl border ${isMyTeam ? 'bg-gradient-to-br from-violet-50 to-indigo-50/30 border-violet-200 shadow-sm' : 'bg-white border-slate-200/80'}">
-                <span class="font-black text-slate-800 flex items-center gap-1.5">
-                    ${isMyTeam ? '🛡️' : '🏃'} ${teamName} ${isMyTeam ? '<span class="text-[9px] bg-violet-600 text-white px-1 rounded font-black">My</span>' : ''}
-                </span>
-                <span class="font-bold text-slate-500 text-xs">
-                    영토 <span class="${isMyTeam ? 'text-violet-600' : 'text-slate-800'} font-extrabold text-sm">${counts[teamName]}</span>칸 / 
-                    빙고 <span class="text-amber-500 font-extrabold text-sm">${lineCount}</span>줄
-                </span>
+            <div class="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-sm space-y-3 transition-all hover:border-slate-300">
+                <div class="flex justify-between items-center">
+                    <span class="font-black text-slate-800 text-xs flex items-center gap-1">🛡️ ${teamName}</span>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-400 font-bold">총점</span>
+                        <span class="text-indigo-600 font-black text-sm ml-0.5">${totalScore} XP</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2 text-center bg-slate-50 p-2 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100">
+                    <div>점유 영토 <span class="text-slate-800 font-black">${basicSlots}칸</span></div>
+                    <div class="border-l border-slate-200">완성 라인 <span class="text-amber-500 font-black">${totalLines}줄</span></div>
+                </div>
+                
+                <div class="flex flex-wrap gap-1 pt-1 border-t border-dashed border-slate-100">
+                    ${badgesHtml}
+                </div>
             </div>
         `;
     });
