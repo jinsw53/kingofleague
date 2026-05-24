@@ -201,7 +201,7 @@ Boako.League.loadBingoBoardData = async function() {
 };
 
 // ====================================================================
-// 🖼️ [폭 기준 보정] 이미지 커팅 원천 차단 및 칸 내부 안착 레이아웃
+// 🖼️ [상단 정렬 보정] 이미지 배치 상단 고정 및 게임명 라벨 간섭 차단
 // ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
@@ -232,17 +232,17 @@ Boako.League.renderBingoBoard = function() {
         // 고정 높이 24(96px) 규격 유지
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-between p-2 transition-all text-center relative overflow-hidden ${bgClass}`;
         
-        // 🎯 이미지 폭 기준 피팅:
-        // 너비를 100%(w-full)로 채우고 높이는 자동(h-auto)으로 흐르게 하되, 
-        // max-h-full과 object-contain을 조합하여 칸 밖으로 이미지가 잘려 나가는 것을 원천 봉쇄합니다.
+        // 🎯 이미지 상단 정렬 및 여백 확보:
+        // 기존 items-center(중앙 정렬)를 items-start(상단 정렬)로 전격 교체하고, pt-2(위쪽 여백)를 주어 
+        // 하단 게임명 텍스트 라벨 박스와 물리적 거리를 벌려 로고가 가려지는 현상을 원천 방어합니다.
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         const gameImageHtml = gameLogoUrl 
-            ? `<div class="absolute inset-0 w-full h-full p-1.5 flex items-center justify-center pointer-events-none">
-                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="w-full h-auto max-h-full object-contain opacity-35 group-hover:opacity-50 transition-opacity">
+            ? `<div class="absolute inset-0 w-full h-full pt-2 px-1.5 flex items-start justify-center pointer-events-none">
+                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="w-full h-auto max-h-[58px] object-contain opacity-35 group-hover:opacity-50 transition-opacity">
                </div>`
             : `<div class="absolute inset-0 w-full h-full flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100">🎲</div>`;
 
-        // 👑 점유 구단 팀 배지 렌더링 (공석일 땐 철저히 공백)
+        // 👑 점유 구단 팀 배지 렌더링
         let teamBadgeHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25 ? Boako.League.State.bingoTeamLogos25[idx] : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
@@ -255,7 +255,7 @@ Boako.League.renderBingoBoard = function() {
             `;
         }
         
-        // 하단 게임명 가독성 라벨 레이아웃
+        // 하단 게임명 가독성 라벨 레이아웃 (위쪽 마진 mt-auto 구조로 무조건 바닥 안착)
         cell.innerHTML = `
             ${gameImageHtml}
             ${teamBadgeHtml}
