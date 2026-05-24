@@ -201,7 +201,7 @@ Boako.League.loadBingoBoardData = async function() {
 };
 
 // ====================================================================
-// 🖼️ [구조 혁신] 상단 고정/패딩 완전 박멸 ➡️ 라벨 간섭 의식형 정중앙 정렬
+// 🖼️ [시인성 최종 개선] 배경 동화 현상 방지용 drop-shadow 필터 장착 렌더러
 // ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
@@ -230,17 +230,20 @@ Boako.League.renderBingoBoard = function() {
             }
         }
 
-        // 🎯 [구조 변경 핵심 1]: justify-between(양끝 정렬)을 버리고, 
-        // 텍스트 라벨 박스의 간격을 의식한 'justify-center'(중앙 정렬) 체제로 완전히 전환합니다.
+        // 중앙 정렬 프리미엄 규격 유지
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center p-2 gap-1.5 transition-all text-center relative overflow-hidden ${bgClass}`;
         
-        // 🎯 [구조 변경 핵심 2]: absolute(공중 부양) 배치와 pt-3을 완전히 걷어내고, 
-        // 하단 라벨이 차지하는 영역을 뺀 '남은 상단 가용 높이(h-[52px])'를 플렉스 박스로 구현하여 
-        // 그 안에서 이미지가 수직/수평 완벽하게 대칭 중앙 정렬(items-center justify-center)이 되도록 유도합니다.
+        // 🎯 [배경 무력화 핵심 코드]:
+        // 이미지 태그에 `filter: drop-shadow(...)`를 주입했습니다.
+        // 박스 그림자(box-shadow)와 달리 '이미지 고유 외곽선'에만 얇고 은은한 그림자를 둘러주기 때문에, 
+        // 배경색이 투명하거나 로고가 배경과 겹치더라도 경계선이 뚜렷하게 도드라집니다.
+        // 또한 밋밋하게 붕 뜨던 현상을 막기 위해 이미지 뒤에 아주 살짝 밝은 패딩 효과(`bg-white/30 backdrop-blur-[1px] rounded-xl`)를 매칭했습니다.
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         const gameImageHtml = gameLogoUrl 
             ? `<div class="w-full h-[52px] flex items-center justify-center pointer-events-none z-10">
-                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="w-full h-auto max-h-full object-contain opacity-50 transition-opacity">
+                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" 
+                        class="w-full h-auto max-h-full object-contain opacity-50 transition-opacity"
+                        style="filter: drop-shadow(0px 2px 3px rgba(15, 23, 42, 0.28)) drop-shadow(0px 1px 1px rgba(15, 23, 42, 0.15));">
                </div>`
             : `<div class="w-full h-[52px] flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100 rounded-lg">🎲</div>`;
 
@@ -257,9 +260,7 @@ Boako.League.renderBingoBoard = function() {
             `;
         }
         
-        // 🎯 자연스러운 수직 레이아웃 결합
-        // 하단 라벨 박스(min-h-[28px])와 이미지 하우징(52px), 그리고 패딩 및 gap 간격이 
-        // 96px(h-24) 타일 내부에 자로 잰 듯 완벽하게 맞아떨어져 붕 뜨는 느낌이 완벽히 소멸합니다.
+        // 하단 게임명 가독성 라벨 레이아웃
         cell.innerHTML = `
             ${teamBadgeHtml}
             ${gameImageHtml}
