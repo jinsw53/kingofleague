@@ -111,18 +111,16 @@ Boako.League.switchTab = async function(tabId) {
     }
 };
 
-// ==========================================
-// 🎲 탭 1: 5x5 팀 빙고전 실시간 가상 뷰 연동단 (순수 자동 정산화 완결본)
+// ====================================================================
+// 🎲 탭 1: 5x5 팀 빙고전 실시간 가상 뷰 연동단 (소속 구단 노출 바 완전 박멸)
 // ====================================================================
 Boako.League.getBingoHTML = function() {
-    const myTeamName = Boako.state.team?.info?.team_name || "미소속 구단";
-    
     return `
         <div class="space-y-6">
             <div class="p-5 sm:p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h3 class="font-black text-slate-800 text-base">BTL 실시간 영토 빙고전</h3>
-                    <p class="text-xs text-slate-500 font-bold mt-1">구단원들의 전적 통계가 소장님의 백엔드 연산 조건에 충족되면 자동으로 마킹 영토가 갱신됩니다.</p>
+                    <p class="text-xs text-slate-500 font-bold mt-1">구단원들의 누적 전적 데이터가 소장님의 실시간 백엔드 연산 조건에 충족되면 자동으로 마킹 영토가 갱신됩니다.</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5">
@@ -131,18 +129,11 @@ Boako.League.getBingoHTML = function() {
                 </div>
             </div>
 
-            <div class="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200/60 text-xs font-bold">
-                <div class="flex items-center gap-2">
-                    <span class="text-slate-400 font-black uppercase tracking-wider">현재 내 소속 구단:</span>
-                    <span class="text-violet-700 font-black bg-violet-50 border border-violet-100 px-3 py-1.5 rounded-xl text-xs">🛡️ ${myTeamName}</span>
-                </div>
-                <span class="text-slate-400 font-medium flex items-center gap-1">📊 각 타일은 난이도별(EASY/NORMAL/HARD) 구단원 플레이 비중을 연산합니다.</span>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
                     <div class="grid grid-cols-5 gap-2" id="bingo-grid"></div>
                 </div>
+                
                 <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
                     <h5 class="font-black text-slate-800 text-sm border-b border-violet-100 pb-2.5 flex items-center gap-2">
                         <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 구단별 실시간 영토 스코어보드
