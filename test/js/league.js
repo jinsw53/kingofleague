@@ -8,8 +8,10 @@ Boako.League = Boako.League || {};
 // 💡 1. 리그 전용 로컬 상태 관리 (명칭 일치 및 오염 방지)
 Boako.League.State = {
     currentTab: 'bingo',
-    bingoBoard: Array(25).fill(null),    // 🌟 가상 뷰의 occupying_team_name이 순서대로 바인딩됨
-    boardGames25: Array(25).fill("지정 미정"), // 🌟 뷰에서 동적으로 공급하는 실시간 게임명 적재
+    bingoBoard: Array(25).fill(null),       // 🌟 뷰의 occupying_team_name 적재
+    boardGames25: Array(25).fill("지정 미정"), // 🌟 뷰의 game_name 적재
+    boardLogos25: Array(25).fill(null),      // 🌟 [방 생성 완료] 뷰의 game_logo_url 적재
+    bingoTeamLogos25: Array(25).fill(null),  // 🌟 [방 생성 완료] 뷰의 occupying_team_logo_url 적재
     champions: []
 };
 
@@ -166,26 +168,29 @@ Boako.League.loadBingoBoardData = async function() {
         const { data, error } = await Boako.db.from('v_bingo_board_live_scoring').select('*').order('coordinate_id', { ascending: true });
         if (error) throw error;
 
+        // 초기화용 임시 메모리 장부 생성
         const initializedBoard = Array(25).fill(null);
         const initializedGames = Array(25).fill("미정 종목");
+        const initializedGameLogos = Array(25).fill(null);
+        const initializedTeamLogos = Array(25).fill(null);
 
         if (data && data.length > 0) {
-           data.forEach(row => {
-    const idx = parseInt(row.coordinate_id) - 1;
-    if (idx >= 0 && idx < 25) {
-        initializedBoard[idx] = row.occupying_team_name; 
-        initializedGames[idx] = row.game_name || "지정 미정";
-        
-        // 🌟 아래 2줄이 장부에 추가되어 있으면 신형 렌더러가 완벽하게 주소를 가져옵니다!
-        Boako.League.State.boardLogos25[idx] = row.game_logo_url || null;
-        Boako.League.State.bingoTeamLogos25 = Boako.League.State.bingoTeamLogos25 || Array(25).fill(null);
-        Boako.League.State.bingoTeamLogos25[idx] = row.occupying_team_logo_url || null;
-    }
-});
+            data.forEach(row => {
+                const idx = parseInt(row.coordinate_id) - 1; // 1~25를 0~24 배열 인덱스로 정밀 보정
+                if (idx >= 0 && idx < 25) {
+                    initializedBoard[idx] = row.occupying_team_name || null; 
+                    initializedGames[idx] = row.game_name || "지정 미정";
+                    initializedGameLogos[idx] = row.game_logo_url || null;
+                    initializedTeamLogos[idx] = row.occupying_team_logo_url || null;
+                }
+            });
         }
         
+        // 안전하게 한 번에 전역 장부로 데이터 이관 수송
         Boako.League.State.bingoBoard = initializedBoard;
         Boako.League.State.boardGames25 = initializedGames;
+        Boako.League.State.boardLogos25 = initializedGameLogos;
+        Boako.League.State.bingoTeamLogos25 = initializedTeamLogos;
         
         Boako.League.renderBingoBoard();
 
