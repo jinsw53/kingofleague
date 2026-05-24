@@ -8,21 +8,9 @@ Boako.League = Boako.League || {};
 // 💡 1. 리그 전용 로컬 상태 관리 (명칭 일치 및 오염 방지)
 Boako.League.State = {
     currentTab: 'bingo',
-    selectedTeam: 'blue',
-    bingoBoard: Array(25).fill(null),
-    // ⚔️ challenge 가문 명칭 정돈 완료
-    challenges: [
-        { id: 1, attacker: '블루 타이거', defender: '레드 피닉스', game: '스플렌더', message: '스플렌더 3라운드 안에 귀족 카드 다 털고 챔피언 사수하겠습니다.', accepted: false },
-        { id: 2, attacker: '그린 드래곤', defender: '골드 세이버', game: '아크 노바', message: '대칭 배치 동물원의 참맛을 확실히 교육해 드립니다.', accepted: true }
-    ],
-    champions: [], 
-    boardGames25: [
-        "스플렌더", "아크 노바", "윙스팬", "쿼리도", "티켓 투 라이드", 
-        "카르카손", "캐스케디아", "센추리", "아발론", "한밤의 늑대인간", 
-        "라스베가스", "다빈치코드", "달무티", "젝스님트", "스컬", 
-        "루미큐브", "테라포밍", "코드네임", "카탄", "패치워크", 
-        "러브레터", "딕싯", "가이아", "오를레앙", "하모니즈"
-    ]
+    bingoBoard: Array(25).fill(null),    // 🌟 가상 뷰의 occupying_team_name이 순서대로 바인딩됨
+    boardGames25: Array(25).fill("지정 미정"), // 🌟 뷰에서 동적으로 공급하는 실시간 게임명 적재
+    champions: []
 };
 
 // 💡 2. 메인 UI 사출 엔진 (기존 좌측 텍스트를 날리고 수평 라인을 유지한 채 배너 확장)
@@ -103,7 +91,11 @@ Boako.League.switchTab = async function(tabId) {
 
     if (tabId === 'bingo') {
         container.innerHTML = Boako.League.getBingoHTML();
-        Boako.League.renderBingoBoard();
+        
+        // 🔴 [기존 하드코딩 실행문] Boako.League.renderBingoBoard();
+        // 🟢 [교체 실행문] 소장님의 실시간 연산 뷰를 백엔드에서 다이렉트로 호출합니다.
+        await Boako.League.loadBingoBoardData(); 
+    }
     } else if (tabId === 'challenge') {
         container.innerHTML = Boako.League.getChallengeHTML();
         Boako.League.renderChallenges();
@@ -120,28 +112,31 @@ Boako.League.switchTab = async function(tabId) {
 };
 
 // ==========================================
-// 🎲 탭 1: 5x5 팀 빙고전 오리지널 순정 로직
-// ==========================================
+// 🎲 탭 1: 5x5 팀 빙고전 실시간 가상 뷰 연동단 (순수 자동 정산화 완결본)
+// ====================================================================
 Boako.League.getBingoHTML = function() {
+    const myTeamName = Boako.state.team?.info?.team_name || "미소속 구단";
+    
     return `
         <div class="space-y-6">
             <div class="p-5 sm:p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h3 class="font-black text-slate-800 text-base">팀 빙고 실시간 영토전</h3>
-                    <p class="text-xs text-slate-500 font-bold mt-1">우리 팀 소유의 타일을 늘려서 가로/세로/대각선 5칸 연결을 완성하세요!</p>
+                    <h3 class="font-black text-slate-800 text-base">BTL 실시간 영토 빙고전</h3>
+                    <p class="text-xs text-slate-500 font-bold mt-1">구단원들의 전적 통계가 소장님의 백엔드 연산 조건에 충족되면 자동으로 마킹 영토가 갱신됩니다.</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button onclick="Boako.League.randomizeBoard()" class="bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors">무작위 영토 부여</button>
-                    <button onclick="Boako.League.clearBoard()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs px-4 py-2.5 rounded-xl transition-colors">초기화</button>
+                    <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5">
+                        <span>🔄 라이브 스코어 정산</span>
+                    </button>
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                <span class="text-xs font-black text-slate-400 mr-2 uppercase tracking-wider">가문 색상 설정:</span>
-                <button onclick="Boako.League.selectTeam('blue')" id="team-sel-blue" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💙 블루 타이거</button>
-                <button onclick="Boako.League.selectTeam('red')" id="team-sel-red" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">❤️ 레드 피닉스</button>
-                <button onclick="Boako.League.selectTeam('emerald')" id="team-sel-emerald" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💚 그린 드래곤</button>
-                <button onclick="Boako.League.selectTeam('amber')" id="team-sel-amber" class="px-4 py-2 text-xs font-bold rounded-xl transition-all">💛 골드 세이버</button>
+            <div class="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200/60 text-xs font-bold">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400 font-black uppercase tracking-wider">현재 내 소속 구단:</span>
+                    <span class="text-violet-700 font-black bg-violet-50 border border-violet-100 px-3 py-1.5 rounded-xl text-xs">🛡️ ${myTeamName}</span>
+                </div>
+                <span class="text-slate-400 font-medium flex items-center gap-1">📊 각 타일은 난이도별(EASY/NORMAL/HARD) 구단원 플레이 비중을 연산합니다.</span>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -150,25 +145,10 @@ Boako.League.getBingoHTML = function() {
                 </div>
                 <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
                     <h5 class="font-black text-slate-800 text-sm border-b border-violet-100 pb-2.5 flex items-center gap-2">
-                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 가문별 실시간 영토 점유 현황
+                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 구단별 실시간 영토 스코어보드
                     </h5>
-                    <div class="space-y-2 text-xs">
-                        <div class="flex justify-between items-center bg-blue-50/50 border border-blue-100 p-3 rounded-xl">
-                            <span class="font-black text-blue-700">💙 블루 타이거</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-blue-tiles" class="text-blue-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-blue-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-rose-50/50 border border-rose-100 p-3 rounded-xl">
-                            <span class="font-black text-rose-700">❤️ 레드 피닉스</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-red-tiles" class="text-rose-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-red-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-emerald-50/50 border border-emerald-100 p-3 rounded-xl">
-                            <span class="font-black text-emerald-700">💚 그린 드래곤</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-emerald-tiles" class="text-emerald-600 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-emerald-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-amber-50/50 border border-amber-100 p-3 rounded-xl">
-                            <span class="font-black text-amber-800">💛 골드 세이버</span>
-                            <span class="font-bold text-slate-600">영토 <span id="stat-amber-tiles" class="text-amber-700 font-extrabold text-sm">0</span>칸 / 빙고 <span id="stat-amber-lines" class="text-amber-500 font-extrabold text-sm">0</span>줄</span>
-                        </div>
+                    <div id="team-stat-rows-container" class="space-y-2 text-xs">
+                        <div class="text-center py-4 text-slate-400 font-bold">집계 데이터를 계산 중...</div>
                     </div>
                 </div>
             </div>
@@ -176,46 +156,84 @@ Boako.League.getBingoHTML = function() {
     `;
 };
 
-Boako.League.selectTeam = function(teamId) {
-    if (typeof sfx !== 'undefined') sfx.playClick();
-    Boako.League.State.selectedTeam = teamId;
-    const teams = ['blue', 'red', 'emerald', 'amber'];
-    const classConfig = {
-        blue: "bg-blue-600 text-white shadow-md",
-        red: "bg-red-600 text-white shadow-md",
-        emerald: "bg-emerald-600 text-white shadow-md",
-        amber: "bg-amber-500 text-slate-900 shadow-md font-extrabold"
-    };
-    teams.forEach(t => {
-        const btn = document.getElementById(`team-sel-${t}`);
-        if (btn) btn.className = (t === teamId) ? `px-4 py-2 text-xs font-bold rounded-xl transition-all ${classConfig[t]}` : "px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-500 hover:bg-slate-100";
-    });
+// 🌟 [소장님 마스터 가상 뷰 v_bingo_board_live_scoring 수송선 로더]
+Boako.League.loadBingoBoardData = async function() {
+    const grid = document.getElementById('bingo-grid');
+    if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-bold text-slate-400">🌐 실시간 라이브 스코어 연산 중...</div>`;
+
+    try {
+        if (!Boako.db) throw new Error("Supabase 비가동 상태");
+
+        // 소장님이 하사하신 황금의 실시간 연산 뷰 다이렉트 쿼리 수행
+        const { data, error } = await Boako.db.from('v_bingo_board_live_scoring').select('*').order('coordinate_id', { ascending: true });
+        if (error) throw error;
+
+        const initializedBoard = Array(25).fill(null);
+        const initializedGames = Array(25).fill("미정 종목");
+
+        if (data && data.length > 0) {
+            data.forEach(row => {
+                const idx = parseInt(row.coordinate_id) - 1; // 1~25를 0~24 배열 인덱스로 정밀 보정
+                if (idx >= 0 && idx < 25) {
+                    initializedBoard[idx] = row.occupying_team_name; // 정산 조건 통과한 1등 구단명 수송
+                    initializedGames[idx] = row.game_name || "지정 미정";
+                }
+            });
+        }
+        
+        Boako.League.State.bingoBoard = initializedBoard;
+        Boako.League.State.boardGames25 = initializedGames;
+        
+        Boako.League.renderBingoBoard();
+
+    } catch (err) {
+        console.error("빙고 라이브 스코어 로드 실패:", err);
+        if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-black text-rose-500">❌ 연산 뷰 동기화 실패 (${err.message})</div>`;
+    }
 };
 
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    const teamStyles = { blue: 'bg-blue-600 text-white border-blue-400 shadow-inner scale-[0.97]', red: 'bg-red-600 text-white border-red-400 shadow-inner scale-[0.97]', emerald: 'bg-emerald-600 text-white border-emerald-400 shadow-inner scale-[0.97]', amber: 'bg-amber-500 text-slate-950 border-amber-300 font-extrabold shadow-inner scale-[0.97]' };
+    
     const winCells = Boako.League.calculateWinningCells();
-    Boako.League.State.bingoBoard.forEach((owner, idx) => {
-        const cell = document.createElement('button');
+    const myTeamName = Boako.state.team?.info?.team_name;
+    
+    Boako.League.State.bingoBoard.forEach((ownerTeam, idx) => {
+        const cell = document.createElement('div'); // 자동 정산이므로 수동 클릭 이벤트가 차단된 순수 정보 컨테이너로 등급 상향
         const isWinner = winCells.includes(idx);
-        cell.className = `h-20 rounded-2xl border flex flex-col items-center justify-center p-1.5 transition-all text-center relative overflow-hidden group ${owner ? `${teamStyles[owner]} ${isWinner ? 'bingo-won-pulse border-2' : ''}` : 'bg-slate-50 border-slate-200/70 hover:border-violet-500 hover:bg-slate-100/50'}`;
-        cell.onclick = () => Boako.League.toggleTile(idx);
-        const flag = owner ? {blue:'💙', red:'❤️', emerald:'💚', amber:'💛'}[owner] : '';
-        cell.innerHTML = `<span class="text-[9px] font-black tracking-wider text-slate-400 group-hover:text-violet-600 transition-colors uppercase">TILE ${idx+1} ${flag}</span><span class="text-xs font-black truncate w-full tracking-tight mt-1">${Boako.League.State.boardGames25[idx]}</span>${isWinner ? '<span class="absolute bottom-1 right-1.5 text-xs text-amber-400">★</span>' : ''}`;
+        const isMyTeam = ownerTeam && ownerTeam === myTeamName;
+        
+        let bgClass = "bg-slate-50 border-slate-200/60";
+        if (ownerTeam) {
+            if (isMyTeam) {
+                bgClass = isWinner 
+                    ? "bg-gradient-to-br from-violet-600 to-indigo-600 text-white border-violet-400 bingo-won-pulse border-2 scale-[0.97] shadow-md" 
+                    : "bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300 text-violet-950 font-black scale-[0.97] shadow-inner border";
+            } else {
+                bgClass = isWinner 
+                    ? "bg-slate-700 text-slate-100 border-slate-500 scale-[0.97] opacity-80" 
+                    : "bg-slate-100 border-slate-200 text-slate-700 font-bold scale-[0.97]";
+            }
+        }
+
+        cell.className = `h-20 rounded-2xl border flex flex-col items-center justify-center p-1.5 transition-all text-center relative overflow-hidden ${bgClass}`;
+        
+        const teamBadge = ownerTeam 
+            ? `<span class="text-[9px] ${isMyTeam ? 'bg-violet-600 text-white' : 'bg-slate-200 text-slate-800'} px-1.5 py-0.5 rounded-md font-black truncate max-w-[90%] block mt-1 shadow-sm">🛡️ ${ownerTeam}</span>` 
+            : '<span class="text-[9px] text-slate-400 font-bold mt-1">🏳️ 공석 영토</span>';
+        
+        cell.innerHTML = `
+            <span class="text-[9px] font-black tracking-wider ${isMyTeam ? 'text-violet-400' : 'text-slate-400'} uppercase">TILE ${idx+1}</span>
+            <span class="text-xs font-black truncate w-full tracking-tight mt-0.5">${Boako.League.State.boardGames25[idx]}</span>
+            ${teamBadge}
+            ${isWinner ? '<span class="absolute top-1 right-1.5 text-xs text-amber-400 animate-bounce">👑</span>' : ''}
+        `;
         grid.appendChild(cell);
     });
-    Boako.League.selectTeam(Boako.League.State.selectedTeam);
-    Boako.League.updateStats();
-};
 
-Boako.League.toggleTile = function(index) {
-    if (typeof sfx !== 'undefined') sfx.playClick();
-    if (Boako.League.State.bingoBoard[index] === Boako.League.State.selectedTeam) Boako.League.State.bingoBoard[index] = null;
-    else Boako.League.State.bingoBoard[index] = Boako.League.State.selectedTeam;
-    Boako.League.renderBingoBoard();
+    Boako.League.updateStats();
 };
 
 Boako.League.calculateWinningCells = function() {
@@ -227,30 +245,49 @@ Boako.League.calculateWinningCells = function() {
     return Array.from(winningSet);
 };
 
-Boako.League.countLinesForTeam = function(team) {
+Boako.League.countLinesForTeam = function(teamName) {
     const size = 5; let lines = 0; const board = Boako.League.State.bingoBoard;
-    for (let r = 0; r < size; r++) if (Array(size).fill(0).every((_, c) => board[r * size + c] === team)) lines++;
-    for (let c = 0; c < size; c++) if (Array(size).fill(0).every((_, r) => board[r * size + c] === team)) lines++;
-    if (Array(size).fill(0).every((_, i) => board[i * size + i] === team)) lines++; if (Array(size).fill(0).every((_, i) => board[i * size + (size - 1 - i)] === team)) lines++;
+    for (let r = 0; r < size; r++) if (Array(size).fill(0).every((_, c) => board[r * size + c] === teamName)) lines++;
+    for (let c = 0; c < size; c++) if (Array(size).fill(0).every((_, r) => board[r * size + c] === teamName)) lines++;
+    if (Array(size).fill(0).every((_, i) => board[i * size + i] === teamName)) lines++; if (Array(size).fill(0).every((_, i) => board[i * size + (size - 1 - i)] === teamName)) lines++;
     return lines;
 };
 
 Boako.League.updateStats = function() {
-    const counts = { blue: 0, red: 0, emerald: 0, amber: 0 }; Boako.League.State.bingoBoard.forEach(owner => { if(owner) counts[owner]++; });
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-    setVal('stat-blue-tiles', counts.blue); setVal('stat-blue-lines', Boako.League.countLinesForTeam('blue'));
-    setVal('stat-red-tiles', counts.red); setVal('stat-red-lines', Boako.League.countLinesForTeam('red'));
-    setVal('stat-emerald-tiles', counts.emerald); setVal('stat-emerald-lines', Boako.League.countLinesForTeam('emerald'));
-    setVal('stat-amber-tiles', counts.amber); setVal('stat-amber-lines', Boako.League.countLinesForTeam('amber'));
-};
+    const statContainer = document.getElementById('team-stat-rows-container');
+    if (!statContainer) return;
 
-Boako.League.randomizeBoard = function() {
-    const options = [null, 'blue', 'red', 'emerald', 'amber', null]; Boako.League.State.bingoBoard = Boako.League.State.bingoBoard.map(() => options[Math.floor(Math.random() * options.length)]);
-    Boako.League.renderBingoBoard();
-};
+    const uniqueTeams = new Set();
+    Boako.League.State.bingoBoard.forEach(team => { if (team) uniqueTeams.add(team); });
 
-Boako.League.clearBoard = function() {
-    Boako.League.State.bingoBoard = Array(25).fill(null); Boako.League.renderBingoBoard();
+    if (uniqueTeams.size === 0) {
+        statContainer.innerHTML = `<div class="text-center py-6 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl">🏳️ 아직 조건을 충족하여 점유한 구단별 영토가 없습니다.</div>`;
+        return;
+    }
+
+    const counts = {};
+    uniqueTeams.forEach(t => counts[t] = 0);
+    Boako.League.State.bingoBoard.forEach(team => { if(team) counts[team]++; });
+
+    let html = '';
+    Array.from(uniqueTeams).forEach(teamName => {
+        const lineCount = Boako.League.countLinesForTeam(teamName);
+        const isMyTeam = teamName === Boako.state.team?.info?.team_name;
+        
+        html += `
+            <div class="flex justify-between items-center p-3 rounded-xl border ${isMyTeam ? 'bg-gradient-to-br from-violet-50 to-indigo-50/30 border-violet-200 shadow-sm' : 'bg-white border-slate-200/80'}">
+                <span class="font-black text-slate-800 flex items-center gap-1.5">
+                    ${isMyTeam ? '🛡️' : '🏃'} ${teamName} ${isMyTeam ? '<span class="text-[9px] bg-violet-600 text-white px-1 rounded font-black">My</span>' : ''}
+                </span>
+                <span class="font-bold text-slate-500 text-xs">
+                    영토 <span class="${isMyTeam ? 'text-violet-600' : 'text-slate-800'} font-extrabold text-sm">${counts[teamName]}</span>칸 / 
+                    빙고 <span class="text-amber-500 font-extrabold text-sm">${lineCount}</span>줄
+                </span>
+            </div>
+        `;
+    });
+
+    statContainer.innerHTML = html;
 };
 
 // ==========================================
