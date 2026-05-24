@@ -237,8 +237,8 @@ Boako.League.renderBingoBoard = function() {
         // 하단 게임명 텍스트 라벨 박스와 물리적 거리를 벌려 로고가 가려지는 현상을 원천 방어합니다.
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         const gameImageHtml = gameLogoUrl 
-            ? `<div class="absolute inset-0 w-full h-full pt-2 px-1.5 flex items-start justify-center pointer-events-none">
-                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="w-full h-auto max-h-[58px] object-contain opacity-35 group-hover:opacity-50 transition-opacity">
+            ? `<div class="absolute inset-0 w-full h-full pt-3 px-1.5 flex items-start justify-center pointer-events-none">
+                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="w-full h-auto max-h-[58px] object-contain opacity-50 group-hover:opacity-50 transition-opacity">
                </div>`
             : `<div class="absolute inset-0 w-full h-full flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100">🎲</div>`;
 
