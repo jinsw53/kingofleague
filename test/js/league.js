@@ -201,7 +201,7 @@ Boako.League.loadBingoBoardData = async function() {
 };
 
 // ====================================================================
-// 🖼️ [상단 정렬 보정] 이미지 배치 상단 고정 및 게임명 라벨 간섭 차단
+// 🖼️ [구조 혁신] 상단 고정/패딩 완전 박멸 ➡️ 라벨 간섭 의식형 정중앙 정렬
 // ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
@@ -219,9 +219,10 @@ Boako.League.renderBingoBoard = function() {
         let bgClass = "bg-slate-50 border-slate-200/60";
         if (ownerTeam) {
             if (isMyTeam) {
-                bgClass = isWinner 
-                    ? "bg-gradient-to-br from-violet-600 to-indigo-600 text-white border-violet-400 bingo-won-pulse border-2 scale-[0.97] shadow-md" 
-                    : "bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300 text-violet-950 font-black scale-[0.97] shadow-inner border";
+                bgClass = "bg-gradient-to-br from-violet-600 to-indigo-600 text-white border-violet-400 bingo-won-pulse border-2 scale-[0.97] shadow-md";
+                if (!isWinner) {
+                    bgClass = "bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300 text-violet-950 font-black scale-[0.97] shadow-inner border";
+                }
             } else {
                 bgClass = isWinner 
                     ? "bg-slate-700 text-slate-100 border-slate-500 scale-[0.97] opacity-80" 
@@ -229,18 +230,19 @@ Boako.League.renderBingoBoard = function() {
             }
         }
 
-        // 고정 높이 24(96px) 규격 유지
-        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-between p-2 transition-all text-center relative overflow-hidden ${bgClass}`;
+        // 🎯 [구조 변경 핵심 1]: justify-between(양끝 정렬)을 버리고, 
+        // 텍스트 라벨 박스의 간격을 의식한 'justify-center'(중앙 정렬) 체제로 완전히 전환합니다.
+        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center p-2 gap-1.5 transition-all text-center relative overflow-hidden ${bgClass}`;
         
-        // 🎯 이미지 상단 정렬 및 여백 확보:
-        // 기존 items-center(중앙 정렬)를 items-start(상단 정렬)로 전격 교체하고, pt-2(위쪽 여백)를 주어 
-        // 하단 게임명 텍스트 라벨 박스와 물리적 거리를 벌려 로고가 가려지는 현상을 원천 방어합니다.
+        // 🎯 [구조 변경 핵심 2]: absolute(공중 부양) 배치와 pt-3을 완전히 걷어내고, 
+        // 하단 라벨이 차지하는 영역을 뺀 '남은 상단 가용 높이(h-[52px])'를 플렉스 박스로 구현하여 
+        // 그 안에서 이미지가 수직/수평 완벽하게 대칭 중앙 정렬(items-center justify-center)이 되도록 유도합니다.
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         const gameImageHtml = gameLogoUrl 
-            ? `<div class="absolute inset-0 w-full h-full pt-3 px-1.5 flex items-start justify-center pointer-events-none">
-                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="w-full h-auto max-h-[58px] object-contain opacity-50 group-hover:opacity-50 transition-opacity">
+            ? `<div class="w-full h-[52px] flex items-center justify-center pointer-events-none z-10">
+                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" class="w-full h-auto max-h-full object-contain opacity-50 transition-opacity">
                </div>`
-            : `<div class="absolute inset-0 w-full h-full flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100">🎲</div>`;
+            : `<div class="w-full h-[52px] flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100 rounded-lg">🎲</div>`;
 
         // 👑 점유 구단 팀 배지 렌더링
         let teamBadgeHtml = '';
@@ -248,23 +250,25 @@ Boako.League.renderBingoBoard = function() {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25 ? Boako.League.State.bingoTeamLogos25[idx] : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             
             teamBadgeHtml = `
-                <div class="absolute top-1.5 left-1.5 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-sm pl-1 pr-1.5 py-0.5 rounded-lg border border-slate-200/80 shadow-sm max-w-[85%]">
+                <div class="absolute top-1.5 left-1.5 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-sm pl-1 pr-1.5 py-0.5 rounded-lg border border-slate-200/80 shadow-sm max-w-[85%]">
                     <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-4 h-4 object-contain rounded-full">
                     <span class="text-[9px] font-black text-slate-800 truncate">${ownerTeam}</span>
                 </div>
             `;
         }
         
-        // 하단 게임명 가독성 라벨 레이아웃 (위쪽 마진 mt-auto 구조로 무조건 바닥 안착)
+        // 🎯 자연스러운 수직 레이아웃 결합
+        // 하단 라벨 박스(min-h-[28px])와 이미지 하우징(52px), 그리고 패딩 및 gap 간격이 
+        // 96px(h-24) 타일 내부에 자로 잰 듯 완벽하게 맞아떨어져 붕 뜨는 느낌이 완벽히 소멸합니다.
         cell.innerHTML = `
-            ${gameImageHtml}
             ${teamBadgeHtml}
-            <div class="w-full mt-auto z-10">
+            ${gameImageHtml}
+            <div class="w-full z-10">
                 <div class="w-full px-1 bg-white/80 backdrop-blur-[2px] py-1 rounded-lg border border-white/50 shadow-sm flex items-center justify-center min-h-[28px]">
                     <p class="text-[9px] font-black text-slate-800 tracking-tight leading-tight line-clamp-2 break-all">${Boako.League.State.boardGames25[idx]}</p>
                 </div>
             </div>
-            ${isWinner ? '<span class="absolute top-1.5 right-2 text-xs text-amber-400 animate-bounce z-10">👑</span>' : ''}
+            ${isWinner ? '<span class="absolute top-1.5 right-2 text-xs text-amber-400 animate-bounce z-20">👑</span>' : ''}
         `;
         
         grid.appendChild(cell);
