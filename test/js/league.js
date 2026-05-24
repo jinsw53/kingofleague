@@ -69,7 +69,7 @@ Boako.League.switchTab = async function(tabId) {
     });
 
     // 🎯 버튼을 누르면 좌측 확장 구역의 'league-header-main-img' 요소를 찾아 배너를 실시간 변환합니다.
-  const mainImg = document.getElementById('league-header-main-img');
+    const mainImg = document.getElementById('league-header-main-img');
     if (mainImg) {
         // 🎯 [완전 고정] 2:1 비율 상자 안에서 찌그러짐 없이 완벽하게 축소되도록 contain 유지
         mainImg.style.objectFit = "contain"; 
@@ -92,10 +92,8 @@ Boako.League.switchTab = async function(tabId) {
     if (tabId === 'bingo') {
         container.innerHTML = Boako.League.getBingoHTML();
         
-        // 🔴 [기존 하드코딩 실행문] Boako.League.renderBingoBoard();
-        // 🟢 [교체 실행문] 소장님의 실시간 연산 뷰를 백엔드에서 다이렉트로 호출합니다.
+        // 🟢 소장님의 실시간 연산 뷰를 백엔드에서 다이렉트로 안전하게 원격 호출합니다.
         await Boako.League.loadBingoBoardData(); 
-    }
     } else if (tabId === 'challenge') {
         container.innerHTML = Boako.League.getChallengeHTML();
         Boako.League.renderChallenges();
