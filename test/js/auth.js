@@ -3,24 +3,28 @@
  */
 Boako.Auth = {
     init: async () => {
-        Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
-        // ====================================================================
-        // 🎯 [여기서부터 추가] 수십 분 잠수 후 무한 Pending & 브라우저 락 방어 엔진
-        // ====================================================================
-        if (Boako.db && !Boako.db.isIntercepted) {
-            const originalFrom = Boako.db.from;
-            Boako.db.isIntercepted = true; // 중복 인터셉터 바인딩 방지
+        // ----------------------------------------------------------------
+        // 🛡️ [글로벌 마스터 치트키] 모든 콘텐츠 수정 제로 ➡️ 끊김 없는 커넥터 개조
+        // ----------------------------------------------------------------
+        const createSmartClient = () => {
+            const client = supabase.createClient(Boako.config.url, Boako.config.key);
+            const originalFrom = client.from;
 
-            Boako.db.from = function(tableName) {
-                // 수십 분 방치로 인해 세션 내부 객체가 유령 상태이거나 유실되었을 때
-                if (!Boako.db || typeof Boako.db.auth === 'undefined') {
-                    console.log("♻️ [마스터 허브] 커넥션 타임아웃 정황 포착: 인스턴스 전격 즉시 리프레시");
-                    Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
+            // 모든 콘텐츠 파일의 db.from()이 실행될 때 자동으로 커넥션을 감지하고 자동 재접속(Auto-Reconnect)합니다.
+            client.from = function(tableName) {
+                // 장시간 잠수로 인해 통신 상태 스탬프가 맛이 갔거나 객체가 잠들었을 때
+                if (!Boako.db || !Boako.db.auth || typeof Boako.db.auth.getSession !== 'function') {
+                    console.log("♻️ [마스터 엔진] 단선 감지: 클라이언트를 전격 즉시 재기동합니다.");
+                    Boako.db = createSmartClient();
+                    return originalFrom.call(Boako.db, tableName);
                 }
-                // 기존에 호출하려던 본래의 from().select() 쿼리 빌더 엔진으로 무결하게 수송
-                return originalFrom.call(Boako.db, tableName);
+                return originalFrom.call(this, tableName);
             };
-        }
+            return client;
+        };
+
+        // 스마트 클라이언트로 최초 구동 발사
+        Boako.db = createSmartClient();
         // ====================================================================
         const { data: { session } } = await Boako.db.auth.getSession();
         
