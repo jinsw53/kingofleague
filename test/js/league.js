@@ -117,23 +117,44 @@ Boako.League.switchTab = async function(tabId) {
 Boako.League.getBingoHTML = function() {
     return `
         <div class="space-y-6">
-            <div class="p-5 sm:p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h3 class="font-black text-slate-800 text-base">팀 빙고 쟁탈전 규칙</h3>
-                    <p class="text-xs text-slate-500 font-bold mt-1">차지한 칸마다 1점을 얻습니다.</p>
+            <div class="p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-violet-200/60 pb-4">
+                    <div>
+                        <h3 class="font-black text-slate-800 text-base flex items-center gap-2">🎲 BTL 실시간 영토 빙고전</h3>
+                        <p class="text-xs text-slate-500 font-bold mt-1">구단원들의 누적 전적 통계가 난이도 충족 조건에 매칭되면 자동으로 영토 소유권이 마킹됩니다.</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5">
+                            <span>🔄 라이브 스코어 정산</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5">
-                        <span>🔄 라이브 스코어 정산</span>
-                    </button>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] font-bold text-slate-600">
+                    <div class="bg-white/80 border border-slate-200 p-2.5 rounded-xl flex items-center gap-1.5">
+                        <span class="bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded-md font-black">EASY</span>
+                        <span>팀원 전원 충족</span>
+                    </div>
+                    <div class="bg-white/80 border border-slate-200 p-2.5 rounded-xl flex items-center gap-1.5">
+                        <span class="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded-md font-black">NORMAL</span>
+                        <span>팀원 75% 이상</span>
+                    </div>
+                    <div class="bg-white/80 border border-slate-200 p-2.5 rounded-xl flex items-center gap-1.5">
+                        <span class="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-md font-black">HARD</span>
+                        <span>팀원 50% 이상</span>
+                    </div>
+                    <div class="bg-amber-500/10 border border-amber-400/30 p-2.5 rounded-xl flex items-center gap-1.5 animate-pulse">
+                        <span class="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] px-1.5 py-0.5 rounded-md font-black">🔥 CENTER</span>
+                        <span class="text-amber-800 font-black">중앙 페널티: 전원</span>
+                    </div>
                 </div>
+                <p class="text-[10px] text-slate-400 font-medium pt-1">🎯 기본 규칙: 차지한 칸마다 리그 승점 <span class="text-indigo-600 font-bold">1 점</span>을 획득하며, 빙고줄 완성 시 스코어보드 보너스가 연산됩니다.</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
                     <div class="grid grid-cols-5 gap-2" id="bingo-grid"></div>
                 </div>
-                
                 <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
                     <h5 class="font-black text-slate-800 text-sm border-b border-violet-100 pb-2.5 flex items-center gap-2">
                         <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 실시간 빙고 스코어 보드
@@ -216,11 +237,13 @@ Boako.League.renderBingoBoard = function() {
     
     const winCells = Boako.League.calculateWinningCells();
     const myTeamName = Boako.state.team?.info?.team_name;
+    const difficulties = Boako.League.State.missionDifficulties || Array(25).fill("EASY");
     
     Boako.League.State.bingoBoard.forEach((ownerTeam, idx) => {
         const cell = document.createElement('div');
         const isWinner = winCells.includes(idx);
         const isMyTeam = ownerTeam && ownerTeam === myTeamName;
+        const diffStatus = difficulties[idx] || "EASY";
         
         let bgClass = "bg-slate-50 border-slate-200/60";
         if (ownerTeam) {
@@ -236,14 +259,12 @@ Boako.League.renderBingoBoard = function() {
             }
         }
 
-        // 중앙 정렬 프리미엄 규격 유지
+        if (diffStatus === 'HARD_CENTER_PENALTY') {
+            bgClass += " border-orange-500 shadow-[inset_0_0_12px_rgba(249,115,22,0.3)] ring-2 ring-orange-500/20";
+        }
+
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center p-2 gap-1.5 transition-all text-center relative overflow-hidden ${bgClass}`;
         
-        // 🎯 [배경 무력화 핵심 코드]:
-        // 이미지 태그에 `filter: drop-shadow(...)`를 주입했습니다.
-        // 박스 그림자(box-shadow)와 달리 '이미지 고유 외곽선'에만 얇고 은은한 그림자를 둘러주기 때문에, 
-        // 배경색이 투명하거나 로고가 배경과 겹치더라도 경계선이 뚜렷하게 도드라집니다.
-        // 또한 밋밋하게 붕 뜨던 현상을 막기 위해 이미지 뒤에 아주 살짝 밝은 패딩 효과(`bg-white/30 backdrop-blur-[1px] rounded-xl`)를 매칭했습니다.
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         const gameImageHtml = gameLogoUrl 
             ? `<div class="w-full h-[52px] flex items-center justify-center pointer-events-none z-10">
@@ -253,29 +274,43 @@ Boako.League.renderBingoBoard = function() {
                </div>`
             : `<div class="w-full h-[52px] flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100 rounded-lg">🎲</div>`;
 
-        // 👑 점유 구단 팀 배지 렌더링
+        // 👑 점유 팀 배지 렌더링 구역 (구단 ➡️ 팀 텍스트 정정)
         let teamBadgeHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25 ? Boako.League.State.bingoTeamLogos25[idx] : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             
             teamBadgeHtml = `
-                <div class="absolute top-1.5 left-1.5 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-sm pl-1 pr-1.5 py-0.5 rounded-lg border border-slate-200/80 shadow-sm max-w-[85%]">
-                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-4 h-4 object-contain rounded-full">
-                    <span class="text-[9px] font-black text-slate-800 truncate">${ownerTeam}</span>
+                <div class="absolute top-1.5 left-1.5 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-sm pl-1 pr-1.5 py-0.5 rounded-lg border border-slate-200/80 shadow-sm max-w-[50%]">
+                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-3.5 h-3.5 object-contain rounded-full">
+                    <span class="text-[8px] font-black text-slate-800 truncate">${ownerTeam}</span>
                 </div>
             `;
         }
+
+        let diffBadgeHtml = '';
+        if (diffStatus === 'HARD_CENTER_PENALTY') {
+            diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-20 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[8px] px-1.5 py-0.5 rounded-md shadow-sm animate-bounce">🔥 CENTER</span>`;
+        } else {
+            const diffColors = {
+                EASY: "bg-emerald-500/90 text-white",
+                NORMAL: "bg-blue-500/90 text-white",
+                HARD: "bg-rose-500/90 text-white"
+            };
+            diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-20 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm scale-90">${diffStatus}</span>`;
+        }
         
-        // 하단 게임명 가독성 라벨 레이아웃
+        const crownHtml = isWinner ? `<span class="absolute top-1.5 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-14' : 'right-9'} text-xs text-amber-400 animate-bounce z-20">👑</span>` : '';
+        
         cell.innerHTML = `
             ${teamBadgeHtml}
+            ${diffBadgeHtml}
             ${gameImageHtml}
             <div class="w-full z-10">
                 <div class="w-full px-1 bg-white/80 backdrop-blur-[2px] py-1 rounded-lg border border-white/50 shadow-sm flex items-center justify-center min-h-[28px]">
                     <p class="text-[9px] font-black text-slate-800 tracking-tight leading-tight line-clamp-2 break-all">${Boako.League.State.boardGames25[idx]}</p>
                 </div>
             </div>
-            ${isWinner ? '<span class="absolute top-1.5 right-2 text-xs text-amber-400 animate-bounce z-20">👑</span>' : ''}
+            ${crownHtml}
         `;
         
         grid.appendChild(cell);
