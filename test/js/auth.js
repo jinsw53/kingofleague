@@ -4,6 +4,24 @@
 Boako.Auth = {
     init: async () => {
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
+        // ====================================================================
+        // 🎯 [여기서부터 추가] 수십 분 잠수 후 무한 Pending & 브라우저 락 방어 엔진
+        // ====================================================================
+        if (Boako.db && !Boako.db.isIntercepted) {
+            const originalFrom = Boako.db.from;
+            Boako.db.isIntercepted = true; // 중복 인터셉터 바인딩 방지
+
+            Boako.db.from = function(tableName) {
+                // 수십 분 방치로 인해 세션 내부 객체가 유령 상태이거나 유실되었을 때
+                if (!Boako.db || typeof Boako.db.auth === 'undefined') {
+                    console.log("♻️ [마스터 허브] 커넥션 타임아웃 정황 포착: 인스턴스 전격 즉시 리프레시");
+                    Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
+                }
+                // 기존에 호출하려던 본래의 from().select() 쿼리 빌더 엔진으로 무결하게 수송
+                return originalFrom.call(Boako.db, tableName);
+            };
+        }
+        // ====================================================================
         const { data: { session } } = await Boako.db.auth.getSession();
         
         if (session?.user) {
