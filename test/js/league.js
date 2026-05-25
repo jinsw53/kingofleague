@@ -235,7 +235,7 @@ Boako.League.loadBingoBoardData = async function() {
 };
 
 // ====================================================================
-// 🖼️ [시인성 최종 개선] 배경 동화 현상 방지용 drop-shadow 필터 장착 렌더러
+// 🖼️ [디자인 원상 복구] 배경 로고 박멸 ➡️ 팀 배경 유지 + 테두리 불꽃 이식
 // ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
@@ -252,7 +252,7 @@ Boako.League.renderBingoBoard = function() {
         const isMyTeam = ownerTeam && ownerTeam === myTeamName;
         const diffStatus = difficulties[idx] || "EASY";
         
-        // 1) 소장님이 오케전하신 순수 팀별 배경색 조건 분기 철저히 보존
+        // 🌟 [순수성 컴백] 소장님이 검증하신 정갈한 팀별 배경 클래스 100% 유지
         let bgClass = "bg-slate-50 border-slate-200/60";
         if (ownerTeam) {
             if (isMyTeam) {
@@ -267,16 +267,16 @@ Boako.League.renderBingoBoard = function() {
             }
         }
 
-        // 🎯 [테두리 불꽃 핵심]: 기존 배경을 절대 해치지 않고, 
-        // HARD_CENTER_PENALTY 타일일 경우에만 전용 CSS 애니메이션 클래스(`fire-border-glow`)를 투입합니다.
+        // 🎯 [테두리 불꽃 스냅 주입]: 지저분한 배경 이미지는 완전히 박멸하고,
+        // 오직 HARD_CENTER_PENALTY 타일의 '외곽선 테두리'에만 이글거리는 네온 효과를 매칭합니다.
         if (diffStatus === 'HARD_CENTER_PENALTY') {
             bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
         }
 
-        // 수직/수평 정중앙 밸런스 구조 고정
+        // 소장님 픽: 수직/수평 황금 비율 정중앙 격리 구조
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center p-2 gap-1.5 transition-all text-center relative overflow-hidden ${bgClass}`;
         
-        // 게임 로고 하우징 (선명도 50% 및 드롭 섀도 유지)
+        // 보드게임 로고 하우징 (시인성 섀도 및 소장님 튜닝 opacity-50 유지)
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         const gameImageHtml = gameLogoUrl 
             ? `<div class="w-full h-[52px] flex items-center justify-center pointer-events-none z-10">
@@ -299,7 +299,7 @@ Boako.League.renderBingoBoard = function() {
             `;
         }
 
-        // 🎯 [난이도 배지] 우측 상단 배치
+        // 🎯 [난이도 배지] 우측 상단 완벽 수평 매칭
         let diffBadgeHtml = '';
         if (diffStatus === 'HARD_CENTER_PENALTY') {
             diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-20 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[8px] px-1.5 py-0.5 rounded-md shadow-sm">🔥 CENTER</span>`;
@@ -334,7 +334,7 @@ Boako.League.renderBingoBoard = function() {
 };
 
 // ====================================================================
-// 🔥 [이글거리는 테두리 네온] 순수 CSS 애니메이션 자동 주입 엔진
+// 🔥 [이글거리는 테두리 네온] 순수 CSS 애니메이션 주입 엔진 (클래스 충돌 해제)
 // ====================================================================
 if (!document.getElementById('bingo-fire-border-style')) {
     const styleId = document.createElement('style');
@@ -343,19 +343,19 @@ if (!document.getElementById('bingo-fire-border-style')) {
         @keyframes fireBorderGlow {
             0% {
                 border-color: #f97316;
-                box-shadow: 0 0 4px #ea580c, inset 0 0 6px rgba(234, 88, 12, 0.3);
+                box-shadow: 0 0 6px #ea580c, inset 0 0 4px rgba(234, 88, 12, 0.2);
             }
             50% {
                 border-color: #ef4444;
-                box-shadow: 0 0 12px #dc2626, inset 0 0 12px rgba(220, 38, 38, 0.5);
+                box-shadow: 0 0 14px #dc2626, inset 0 0 8px rgba(220, 38, 38, 0.4);
             }
             100% {
                 border-color: #f59e0b;
-                box-shadow: 0 0 5px #d97706, inset 0 0 8px rgba(217, 119, 6, 0.4);
+                box-shadow: 0 0 6px #d97706, inset 0 0 5px rgba(217, 119, 6, 0.3);
             }
         }
         .fire-border-glow {
-            animation: fireBorderGlow 1.5s infinite ease-in-out alternate !important;
+            animation: fireBorderGlow 1.4s infinite ease-in-out alternate !important;
             border-width: 2px !important;
         }
     `;
