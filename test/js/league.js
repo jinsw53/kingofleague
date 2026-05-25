@@ -10,8 +10,9 @@ Boako.League.State = {
     currentTab: 'bingo',
     bingoBoard: Array(25).fill(null),       // 🌟 뷰의 occupying_team_name 적재
     boardGames25: Array(25).fill("지정 미정"), // 🌟 뷰의 game_name 적재
-    boardLogos25: Array(25).fill(null),      // 🌟 [방 생성 완료] 뷰의 game_logo_url 적재
-    bingoTeamLogos25: Array(25).fill(null),  // 🌟 [방 생성 완료] 뷰의 occupying_team_logo_url 적재
+    boardLogos25: Array(25).fill(null),      // 🌟 뷰의 game_logo_url 적재
+    bingoTeamLogos25: Array(25).fill(null),  // 🌟 뷰의 occupying_team_logo_url 적재
+    missionDifficulties: Array(25).fill("EASY"), // 🌟 [방 생성 완료] 뷰의 mission_difficulty 적재
     champions: []
 };
 
@@ -111,7 +112,7 @@ Boako.League.switchTab = async function(tabId) {
     }
 };
 
-// ====================================================================
+/ ====================================================================
 // 🎲 탭 1: 5x5 팀 빙고전 실시간 가상 뷰 연동단 (소속 구단 노출 바 완전 박멸)
 // ====================================================================
 Boako.League.getBingoHTML = function() {
@@ -121,7 +122,7 @@ Boako.League.getBingoHTML = function() {
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-violet-200/60 pb-4">
                     <div>
                         <h3 class="font-black text-slate-800 text-base flex items-center gap-2">🎲 BTL 실시간 영토 빙고전</h3>
-                        <p class="text-xs text-slate-500 font-bold mt-1">구단원들의 누적 전적 통계가 난이도 충족 조건에 매칭되면 자동으로 영토 소유권이 마킹됩니다.</p>
+                        <p class="text-xs text-slate-500 font-bold mt-1">팀원들의 누적 전적 통계가 난이도 충족 조건에 매칭되면 자동으로 영토 소유권이 마킹됩니다.</p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5">
@@ -169,7 +170,7 @@ Boako.League.getBingoHTML = function() {
 };
 
 // ====================================================================
-// 🌟 [소장님 마스터 뷰 듀얼 연동] 타일 정보 및 구단별 라인 스코어보드 동시 수송
+// 🌟 [소장님 마스터 뷰 듀얼 연동 완결본] 데이터 유실 차단 정밀 수송선
 // ====================================================================
 Boako.League.loadBingoBoardData = async function() {
     const grid = document.getElementById('bingo-grid');
@@ -185,17 +186,18 @@ Boako.League.loadBingoBoardData = async function() {
             .order('coordinate_id', { ascending: true });
         if (boardError) throw boardError;
 
-        // 2) [신규 소장님 뷰] 구단별 가로/세로/대각선 빙고 세부 현황 데이터 다이렉트 호출
+        // 2) 구단별 가로/세로/대각선 빙고 세부 현황 데이터 다이렉트 호출
         const { data: scoreData, error: scoreError } = await Boako.db
             .from('v_bingo_team_total_scores')
             .select('*')
-            .order('bingo_total_score', { ascending: false }); // 총점 높은 순 정렬
+            .order('bingo_total_score', { ascending: false });
         if (scoreError) throw scoreError;
 
         const initializedBoard = Array(25).fill(null);
         const initializedGames = Array(25).fill("미정 종목");
         const initializedGameLogos = Array(25).fill(null);
         const initializedTeamLogos = Array(25).fill(null);
+        const initializedDiffs = Array(25).fill("EASY"); // 🌟 난이도 안정 적재함 임시 생성
 
         if (boardData && boardData.length > 0) {
             boardData.forEach(row => {
@@ -205,20 +207,25 @@ Boako.League.loadBingoBoardData = async function() {
                     initializedGames[idx] = row.game_name || "지정 미정";
                     initializedGameLogos[idx] = row.game_logo_url || null;
                     initializedTeamLogos[idx] = row.occupying_team_logo_url || null;
+                    
+                    // 🌟 뷰에서 쏴주는 mission_difficulty 컬럼을 전량 가공하여 임시 배열에 마킹
+                    if (row.mission_difficulty) {
+                        initializedDiffs[idx] = row.mission_difficulty.trim().toUpperCase();
+                    }
                 }
             });
         }
         
-        // 전역 상태 장부에 안전하게 적재
+        // 임시 변수에서 메인 전역 장부로 완벽 이관 (데이터 꼬임 및 소멸 원천 봉쇄)
         Boako.League.State.bingoBoard = initializedBoard;
         Boako.League.State.boardGames25 = initializedGames;
         Boako.League.State.boardLogos25 = initializedGameLogos;
         Boako.League.State.bingoTeamLogos25 = initializedTeamLogos;
+        Boako.League.State.missionDifficulties = initializedDiffs; // 🎯 족보 연동 완료
         
-        // 🔥 소장님의 스코어 뷰 데이터 장부 추가 적재
         Boako.League.State.teamBingoScores = scoreData || [];
         
-        // 화면 리렌더링
+        // 안정적으로 리렌더링 트리거 실행
         Boako.League.renderBingoBoard();
 
     } catch (err) {
