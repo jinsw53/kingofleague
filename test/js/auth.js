@@ -33,14 +33,9 @@ Boako.Auth = {
                 return originalFrom.call(this, tableName);
             };
         }
-        // ====================================================================
+       // ====================================================================
 
-        // 2. 기존 뼈대 세션 체크 로직 (여기서부터 기존 코드 100% 그대로 유지)
-        const { data: { session } } = await Boako.db.auth.getSession();
-        
-        if (session?.user) {
-            Boako.state.user = session.user;
-        // ====================================================================
+        // 2. 기존 소장님 비즈니스 로직 (여기서부터 기존 코드와 100% 동일하게 이음)
         const { data: { session } } = await Boako.db.auth.getSession();
         
         if (session?.user) {
