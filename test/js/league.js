@@ -119,8 +119,8 @@ Boako.League.getBingoHTML = function() {
         <div class="space-y-6">
             <div class="p-5 sm:p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h3 class="font-black text-slate-800 text-base">BTL 실시간 영토 빙고전</h3>
-                    <p class="text-xs text-slate-500 font-bold mt-1">구단원들의 누적 전적 데이터가 소장님의 실시간 백엔드 연산 조건에 충족되면 자동으로 마킹 영토가 갱신됩니다.</p>
+                    <h3 class="font-black text-slate-800 text-base">팀 빙고 쟁탈전 규칙</h3>
+                    <p class="text-xs text-slate-500 font-bold mt-1">차지한 칸마다 1점을 얻습니다.</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5">
@@ -136,7 +136,7 @@ Boako.League.getBingoHTML = function() {
                 
                 <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
                     <h5 class="font-black text-slate-800 text-sm border-b border-violet-100 pb-2.5 flex items-center gap-2">
-                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 구단별 실시간 영토 스코어보드
+                        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i> 실시간 빙고 스코어 보드
                     </h5>
                     <div id="team-stat-rows-container" class="space-y-2 text-xs">
                         <div class="text-center py-4 text-slate-400 font-bold">집계 데이터를 계산 중...</div>
@@ -312,7 +312,7 @@ Boako.League.updateStats = function() {
 
     // 만약 집계된 구단 전적이 아예 없다면 깔끔하게 공백 처리
     if (scoreData.length === 0) {
-        statContainer.innerHTML = `<div class="text-center py-6 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl">🏳️ 현재 전적 조건에 매칭된 구단별 점수가 없습니다.</div>`;
+        statContainer.innerHTML = `<div class="text-center py-6 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl">🏳️ 현재 빙고를 완성한 팀이 없습니다.</div>`;
         return;
     }
 
