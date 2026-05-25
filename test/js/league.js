@@ -244,8 +244,6 @@ Boako.League.renderBingoBoard = function() {
     
     const winCells = Boako.League.calculateWinningCells();
     const myTeamName = Boako.state.team?.info?.team_name;
-    
-    // 데이터 로더에서 안전하게 빌드된 난이도 장부 로드
     const difficulties = Boako.League.State.missionDifficulties || Array(25).fill("EASY");
     
     Boako.League.State.bingoBoard.forEach((ownerTeam, idx) => {
@@ -254,10 +252,8 @@ Boako.League.renderBingoBoard = function() {
         const isMyTeam = ownerTeam && ownerTeam === myTeamName;
         const diffStatus = difficulties[idx] || "EASY";
         
+        // 1) 소장님이 오케전하신 순수 팀별 배경색 조건 분기 철저히 보존
         let bgClass = "bg-slate-50 border-slate-200/60";
-        let customStyle = ""; // 특수 스타일 주입용
-
-        // 1) 기본 점유 팀별 배경색 조건 분기
         if (ownerTeam) {
             if (isMyTeam) {
                 bgClass = "bg-gradient-to-br from-violet-600 to-indigo-600 text-white border-violet-400 bingo-won-pulse border-2 scale-[0.97] shadow-md";
@@ -271,33 +267,22 @@ Boako.League.renderBingoBoard = function() {
             }
         }
 
-        // 🎯 [지옥불 센터 구현 핵심]: 
-        // HARD_CENTER_PENALTY 타일(13번)인 경우, 팀 배경색을 싹 걷어내고 
-        // 이글거리는 용암/불꽃 움직이는 애니메이션 배경을 주입합니다.
+        // 🎯 [테두리 불꽃 핵심]: 기존 배경을 절대 해치지 않고, 
+        // HARD_CENTER_PENALTY 타일일 경우에만 전용 CSS 애니메이션 클래스(`fire-border-glow`)를 투입합니다.
         if (diffStatus === 'HARD_CENTER_PENALTY') {
-            bgClass = "border-orange-500 shadow-xl scale-[0.98]";
-            // 소장님 마스터 배너 주소를 활용해 센터 전용 이글거리는 용암 이미지로 대체 (없을 경우 애니메이션 그라데이션)
-            customStyle = `
-                background-image: url('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/teambingo.png');
-                background-size: cover;
-                background-position: center;
-                filter: hue-rotate(330deg) saturate(1.5) brightness(0.8);
-                animation: firePulse 2s infinite alternate;
-            `;
+            bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
         }
 
-        // 중앙 정렬 프리미엄 규격 유지 (customStyle 주입)
-        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center p-2 gap-1.5 transition-all text-center relative overflow-hidden group ${bgClass}`;
-        if (customStyle) cell.style = customStyle;
+        // 수직/수평 정중앙 밸런스 구조 고정
+        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center p-2 gap-1.5 transition-all text-center relative overflow-hidden ${bgClass}`;
         
-        // 🎯 보드게임 로고 하우징 (CORS 우회용 drop-shadow 및 센터 전용 선명도 보정)
+        // 게임 로고 하우징 (선명도 50% 및 드롭 섀도 유지)
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
-        const logoOpacity = diffStatus === 'HARD_CENTER_PENALTY' ? 'opacity-70 group-hover:opacity-100' : 'opacity-50'; // 불길 위에서 더 잘 보이게
         const gameImageHtml = gameLogoUrl 
             ? `<div class="w-full h-[52px] flex items-center justify-center pointer-events-none z-10">
                    <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" 
-                        class="w-full h-auto max-h-full object-contain ${logoOpacity} transition-opacity"
-                        style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)) drop-shadow(0px 1px 2px rgba(0,0,0,0.3));">
+                        class="w-full h-auto max-h-full object-contain opacity-50 transition-opacity"
+                        style="filter: drop-shadow(0px 2px 3px rgba(15, 23, 42, 0.28)) drop-shadow(0px 1px 1px rgba(15, 23, 42, 0.15));">
                </div>`
             : `<div class="w-full h-[52px] flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100 rounded-lg">🎲</div>`;
 
@@ -305,20 +290,19 @@ Boako.League.renderBingoBoard = function() {
         let teamBadgeHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25 ? Boako.League.State.bingoTeamLogos25[idx] : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
-            const badgeBg = diffStatus === 'HARD_CENTER_PENALTY' ? 'bg-black/70 border-orange-500 text-white' : 'bg-white/90 border-slate-200/80 text-slate-800';
             
             teamBadgeHtml = `
-                <div class="absolute top-1.5 left-1.5 z-20 flex items-center gap-1 backdrop-blur-sm pl-1 pr-1.5 py-0.5 rounded-lg border shadow-sm max-w-[50%] ${badgeBg}">
+                <div class="absolute top-1.5 left-1.5 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-sm pl-1 pr-1.5 py-0.5 rounded-lg border border-slate-200/80 shadow-sm max-w-[50%]">
                     <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-3.5 h-3.5 object-contain rounded-full">
-                    <span class="text-[8px] font-black truncate">${ownerTeam}</span>
+                    <span class="text-[8px] font-black text-slate-800 truncate">${ownerTeam}</span>
                 </div>
             `;
         }
 
-        // 🎯 [난이도 배지] 센터 페널티 전용 불타는 배지 렌더링
+        // 🎯 [난이도 배지] 우측 상단 배치
         let diffBadgeHtml = '';
         if (diffStatus === 'HARD_CENTER_PENALTY') {
-            diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-20 bg-gradient-to-r from-orange-500 via-red-600 to-amber-500 text-white font-black text-[9px] px-2 py-0.5 rounded-md shadow-xl animate-pulse">🔥 CENTER</span>`;
+            diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-20 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[8px] px-1.5 py-0.5 rounded-md shadow-sm">🔥 CENTER</span>`;
         } else {
             const diffColors = {
                 EASY: "bg-emerald-500/90 text-white",
@@ -328,8 +312,9 @@ Boako.League.renderBingoBoard = function() {
             diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-20 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm scale-90">${diffStatus}</span>`;
         }
         
-        // 왕관 타일 및 하단 게임명 가독성 라벨
-        const crownRight = diffStatus === 'HARD_CENTER_PENALTY' ? 'right-16' : 'right-9';
+        const crownHtml = isWinner ? `<span class="absolute top-1.5 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-14' : 'right-9'} text-xs text-amber-400 animate-bounce z-20">👑</span>` : '';
+        
+        // 하단 게임명 가독성 라벨 레이아웃
         cell.innerHTML = `
             ${teamBadgeHtml}
             ${diffBadgeHtml}
@@ -339,7 +324,7 @@ Boako.League.renderBingoBoard = function() {
                     <p class="text-[9px] font-black text-slate-800 tracking-tight leading-tight line-clamp-2 break-all">${Boako.League.State.boardGames25[idx]}</p>
                 </div>
             </div>
-            ${isWinner ? `<span class="absolute top-1.5 ${crownRight} text-xs text-amber-400 animate-bounce z-20">👑</span>` : ''}
+            ${crownHtml}
         `;
         
         grid.appendChild(cell);
@@ -348,16 +333,30 @@ Boako.League.renderBingoBoard = function() {
     Boako.League.updateStats();
 };
 
-// ==========================================
-// 🔥 지옥불 센터 칸 전용 CSS 애니메이션 정의 (HTML 헤더나 view.js 초기화 시 주입 필요)
-// ==========================================
-if (!document.getElementById('bingo-fire-style')) {
+// ====================================================================
+// 🔥 [이글거리는 테두리 네온] 순수 CSS 애니메이션 자동 주입 엔진
+// ====================================================================
+if (!document.getElementById('bingo-fire-border-style')) {
     const styleId = document.createElement('style');
-    styleId.id = 'bingo-fire-style';
+    styleId.id = 'bingo-fire-border-style';
     styleId.innerHTML = `
-        @keyframes firePulse {
-            0% { box-shadow: inset 0 0 15px rgba(249,115,22,0.4), 0 0 5px rgba(239,68,68,0.2); }
-            100% { box-shadow: inset 0 0 25px rgba(249,115,22,0.7), 0 0 15px rgba(239,68,68,0.5); }
+        @keyframes fireBorderGlow {
+            0% {
+                border-color: #f97316;
+                box-shadow: 0 0 4px #ea580c, inset 0 0 6px rgba(234, 88, 12, 0.3);
+            }
+            50% {
+                border-color: #ef4444;
+                box-shadow: 0 0 12px #dc2626, inset 0 0 12px rgba(220, 38, 38, 0.5);
+            }
+            100% {
+                border-color: #f59e0b;
+                box-shadow: 0 0 5px #d97706, inset 0 0 8px rgba(217, 119, 6, 0.4);
+            }
+        }
+        .fire-border-glow {
+            animation: fireBorderGlow 1.5s infinite ease-in-out alternate !important;
+            border-width: 2px !important;
         }
     `;
     document.head.appendChild(styleId);
