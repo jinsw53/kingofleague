@@ -3,28 +3,44 @@
  */
 Boako.Auth = {
     init: async () => {
-        // ----------------------------------------------------------------
-        // 🛡️ [글로벌 마스터 치트키] 모든 콘텐츠 수정 제로 ➡️ 끊김 없는 커넥터 개조
-        // ----------------------------------------------------------------
-        const createSmartClient = () => {
-            const client = supabase.createClient(Boako.config.url, Boako.config.key);
-            const originalFrom = client.from;
+        // 1. 최초 수파베이스 클라이언트 생성
+        Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
-            // 모든 콘텐츠 파일의 db.from()이 실행될 때 자동으로 커넥션을 감지하고 자동 재접속(Auto-Reconnect)합니다.
-            client.from = function(tableName) {
-                // 장시간 잠수로 인해 통신 상태 스탬프가 맛이 갔거나 객체가 잠들었을 때
-                if (!Boako.db || !Boako.db.auth || typeof Boako.db.auth.getSession !== 'function') {
-                    console.log("♻️ [마스터 엔진] 단선 감지: 클라이언트를 전격 즉시 재기동합니다.");
-                    Boako.db = createSmartClient();
+        // ====================================================================
+        // 🛡️ [글로벌 마스터 허브] 대용량 무한 로딩 방어형 커넥션 헬스체크 엔진
+        // ====================================================================
+        if (Boako.db && !Boako.db.isIntercepted) {
+            const originalFrom = Boako.db.from;
+            Boako.db.isIntercepted = true; // 중복 방지 플래그
+
+            Boako.db.from = function(tableName) {
+                // 🎯 장시간 잠수로 인해 객체가 잠들었거나 내부 채널이 파괴되었는지 즉각 스캔
+                if (!Boako.db || !Boako.db.auth || typeof Boako.db.auth.refreshSession !== 'function') {
+                    console.log("♻️ [마스터 허브] 커넥션 유실 확인: 수파베이스 인스턴스 전격 즉시 리프레시");
+                    Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
                     return originalFrom.call(Boako.db, tableName);
                 }
+
+                // 소장님의 기존 세션 상태 유효성 및 토큰 만료 잔여 시간 체크
+                // (수십 분 방치로 인해 토큰 세션 정보가 무응답 유령 기조로 바뀌었을 때)
+                const session = Boako.db.auth.session ? Boako.db.auth.session() : null;
+                if (session && session.expires_at && Date.now() / 1000 > session.expires_at - 60) {
+                    console.log("🕒 인증 토큰 수명 만료 임박 감지 ➡️ 안전하게 인스턴스 재생성 스왑");
+                    Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
+                    return originalFrom.call(Boako.db, tableName);
+                }
+
+                // 정상적인 상태일 때는 서버의 응답을 끝까지 정당하게 기다려줍니다 (무한 로딩 차단)
                 return originalFrom.call(this, tableName);
             };
-            return client;
-        };
+        }
+        // ====================================================================
 
-        // 스마트 클라이언트로 최초 구동 발사
-        Boako.db = createSmartClient();
+        // 2. 기존 뼈대 세션 체크 로직 (여기서부터 기존 코드 100% 그대로 유지)
+        const { data: { session } } = await Boako.db.auth.getSession();
+        
+        if (session?.user) {
+            Boako.state.user = session.user;
         // ====================================================================
         const { data: { session } } = await Boako.db.auth.getSession();
         
