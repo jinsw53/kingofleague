@@ -113,7 +113,7 @@ Boako.League.switchTab = async function(tabId) {
 };
 
 // ====================================================================
-// 🎲 탭 1: 5x5 팀 빙고전 실시간 가상 뷰 연동단 (소속 구단 노출 바 완전 박멸)
+// 🎲 탭 1: 5x5 팀 빙고전 실시간 가상 뷰 연동단 (시즌 히스토리 셀렉터 개조본)
 // ====================================================================
 Boako.League.getBingoHTML = function() {
     return `
@@ -124,9 +124,16 @@ Boako.League.getBingoHTML = function() {
                         <h3 class="font-black text-slate-800 text-base flex items-center gap-2">🎲 BTL 실시간 영토 빙고전</h3>
                         <p class="text-xs text-slate-500 font-bold mt-1">팀원들의 누적 전적 통계가 난이도 충족 조건에 매칭되면 자동으로 영토 소유권이 마킹됩니다.</p>
                     </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5">
-                            <span>🔄 라이브 스코어 정산</span>
+                    
+                    <div class="flex items-center gap-1.5 shrink-0 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+                        <select id="bingo-season-selector" class="bg-slate-50 text-slate-700 font-black text-xs px-2.5 py-2 rounded-lg outline-none border border-slate-200/60 focus:border-violet-500">
+                            <option value="live">🔴 실시간 라이브</option>
+                            <option value="1">시즌 1 아카이브</option>
+                            <option value="2">시즌 2 아카이브</option>
+                            <option value="3">시즌 3 아카이브</option>
+                        </select>
+                        <button id="bingo-sync-btn" onclick="Boako.League.loadBingoBoardData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1">
+                            <span>🔍 과거 기록 보기</span>
                         </button>
                     </div>
                 </div>
@@ -170,34 +177,71 @@ Boako.League.getBingoHTML = function() {
 };
 
 // ====================================================================
-// 🌟 [소장님 마스터 뷰 듀얼 연동 완결본] 데이터 유실 차단 정밀 수송선
+// 🌟 [소장님 마스터 뷰 듀얼 연동 완결본] 실시간 뷰 & 히스토리 테이블 자동 스위칭
 // ====================================================================
 Boako.League.loadBingoBoardData = async function() {
     const grid = document.getElementById('bingo-grid');
-    if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-bold text-slate-400">🌐 실시간 라이브 스코어 연산 중...</div>`;
+    if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-bold text-slate-400">🌐 데이터를 배달하는 중...</div>`;
 
     try {
         if (!Boako.db) throw new Error("Supabase 비가동 상태");
 
-        // 1) 5x5 타일 점유 정보 호출
-        const { data: boardData, error: boardError } = await Boako.db
-            .from('v_bingo_board_live_scoring')
-            .select('*')
-            .order('coordinate_id', { ascending: true });
-        if (boardError) throw boardError;
+        // 드롭다운 선택된 시즌 값 추출
+        const seasonSelector = document.getElementById('bingo-season-selector');
+        const selectedSeason = seasonSelector ? seasonSelector.value : 'live';
 
-        // 2) 구단별 가로/세로/대각선 빙고 세부 현황 데이터 다이렉트 호출
-        const { data: scoreData, error: scoreError } = await Boako.db
-            .from('v_bingo_team_total_scores')
-            .select('*')
-            .order('bingo_total_score', { ascending: false });
-        if (scoreError) throw scoreError;
+        let boardData = null;
+        let scoreData = null;
 
+        // 🎯 [테이블 분기 크로스 매핑 알고리즘]
+        if (selectedSeason === 'live') {
+            console.log("🔴 BTL 실시간 라이브 스코어 연산 뷰 가동");
+            
+            // 1) 실시간 타일 현황 뷰 로드
+            const { data: bData, error: bError } = await Boako.db
+                .from('v_bingo_board_live_scoring')
+                .select('*')
+                .order('coordinate_id', { ascending: true });
+            if (bError) throw bError;
+            boardData = bData;
+
+            // 2) 실시간 팀 스코어보드 뷰 로드
+            const { data: sData, error: sError } = await Boako.db
+                .from('v_bingo_team_total_scores')
+                .select('*')
+                .order('bingo_total_score', { ascending: false });
+            if (sError) throw sError;
+            scoreData = sData;
+
+        } else {
+            const seasonNo = parseInt(selectedSeason);
+            console.log(`🕒 과거 아카이브 장부 조회 가동 ➡️ 시즌 번호: ${seasonNo}`);
+
+            // 1) 과거 타일 히스토리 물리 테이블 저격 필터링
+            const { data: bData, error: bError } = await Boako.db
+                .from('bingo_board_history')
+                .select('*')
+                .eq('season_no', seasonNo)
+                .order('coordinate_id', { ascending: true });
+            if (bError) throw bError;
+            boardData = bData;
+
+            // 2) 과거 팀 스코어보드 히스토리 물리 테이블 저격 필터링
+            const { data: sData, error: sError } = await Boako.db
+                .from('bingo_team_scores_history')
+                .select('*')
+                .eq('season_no', seasonNo)
+                .order('bingo_total_score', { ascending: false });
+            if (sError) throw sError;
+            scoreData = sData;
+        }
+
+        // 데이터 25칸 안전 분배 하우징
         const initializedBoard = Array(25).fill(null);
         const initializedGames = Array(25).fill("미정 종목");
         const initializedGameLogos = Array(25).fill(null);
         const initializedTeamLogos = Array(25).fill(null);
-        const initializedDiffs = Array(25).fill("EASY"); // 🌟 난이도 안정 적재함 임시 생성
+        const initializedDiffs = Array(25).fill("EASY");
 
         if (boardData && boardData.length > 0) {
             boardData.forEach(row => {
@@ -208,7 +252,6 @@ Boako.League.loadBingoBoardData = async function() {
                     initializedGameLogos[idx] = row.game_logo_url || null;
                     initializedTeamLogos[idx] = row.occupying_team_logo_url || null;
                     
-                    // 🌟 뷰에서 쏴주는 mission_difficulty 컬럼을 전량 가공하여 임시 배열에 마킹
                     if (row.mission_difficulty) {
                         initializedDiffs[idx] = row.mission_difficulty.trim().toUpperCase();
                     }
@@ -216,21 +259,21 @@ Boako.League.loadBingoBoardData = async function() {
             });
         }
         
-        // 임시 변수에서 메인 전역 장부로 완벽 이관 (데이터 꼬임 및 소멸 원천 봉쇄)
+        // 전역 장부 메모리 조인 이관
         Boako.League.State.bingoBoard = initializedBoard;
         Boako.League.State.boardGames25 = initializedGames;
         Boako.League.State.boardLogos25 = initializedGameLogos;
         Boako.League.State.bingoTeamLogos25 = initializedTeamLogos;
-        Boako.League.State.missionDifficulties = initializedDiffs; // 🎯 족보 연동 완료
+        Boako.League.State.missionDifficulties = initializedDiffs;
         
         Boako.League.State.teamBingoScores = scoreData || [];
         
-        // 안정적으로 리렌더링 트리거 실행
+        // 렌더러로 리플렉션 사출
         Boako.League.renderBingoBoard();
 
     } catch (err) {
-        console.error("빙고 라이브 데이터 동기화 실패:", err);
-        if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-black text-rose-500">❌ 연산 뷰 동기화 실패 (${err.message})</div>`;
+        console.error("빙고 히스토리 추적 연동 실패:", err);
+        if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-black text-rose-500">❌ 데이터 바인딩 실패 (${err.message})</div>`;
     }
 };
 
