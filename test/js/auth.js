@@ -1,68 +1,44 @@
 /**
- * [AUTH] 인증 및 프로필 관리 (인덱스 다이어트 대응 최종본 - 순정 복구 + 숨통 트기)
+ * [AUTH] 인증 및 프로필 관리 (모든 꼼수 제거 순정본)
  */
 Boako.Auth = {
     init: async () => {
-        // 1. 최초 수파베이스 클라이언트 생성 (웹앱 가동 시 딱 한 번만 순수하게 생성)
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
-        // ❌ 골칫덩어리였던 Boako.db.from 가로채기(Proxy) 싹 다 철거했습니다! ❌
-
-        // 2. 기존 소장님 비즈니스 로직 흐름
+        // 🌟 최초 접속 시의 정상적인 초기 로드 및 렌더링
         const { data: { session } } = await Boako.db.auth.getSession();
-        
         if (session?.user) {
             Boako.state.user = session.user;
-
-            // 🚚 [1번째 방어막] 팀 실무 파일이 메모리에 없다면 즉시 실시간 배달 받기!
-            if (!Boako.Team.syncStatus) {
-                await Boako.Util.loadScript('js/team.js');
-            }
+            if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
             await Boako.Team.syncStatus();
-            
-            // 🌟 권한 메뉴 체크 세트 실행
             await Boako.Auth.checkAdminMenu();
             await Boako.Auth.checkLeaderMenu();
         }
-        
         Boako.Auth.renderWidget();
-        Boako.View.render('main');
+        Boako.View.render('main'); // <--- 최초 접속 시 한 번만 렌더링!
 
+        // 🌟 이후 탭 복귀 시 발동하는 이벤트 (여기서 화면 렌더링 빼버림)
         Boako.db.auth.onAuthStateChange(async (e, s) => {
-            console.log("📍 [이벤트 감지] 상태 변화:", e);
-
-            // =========================================================
-            // 🛡️ [철통 방어막] 탭 복귀로 인해 발생한 여진(TOKEN_REFRESHED, SIGNED_IN 등)을 
-            // 1초 동안 완벽하게 모두 무시합니다. (아까 에러 났을 때의 쾌적함 100% 재현)
-            // =========================================================
-            if (window.Boako_isTabReturning) {
-                console.log(`✅ 탭 복귀 여진 차단(${e}): 무거운 화면 렌더링을 생략합니다.`);
-                return; // 여기서 함수를 완전 종료! 무한 대기 절대 안 걸림.
-            }
-
-            // 아래 로직은 최초 접속(INITIAL_SESSION)이거나 진짜로 로그인 버튼을 눌렀을 때만 실행됩니다.
             if (s?.user) {
                 Boako.state.user = s.user;
 
                 if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
-                
                 await Boako.Team.syncStatus();
                 await Boako.Auth.checkAdminMenu();
                 await Boako.Auth.checkLeaderMenu();
                 
                 Boako.Auth.renderWidget();
-                if (typeof Boako.View !== 'undefined') Boako.View.render('main');
+                
+                // ❌ 만악의 근원이었던 Boako.View.render('main'); 삭제 완료! ❌
+                // 이제 탭으로 돌아와도 소장님이 보던 화면의 데이터를 날려버리지 않습니다.
                 
             } else {
                 Boako.state.user = null;
                 Boako.state.team = null;
-                
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) adminMenu.style.display = 'none';
-                
                 const verifyMenu = document.getElementById('menu-record-verify');
                 if (verifyMenu) verifyMenu.style.display = 'none';
-                
                 Boako.Auth.renderWidget();
             }
         });
@@ -91,13 +67,9 @@ Boako.Auth = {
             area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
         } else {
             const avatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://');
-
             area.innerHTML = `
             <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
-                ${avatarUrl 
-                    ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` 
-                    : '👤'
-                }
+                ${avatarUrl ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
             </div>
             <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
                 <strong>${user.nickname || '사용자'}</strong>
@@ -109,82 +81,34 @@ Boako.Auth = {
         }
     },
 
-    /**
-     * 🌟 관리자 메뉴 권한 체크 및 실시간 스타일링
-     */
     checkAdminMenu: async function() {
         if (!Boako.state.user) return;
-
         try {
-            const { data: profile } = await Boako.db
-                .from('profiles')
-                .select('is_admin')
-                .eq('id', Boako.state.user.id)
-                .single();
-
+            const { data: profile } = await Boako.db.from('profiles').select('is_admin').eq('id', Boako.state.user.id).single();
             if (profile && profile.is_admin) {
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) {
                     adminMenu.style.display = 'list-item'; 
-                    
-                    const { count } = await Boako.db
-                        .from('view_pending_review_games')
-                        .select('*', { count: 'exact', head: true });
-                    
-                    if (count > 0) {
-                        adminMenu.style.background = '#fff1f2';
-                        adminMenu.style.borderLeft = '4px solid #f43f5e';
-                        adminMenu.style.fontWeight = '800';
-                    } else {
-                        adminMenu.style.background = 'transparent';
-                        adminMenu.style.borderLeft = 'none';
-                        adminMenu.style.fontWeight = 'normal';
-                    }
+                    const { count } = await Boako.db.from('view_pending_review_games').select('*', { count: 'exact', head: true });
+                    if (count > 0) { adminMenu.style.background = '#fff1f2'; adminMenu.style.borderLeft = '4px solid #f43f5e'; adminMenu.style.fontWeight = '800'; } 
+                    else { adminMenu.style.background = 'transparent'; adminMenu.style.borderLeft = 'none'; adminMenu.style.fontWeight = 'normal'; }
                 }
             }
-        } catch (err) { 
-            console.error("관리자 메뉴 로드 오류:", err); 
-        }
+        } catch (err) {}
     },
 
-    /**
-     * 🌟 팀 리더 메뉴 권한 체크 및 타 팀 미인증 알림 (b_all_team 다이렉트 매칭)
-     */
     checkLeaderMenu: async function() {
         if (!Boako.state.user || !Boako.state.team) return;
-
         try {
             const myTeamName = Boako.state.team.info.team_name;
             const isLeader = Boako.state.team.type === 'LEADER';
-
             const verifyMenu = document.getElementById('menu-record-verify');
             if (!verifyMenu) return;
-
-            if (!isLeader) {
-                verifyMenu.style.display = 'none';
-                return;
-            }
-
+            if (!isLeader) { verifyMenu.style.display = 'none'; return; }
             verifyMenu.style.display = 'list-item';
-
-            const { count } = await Boako.db
-                .from('v_boako_total_records')
-                .select('*', { count: 'exact', head: true })
-                .neq('b_all_team', myTeamName)
-                .eq('is_verified', 1);
-
-            if (count > 0) {
-                verifyMenu.style.background = '#fff1f2';
-                verifyMenu.style.borderLeft = '4px solid #10b981';
-                verifyMenu.style.fontWeight = '800';
-            } else {
-                verifyMenu.style.background = 'transparent';
-                verifyMenu.style.borderLeft = 'none';
-                verifyMenu.style.fontWeight = 'normal';
-            }
-
-        } catch (err) {
-            console.error("팀 리더 타 팀 검증 알림 연동 오류:", err);
-        }
+            const { count } = await Boako.db.from('v_boako_total_records').select('*', { count: 'exact', head: true }).neq('b_all_team', myTeamName).eq('is_verified', 1);
+            if (count > 0) { verifyMenu.style.background = '#fff1f2'; verifyMenu.style.borderLeft = '4px solid #10b981'; verifyMenu.style.fontWeight = '800'; } 
+            else { verifyMenu.style.background = 'transparent'; verifyMenu.style.borderLeft = 'none'; verifyMenu.style.fontWeight = 'normal'; }
+        } catch (err) {}
     }
 };
