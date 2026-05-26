@@ -29,30 +29,28 @@ Boako.Auth = {
         Boako.View.render('main');
 
         Boako.db.auth.onAuthStateChange(async (e, s) => {
-            // 디버깅 로그 유지 (확인용)
             console.log("📍 [이벤트 감지] 상태 변화:", e);
-
-            // =========================================================
-            // 🛡️ [크롬 네트워크 무한 펜딩 방지] 
-            // 탭 복귀 시 네트워크 소켓이 완전히 열릴 때까지 0.5초만 숨통을 트여줍니다.
-            // =========================================================
-            if (e === 'TOKEN_REFRESHED') {
-                console.log("⏳ 네트워크 통로 예열 중... (0.5초 대기)");
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
 
             if (s?.user) {
                 Boako.state.user = s.user;
 
+                // =========================================================
+                // 🛡️ [마스터 키] 탭 복귀로 인한 단순 토큰 연장일 경우, 
+                // 무거운 쿼리나 화면 재로딩을 캔슬하고 원래 화면을 유지합니다!
+                // (아까 에러가 나서 정상 작동했던 그 원리를 합법적으로 구현)
+                // =========================================================
+                if (e === 'TOKEN_REFRESHED') {
+                    console.log("✅ 토큰 갱신 완료: 화면 재로딩을 생략하고 쾌적함을 유지합니다.");
+                    return; // 여기서 함수를 끝내버림 (아래 로직 실행 안 함)
+                }
+
+                // 아래 로직은 처음 접속(INITIAL_SESSION)이거나 로그인(SIGNED_IN) 시에만 실행됨
                 if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
                 
-                // 이제 무한 대기에 빠지지 않고 정상적으로 0.5초 뒤에 쏩니다!
                 await Boako.Team.syncStatus();
                 await Boako.Auth.checkAdminMenu();
                 await Boako.Auth.checkLeaderMenu();
                 
-                console.log("✅ [데이터 로드 완료] 화면을 갱신합니다.");
-
                 Boako.Auth.renderWidget();
                 if (typeof Boako.View !== 'undefined') Boako.View.render('main');
                 
@@ -65,8 +63,9 @@ Boako.Auth = {
                 
                 const verifyMenu = document.getElementById('menu-record-verify');
                 if (verifyMenu) verifyMenu.style.display = 'none';
+                
+                Boako.Auth.renderWidget();
             }
-            Boako.Auth.renderWidget();
         });
     },
 
