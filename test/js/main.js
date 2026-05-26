@@ -1,8 +1,7 @@
 /**
- * [MAIN] 스크립트 실행 진입점 (가장 마지막에 로드되어야 합니다)
+ * [MAIN] 스크립트 실행 진입점
  */
 window.onload = () => {
-    // 모든 모듈이 로드된 후 초기화 함수 실행
     if (Boako && Boako.Auth) {
         Boako.Auth.init();
     } else {
@@ -10,21 +9,26 @@ window.onload = () => {
         return;
     }
 
-    // ====================================================================
-    // ♻️ [BOAKO 엔진] 탭 복귀 시 세션 동기화 (프록시 연동 변수 싹 다 제거됨)
-    // ====================================================================
+    // 🔴 탭 복귀 중임을 알리는 전역 방어막
+    window.Boako_isTabReturning = false;
+
     document.addEventListener('visibilitychange', async () => {
-        // 다른 탭을 보다가 아카이브 화면으로 딱 돌아오는 그 순간!
         if (document.visibilityState === 'visible') {
             try {
                 if (Boako.db && Boako.db.auth) {
                     console.log("♻️ [BOAKO 엔진] 크롬 탭 복귀 확인 ➡️ 세션 싱크 가동");
+                    
+                    // 세션 갱신 시작! 방어막을 폅니다.
+                    window.Boako_isTabReturning = true; 
+                    
                     await Boako.db.auth.refreshSession();
+                    
+                    // 1초 뒤에 세션 갱신 여파가 완전히 가라앉으면 방어막을 해제합니다.
+                    setTimeout(() => { window.Boako_isTabReturning = false; }, 1000);
                 }
             } catch (err) {
                 console.warn("⚠️ 세션 복구 중 예외 발생");
             }
         }
     });
-    // ====================================================================
 };
