@@ -3,29 +3,42 @@
  */
 Boako.Auth = {
     init: async () => {
-        // 1. 최초 수파베이스 클라이언트 생성 (웹앱 가동 시 딱 한 번만 순수하게 생성)
+        // 1. 최초 수파베이스 클라이언트 생성
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
         // ====================================================================
-        // 🛡️ [마스터 스핀락 밸브] 세션 예열 중일 때 하위 쿼리를 안전하게 정체시키는 장치
+        // 🛡️ [마스터 비동기 밸브] 스레드를 방해하지 않고 세션 예열 완료를 기다리는 장치
         // ====================================================================
         if (Boako.db) {
             const originalFrom = Boako.db.from;
             
             Boako.db.from = function(tableName) {
-                // main.js에서 튼 신호등이 빨간불(true)이라면, 통로가 완전히 예열될 때까지 쿼리 발사를 보류
+                // main.js에서 튼 신호등이 빨간불(true)이라면, 통로가 열릴 때까지 자바스크립트 엔진에 순서를 양보하며 대기
                 if (window.Boako_isRefreshing) {
-                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리를 안전하게 지연 시킵니다.`);
+                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리를 비동기 대기 시킵니다.`);
                     
-                    // 수파베이스의 체이닝 규격을 오염시키지 않기 위해, 원래 메서드를 호출하되
-                    // 실행 직전에 자바스크립트 실행 스택을 비워주어 refreshSession이 먼저 완수되도록 유도합니다.
-                    const deSync = Date.now();
-                    // 최대 300ms 동안만 안전하게 브레이크를 밟습니다.
-                    while (window.Boako_isRefreshing && (Date.now() - deSync) < 300) {
-                        // 세션 수리가 완료될 때까지 미세한 동기식 홀딩 타임을 가집니다.
-                    }
+                    // 수파베이스의 모든 꼬리물기(Method Chaining) 규격을 100% 원형 보존하기 위해 Proxy를 쓰되,
+                    // 실행 순서만 세션 리프레시 완료 후로 미뤄버립니다.
+                    return new Proxy({}, {
+                        get: (target, prop) => {
+                            return (...args) => {
+                                // 0.05초마다 신호등이 파란불로 바뀌었는지 체크하는 재귀 함수
+                                const waitForRefresh = (resolve) => {
+                                    if (!window.Boako_isRefreshing) {
+                                        // 예열 완료 시 원본 수파베이스 쿼리 실행 후 결과 토스
+                                        const queryInstance = originalFrom.call(Boako.db, tableName);
+                                        resolve(queryInstance[prop](...args));
+                                    } else {
+                                        // 아직 빨간불이면 50ms 뒤에 다시 체크 (스레드를 막지 않고 양보함)
+                                        setTimeout(() => waitForRefresh(resolve), 50);
+                                    }
+                                };
+                                return new Promise(resolve => waitForRefresh(resolve));
+                            };
+                        }
+                    });
                 }
-                // 통로가 예열 완료되었거나 평소 상태일 때는 100% 원본 쿼리 규격 그대로 사출
+                // 평소 정상 가동 중이거나 웨일처럼 잠들지 않았을 때는 100% 즉시 통과
                 return originalFrom.call(this, tableName);
             };
         }
