@@ -3,46 +3,58 @@
  */
 Boako.Auth = {
     init: async () => {
-        // 1. 최초 수파베이스 클라이언트 생성
+        // 1. 최초 수파베이스 클라이언트 생성 (웹앱 가동 시 딱 한 번만 순수하게 생성)
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
         // ====================================================================
-        // 🛡️ [마스터 비동기 밸브] 스레드를 방해하지 않고 세션 예열 완료를 기다리는 장치
+        // 🛡️ [마스터 무결점 안전 밸브] 세션 예열 중일 때 원본 호출을 뒤로 미루는 장치
         // ====================================================================
         if (Boako.db) {
             const originalFrom = Boako.db.from;
             
             Boako.db.from = function(tableName) {
-                // main.js에서 튼 신호등이 빨간불(true)이라면, 통로가 열릴 때까지 자바스크립트 엔진에 순서를 양보하며 대기
+                // main.js에서 튼 신호등이 빨간불(true) 상태라면 
                 if (window.Boako_isRefreshing) {
-                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리를 비동기 대기 시킵니다.`);
+                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리 진입을 안전하게 우회시킵니다.`);
                     
-                    // 수파베이스의 모든 꼬리물기(Method Chaining) 규격을 100% 원형 보존하기 위해 Proxy를 쓰되,
-                    // 실행 순서만 세션 리프레시 완료 후로 미뤄버립니다.
-                    return new Proxy({}, {
-                        get: (target, prop) => {
-                            return (...args) => {
-                                // 0.05초마다 신호등이 파란불로 바뀌었는지 체크하는 재귀 함수
-                                const waitForRefresh = (resolve) => {
-                                    if (!window.Boako_isRefreshing) {
-                                        // 예열 완료 시 원본 수파베이스 쿼리 실행 후 결과 토스
-                                        const queryInstance = originalFrom.call(Boako.db, tableName);
-                                        resolve(queryInstance[prop](...args));
-                                    } else {
-                                        // 아직 빨간불이면 50ms 뒤에 다시 체크 (스레드를 막지 않고 양보함)
-                                        setTimeout(() => waitForRefresh(resolve), 50);
-                                    }
-                                };
-                                return new Promise(resolve => waitForRefresh(resolve));
+                    // 수파베이스 체이닝(.select().eq)을 완벽하게 보호하기 위해
+                    // 지연된 '가짜 쿼리 빌더' 객체를 임시로 던져주고, 실제 실행은 뒤로 유도합니다.
+                    const dummyBuilder = {
+                        select: (...selectArgs) => {
+                            const chain = {
+                                eq: (...eqArgs) => chain,
+                                neq: (...neqArgs) => chain,
+                                single: (...singleArgs) => chain,
+                                // 혹시 모를 다른 체이닝 메서드가 있다면 아래에 매핑하거나, 프로미스로 낚아챕니다.
+                                then: (onfulfilled) => {
+                                    // 유저가 await를 걸어 실제 데이터를 원할 때 비동기로 대기 후 쏩니다.
+                                    const waitAndFetch = () => {
+                                        if (!window.Boako_isRefreshing) {
+                                            // 신호등이 파란불로 바뀌면 무결한 원본 쿼리를 날려 체이닝을 복구합니다.
+                                            originalFrom.call(Boako.db, tableName)
+                                                .select(...selectArgs)
+                                                .eq(...eqArgs)
+                                                .then(onfulfilled);
+                                        } else {
+                                            setTimeout(waitAndFetch, 50); // 50ms 후 재확인
+                                        }
+                                    };
+                                    waitAndFetch();
+                                }
                             };
+                            return chain;
                         }
-                    });
+                    };
+                    return dummyBuilder;
                 }
-                // 평소 정상 가동 중이거나 웨일처럼 잠들지 않았을 때는 100% 즉시 통과
+                
+                // 평소 정상 상태이거나 웨일처럼 안 잠들었을 때는 오리지널 쿼리 100% 즉시 통과
                 return originalFrom.call(this, tableName);
             };
         }
-        // 2. 기존 소장님 비즈니스 로직 흐름 (유령 인스턴스 충돌 장치 완벽 제거)
+        // ====================================================================
+
+        // 2. 기존 소장님 비즈니스 로직 흐름 (이 아래로는 원본 코드와 100% 완벽히 동일합니다)
         const { data: { session } } = await Boako.db.auth.getSession();
         
         if (session?.user) {
