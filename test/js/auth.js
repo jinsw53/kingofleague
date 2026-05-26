@@ -7,45 +7,36 @@ Boako.Auth = {
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
         // ====================================================================
-        // 🛡️ [마스터 무결점 안전 밸브] 세션 예열 중일 때 원본 호출을 뒤로 미루는 장치
+        // 🛡️ [마스터 블랙홀 방어막] 수파베이스 원본 객체를 보존하며 실행만 뒤로 미루는 장치
         // ====================================================================
         if (Boako.db) {
             const originalFrom = Boako.db.from;
             
             Boako.db.from = function(tableName) {
-                // main.js에서 튼 신호등이 빨간불(true) 상태라면 
+                // main.js에서 튼 신호등이 빨간불(true) 상태라면
                 if (window.Boako_isRefreshing) {
-                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리 진입을 안전하게 우회시킵니다.`);
+                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리 통로를 잠시 동결합니다.`);
                     
-                    // 수파베이스 체이닝(.select().eq)을 완벽하게 보호하기 위해
-                    // 지연된 '가짜 쿼리 빌더' 객체를 임시로 던져주고, 실제 실행은 뒤로 유도합니다.
-                    const dummyBuilder = {
-                        select: (...selectArgs) => {
-                            const chain = {
-                                eq: (...eqArgs) => chain,
-                                neq: (...neqArgs) => chain,
-                                single: (...singleArgs) => chain,
-                                // 혹시 모를 다른 체이닝 메서드가 있다면 아래에 매핑하거나, 프로미스로 낚아챕니다.
-                                then: (onfulfilled) => {
-                                    // 유저가 await를 걸어 실제 데이터를 원할 때 비동기로 대기 후 쏩니다.
-                                    const waitAndFetch = () => {
-                                        if (!window.Boako_isRefreshing) {
-                                            // 신호등이 파란불로 바뀌면 무결한 원본 쿼리를 날려 체이닝을 복구합니다.
-                                            originalFrom.call(Boako.db, tableName)
-                                                .select(...selectArgs)
-                                                .eq(...eqArgs)
-                                                .then(onfulfilled);
-                                        } else {
-                                            setTimeout(waitAndFetch, 50); // 50ms 후 재확인
-                                        }
-                                    };
-                                    waitAndFetch();
-                                }
+                    // 수파베이스의 모든 문법(.select().eq().maybeSingle())을 100% 원형 보존하기 위해
+                    // 최종 연산이 일어날 때까지 신호등을 체크하며 대기하는 무결점 프록시 래퍼 사출
+                    return new Proxy({}, {
+                        get: (target, prop) => {
+                            return (...args) => {
+                                // 유저가 최종적으로 데이터를 원하거나 메서드를 트리거할 때 비동기 대기 가동
+                                const waitAndExecute = (resolve) => {
+                                    if (!window.Boako_isRefreshing) {
+                                        // 신호등이 파란불로 꺼지면 무결한 원본 수파베이스 빌더를 통째로 호출
+                                        const queryInstance = originalFrom.call(Boako.db, tableName);
+                                        // 유저가 요청한 쿼리(.select 등)를 원본 객체에 그대로 바인딩하여 실행
+                                        resolve(queryInstance[prop](...args));
+                                    } else {
+                                        setTimeout(() => waitAndExecute(resolve), 30); // 30ms 간격으로 스레드 양보하며 재확인
+                                    }
+                                };
+                                return new Promise(resolve => waitAndExecute(resolve));
                             };
-                            return chain;
                         }
-                    };
-                    return dummyBuilder;
+                    });
                 }
                 
                 // 평소 정상 상태이거나 웨일처럼 안 잠들었을 때는 오리지널 쿼리 100% 즉시 통과
