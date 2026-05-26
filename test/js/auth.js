@@ -29,20 +29,27 @@ Boako.Auth = {
         Boako.View.render('main');
 
         Boako.db.auth.onAuthStateChange(async (e, s) => {
-           
+            console.log("📍 [이벤트 감지] 상태 변화:", e); // <--- 이거 찍히나요?
 
             if (s?.user) {
                 Boako.state.user = s.user;
 
-                // 🚚 [2번째 방어막] 실시간 로그인 상태 변화 대응 배달 검문
-                if (!Boako.Team.syncStatus) {
-                    await Boako.Util.loadScript('js/team.js');
-                }
-                await Boako.Team.syncStatus();
+                if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
                 
-                // 🌟 로그인/변경 시 권한 메뉴 재확인
+                await Boako.Team.syncStatus();
                 await Boako.Auth.checkAdminMenu();
                 await Boako.Auth.checkLeaderMenu();
+                
+                console.log("📍 [데이터 로드 완료] 렌더링 직전 상태:", Boako.state); // <--- 값들이 들어있나요?
+
+                Boako.Auth.renderWidget();
+                if (typeof Boako.View !== 'undefined') {
+                    console.log("📍 [렌더링 시도]"); // <--- 이 로그가 찍히나요?
+                    Boako.View.render('main');
+                } else {
+                    console.error("❌ Boako.View가 정의되지 않았습니다!");
+                }
+                
             } else {
                 Boako.state.user = null;
                 Boako.state.team = null;
