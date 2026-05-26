@@ -7,36 +7,25 @@ Boako.Auth = {
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
         // ====================================================================
-        // 🛡️ [크롬 전용 세션 예열 안전 밸브] 세션 수리 중일 때 쿼리 블랙홀 방어막
+        // 🛡️ [마스터 스핀락 밸브] 세션 예열 중일 때 하위 쿼리를 안전하게 정체시키는 장치
         // ====================================================================
         if (Boako.db) {
-            const originalFrom = Boako.db.from; // 오리지널 from 메서드 보존
-
+            const originalFrom = Boako.db.from;
+            
             Boako.db.from = function(tableName) {
-                // main.js에서 켜놓은 전역 신호등이 빨간불(true)이라면 통로가 예열될 때까지 대기 제어
+                // main.js에서 튼 신호등이 빨간불(true)이라면, 통로가 완전히 예열될 때까지 쿼리 발사를 보류
                 if (window.Boako_isRefreshing) {
-                    console.log("🕒 [안전 밸브] 크롬 탭 복귀 세션 예열 중... 잠시 후 자동으로 쿼리를 발사합니다.");
+                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리를 안전하게 지연 시킵니다.`);
                     
-                    // Supabase의 체이닝 쿼리를 깨뜨리지 않기 위해 비동기 래퍼 객체 반환
-                    return new Proxy({}, {
-                        get: (target, prop) => {
-                            return (...args) => {
-                                return new Promise(resolve => {
-                                    setTimeout(() => {
-                                        // 0.2초 대기 후 파이프가 다 뚫리면 원래 쿼리를 호출하여 resolve
-                                        const queryInstance = originalFrom.call(Boako.db, tableName);
-                                        if (typeof queryInstance[prop] === 'function') {
-                                            resolve(queryInstance[prop](...args));
-                                        } else {
-                                            resolve(queryInstance[prop]);
-                                        }
-                                    }, 200); // 0.2초의 우아한 서행 버퍼링
-                                });
-                            };
-                        }
-                    });
+                    // 수파베이스의 체이닝 규격을 오염시키지 않기 위해, 원래 메서드를 호출하되
+                    // 실행 직전에 자바스크립트 실행 스택을 비워주어 refreshSession이 먼저 완수되도록 유도합니다.
+                    const deSync = Date.now();
+                    // 최대 300ms 동안만 안전하게 브레이크를 밟습니다.
+                    while (window.Boako_isRefreshing && (Date.now() - deSync) < 300) {
+                        // 세션 수리가 완료될 때까지 미세한 동기식 홀딩 타임을 가집니다.
+                    }
                 }
-                // 평소 정상 가동 중이거나 웨일처럼 잠들지 않았을 때는 무감속 즉시 통과
+                // 통로가 예열 완료되었거나 평소 상태일 때는 100% 원본 쿼리 규격 그대로 사출
                 return originalFrom.call(this, tableName);
             };
         }
