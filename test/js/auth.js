@@ -29,11 +29,7 @@ Boako.Auth = {
         Boako.View.render('main');
 
         Boako.db.auth.onAuthStateChange(async (e, s) => {
-            // =========================================================
-            // 🛡️ [크롬 전용 숨통 트기] 탭 전환 직후 네트워크가 안정될 때까지 0.3초 대기
-            // 이 한 줄이 뱃지 검사기들의 헛발질(콘솔 에러)을 완벽하게 막아줍니다.
-            // =========================================================
-            await new Promise(resolve => setTimeout(resolve, 300));
+           
 
             if (s?.user) {
                 Boako.state.user = s.user;
