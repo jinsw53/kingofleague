@@ -7,37 +7,33 @@ window.onload = () => {
         Boako.Auth.init();
     } else {
         console.error("Core 모듈 로딩에 실패했습니다. 스크립트 순서를 확인해주세요.");
-        return; // 실패 시 실행 방지
+        return;
     }
 
     // ====================================================================
-    // 🛡️ [마스터 잠수 해제 장치] 보드게임 플레이 후 복귀 시 탭 강제 심폐소생
+    // 🛡️ [마스터 잠수 해제 장치] 고장 난 통신 채널 파이프라인 완전 재부팅 엔진
     // ====================================================================
     document.addEventListener('visibilitychange', async () => {
-        // 유저가 한 시간 동안 보드게임을 하다가 아카이브 브라우저 화면을 딱 보는 바로 그 0초의 순간!
+        // 유저가 한 시간 동안 보드게임을 하다가 아카이브 브라우저 화면을 다시 활성화하는 바로 그 0초의 순간!
         if (document.visibilityState === 'visible') {
-            console.log("♻️ [BOAKO 엔진] 유저 복귀 확인 ➡️ 잠들었던 수파베이스 커넥션 강제 심폐소생");
+            console.log("♻️ [BOAKO 엔진] 유저 복귀 확인 ➡️ 단선된 수파베이스 통신 기지국 완전 재부팅 발사");
             
             try {
-                if (Boako.db && Boako.db.auth) {
-                    // 1. 단순 껍데기가 아닌 진짜 네트워크를 태워 세션을 수리(Refresh)합니다.
-                    const { data: { session }, error } = await Boako.db.auth.refreshSession();
-                    
-                    // 2. 세션 수리 중 네트워크가 완전히 터졌거나 세션이 만료 정지 처리가 내려왔다면
-                    if (error || !session) {
-                        throw new Error("세션 파이프라인 수리 거부");
-                    }
-                    console.log("✅ 수파베이스 세션 파이프라인 및 토큰 복구 성공!");
+                // 1. 유령 상태가 된 통신 풀(Pool)을 아예 메모리에서 지워버리고 완전 새 클라이언트를 생성합니다.
+                // 대시보드에서 만료 시간을 24시간으로 늘려두셨기 때문에, 새 인스턴스를 파도 브라우저 쿠키의 세션은 무사히 살아있습니다.
+                Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
+
+                // 2. 새 통신 라인을 타고 서버에 찌를 수 있도록 인증 세션을 강제로 동기화(싱크) 시킵니다.
+                const { data: { session }, error } = await Boako.db.auth.getSession();
+                
+                if (!error && session?.user) {
+                    Boako.state.user = session.user;
+                    console.log("✅ [BOAKO 엔진] 수파베이스 통신 기지국 및 로그인 세션 새 파이프라인 정비 완벽 완료!");
+                } else {
+                    console.log("ℹ️ [BOAKO 엔진] 비로그인 또는 세션 만료 상태로 기지국 리셋 완료");
                 }
             } catch (err) {
-                console.warn("⚠️ 세션 심폐소생 실패 ➡️ 안전하게 클라이언트 인스턴스 전격 즉시 리셋");
-                // 통신 파이프라인 라인을 아예 공장 초기화하듯 완전히 새로 뚫어서 무응답 원천 차단
-                Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
-                
-                // 만약 로그인 세션이 유효하다면 새 인스턴스에 강제 바인딩 처리
-                try {
-                    await Boako.db.auth.getSession();
-                } catch(e) {}
+                console.error("🚨 기지국 재부팅 중 치명적 예외 발생:", err);
             }
         }
     });
