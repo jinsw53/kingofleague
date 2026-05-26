@@ -29,32 +29,37 @@ Boako.Auth = {
         Boako.View.render('main');
 
         Boako.db.auth.onAuthStateChange(async (e, s) => {
-            console.log("📍 [이벤트 감지] 상태 변화:", e); // <--- 이거 찍히나요?
+            // 디버깅 로그 유지 (확인용)
+            console.log("📍 [이벤트 감지] 상태 변화:", e);
+
+            // =========================================================
+            // 🛡️ [크롬 네트워크 무한 펜딩 방지] 
+            // 탭 복귀 시 네트워크 소켓이 완전히 열릴 때까지 0.5초만 숨통을 트여줍니다.
+            // =========================================================
+            if (e === 'TOKEN_REFRESHED') {
+                console.log("⏳ 네트워크 통로 예열 중... (0.5초 대기)");
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
 
             if (s?.user) {
                 Boako.state.user = s.user;
 
                 if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
                 
+                // 이제 무한 대기에 빠지지 않고 정상적으로 0.5초 뒤에 쏩니다!
                 await Boako.Team.syncStatus();
                 await Boako.Auth.checkAdminMenu();
                 await Boako.Auth.checkLeaderMenu();
                 
-                console.log("📍 [데이터 로드 완료] 렌더링 직전 상태:", Boako.state); // <--- 값들이 들어있나요?
+                console.log("✅ [데이터 로드 완료] 화면을 갱신합니다.");
 
                 Boako.Auth.renderWidget();
-                if (typeof Boako.View !== 'undefined') {
-                    console.log("📍 [렌더링 시도]"); // <--- 이 로그가 찍히나요?
-                    Boako.View.render('main');
-                } else {
-                    console.error("❌ Boako.View가 정의되지 않았습니다!");
-                }
+                if (typeof Boako.View !== 'undefined') Boako.View.render('main');
                 
             } else {
                 Boako.state.user = null;
                 Boako.state.team = null;
                 
-                // 로그아웃 시 권한 메뉴 일제히 숨기기
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) adminMenu.style.display = 'none';
                 
