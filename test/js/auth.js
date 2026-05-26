@@ -3,39 +3,10 @@
  */
 Boako.Auth = {
     init: async () => {
-        // 1. 최초 수파베이스 클라이언트 생성 (소장님 원본 흐름)
+        // 1. 최초 수파베이스 클라이언트 생성 (웹앱 가동 시 딱 한 번만 순수하게 생성)
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
-        // ====================================================================
-        // 🛡️ [글로벌 마스터 허브] 대용량 무한 로딩 방어형 커넥션 헬스체크 엔진
-        // ====================================================================
-        if (Boako.db && !Boako.db.isIntercepted) {
-            const originalFrom = Boako.db.from;
-            Boako.db.isIntercepted = true; // 중복 바인딩 완벽 차단
-
-            Boako.db.from = function(tableName) {
-                // 🎯 장시간 잠수로 인해 객체가 잠들었거나 내부 채널이 파괴되었는지 즉각 스캔
-                if (!Boako.db || !Boako.db.auth || typeof Boako.db.auth.refreshSession !== 'function') {
-                    console.log("♻️ [마스터 허브] 커넥션 유실 확인: 수파베이스 인스턴스 전격 즉시 리프레시");
-                    Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
-                    return originalFrom.call(Boako.db, tableName);
-                }
-
-                // 소장님의 기존 세션 상태 유효성 및 토큰 만료 시간 체크 (유령 세션 전환 기조 차단)
-                const session = typeof Boako.db.auth.session === 'function' ? Boako.db.auth.session() : null;
-                if (session && session.expires_at && (Date.now() / 1000) > (session.expires_at - 60)) {
-                    console.log("🕒 인증 토큰 수명 만료 임박 감지 ➡️ 안전하게 인스턴스 재생성 스왑");
-                    Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
-                    return originalFrom.call(Boako.db, tableName);
-                }
-
-                // 정상 작동 및 대용량 페이지 연산 시에는 서버 응답을 안전하게 보장 (무한 로딩 0%)
-                return originalFrom.call(this, tableName);
-            };
-        }
-       // ====================================================================
-
-        // 2. 기존 소장님 비즈니스 로직 (여기서부터 기존 코드와 100% 동일하게 이음)
+        // 2. 기존 소장님 비즈니스 로직 흐름 (유령 인스턴스 충돌 장치 완벽 제거)
         const { data: { session } } = await Boako.db.auth.getSession();
         
         if (session?.user) {
