@@ -6,6 +6,40 @@ Boako.Auth = {
         // 1. 최초 수파베이스 클라이언트 생성 (웹앱 가동 시 딱 한 번만 순수하게 생성)
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
+        // ====================================================================
+        // 🛡️ [크롬 전용 세션 예열 안전 밸브] 세션 수리 중일 때 쿼리 블랙홀 방어막
+        // ====================================================================
+        if (Boako.db) {
+            const originalFrom = Boako.db.from; // 오리지널 from 메서드 보존
+
+            Boako.db.from = function(tableName) {
+                // main.js에서 켜놓은 전역 신호등이 빨간불(true)이라면 통로가 예열될 때까지 대기 제어
+                if (window.Boako_isRefreshing) {
+                    console.log("🕒 [안전 밸브] 크롬 탭 복귀 세션 예열 중... 잠시 후 자동으로 쿼리를 발사합니다.");
+                    
+                    // Supabase의 체이닝 쿼리를 깨뜨리지 않기 위해 비동기 래퍼 객체 반환
+                    return new Proxy({}, {
+                        get: (target, prop) => {
+                            return (...args) => {
+                                return new Promise(resolve => {
+                                    setTimeout(() => {
+                                        // 0.2초 대기 후 파이프가 다 뚫리면 원래 쿼리를 호출하여 resolve
+                                        const queryInstance = originalFrom.call(Boako.db, tableName);
+                                        if (typeof queryInstance[prop] === 'function') {
+                                            resolve(queryInstance[prop](...args));
+                                        } else {
+                                            resolve(queryInstance[prop]);
+                                        }
+                                    }, 200); // 0.2초의 우아한 서행 버퍼링
+                                });
+                            };
+                        }
+                    });
+                }
+                // 평소 정상 가동 중이거나 웨일처럼 잠들지 않았을 때는 무감속 즉시 통과
+                return originalFrom.call(this, tableName);
+            };
+        }
         // 2. 기존 소장님 비즈니스 로직 흐름 (유령 인스턴스 충돌 장치 완벽 제거)
         const { data: { session } } = await Boako.db.auth.getSession();
         
