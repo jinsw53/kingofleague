@@ -31,20 +31,19 @@ Boako.Auth = {
         Boako.db.auth.onAuthStateChange(async (e, s) => {
             console.log("📍 [이벤트 감지] 상태 변화:", e);
 
+            // =========================================================
+            // 🛡️ [철통 방어막] 탭 복귀로 인해 발생한 여진(TOKEN_REFRESHED, SIGNED_IN 등)을 
+            // 1초 동안 완벽하게 모두 무시합니다. (아까 에러 났을 때의 쾌적함 100% 재현)
+            // =========================================================
+            if (window.Boako_isTabReturning) {
+                console.log(`✅ 탭 복귀 여진 차단(${e}): 무거운 화면 렌더링을 생략합니다.`);
+                return; // 여기서 함수를 완전 종료! 무한 대기 절대 안 걸림.
+            }
+
+            // 아래 로직은 최초 접속(INITIAL_SESSION)이거나 진짜로 로그인 버튼을 눌렀을 때만 실행됩니다.
             if (s?.user) {
                 Boako.state.user = s.user;
 
-                // =========================================================
-                // 🛡️ [마스터 키] 탭 복귀로 인한 단순 토큰 연장일 경우, 
-                // 무거운 쿼리나 화면 재로딩을 캔슬하고 원래 화면을 유지합니다!
-                // (아까 에러가 나서 정상 작동했던 그 원리를 합법적으로 구현)
-                // =========================================================
-                if (e === 'TOKEN_REFRESHED') {
-                    console.log("✅ 토큰 갱신 완료: 화면 재로딩을 생략하고 쾌적함을 유지합니다.");
-                    return; // 여기서 함수를 끝내버림 (아래 로직 실행 안 함)
-                }
-
-                // 아래 로직은 처음 접속(INITIAL_SESSION)이거나 로그인(SIGNED_IN) 시에만 실행됨
                 if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
                 
                 await Boako.Team.syncStatus();
