@@ -1,51 +1,14 @@
 /**
- * [AUTH] 인증 및 프로필 관리 (인덱스 다이어트 대응 최종본)
+ * [AUTH] 인증 및 프로필 관리 (인덱스 다이어트 대응 최종본 - 순정 복구 + 숨통 트기)
  */
 Boako.Auth = {
     init: async () => {
         // 1. 최초 수파베이스 클라이언트 생성 (웹앱 가동 시 딱 한 번만 순수하게 생성)
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
-        // ====================================================================
-        // 🛡️ [마스터 블랙홀 방어막] 수파베이스 원본 객체를 보존하며 실행만 뒤로 미루는 장치
-        // ====================================================================
-        if (Boako.db) {
-            const originalFrom = Boako.db.from;
-            
-            Boako.db.from = function(tableName) {
-                // main.js에서 튼 신호등이 빨간불(true) 상태라면
-                if (window.Boako_isRefreshing) {
-                    console.log(`🕒 [안전 밸브] 세션 싱크 중... [${tableName}] 쿼리 통로를 잠시 동결합니다.`);
-                    
-                    // 수파베이스의 모든 문법(.select().eq().maybeSingle())을 100% 원형 보존하기 위해
-                    // 최종 연산이 일어날 때까지 신호등을 체크하며 대기하는 무결점 프록시 래퍼 사출
-                    return new Proxy({}, {
-                        get: (target, prop) => {
-                            return (...args) => {
-                                // 유저가 최종적으로 데이터를 원하거나 메서드를 트리거할 때 비동기 대기 가동
-                                const waitAndExecute = (resolve) => {
-                                    if (!window.Boako_isRefreshing) {
-                                        // 신호등이 파란불로 꺼지면 무결한 원본 수파베이스 빌더를 통째로 호출
-                                        const queryInstance = originalFrom.call(Boako.db, tableName);
-                                        // 유저가 요청한 쿼리(.select 등)를 원본 객체에 그대로 바인딩하여 실행
-                                        resolve(queryInstance[prop](...args));
-                                    } else {
-                                        setTimeout(() => waitAndExecute(resolve), 30); // 30ms 간격으로 스레드 양보하며 재확인
-                                    }
-                                };
-                                return new Promise(resolve => waitAndExecute(resolve));
-                            };
-                        }
-                    });
-                }
-                
-                // 평소 정상 상태이거나 웨일처럼 안 잠들었을 때는 오리지널 쿼리 100% 즉시 통과
-                return originalFrom.call(this, tableName);
-            };
-        }
-        // ====================================================================
+        // ❌ 골칫덩어리였던 Boako.db.from 가로채기(Proxy) 싹 다 철거했습니다! ❌
 
-        // 2. 기존 소장님 비즈니스 로직 흐름 (이 아래로는 원본 코드와 100% 완벽히 동일합니다)
+        // 2. 기존 소장님 비즈니스 로직 흐름
         const { data: { session } } = await Boako.db.auth.getSession();
         
         if (session?.user) {
@@ -66,6 +29,12 @@ Boako.Auth = {
         Boako.View.render('main');
 
         Boako.db.auth.onAuthStateChange(async (e, s) => {
+            // =========================================================
+            // 🛡️ [크롬 전용 숨통 트기] 탭 전환 직후 네트워크가 안정될 때까지 0.3초 대기
+            // 이 한 줄이 뱃지 검사기들의 헛발질(콘솔 에러)을 완벽하게 막아줍니다.
+            // =========================================================
+            await new Promise(resolve => setTimeout(resolve, 300));
+
             if (s?.user) {
                 Boako.state.user = s.user;
 
