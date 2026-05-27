@@ -1,5 +1,5 @@
 /**
- * [MESSENGER] 아카이브 통신망 (초고속 No-Join + CASCADE 최적화 + 일정 연동)
+ * [MESSENGER] 아카이브 통신망 (초고속 No-Join + CASCADE 최적화 + 일정 연동 & 종목 검색)
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -141,6 +141,7 @@ Boako.Messenger = {
     View: {
         currentTab: 'inbox',
         messagesData: [],
+        searchTimeout: null, // 검색 디바운스용 타이머
 
         renderMain: async () => {
             const container = document.getElementById('main-content') || document.getElementById('app'); 
@@ -270,6 +271,62 @@ Boako.Messenger = {
             `;
         },
 
+       // 🚀 [수정] 종목 라이브 검색 (소장님의 실제 games 테이블 스키마 100% 반영)
+        handleGameSearch: (keyword) => {
+            clearTimeout(Boako.Messenger.View.searchTimeout);
+            const resultBox = document.getElementById('game-search-results');
+            
+            if (!keyword || keyword.trim() === '') {
+                resultBox.style.display = 'none';
+                return;
+            }
+
+            // DB 과부하 방지용 디바운스 (0.3초 딜레이)
+            Boako.Messenger.View.searchTimeout = setTimeout(async () => {
+                try {
+                    // ⚠️ 알려주신 game_name 과 image_url 컬럼을 정확히 호출합니다!
+                    const { data, error } = await Boako.db
+                        .from('games')
+                        .select('game_name, image_url') 
+                        .ilike('game_name', `%${keyword}%`)
+                        .limit(10);
+
+                    if (error) throw error;
+
+                    if (data && data.length > 0) {
+                        resultBox.innerHTML = data.map(game => {
+                            // 이미지가 없으면 기본 주사위 아이콘으로 대체
+                            const imgHtml = game.image_url 
+                                ? `<img src="${game.image_url}" style="width:24px; height:24px; border-radius:4px; object-fit:cover;">` 
+                                : `🎲`;
+                                
+                            return `
+                            <div style="padding:10px 12px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:14px; color:#1e293b; display:flex; align-items:center; gap:10px;"
+                                  onmouseover="this.style.background='#f8fafc'"
+                                  onmouseout="this.style.background='white'"
+                                  onclick="Boako.Messenger.View.selectGame('${game.game_name}')">
+                                ${imgHtml}
+                                <span style="font-weight:600;">${game.game_name}</span>
+                            </div>`;
+                        }).join('');
+                        resultBox.style.display = 'block';
+                    } else {
+                        resultBox.innerHTML = `<div style="padding:10px 12px; color:#94a3b8; font-size:13px; text-align:center;">검색 결과가 없습니다.</div>`;
+                        resultBox.style.display = 'block';
+                    }
+                } catch (err) {
+                    console.error("게임 검색 오류", err);
+                }
+            }, 300); 
+        },
+
+        // 🚀 [추가] 종목 선택 시 검색창에 넣고 목록 닫기
+        selectGame: (gameName) => {
+            document.getElementById('prop-game').value = gameName;
+            document.getElementById('game-search-results').style.display = 'none';
+        },
+
+        // 🚀 UI 렌더링 (라벨 추가 및 검색창 적용)
         renderCompose: (replyToId = '', replyToName = '') => {
             const container = document.getElementById('main-content') || document.getElementById('app');
             const defaultName = replyToName ? replyToName : '';
@@ -282,36 +339,45 @@ Boako.Messenger = {
                         <h2 style="margin-top: 0; margin-bottom: 20px;">새 쪽지 작성</h2>
                         
                         <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                            <label style="display:flex; align-items:center; gap:10px; font-weight:bold; cursor:pointer;">
-                                <input type="checkbox" id="is-schedule-toggle" onchange="document.getElementById('schedule-form-area').style.display = this.checked ? 'block' : 'none'">
-                                📅 매치 일정 제안하기
+                            <label style="display:flex; align-items:center; gap:10px; font-weight:bold; cursor:pointer; font-size:15px; color:#1e293b;">
+                                <input type="checkbox" id="is-schedule-toggle" onchange="document.getElementById('schedule-form-area').style.display = this.checked ? 'block' : 'none'" style="width:16px; height:16px;">
+                                📅 매치 일정 제안하기 (선택)
                             </label>
                             
                             <div id="schedule-form-area" style="display:none; margin-top: 15px; border-top: 1px dashed #cbd5e1; padding-top: 15px;">
-                                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                                    <select id="prop-game" style="flex:1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                                        <option value="쿼리돌">쿼리돌</option>
-                                        <option value="아크 노바">아크 노바</option>
-                                        <option value="다빈치 코드">다빈치 코드</option>
-                                    </select>
-                                    <select id="prop-type" style="flex:1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                                        <option value="RIVAL">⚔️ 라이벌전</option>
-                                        <option value="LEAGUE">🏆 공식리그</option>
-                                        <option value="FRIENDLY">🤝 친선전</option>
-                                    </select>
+                                
+                                <div style="margin-bottom: 12px; position: relative;">
+                                    <label style="display:block; font-size:12px; font-weight:bold; color:#64748b; margin-bottom:4px;">🎲 종목 검색</label>
+                                    <input type="text" id="prop-game" oninput="Boako.Messenger.View.handleGameSearch(this.value)" placeholder="게임 이름을 검색하세요 (예: 쿼리돌)" style="width:100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;" autocomplete="off">
+                                    <div id="game-search-results" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #cbd5e1; border-radius:6px; max-height:180px; overflow-y:auto; z-index:10; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"></div>
                                 </div>
-                                <input type="datetime-local" id="prop-time" style="width:100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+
+                                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                                    <div style="flex:1;">
+                                        <label style="display:block; font-size:12px; font-weight:bold; color:#64748b; margin-bottom:4px;">⚔️ 매치 유형</label>
+                                        <select id="prop-type" style="width:100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                                            <option value="RIVAL">라이벌전</option>
+                                            <option value="LEAGUE">공식리그</option>
+                                            <option value="FRIENDLY">친선전</option>
+                                        </select>
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label style="display:block; font-size:12px; font-weight:bold; color:#64748b; margin-bottom:4px;">⏰ 경기 일시</label>
+                                        <input type="datetime-local" id="prop-time" style="width:100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
 
                         <div style="margin-bottom: 16px;">
-                            <label style="display:block; margin-bottom: 8px; font-weight:bold;">받는 사람 (닉네임)</label>
+                            <label style="display:block; margin-bottom: 8px; font-weight:bold; font-size:14px;">👤 받는 사람 (닉네임)</label>
                             <input type="text" id="msg-receiver-name" value="${defaultName}" ${defaultName ? 'readonly' : ''} placeholder="정확한 닉네임을 입력하세요" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; ${defaultName ? 'background:#f8fafc;' : ''}">
                             <input type="hidden" id="msg-receiver-id-hidden" value="${replyToId}">
                         </div>
                         
                         <div style="margin-bottom: 20px;">
-                            <label style="display:block; margin-bottom: 8px; font-weight:bold;">내용</label>
+                            <label style="display:block; margin-bottom: 8px; font-weight:bold; font-size:14px;">✉️ 내용</label>
                             <textarea id="msg-content" rows="5" placeholder="전달할 내용을 입력하세요" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; resize: vertical;"></textarea>
                         </div>
                         
@@ -333,9 +399,12 @@ Boako.Messenger = {
             let metadataParams = {};
 
             if (isSchedule) {
-                const gameName = document.getElementById('prop-game').value;
+                // 🚀 종목명 유효성 검사 추가
+                const gameName = document.getElementById('prop-game').value.trim();
                 const matchType = document.getElementById('prop-type').value;
                 const schedTime = document.getElementById('prop-time').value;
+                
+                if (!gameName) return Boako.Util.toast("⚠️ 진행할 종목을 검색해서 선택해주세요!");
                 if (!schedTime) return Boako.Util.toast("⚠️ 경기 일시를 선택해주세요!");
                 
                 actionType = 'SCHEDULE_PROPOSE';
