@@ -1,6 +1,6 @@
 /**
  * [VIEW] 화면 렌더링 및 페이지 템플릿 관리 (인덱스 다이어트 최종 최적화본)
- * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) 확장 완료
+ * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) + 일정표(스케줄) 확장 완료
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -438,7 +438,6 @@ Boako.View = {
                 }, 0);
                 break;
 
-            // 📩 [추가] 통신망(메신저) 수송선 라인 가동
             case 'messenger':
                 if (!Boako.state.user) {
                     html = `<div class="main-banner"><h1>📬 아카이브 통신망</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
@@ -449,12 +448,27 @@ Boako.View = {
                     await Boako.Util.loadScript('js/messenger.js');
                 }
                 
-                // messenger.js가 id="main-content"를 타겟으로 하므로, 해당 뼈대를 미리 세워줍니다.
                 html = `<div id="main-content" class="w-full"></div>`;
                 
                 setTimeout(() => {
                     if (Boako.Messenger && typeof Boako.Messenger.View.renderMain === 'function') {
                         Boako.Messenger.View.renderMain();
+                    }
+                }, 0);
+                break;
+
+            // 📅 [추가] 일정표(Schedule) 수송선 라인 가동!
+            case 'schedule':
+                if (!Boako.Schedule || !Boako.Schedule.View) {
+                    await Boako.Util.loadScript('js/schedule.js');
+                }
+                
+                // schedule.js의 렌더링 타겟 뼈대 세팅
+                html = `<div id="main-content" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.Schedule && typeof Boako.Schedule.View.renderMain === 'function') {
+                        Boako.Schedule.View.renderMain();
                     }
                 }, 0);
                 break;
