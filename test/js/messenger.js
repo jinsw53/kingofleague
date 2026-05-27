@@ -87,6 +87,62 @@ Boako.Messenger = {
             console.error("읽음 처리 오류:", err);
         }
     },
+    // 🚀 [신규] 일정 수락 시 match_schedules 장부에 공식 등록!
+    acceptSchedule: async (msgId) => {
+        const msg = Boako.Messenger.View.messagesData.find(m => m.message_id == msgId);
+        if (!msg) return;
+
+        if (confirm(`'${msg.metadata.game_name}' 일정을 수락하시겠습니까?\n(수락 시 전광판에 공식 등록됩니다)`)) {
+            try {
+                // 1. match_schedules 에 공식 등록 (외래키 및 닉네임 박제 데이터 토스)
+                const { error: scheduleError } = await Boako.db.from('match_schedules').insert({
+                    proposer_id: msg.sender_id,
+                    responder_id: msg.receiver_id,
+                    proposer_name_override: msg.sender_name_override,
+                    responder_name_override: msg.receiver_name_override,
+                    game_name: msg.metadata.game_name,
+                    match_type: msg.metadata.match_type,
+                    scheduled_time: msg.metadata.scheduled_time,
+                    status: 'UPCOMING',
+                    original_message_id: msg.message_id
+                });
+                if (scheduleError) throw scheduleError;
+
+                // 2. 쪽지 상태를 ACCEPTED로 마감
+                const { error: msgError } = await Boako.db.from('messages')
+                    .update({ action_status: 'ACCEPTED' })
+                    .eq('message_id', msg.message_id);
+                if (msgError) throw msgError;
+
+                Boako.Util.toast("✅ 일정을 수락하고 공식 캘린더에 등록했습니다!");
+                msg.action_status = 'ACCEPTED'; // 화면 즉시 반영
+                Boako.Messenger.View.openMessage(msgId); // 화면 새로고침
+            } catch (err) {
+                Boako.Util.toast("❌ 수락 처리 중 오류: " + err.message);
+            }
+        }
+    },
+
+    // 🚀 [신규] 일정 거절 처리
+    rejectSchedule: async (msgId) => {
+        const msg = Boako.Messenger.View.messagesData.find(m => m.message_id == msgId);
+        if (!msg) return;
+
+        if (confirm("정말로 이 제안을 거절하시겠습니까?")) {
+            try {
+                const { error } = await Boako.db.from('messages')
+                    .update({ action_status: 'REJECTED' })
+                    .eq('message_id', msgId);
+                if (error) throw error;
+                
+                Boako.Util.toast("🛑 일정을 거절했습니다.");
+                msg.action_status = 'REJECTED'; 
+                Boako.Messenger.View.openMessage(msgId);
+            } catch (err) {
+                Boako.Util.toast("❌ 거절 처리 중 오류: " + err.message);
+            }
+        }
+    },
 
     // ==========================================
     // 🎨 2. 프론트엔드 UI 화면 렌더링 (View)
