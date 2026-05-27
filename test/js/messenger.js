@@ -295,10 +295,10 @@ Boako.Messenger = {
 
                     if (data && data.length > 0) {
                         resultBox.innerHTML = data.map(game => {
-                            // 이미지가 없으면 기본 주사위 아이콘으로 대체
+                           // 이미지가 없으면 기본 주사위 아이콘으로 대체 (cover -> contain 으로 변경하여 잘림 방지)
                             const imgHtml = game.image_url 
-                                ? `<img src="${game.image_url}" style="width:24px; height:24px; border-radius:4px; object-fit:cover;">` 
-                                : `🎲`;
+                                ? `<img src="${game.image_url}" style="width:28px; height:28px; border-radius:4px; object-fit:contain; background:#f8fafc;">` 
+                                : `<span style="font-size:20px;">🎲</span>`;
                                 
                             return `
                             <div style="padding:10px 12px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:14px; color:#1e293b; display:flex; align-items:center; gap:10px;"
