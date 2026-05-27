@@ -1,5 +1,5 @@
 /**
- * [SCHEDULE] 아카이브 일정 관리 및 캘린더 전광판
+ * [SCHEDULE] 아카이브 일정 관리 및 캘린더 전광판 (히트맵 적용)
  */
 Boako.Schedule = {
     schedulesData: [],
@@ -66,7 +66,7 @@ Boako.Schedule = {
             
             const todayStr = Boako.Schedule.formatDateStr(new Date());
 
-            // 📌 날짜별로 일정을 분류하여 맵핑 (달력에 점 찍기 위함)
+            // 📌 날짜별로 일정을 분류하여 맵핑
             const scheduleMap = {};
             Boako.Schedule.schedulesData.forEach(sch => {
                 const dStr = Boako.Schedule.formatDateStr(new Date(sch.scheduled_time));
@@ -85,33 +85,38 @@ Boako.Schedule = {
 
             // 1일 이전의 빈 칸 채우기
             for (let i = 0; i < firstDay; i++) {
-                calendarHtml += `<div style="min-height:50px; padding:5px;"></div>`;
+                calendarHtml += `<div style="min-height:60px; padding:5px;"></div>`;
             }
 
-            // 실제 날짜 채우기
+            // 🚀 [여기가 핵심입니다!] 실제 날짜 채우기 + 히트맵 적용 
             for (let i = 1; i <= lastDate; i++) {
                 const cellDateStr = Boako.Schedule.formatDateStr(new Date(year, month, i));
+                const dailySchedules = scheduleMap[cellDateStr] || [];
+                const count = dailySchedules.length; // 해당 날짜의 일정 개수
+                
                 const isToday = cellDateStr === todayStr;
                 const isSelected = cellDateStr === Boako.Schedule.selectedDateStr;
-                const dailySchedules = scheduleMap[cellDateStr] || [];
-                const hasSchedule = dailySchedules.length > 0;
                 
-                // 일요일(0)은 빨간색, 토요일(6)은 파란색
-                const dayOfWeek = new Date(year, month, i).getDay();
-                const dayColor = dayOfWeek === 0 ? '#ef4444' : (dayOfWeek === 6 ? '#3b82f6' : '#1e293b');
-                
-                // 선택 상태 및 오늘 날짜 강조 스타일
-                const bgStyle = isSelected ? 'background:#3b82f6; color:white;' : (isToday ? 'background:#f1f5f9; font-weight:bold;' : 'background:white;');
-                const fontColor = isSelected ? 'white' : dayColor;
-                const borderStyle = isSelected ? 'border:1px solid #3b82f6;' : 'border:1px solid #e2e8f0;';
+                // 🚀 히트맵 로직: 일정 개수(count)에 따른 배경 농도 계산
+                let bgStyle = 'background: white;';
+                if (count > 0) {
+                    const opacity = Math.min(count * 0.25, 0.7); // 최대 0.7까지만 진하게
+                    bgStyle = `background: rgba(245, 158, 11, ${opacity}); color: ${count > 2 ? 'white' : 'black'};`;
+                } else if (isToday) {
+                    bgStyle = `background: #f1f5f9; color: #0f172a;`; // 일정이 없는 '오늘'
+                }
+
+                // 선택된 날짜 테두리 강조
+                const borderStyle = isSelected ? 'border:2px solid #3b82f6;' : 'border:1px solid #e2e8f0;';
 
                 calendarHtml += `
-                    <div onclick="Boako.Schedule.View.selectDate('${cellDateStr}')" style="min-height:60px; padding:8px; border-radius:8px; cursor:pointer; display:flex; flex-direction:column; align-items:center; ${bgStyle} ${borderStyle} transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                        <span style="font-size:14px; color:${fontColor};">${i}</span>
-                        ${hasSchedule ? `<div style="margin-top:auto; display:flex; gap:3px;">
-                            ${dailySchedules.slice(0,3).map(() => `<div style="width:6px; height:6px; border-radius:50%; background:${isSelected ? 'white' : '#f59e0b'};"></div>`).join('')}
-                            ${dailySchedules.length > 3 ? `<span style="font-size:10px; font-weight:900; color:${isSelected ? 'white' : '#94a3b8'}; line-height:6px;">+</span>` : ''}
-                        </div>` : ''}
+                    <div onclick="Boako.Schedule.View.selectDate('${cellDateStr}')" 
+                         style="min-height:60px; padding:8px; border-radius:8px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; 
+                                ${bgStyle} ${borderStyle} transition:all 0.2s;" 
+                         onmouseover="this.style.filter='brightness(0.95)'" 
+                         onmouseout="this.style.filter='brightness(1)'">
+                        <span style="font-size:15px; font-weight:bold;">${i}</span>
+                        ${count > 0 ? `<span style="font-size:11px; font-weight:800; margin-top:2px;">${count}건</span>` : ''}
                     </div>
                 `;
             }
@@ -190,7 +195,6 @@ Boako.Schedule = {
         changeMonth: (offset) => {
             const cur = Boako.Schedule.currentDate;
             Boako.Schedule.currentDate = new Date(cur.getFullYear(), cur.getMonth() + offset, 1);
-            // 달을 넘기면 그 달의 1일로 포커스 이동
             Boako.Schedule.selectedDateStr = Boako.Schedule.formatDateStr(Boako.Schedule.currentDate);
             Boako.Schedule.View.renderUI();
         },
@@ -201,7 +205,7 @@ Boako.Schedule = {
             Boako.Schedule.View.renderUI();
         },
 
-        // 📜 전체 일정 리스트 모드로 덮어쓰기
+        // 📜 전체 일정 리스트 모드
         showAllSchedules: () => {
             const container = document.getElementById('main-content') || document.getElementById('app');
             let html = `
@@ -248,8 +252,6 @@ Boako.Schedule = {
                 });
             }
             html += `</div></div>`;
-            
-            // 🚀 여기서 중복 선언되어 있던 `const container = ...` 부분을 삭제하고 바로 innerHTML 주입!
             container.innerHTML = html;
         }
     }
