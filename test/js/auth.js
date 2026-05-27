@@ -1,5 +1,5 @@
 /**
- * [AUTH] 인증 및 프로필 관리 (최종 순정본 - 데드락 완벽 차단)
+ * [AUTH] 인증 및 프로필 관리 (최종 순정본 - 데드락 완벽 차단 + 메신저 연결)
  */
 Boako.Auth = {
     init: async () => {
@@ -13,6 +13,10 @@ Boako.Auth = {
             await Boako.Team.syncStatus();
             await Boako.Auth.checkAdminMenu();
             await Boako.Auth.checkLeaderMenu();
+
+            // 📩 [추가 1] 최초 로그인 시 메신저 로드 및 안 읽은 쪽지 카운트
+            if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
+            if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
         }
         Boako.Auth.renderWidget();
         Boako.View.render('main'); // 최초 접속 시 딱 한 번만 화면 그림
@@ -37,6 +41,10 @@ Boako.Auth = {
                 await Boako.Auth.checkAdminMenu();
                 await Boako.Auth.checkLeaderMenu();
                 
+                // 📩 [추가 2] 신규 재로그인 시 메신저 로드 및 카운트
+                if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
+                if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
+
                 Boako.Auth.renderWidget();
                 
             } else {
@@ -72,6 +80,13 @@ Boako.Auth = {
             area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
         } else {
             const avatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://');
+            
+            // 📩 [추가 3] 빨간색 안 읽음 뱃지 HTML 생성
+            const unreadBadge = (Boako.Messenger && Boako.Messenger.unreadCount > 0) 
+                ? `<span style="background:#ef4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; margin-left:4px; font-weight:bold;">${Boako.Messenger.unreadCount}</span>` 
+                : '';
+
+            // 📩 [수정 3] 인벤토리 버튼 옆에 '통신망(메신저)' 버튼 추가
             area.innerHTML = `
             <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
                 ${avatarUrl ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
@@ -80,8 +95,11 @@ Boako.Auth = {
                 <strong>${user.nickname || '사용자'}</strong>
                 <button class="btn-edit-small" onclick="Boako.Shop.buyItem('item_ticket_nick')">수정</button>
             </div>
-            <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="margin-left: 10px; cursor: pointer;">🎒 내 인벤토리</button><br>
-            <span class="badge-premium">아카이브 멤버</span><br>
+            <div style="margin-top: 8px;">
+                <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 가방</button>
+                <button class="btn-messenger" onclick="Boako.View.render('messenger')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px; margin-left: 5px;">📬 통신망${unreadBadge}</button>
+            </div>
+            <span class="badge-premium" style="display:inline-block; margin-top:8px;">아카이브 멤버</span><br>
             <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
         }
     },
