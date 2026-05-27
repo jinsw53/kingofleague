@@ -248,7 +248,8 @@ Boako.Schedule = {
                 });
             }
             html += `</div></div>`;
-            const container = document.getElementById('main-content') || document.getElementById('app');
+            
+            // 🚀 여기서 중복 선언되어 있던 `const container = ...` 부분을 삭제하고 바로 innerHTML 주입!
             container.innerHTML = html;
         }
     }
