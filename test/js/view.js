@@ -1,6 +1,6 @@
 /**
  * [VIEW] 화면 렌더링 및 페이지 템플릿 관리 (인덱스 다이어트 최종 최적화본)
- * 구조: 신설 6대장 메뉴 수송선 라인 확장 완료 (match, rival, league, tournament, together, team_list)
+ * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) 확장 완료
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -20,7 +20,6 @@ Boako.View = {
 
         switch(pageId) {
             case 'ranking':
-                // 🚚 [랭킹 수송선] ranking.js가 없으면 실시간 배달
                 if (!Boako.Ranking || !Boako.Ranking.init) {
                     await Boako.Util.loadScript('js/ranking.js');
                 }
@@ -33,7 +32,6 @@ Boako.View = {
                 }, 0);
                 break;
 
-            // 🎯 [신설 1] ⚔️ 대항전 수송선 라인 가동
             case 'match':
                 if (!Boako.Match || !Boako.Match.init) {
                     await Boako.Util.loadScript('js/match.js');
@@ -47,7 +45,6 @@ Boako.View = {
                 }, 0);
                 break;
 
-            // 🎯 [신설 2] ⚡ 라이벌 매치 수송선 라인 가동 (대항전-리그 콘텐츠 사이 황금 배치 완료)
             case 'rival':
                 if (!Boako.Rival || !Boako.Rival.init) {
                     await Boako.Util.loadScript('js/rival.js');
@@ -61,22 +58,20 @@ Boako.View = {
                 }, 0);
                 break;
 
-            // 🎯 [신설 3] 🎯 리그 콘텐츠 수송선 라인 가동 (Boako.League 코어 연동)
             case 'league':
                 if (!Boako.League || !Boako.League.buildUI) {
-                    await Boako.Util.loadScript('js/league.js'); // 미션 4대장 패키지 스크립트 리딩
+                    await Boako.Util.loadScript('js/league.js'); 
                 }
                 html = `<div id="league-master-container" class="w-full"></div>`;
                 
                 setTimeout(() => {
                     if (Boako.League && typeof Boako.League.buildUI === 'function') {
-                        Boako.League.buildUI('league-master-container'); // 챔피언/빙고/챌린지/킹오브리그 현황판 사출
+                        Boako.League.buildUI('league-master-container'); 
                     }
                 }, 0);
                 break;
 
             case 'records':
-                // 🚚 [기록실 수송선] archive.js가 없으면 실시간 배달
                 if (!Boako.Archive || !Boako.Archive.buildUI) {
                     await Boako.Util.loadScript('js/archive.js');
                 }
@@ -89,7 +84,6 @@ Boako.View = {
                 }, 0);
                 break;
 
-            // 🎯 [신설 4] 🏅 공식 토너먼트 수송선 라인 가동
             case 'tournament':
                 if (!Boako.Tournament || !Boako.Tournament.init) {
                     await Boako.Util.loadScript('js/tournament.js');
@@ -103,7 +97,6 @@ Boako.View = {
                 }, 0);
                 break;
 
-            // 🎯 [신설 5] 🤝 같이 하자 자율 커뮤니티 수송선 라인 가동
             case 'together':
                 if (!Boako.Together || !Boako.Together.init) {
                     await Boako.Util.loadScript('js/together.js');
@@ -215,7 +208,6 @@ Boako.View = {
                 }
                 break;
 
-            // 🎯 [신설 6] 👥 참가 팀 프로필 갤러리 수송선 라인 가동
             case 'team_list':
                 if (!Boako.TeamList || !Boako.TeamList.init) {
                     await Boako.Util.loadScript('js/team_list.js');
@@ -442,6 +434,27 @@ Boako.View = {
                 setTimeout(() => {
                     if (Boako.AdminReview && typeof Boako.AdminReview.init === 'function') {
                         Boako.AdminReview.init();
+                    }
+                }, 0);
+                break;
+
+            // 📩 [추가] 통신망(메신저) 수송선 라인 가동
+            case 'messenger':
+                if (!Boako.state.user) {
+                    html = `<div class="main-banner"><h1>📬 아카이브 통신망</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
+                    break;
+                }
+                
+                if (!Boako.Messenger || !Boako.Messenger.View) {
+                    await Boako.Util.loadScript('js/messenger.js');
+                }
+                
+                // messenger.js가 id="main-content"를 타겟으로 하므로, 해당 뼈대를 미리 세워줍니다.
+                html = `<div id="main-content" class="w-full"></div>`;
+                
+                setTimeout(() => {
+                    if (Boako.Messenger && typeof Boako.Messenger.View.renderMain === 'function') {
+                        Boako.Messenger.View.renderMain();
                     }
                 }, 0);
                 break;
