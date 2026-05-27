@@ -105,7 +105,7 @@ Boako.Messenger = {
             let html = `
                 <div class="message-container" style="padding: 20px; max-width: 600px; margin: 0 auto;">
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #1e293b; padding-bottom: 10px; margin-bottom: 20px;">
-                        <h2 style="margin:0; font-size:20px;">📬 아카이브 통신망</h2>
+                        <h2 style="margin:0; font-size:20px;">📬 아카이브 쪽지함</h2>
                         <button onclick="Boako.Messenger.View.renderCompose()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor:pointer; font-weight:bold;">+ 새 쪽지 작성</button>
                     </div>
 
