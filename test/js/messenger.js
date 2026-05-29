@@ -257,7 +257,7 @@ Boako.Messenger = {
                     </div>
                     <div class="flex gap-2">
                         <button onclick="Boako.Messenger.hideRoom('${roomId}')" class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-100 transition-colors">나가기</button>
-                        <button onclick="Boako.Util.toast('일정 캘린더 등록 기능이 곧 추가됩니다!')" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-sm">📅 일정 제안</button>
+                        <button onclick="Boako.Messenger.View.promptScheduleProposal('${roomId}')" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-sm">📅 일정 제안</button>
                     </div>
                 </div>
             ` : `
@@ -269,28 +269,69 @@ Boako.Messenger = {
 
             let messagesHtml = '<div class="flex-1 overflow-y-auto p-5 space-y-4 flex flex-col" id="chat-scroll-area">';
             room.messages.forEach(msg => {
+                // 🌟 메시지 말풍선 & 일정 제안 카드 렌더링 로직
+            let messagesHtml = '<div class="flex-1 overflow-y-auto p-5 space-y-4 flex flex-col" id="chat-scroll-area">';
+            room.messages.forEach(msg => {
                 const isMe = msg.sender_id === Boako.state.user.id;
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                 
-                if (isMe) {
+                // 💡 [추가] 일정 제안 메시지일 경우 특별한 카드 UI로 그리기
+                if (msg.action_type === 'SCHEDULE_PROPOSE') {
+                    const proposedTime = new Date(msg.metadata?.proposed_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const status = msg.action_status || 'PENDING';
+                    
+                    let actionButtons = '';
+                    let statusBadge = '';
+
+                    if (status === 'PENDING') {
+                        if (!isMe) {
+                            // 상대방이 보낸 제안이면 수락/거절 버튼 표시
+                            actionButtons = `
+                                <div class="flex gap-2 mt-3">
+                                    <button onclick="Boako.Messenger.View.replySchedule('${msg.message_id}', 'ACCEPTED')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg transition-colors">🟢 수락</button>
+                                    <button onclick="Boako.Messenger.View.replySchedule('${msg.message_id}', 'REJECTED')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold py-2 rounded-lg transition-colors">❌ 거절</button>
+                                </div>
+                            `;
+                        } else {
+                            statusBadge = `<div class="mt-3 text-xs text-slate-500 font-bold text-center bg-white/50 py-1.5 rounded-lg">상대방의 수락을 기다리는 중...</div>`;
+                        }
+                    } else if (status === 'ACCEPTED') {
+                        statusBadge = `<div class="mt-3 text-xs text-emerald-600 font-bold text-center bg-emerald-50 py-1.5 rounded-lg border border-emerald-100">✅ 수락됨 (캘린더 등록 완료)</div>`;
+                    } else if (status === 'REJECTED') {
+                        statusBadge = `<div class="mt-3 text-xs text-red-500 font-bold text-center bg-red-50 py-1.5 rounded-lg border border-red-100">❌ 거절됨</div>`;
+                    }
+
+                    const cardHtml = `
+                        <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800">
+                            <div class="flex items-center gap-2 font-black text-indigo-900 mb-2">
+                                📅 매치 일정 제안
+                            </div>
+                            <div class="text-sm font-bold text-slate-700 bg-white p-2 rounded-lg border border-indigo-100 text-center shadow-inner">
+                                ${proposedTime}
+                            </div>
+                            ${actionButtons}
+                            ${statusBadge}
+                        </div>
+                    `;
+
                     messagesHtml += `
-                        <div class="flex items-end justify-end gap-2 self-end max-w-[85%]">
-                            <span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>
-                            <div class="bg-indigo-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">
-                                ${msg.content.replace(/\\n/g, '<br>')}
+                        <div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">
+                            ${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${msg.sender_name_override}</div>` : ''}
+                            <div class="flex items-end gap-2">
+                                ${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
+                                ${cardHtml}
+                                ${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
                             </div>
                         </div>
                     `;
-                } else {
-                    messagesHtml += `
-                        <div class="flex items-end justify-start gap-2 self-start max-w-[85%]">
-                            <div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed">
-                                <div class="font-bold text-xs text-slate-800 mb-1">${msg.sender_name_override}</div>
-                                ${msg.content.replace(/\\n/g, '<br>')}
-                            </div>
-                            <span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>
-                        </div>
-                    `;
+                } 
+                // 💬 일반 텍스트 메시지 렌더링 (기존 로직 유지)
+                else {
+                    if (isMe) {
+                        messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%] mb-2"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-indigo-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${msg.content.replace(/\n/g, '<br>')}</div></div>`;
+                    } else {
+                        messagesHtml += `<div class="flex items-end justify-start gap-2 self-start max-w-[85%] mb-2"><div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed"><div class="font-bold text-xs text-slate-800 mb-1">${msg.sender_name_override}</div>${msg.content.replace(/\n/g, '<br>')}</div><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span></div>`;
+                    }
                 }
             });
             messagesHtml += '</div>';
@@ -320,7 +361,7 @@ Boako.Messenger = {
             }
         },
 
-        executeChatSend: async () => {
+       executeChatSend: async () => {
             const roomId = Boako.Messenger.currentRoomId;
             const inputEl = document.getElementById('chat-input');
             if (!roomId || !inputEl) return;
@@ -341,6 +382,30 @@ Boako.Messenger = {
             } else {
                 Boako.Util.toast("❌ 전송에 실패했습니다.");
             }
+        }, // 🌟 <--- 소장님이 말씀하신 바로 그 쉼표입니다! 🌟
+
+        // 📅 1. 일정 제안 날짜 선택 및 발송 
+        promptScheduleProposal: async (roomId) => {
+            const room = Boako.Messenger.chatRooms[roomId];
+            if (!room.isMatch) {
+                Boako.Util.toast("일정 제안은 매치(라이벌/챌린지) 전용 대화방에서만 가능합니다.");
+                return;
+            }
+            
+            // ... (생략) ...
+            
+            if (success) Boako.Util.toast("일정 제안 카드가 전송되었습니다!");
+        }, // <--- 여기도 쉼표 필수!
+
+        // 🤝 2. 상대방이 제안 카드의 [수락/거절]을 눌렀을 때의 마법
+        replySchedule: async (messageId, status) => {
+            if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
+            
+            // ... (생략) ...
+            
+            await Boako.Messenger.fetchUnreadCount();
+            await Boako.Messenger.View.refreshRoomList();
+            Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
         }
-    }
-};
+    } // View 객체 닫는 괄호
+}; // Boako.Messenger 객체 닫는 괄호
