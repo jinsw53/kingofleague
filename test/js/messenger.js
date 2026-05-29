@@ -1,12 +1,16 @@
 /**
- * [MESSENGER - V2.0] 아카이브 통신망 (도전/매치 ID 기반 대화방 및 투팬 레이아웃 적용)
+ * [MESSENGER - V2.0] 아카이브 통신망 
+ * - 도전/매치 ID 기반 대화방 그룹화
+ * - 카카오톡 스타일 투팬(Two-Pane) 레이아웃
+ * - Supabase Realtime 기반 실시간 채팅 수신
  */
 Boako.Messenger = {
     unreadCount: 0,
     chatRooms: {},       // 그룹화된 대화방 캐싱
     currentRoomId: null, // 현재 열려있는 방 ID
+    realtimeChannel: null, // 실시간 수신 채널 보관용
 
-    // 1. 안 읽은 쪽지 뱃지용
+    // 1. 안 읽은 쪽지 뱃지 카운트
     fetchUnreadCount: async () => {
         if (!Boako.state.user) return 0;
         try {
@@ -21,11 +25,10 @@ Boako.Messenger = {
         } catch (err) { return 0; }
     },
 
-    // 2. 모든 쪽지를 긁어와서 '방(Room)' 단위로 그룹화하는 핵심 엔진
+    // 2. 모든 쪽지를 긁어와서 '방(Room)' 단위로 그룹화하는 엔진
     loadChatRooms: async () => {
         const myId = Boako.state.user.id;
         try {
-            // 내가 보내거나 받은 모든 쪽지를 최신순으로 가져옴
             const { data, error } = await Boako.db
                 .from('messages')
                 .select('*')
@@ -41,7 +44,7 @@ Boako.Messenger = {
                 const otherId = isMeSender ? msg.receiver_id : msg.sender_id;
                 const otherName = isMeSender ? msg.receiver_name_override : msg.sender_name_override;
                 
-                // 💡 방 식별자: match_id가 있으면 매치 전용방, 없으면 상대방과의 1:1 일반방
+                // 💡 방 식별자: match_id가 있으면 매치 전용방, 없으면 1:1 일반방
                 const roomId = msg.match_id || otherId; 
                 
                 if (!Boako.Messenger.chatRooms[roomId]) {
@@ -61,12 +64,13 @@ Boako.Messenger = {
                         isMatch: isMatch,
                         matchType: msg.metadata?.match_type,
                         otherId: otherId,
+                        otherName: otherName, // 전송 시 사용하기 위해 저장
                         title: roomTitle,
                         badge: matchBadge,
                         lastMessage: msg.content,
                         lastTime: msg.created_at,
                         unread: (!isMeSender && !msg.is_read) ? 1 : 0,
-                        messages: [] // 배열 생성
+                        messages: [] // 메시지 배열
                     };
                 } else {
                     if (!isMeSender && !msg.is_read) Boako.Messenger.chatRooms[roomId].unread++;
@@ -94,7 +98,7 @@ Boako.Messenger = {
                 content: content,
                 action_type: actionType,
                 metadata: metadata,
-                match_id: matchId // 🌟 어느 매치업에 속한 대화인지 꼬리표 부착
+                match_id: matchId
             };
             const { error } = await Boako.db.from('messages').insert([payload]);
             if (error) throw error;
@@ -103,6 +107,40 @@ Boako.Messenger = {
             console.error(err);
             return false;
         }
+    },
+
+    // 📡 4. 실시간(Realtime) 메시지 수신 안테나
+    startRealtime: () => {
+        if (!Boako.state.user || Boako.Messenger.realtimeChannel) return;
+
+        Boako.Messenger.realtimeChannel = Boako.db
+            .channel('messages-changes')
+            .on('postgres_changes', 
+                { event: 'INSERT', schema: 'public', table: 'messages' }, 
+                async (payload) => {
+                    const newMsg = payload.new;
+                    const myId = Boako.state.user.id;
+
+                    if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
+                        // 1. 방 목록과 안읽은 뱃지 리로드
+                        await Boako.Messenger.fetchUnreadCount();
+                        await Boako.Messenger.View.refreshRoomList();
+
+                        // 2. 방 식별자 계산
+                        const roomId = newMsg.match_id || (newMsg.sender_id === myId ? newMsg.receiver_id : newMsg.sender_id);
+                        
+                        // 3. 현재 열려있는 방이면 화면 즉시 갱신
+                        if (Boako.Messenger.currentRoomId === roomId) {
+                            Boako.Messenger.View.openRoom(roomId);
+                        } 
+                        // 4. 다른 곳을 보고 있는데 알림이 온 경우
+                        else if (newMsg.receiver_id === myId) {
+                            Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 새 메시지가 도착했습니다!`);
+                        }
+                    }
+                }
+            )
+            .subscribe();
     },
 
     View: {
@@ -117,6 +155,7 @@ Boako.Messenger = {
                 </div>
                 
                 <div class="flex flex-col md:flex-row h-[600px] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <!-- 좌측: 대화방 리스트 -->
                     <div class="w-full md:w-1/3 border-r border-slate-100 flex flex-col bg-slate-50/50">
                         <div class="p-4 border-b border-slate-200 font-black text-slate-800 flex justify-between items-center bg-white">
                             <span>대화 목록</span>
@@ -127,6 +166,7 @@ Boako.Messenger = {
                         </div>
                     </div>
 
+                    <!-- 우측: 채팅창 영역 -->
                     <div class="w-full md:w-2/3 flex flex-col bg-slate-50 relative" id="chat-room-content">
                         <div class="flex-1 flex items-center justify-center text-slate-400 font-bold flex-col gap-3">
                             <i data-lucide="message-square" class="w-12 h-12 opacity-50"></i>
@@ -138,6 +178,9 @@ Boako.Messenger = {
             lucide.createIcons();
             
             await Boako.Messenger.View.refreshRoomList();
+            
+            // 🌟 화면이 그려진 후 실시간 수신 안테나 가동!
+            Boako.Messenger.startRealtime();
         },
 
         refreshRoomList: async () => {
@@ -179,16 +222,16 @@ Boako.Messenger = {
             const contentContainer = document.getElementById('chat-room-content');
             if (!room || !contentContainer) return;
 
-            // 안 읽은 메시지 읽음 처리 (백그라운드 비동기)
+            // 안 읽은 메시지 읽음 처리
             Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`).then(() => Boako.Messenger.fetchUnreadCount());
 
-            // 🌟 대화방 마스터 배너 (도전 기반)
+            // 상단 배너 렌더링
             const bannerHtml = room.isMatch ? `
                 <div class="bg-indigo-50 border-b border-indigo-100 p-3 px-5 flex items-center justify-between shadow-sm z-10">
                     <div class="font-black text-indigo-900 text-sm flex items-center gap-2">
                         <span class="animate-pulse">🔴</span> 이 대화방은 ${room.title} 조율을 위한 전용 공간입니다.
                     </div>
-                    <button onclick="Boako.Util.toast('일정 캘린더 등록 기능 연결 팝업이 뜰 예정입니다!')" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors">📅 일정 제안하기</button>
+                    <button onclick="Boako.Util.toast('일정 캘린더 등록 기능이 곧 추가됩니다!')" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors">📅 일정 제안하기</button>
                 </div>
             ` : `
                 <div class="bg-white border-b border-slate-200 p-4 font-black text-slate-800 shadow-sm z-10 flex items-center gap-2">
@@ -196,7 +239,7 @@ Boako.Messenger = {
                 </div>
             `;
 
-            // 말풍선 렌더링
+            // 메시지 말풍선 렌더링
             let messagesHtml = '<div class="flex-1 overflow-y-auto p-5 space-y-4 flex flex-col" id="chat-scroll-area">';
             room.messages.forEach(msg => {
                 const isMe = msg.sender_id === Boako.state.user.id;
@@ -225,7 +268,7 @@ Boako.Messenger = {
             });
             messagesHtml += '</div>';
 
-            // 채팅 입력창
+            // 입력창 렌더링
             const inputHtml = `
                 <div class="p-4 bg-white border-t border-slate-200 flex gap-2 z-10">
                     <textarea id="chat-input" rows="1" placeholder="메시지를 입력하세요... (엔터로 전송, Shift+엔터로 줄바꿈)" class="flex-1 resize-none border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"></textarea>
@@ -239,10 +282,9 @@ Boako.Messenger = {
             const scrollArea = document.getElementById('chat-scroll-area');
             if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
 
-            // 좌측 목록 스타일 갱신
             Boako.Messenger.View.refreshRoomList();
             
-            // 엔터키 전송 바인딩
+            // 엔터키 전송 이벤트
             const chatInput = document.getElementById('chat-input');
             if(chatInput) {
                 chatInput.addEventListener('keydown', function(e) {
@@ -254,7 +296,7 @@ Boako.Messenger = {
             }
         },
 
-        // 채팅창 안에서 전송 버튼을 눌렀을 때
+        // 메시지 전송 실행
         executeChatSend: async () => {
             const roomId = Boako.Messenger.currentRoomId;
             const inputEl = document.getElementById('chat-input');
@@ -265,18 +307,14 @@ Boako.Messenger = {
 
             const room = Boako.Messenger.chatRooms[roomId];
             const matchId = room.isMatch ? room.id : null;
-            const targetId = room.otherId; 
-            const targetName = room.otherName; 
             
-            // 발송 전 입력창 비우기 (UI 즉시 반응)
-            inputEl.value = '';
+            inputEl.value = ''; // UI 즉각 반응
 
-            // metadata는 기존 방의 매치 정보를 그대로 유지해서 넘김
             const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.title.replace(/\[|\]/g, '').split(' ')[0] } : {};
 
-            const success = await Boako.Messenger.send(targetId, content, targetName, 'DEFAULT', metadata, matchId);
+            const success = await Boako.Messenger.send(room.otherId, content, room.otherName, 'DEFAULT', metadata, matchId);
             if (success) {
-                // 발송 성공 시 해당 방만 살짝 리로드해서 그려줌
+                // 발송 성공 후 내 화면 즉시 갱신
                 await Boako.Messenger.View.refreshRoomList();
                 Boako.Messenger.View.openRoom(roomId); 
             } else {
