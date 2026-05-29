@@ -1,5 +1,6 @@
 /**
- * [MESSENGER - V2.1] 아카이브 통신망 (방 나가기 및 스마트 숨김 기능 추가)
+ * [MESSENGER - V3.0] 아카이브 통신망
+ * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 캘린더 자동 등록
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -101,22 +102,18 @@ Boako.Messenger = {
         }
     },
 
-    // 🚪 5. [추가] 방 나가기 (숨김) 처리 함수
     hideRoom: async (roomId) => {
         if(!confirm("이 대화방을 나가시겠습니까?\n(새로운 쪽지가 도착하면 다시 나타납니다.)")) return;
 
-        // 1. 방에 있는 안 읽은 메시지 강제 읽음 처리
         await Boako.db.from('messages').update({ is_read: true })
             .eq('receiver_id', Boako.state.user.id)
             .or(`match_id.eq.${roomId},sender_id.eq.${roomId}`);
         
-        // 2. 현재 시간을 '숨김 처리 기준 시간'으로 로컬스토리지에 저장
         const room = Boako.Messenger.chatRooms[roomId];
         let hidden = JSON.parse(localStorage.getItem('boako_hidden_rooms') || '{}');
         hidden[roomId] = room ? room.lastTime : new Date().toISOString();
         localStorage.setItem('boako_hidden_rooms', JSON.stringify(hidden));
 
-        // 3. UI 초기화 (만약 보고 있던 방이었다면 화면 닫기)
         if (Boako.Messenger.currentRoomId === roomId) {
             Boako.Messenger.currentRoomId = null;
             document.getElementById('chat-room-content').innerHTML = `
@@ -197,15 +194,11 @@ Boako.Messenger = {
             const listContainer = document.getElementById('chat-room-list');
             if (!listContainer) return;
 
-            // 💡 [핵심] 로컬 스토리지의 '숨김 기록'을 가져와서 필터링
             let hidden = JSON.parse(localStorage.getItem('boako_hidden_rooms') || '{}');
 
             const roomArray = Object.values(rooms).filter(room => {
                 const hideTime = hidden[room.id];
-                if (hideTime) {
-                    // 숨긴 시간보다 마지막 메시지가 '최신'일 때만 보여줌
-                    return new Date(room.lastTime) > new Date(hideTime);
-                }
+                if (hideTime) return new Date(room.lastTime) > new Date(hideTime);
                 return true;
             }).sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
 
@@ -219,7 +212,6 @@ Boako.Messenger = {
                 const unreadBadge = room.unread > 0 ? `<div class="bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full">${room.unread}</div>` : '';
                 const activeClass = Boako.Messenger.currentRoomId === room.id ? 'bg-white shadow-sm border-indigo-200' : 'border-transparent hover:bg-white/60';
                 
-                // 🖱️ 목록을 호버(마우스 오버)하면 우측 상단에 쪼끄만 [X] 버튼이 나타나게 세팅
                 listHtml += `
                     <div onclick="Boako.Messenger.View.openRoom('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
                         <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center text-slate-500 font-black">
@@ -238,7 +230,7 @@ Boako.Messenger = {
                 `;
             });
             listContainer.innerHTML = listHtml;
-            lucide.createIcons(); // ❌ 아이콘 렌더링
+            lucide.createIcons(); 
         },
 
         openRoom: (roomId) => {
@@ -249,7 +241,7 @@ Boako.Messenger = {
 
             Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`).then(() => Boako.Messenger.fetchUnreadCount());
 
-            // 🌟 상단 배너에 [방 나가기] 버튼 추가
+            // 🌟 버튼 onclick 에 promptScheduleProposal 함수 정상 연결
             const bannerHtml = room.isMatch ? `
                 <div class="bg-indigo-50 border-b border-indigo-100 p-3 px-5 flex items-center justify-between shadow-sm z-10">
                     <div class="font-black text-indigo-900 text-sm flex items-center gap-2">
@@ -267,17 +259,14 @@ Boako.Messenger = {
                 </div>
             `;
 
-            let messagesHtml = '<div class="flex-1 overflow-y-auto p-5 space-y-4 flex flex-col" id="chat-scroll-area">';
-            room.messages.forEach(msg => {
-                // 🌟 메시지 말풍선 & 일정 제안 카드 렌더링 로직
+            // 🌟 일정 제안 카드 렌더링 로직
             let messagesHtml = '<div class="flex-1 overflow-y-auto p-5 space-y-4 flex flex-col" id="chat-scroll-area">';
             room.messages.forEach(msg => {
                 const isMe = msg.sender_id === Boako.state.user.id;
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                 
-                // 💡 [추가] 일정 제안 메시지일 경우 특별한 카드 UI로 그리기
                 if (msg.action_type === 'SCHEDULE_PROPOSE') {
-                    const proposedTime = new Date(msg.metadata?.proposed_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const proposedTime = msg.metadata?.proposed_time ? new Date(msg.metadata.proposed_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '미정';
                     const status = msg.action_status || 'PENDING';
                     
                     let actionButtons = '';
@@ -285,7 +274,6 @@ Boako.Messenger = {
 
                     if (status === 'PENDING') {
                         if (!isMe) {
-                            // 상대방이 보낸 제안이면 수락/거절 버튼 표시
                             actionButtons = `
                                 <div class="flex gap-2 mt-3">
                                     <button onclick="Boako.Messenger.View.replySchedule('${msg.message_id}', 'ACCEPTED')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg transition-colors">🟢 수락</button>
@@ -324,13 +312,26 @@ Boako.Messenger = {
                             </div>
                         </div>
                     `;
-                } 
-                // 💬 일반 텍스트 메시지 렌더링 (기존 로직 유지)
-                else {
+                } else {
                     if (isMe) {
-                        messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%] mb-2"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-indigo-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${msg.content.replace(/\n/g, '<br>')}</div></div>`;
+                        messagesHtml += `
+                            <div class="flex items-end justify-end gap-2 self-end max-w-[85%]">
+                                <span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>
+                                <div class="bg-indigo-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">
+                                    ${msg.content.replace(/\n/g, '<br>')}
+                                </div>
+                            </div>
+                        `;
                     } else {
-                        messagesHtml += `<div class="flex items-end justify-start gap-2 self-start max-w-[85%] mb-2"><div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed"><div class="font-bold text-xs text-slate-800 mb-1">${msg.sender_name_override}</div>${msg.content.replace(/\n/g, '<br>')}</div><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span></div>`;
+                        messagesHtml += `
+                            <div class="flex items-end justify-start gap-2 self-start max-w-[85%]">
+                                <div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed">
+                                    <div class="font-bold text-xs text-slate-800 mb-1">${msg.sender_name_override}</div>
+                                    ${msg.content.replace(/\n/g, '<br>')}
+                                </div>
+                                <span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>
+                            </div>
+                        `;
                     }
                 }
             });
@@ -361,7 +362,7 @@ Boako.Messenger = {
             }
         },
 
-       executeChatSend: async () => {
+        executeChatSend: async () => {
             const roomId = Boako.Messenger.currentRoomId;
             const inputEl = document.getElementById('chat-input');
             if (!roomId || !inputEl) return;
@@ -382,30 +383,70 @@ Boako.Messenger = {
             } else {
                 Boako.Util.toast("❌ 전송에 실패했습니다.");
             }
-        }, // 🌟 <--- 소장님이 말씀하신 바로 그 쉼표입니다! 🌟
+        },
 
-        // 📅 1. 일정 제안 날짜 선택 및 발송 
         promptScheduleProposal: async (roomId) => {
             const room = Boako.Messenger.chatRooms[roomId];
             if (!room.isMatch) {
                 Boako.Util.toast("일정 제안은 매치(라이벌/챌린지) 전용 대화방에서만 가능합니다.");
                 return;
             }
-            
-            // ... (생략) ...
-            
-            if (success) Boako.Util.toast("일정 제안 카드가 전송되었습니다!");
-        }, // <--- 여기도 쉼표 필수!
 
-        // 🤝 2. 상대방이 제안 카드의 [수락/거절]을 눌렀을 때의 마법
+            const inputTime = prompt("제안할 날짜와 시간을 입력해주세요.\n(입력 예시: 2026-06-05 20:00)");
+            if (!inputTime) return;
+
+            const metadata = { 
+                match_type: room.matchType, 
+                game_name: room.title.replace(/\[|\]/g, '').split(' ')[0], 
+                proposed_time: inputTime 
+            };
+
+            const success = await Boako.Messenger.send(
+                room.otherId, 
+                "매치 일정을 제안합니다.", 
+                room.otherName, 
+                'SCHEDULE_PROPOSE', 
+                metadata, 
+                roomId
+            );
+
+            if (success) Boako.Util.toast("일정 제안 카드가 전송되었습니다!");
+        },
+
         replySchedule: async (messageId, status) => {
             if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
-            
-            // ... (생략) ...
-            
+
+            await Boako.db.from('messages')
+                .update({ action_status: status })
+                .eq('message_id', messageId);
+
+            if (status === 'ACCEPTED') {
+                const { data: msgInfo } = await Boako.db.from('messages').select('*').eq('message_id', messageId).single();
+                
+                if (msgInfo) {
+                    const schedulePayload = {
+                        proposer_id: msgInfo.sender_id,
+                        responder_id: msgInfo.receiver_id,
+                        game_name: msgInfo.metadata.game_name || '미정',
+                        match_type: msgInfo.metadata.match_type || 'FRIENDLY',
+                        scheduled_time: msgInfo.metadata.proposed_time,
+                        status: 'UPCOMING',
+                        original_message_id: messageId
+                    };
+                    
+                    const { error } = await Boako.db.from('match_schedules').insert([schedulePayload]);
+                    if (error) {
+                        console.error("캘린더 등록 실패:", error);
+                        Boako.Util.toast("일정은 수락되었으나 캘린더 등록에 실패했습니다.");
+                    } else {
+                        Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
+                    }
+                }
+            }
+
             await Boako.Messenger.fetchUnreadCount();
             await Boako.Messenger.View.refreshRoomList();
             Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
         }
-    } // View 객체 닫는 괄호
-}; // Boako.Messenger 객체 닫는 괄호
+    }
+};
