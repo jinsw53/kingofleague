@@ -86,14 +86,16 @@ Boako.Auth = {
                 ? `<span style="background:#ef4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; margin-left:4px; font-weight:bold;">${Boako.Messenger.unreadCount}</span>` 
                 : '';
 
-            // 📩 [수정 3] 인벤토리 버튼 옆에 '통신망(메신저)' 버튼 추가
+          // 📩 [수정 3] 인벤토리 버튼 옆에 '통신망(메신저)' 버튼 추가
             area.innerHTML = `
             <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
                 ${avatarUrl ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
             </div>
             <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
                 <strong>${user.nickname || '사용자'}</strong>
-                <button class="btn-edit-small" onclick="Boako.Shop.buyItem('item_ticket_nick')">수정</button>
+                
+                <button class="btn-edit-small" onclick="Boako.Auth.editNick()">수정</button>
+                
             </div>
             <div style="margin-top: 8px;">
                 <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 인벤토리</button>
