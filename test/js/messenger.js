@@ -1,6 +1,6 @@
 /**
  * [MESSENGER - V3.0] 아카이브 통신망
- * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 캘린더 자동 등록
+ * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 캘린더 자동 등록 / 라이벌 매치 시스템 통합
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -241,7 +241,6 @@ Boako.Messenger = {
 
             Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`).then(() => Boako.Messenger.fetchUnreadCount());
 
-            // 🌟 버튼 onclick 에 promptScheduleProposal 함수 정상 연결
             const bannerHtml = room.isMatch ? `
                 <div class="bg-indigo-50 border-b border-indigo-100 p-3 px-5 flex items-center justify-between shadow-sm z-10">
                     <div class="font-black text-indigo-900 text-sm flex items-center gap-2">
@@ -259,12 +258,12 @@ Boako.Messenger = {
                 </div>
             `;
 
-            // 🌟 일정 제안 카드 렌더링 로직
             let messagesHtml = '<div class="flex-1 overflow-y-auto p-5 space-y-4 flex flex-col" id="chat-scroll-area">';
             room.messages.forEach(msg => {
                 const isMe = msg.sender_id === Boako.state.user.id;
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                 
+                // 1. [일정 제안 카드] 로직
                 if (msg.action_type === 'SCHEDULE_PROPOSE') {
                     const proposedTime = msg.metadata?.proposed_time ? new Date(msg.metadata.proposed_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '미정';
                     const status = msg.action_status || 'PENDING';
@@ -312,6 +311,59 @@ Boako.Messenger = {
                             </div>
                         </div>
                     `;
+                    
+                // 2. 🌟 [라이벌 도전장 카드] 로직 (신규 추가됨!)
+                } else if (msg.action_type === 'CHALLENGE_CARD') {
+                    const gameName = msg.metadata?.game_name || '종목미정';
+                    const points = msg.metadata?.reward_points || 0;
+                    const status = msg.action_status || 'PENDING';
+                    
+                    let cardContent = '';
+
+                    if (status === 'PENDING') {
+                        if (!isMe) {
+                            cardContent = `
+                                <div class="flex gap-2 mt-3">
+                                    <button onclick="Boako.Messenger.View.replyChallenge('${msg.message_id}', '${msg.match_id}', 'ACCEPTED')" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-black py-2 rounded-lg transition-colors shadow-md shadow-red-500/20">🔥 수락</button>
+                                    <button onclick="Boako.Messenger.View.replyChallenge('${msg.message_id}', '${msg.match_id}', 'REJECTED')" class="flex-1 bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold py-2 rounded-lg transition-colors">거절</button>
+                                </div>
+                            `;
+                        } else {
+                            cardContent = `<div class="mt-3 text-xs text-slate-400 font-bold text-center bg-white/5 py-1.5 rounded-lg">상대방의 응답 대기 중... ⏳</div>`;
+                        }
+                    } else if (status === 'ACCEPTED') {
+                        cardContent = `<div class="mt-3 text-xs text-red-400 font-black text-center bg-red-500/10 py-1.5 rounded-lg border border-red-500/20">🔥 매치 수락됨 (대결 성사!)</div>`;
+                    } else if (status === 'REJECTED') {
+                        cardContent = `<div class="mt-3 text-xs text-slate-400 font-bold text-center bg-white/5 py-1.5 rounded-lg">❌ 거절된 매치입니다.</div>`;
+                    }
+
+                    const cardHtml = `
+                        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-4 w-64 shadow-lg text-white">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="font-black text-red-400 text-xs flex items-center gap-1">⚔️ 라이벌 매치 도착</div>
+                            </div>
+                            <div class="text-sm font-black text-slate-800 bg-white p-2.5 rounded-lg text-center shadow-inner mb-2">
+                                ${gameName}
+                            </div>
+                            <div class="text-center text-yellow-400 text-[11px] font-bold">
+                                승리 보상: <span class="text-sm font-black">${points} P</span>
+                            </div>
+                            ${cardContent}
+                        </div>
+                    `;
+
+                    messagesHtml += `
+                        <div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">
+                            ${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${msg.sender_name_override}</div>` : ''}
+                            <div class="flex items-end gap-2">
+                                ${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
+                                ${cardHtml}
+                                ${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                // 3. [일반 텍스트 대화] 로직
                 } else {
                     if (isMe) {
                         messagesHtml += `
@@ -388,7 +440,7 @@ Boako.Messenger = {
         promptScheduleProposal: async (roomId) => {
             const room = Boako.Messenger.chatRooms[roomId];
             if (!room.isMatch) {
-                Boako.Util.toast("일정 제안은 매치(라이벌/챌린지) 전용 대화방에서만 가능합니다.");
+                Boako.Util.toast("일정 제안는 매치(라이벌/챌린지) 전용 대화방에서만 가능합니다.");
                 return;
             }
 
@@ -447,6 +499,40 @@ Boako.Messenger = {
             await Boako.Messenger.fetchUnreadCount();
             await Boako.Messenger.View.refreshRoomList();
             Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+        },
+
+        // 🌟 [라이벌 도전장 수락/거절] 기능 (신규 추가됨!)
+        replyChallenge: async (messageId, matchId, status) => {
+            const actionText = status === 'ACCEPTED' ? '수락' : '거절';
+            if (!confirm(`이 라이벌 도전을 ${actionText}하시겠습니까?`)) return;
+
+            try {
+                // 1. 진짜 데이터(rival_matches)의 상태 업데이트 (RPC 호출)
+                const { error: rpcError } = await Boako.db.rpc('respond_to_rival_match', {
+                    p_match_id: matchId,
+                    p_action: status
+                });
+                
+                if (rpcError) {
+                    console.error("RPC Error:", rpcError);
+                    throw new Error("이미 처리되었거나 문제가 발생한 매치입니다.");
+                }
+
+                // 2. 화면용 메시지(messages)의 상태도 업데이트 (버튼을 없애기 위함)
+                await Boako.db.from('messages')
+                    .update({ action_status: status })
+                    .eq('message_id', messageId);
+
+                Boako.Util.toast(`✅ 라이벌 도전을 ${actionText}했습니다!`);
+
+                // 3. 채팅창 새로고침 (카드가 '진행중' 또는 '거절됨'으로 바뀜)
+                await Boako.Messenger.fetchUnreadCount();
+                await Boako.Messenger.View.refreshRoomList();
+                Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+                
+            } catch (err) {
+                alert(err.message);
+            }
         }
     }
 };
