@@ -501,13 +501,13 @@ Boako.Messenger = {
             Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
         },
 
-        // 🌟 [라이벌 도전장 수락/거절] 기능 (신규 추가됨!)
+       // 🌟 [라이벌 도전장 수락/거절] 다이어트 완료 버전
         replyChallenge: async (messageId, matchId, status) => {
             const actionText = status === 'ACCEPTED' ? '수락' : '거절';
             if (!confirm(`이 라이벌 도전을 ${actionText}하시겠습니까?`)) return;
 
             try {
-                // 1. 진짜 데이터(rival_matches)의 상태 업데이트 (RPC 호출)
+                // 1. 서버(RPC) 호출 한 방으로 '진짜 매치 상태'와 '화면용 카드 상태' 동시 업데이트!
                 const { error: rpcError } = await Boako.db.rpc('respond_to_rival_match', {
                     p_match_id: matchId,
                     p_action: status
@@ -518,14 +518,9 @@ Boako.Messenger = {
                     throw new Error("이미 처리되었거나 문제가 발생한 매치입니다.");
                 }
 
-                // 2. 화면용 메시지(messages)의 상태도 업데이트 (버튼을 없애기 위함)
-                await Boako.db.from('messages')
-                    .update({ action_status: status })
-                    .eq('message_id', messageId);
-
                 Boako.Util.toast(`✅ 라이벌 도전을 ${actionText}했습니다!`);
 
-                // 3. 채팅창 새로고침 (카드가 '진행중' 또는 '거절됨'으로 바뀜)
+                // 2. 업데이트된 DB 데이터를 기반으로 채팅창 화면 새로고침
                 await Boako.Messenger.fetchUnreadCount();
                 await Boako.Messenger.View.refreshRoomList();
                 Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
