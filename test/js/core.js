@@ -1,7 +1,8 @@
 /**
  * [CORE] 전역 설정 및 상태 객체 선언
  */
-const Boako = {
+// window 객체에 직접 붙여서 어떤 파일에서든 접근 가능하게 만듭니다.
+window.Boako = {
     db: null,
     state: {
         user: null,
