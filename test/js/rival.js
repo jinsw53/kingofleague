@@ -10,6 +10,7 @@ Boako.Rival = {
             <div class="main-banner" style="background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%);">
                 <h1>⚔️ 라이벌 탐색기</h1>
                 <p>내가 즐겨하는 종목을 클릭해 영혼의 맞수를 확인하세요.</p>
+                <p>라이벌 매치를 진행하시면 포인트를 획득할 수 있습니다.</p>
             </div>
 
             <section class="section-card">
