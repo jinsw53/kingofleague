@@ -44,7 +44,6 @@ Boako.Rival = {
             if (e.key === 'Enter') Boako.Rival.searchRivals();
         });
 
-        // 로드 시 자동 검색
         Boako.Rival.searchRivals();
     },
 
@@ -58,7 +57,6 @@ Boako.Rival = {
 
         try {
             if (searchWord) {
-                // 🌟 수정 적용 완료: 무소속 기록도 찾을 수 있도록 활동 내역 뷰 참조
                 const { count, error: countErr } = await Boako.db
                     .from('v_boako_activity_history')
                     .select('*', { count: 'exact', head: true })
@@ -102,9 +100,9 @@ Boako.Rival = {
                     : '';
 
                 const logoSrc = match.game_logo_url || 'https://via.placeholder.com/150?text=GAME';
-                const profileSrc = match.rival_profile_url ? match.rival_profile_url.replace('http://', 'https://') : null;
                 
-                // 🌟 수정 적용 완료: 내 프로필 주소를 프론트엔드가 아닌 DB(match 객체)에서 정확하게 꺼내옵니다.
+                // 🌟 혼합 콘텐츠 에러(Mixed Content) 해결: http를 강제로 https로 변환
+                const profileSrc = match.rival_profile_url ? match.rival_profile_url.replace('http://', 'https://') : null;
                 const myProfileUrl = match.my_profile_url ? match.my_profile_url.replace('http://', 'https://') : null;
                 const myProfileInitial = myNickname.charAt(0);
 
@@ -114,9 +112,11 @@ Boako.Rival = {
                         <div onclick="Boako.Rival.toggleDetail(${index})" class="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors group">
                             <div class="font-black text-slate-800 flex items-center gap-3">
                                 <span class="text-slate-300 font-bold w-4 text-center">${index + 1}</span>
-                                <div class="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm shrink-0">
-                                    <img src="${logoSrc}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/150?text=GAME'">
+                                
+                                <div class="w-10 h-8 shrink-0 flex items-center justify-center bg-transparent">
+                                    <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-sm" onerror="this.src='https://via.placeholder.com/150?text=GAME'">
                                 </div>
+                                
                                 <span class="text-[15px] group-hover:text-red-600 transition-colors">${match.game_name}</span>
                             </div>
                             <div class="flex items-center gap-3">
@@ -129,15 +129,16 @@ Boako.Rival = {
                             <div class="p-8 flex flex-col items-center">
                                 
                                 <div class="flex flex-col items-center mb-8">
-                                    <div class="w-20 h-20 rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-md mb-3 transform -rotate-3">
-                                        <img src="${logoSrc}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/150?text=GAME'">
+                                    
+                                    <div class="w-24 h-20 mb-3 transform -rotate-3 flex items-center justify-center">
+                                        <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-md" onerror="this.src='https://via.placeholder.com/150?text=GAME'">
                                     </div>
+                                    
                                     <h3 class="font-black text-2xl text-slate-800 tracking-tight">${match.game_name}</h3>
                                     <p class="text-xs text-slate-400 font-bold mt-1">기록 차이: ${isPerfectMatch ? '0회 (완벽한 동급)' : match.count_diff + '회'}</p>
                                 </div>
 
                                 <div class="flex items-center justify-center gap-8 w-full max-w-sm mb-8">
-                                    
                                     <div class="flex flex-col items-center gap-2 flex-1">
                                         <div class="w-16 h-16 rounded-full bg-slate-200 border-4 border-slate-100 flex items-center justify-center text-slate-500 font-black text-xl shadow-lg relative overflow-visible">
                                             ${myProfileUrl ? `<img src="${myProfileUrl}" class="w-full h-full object-cover rounded-full">` : myProfileInitial}
@@ -159,7 +160,6 @@ Boako.Rival = {
                                 <button onclick="Boako.Rival.executeChallenge('${match.rival_id}', '${match.game_name}')" class="w-full max-w-xs bg-slate-900 hover:bg-red-600 text-white text-[15px] font-black px-6 py-3.5 rounded-xl transition-all hover:scale-105 hover:shadow-lg flex justify-center items-center gap-2">
                                     <i data-lucide="swords" class="w-5 h-5"></i> 매치 도전장 발송
                                 </button>
-
                             </div>
                         </div>
                     </div>
@@ -174,21 +174,17 @@ Boako.Rival = {
         }
     },
 
-    // 3. 아코디언 토글 (열고 닫기) 애니메이션
     toggleDetail: (index) => {
         const detailDiv = document.getElementById(`rival-detail-${index}`);
         const icon = document.getElementById(`rival-icon-${index}`);
         
         if (detailDiv.classList.contains('hidden')) {
-            // 다른 열려있는 탭을 전부 닫음 (깔끔한 UI를 위해)
             document.querySelectorAll('[id^="rival-detail-"]').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('[id^="rival-icon-"]').forEach(el => el.style.transform = 'rotate(0deg)');
 
-            // 선택한 탭 열기
             detailDiv.classList.remove('hidden');
             icon.style.transform = 'rotate(180deg)';
         } else {
-            // 이미 열려있으면 닫기
             detailDiv.classList.add('hidden');
             icon.style.transform = 'rotate(0deg)';
         }
