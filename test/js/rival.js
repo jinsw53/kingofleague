@@ -102,10 +102,10 @@ Boako.Rival = {
                     : '';
 
                 const logoSrc = match.game_logo_url || 'https://via.placeholder.com/150?text=GAME';
-                const profileSrc = match.rival_profile_url;
+                const profileSrc = match.rival_profile_url ? match.rival_profile_url.replace('http://', 'https://') : null;
                 
                 // 🌟 수정 적용 완료: 내 프로필 주소를 프론트엔드가 아닌 DB(match 객체)에서 정확하게 꺼내옵니다.
-                const myProfileUrl = match.my_profile_url;
+                const myProfileUrl = match.my_profile_url ? match.my_profile_url.replace('http://', 'https://') : null;
                 const myProfileInitial = myNickname.charAt(0);
 
                 listHtml += `
