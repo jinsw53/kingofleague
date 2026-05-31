@@ -19,7 +19,6 @@ Boako.Rival = {
                 </div>
                 
                 <div class="card-body" style="background: #f8fafc; min-height: 400px; padding: 25px;">
-                    <!-- 검색 바 -->
                     <div class="flex gap-2 mb-6">
                         <div class="relative flex-1">
                             <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
@@ -28,7 +27,6 @@ Boako.Rival = {
                         <button onclick="Boako.Rival.searchRivals()" class="bg-slate-800 text-white px-6 rounded-xl font-bold text-sm hover:bg-slate-700 transition-colors shadow-sm">검색</button>
                     </div>
 
-                    <!-- 리스트 영역 -->
                     <div id="rival-list-container" class="space-y-3">
                         <div class="text-center py-10 text-slate-400 font-bold text-sm flex flex-col items-center gap-2">
                             <i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i>
@@ -55,13 +53,12 @@ Boako.Rival = {
         const searchInput = document.getElementById('rival-search-input');
         const searchWord = searchInput ? searchInput.value.trim() : '';
         const myNickname = Boako.state.user.nickname;
-        // 🌟 수정: 내 프로필 이미지 URL도 state에서 가져옵니다. (없을 경우를 대비해 변수 선언)
-        const myProfileUrl = Boako.state.user.profile_url; 
         
         container.innerHTML = `<div class="text-center py-10 text-slate-400 font-bold"><i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto mb-2"></i>분석 중...</div>`;
 
         try {
             if (searchWord) {
+                // 🌟 수정 적용 완료: 무소속 기록도 찾을 수 있도록 활동 내역 뷰 참조
                 const { count, error: countErr } = await Boako.db
                     .from('v_boako_activity_history')
                     .select('*', { count: 'exact', head: true })
@@ -106,12 +103,14 @@ Boako.Rival = {
 
                 const logoSrc = match.game_logo_url || 'https://via.placeholder.com/150?text=GAME';
                 const profileSrc = match.rival_profile_url;
+                
+                // 🌟 수정 적용 완료: 내 프로필 주소를 프론트엔드가 아닌 DB(match 객체)에서 정확하게 꺼내옵니다.
+                const myProfileUrl = match.my_profile_url;
                 const myProfileInitial = myNickname.charAt(0);
 
                 listHtml += `
                     <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all duration-200">
                         
-                        <!-- 1. 접힌 상태 (깔끔한 리스트 형태) -->
                         <div onclick="Boako.Rival.toggleDetail(${index})" class="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors group">
                             <div class="font-black text-slate-800 flex items-center gap-3">
                                 <span class="text-slate-300 font-bold w-4 text-center">${index + 1}</span>
@@ -126,11 +125,9 @@ Boako.Rival = {
                             </div>
                         </div>
 
-                        <!-- 2. 펼쳐진 상태 (VS 레이아웃 구역) -->
                         <div id="rival-detail-${index}" class="hidden border-t border-slate-100 bg-gradient-to-b from-slate-50 to-white">
                             <div class="p-8 flex flex-col items-center">
                                 
-                                <!-- 종목 타이틀 영역 -->
                                 <div class="flex flex-col items-center mb-8">
                                     <div class="w-20 h-20 rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-md mb-3 transform -rotate-3">
                                         <img src="${logoSrc}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/150?text=GAME'">
@@ -139,10 +136,8 @@ Boako.Rival = {
                                     <p class="text-xs text-slate-400 font-bold mt-1">기록 차이: ${isPerfectMatch ? '0회 (완벽한 동급)' : match.count_diff + '회'}</p>
                                 </div>
 
-                                <!-- 나 VS 라이벌 대결 구도 -->
                                 <div class="flex items-center justify-center gap-8 w-full max-w-sm mb-8">
                                     
-                                    <!-- 🌟 수정: '나' 영역 (프로필 이미지 반영 및 닉네임 적용) -->
                                     <div class="flex flex-col items-center gap-2 flex-1">
                                         <div class="w-16 h-16 rounded-full bg-slate-200 border-4 border-slate-100 flex items-center justify-center text-slate-500 font-black text-xl shadow-lg relative overflow-visible">
                                             ${myProfileUrl ? `<img src="${myProfileUrl}" class="w-full h-full object-cover rounded-full">` : myProfileInitial}
@@ -150,10 +145,8 @@ Boako.Rival = {
                                         <div class="text-sm font-black text-slate-800">${myNickname} (${match.my_record_count}회)</div>
                                     </div>
                                     
-                                    <!-- VS 마크 -->
                                     <div class="text-3xl font-black text-red-500 italic drop-shadow-md pb-6 shrink-0">VS</div>
                                     
-                                    <!-- 라이벌 -->
                                     <div class="flex flex-col items-center gap-2 flex-1">
                                         <div class="w-16 h-16 rounded-full bg-slate-200 border-4 ${isPerfectMatch ? 'border-red-400' : 'border-slate-100'} flex items-center justify-center text-slate-500 font-black text-xl shadow-lg relative overflow-visible">
                                             ${profileSrc ? `<img src="${profileSrc}" class="w-full h-full object-cover rounded-full">` : match.rival_nickname.charAt(0)}
@@ -163,7 +156,6 @@ Boako.Rival = {
                                     </div>
                                 </div>
 
-                                <!-- 도전장 버튼 -->
                                 <button onclick="Boako.Rival.executeChallenge('${match.rival_id}', '${match.game_name}')" class="w-full max-w-xs bg-slate-900 hover:bg-red-600 text-white text-[15px] font-black px-6 py-3.5 rounded-xl transition-all hover:scale-105 hover:shadow-lg flex justify-center items-center gap-2">
                                     <i data-lucide="swords" class="w-5 h-5"></i> 매치 도전장 발송
                                 </button>
