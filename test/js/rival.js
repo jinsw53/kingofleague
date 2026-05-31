@@ -61,7 +61,7 @@ Boako.Rival = {
         try {
             if (searchWord) {
                 const { count, error: countErr } = await Boako.db
-                    .from('v_boako_total_records')
+                    .from('v_boako_activity_history')
                     .select('*', { count: 'exact', head: true })
                     .eq('nickname', myNickname)
                     .ilike('game_name', `%${searchWord}%`);
