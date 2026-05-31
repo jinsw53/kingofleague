@@ -55,6 +55,8 @@ Boako.Rival = {
         const searchInput = document.getElementById('rival-search-input');
         const searchWord = searchInput ? searchInput.value.trim() : '';
         const myNickname = Boako.state.user.nickname;
+        // 🌟 수정: 내 프로필 이미지 URL도 state에서 가져옵니다. (없을 경우를 대비해 변수 선언)
+        const myProfileUrl = Boako.state.user.profile_url; 
         
         container.innerHTML = `<div class="text-center py-10 text-slate-400 font-bold"><i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto mb-2"></i>분석 중...</div>`;
 
@@ -139,12 +141,13 @@ Boako.Rival = {
 
                                 <!-- 나 VS 라이벌 대결 구도 -->
                                 <div class="flex items-center justify-center gap-8 w-full max-w-sm mb-8">
-                                    <!-- 나 -->
+                                    
+                                    <!-- 🌟 수정: '나' 영역 (프로필 이미지 반영 및 닉네임 적용) -->
                                     <div class="flex flex-col items-center gap-2 flex-1">
-                                        <div class="w-16 h-16 rounded-full bg-slate-800 border-4 border-slate-100 flex items-center justify-center text-white font-black text-xl shadow-lg relative">
-                                            ${myProfileInitial}
+                                        <div class="w-16 h-16 rounded-full bg-slate-200 border-4 border-slate-100 flex items-center justify-center text-slate-500 font-black text-xl shadow-lg relative overflow-visible">
+                                            ${myProfileUrl ? `<img src="${myProfileUrl}" class="w-full h-full object-cover rounded-full">` : myProfileInitial}
                                         </div>
-                                        <div class="text-sm font-black text-slate-800">나 (${match.my_record_count}회)</div>
+                                        <div class="text-sm font-black text-slate-800">${myNickname} (${match.my_record_count}회)</div>
                                     </div>
                                     
                                     <!-- VS 마크 -->
