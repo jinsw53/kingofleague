@@ -1,6 +1,6 @@
 /**
- * [MESSENGER - V3.0] 아카이브 통신망
- * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 캘린더 자동 등록 / 라이벌 매치 시스템 통합
+ * [MESSENGER - V3.1] 아카이브 통신망
+ * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 라이벌 매치 통합 / 🌟 팀 가입 결재 시스템 추가
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -54,6 +54,9 @@ Boako.Messenger = {
                         matchBadge = `<span class="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">${msg.metadata?.match_type || 'MATCH'}</span>`;
                     }
 
+                    // 🌟 팁: 쪽지가 팀 가입 신청서(TEAM_JOIN)일 경우 목록에 JSON 대신 안내 텍스트 표시
+                    const displayMessage = msg.action_type === 'TEAM_JOIN' ? '🛡️ 입단 지원서가 도착했습니다.' : msg.content;
+
                     Boako.Messenger.chatRooms[roomId] = {
                         id: roomId,
                         isMatch: isMatch,
@@ -62,7 +65,7 @@ Boako.Messenger = {
                         otherName: otherName, 
                         title: roomTitle,
                         badge: matchBadge,
-                        lastMessage: msg.content,
+                        lastMessage: displayMessage,
                         lastTime: msg.created_at,
                         unread: (!isMeSender && !msg.is_read) ? 1 : 0,
                         messages: [] 
@@ -312,7 +315,7 @@ Boako.Messenger = {
                         </div>
                     `;
                     
-                // 2. 🌟 [라이벌 도전장 카드] 로직 (신규 추가됨!)
+                // 2. 🌟 [라이벌 도전장 카드] 로직 
                 } else if (msg.action_type === 'CHALLENGE_CARD') {
                     const gameName = msg.metadata?.game_name || '종목미정';
                     const points = msg.metadata?.reward_points || 0;
@@ -363,7 +366,55 @@ Boako.Messenger = {
                         </div>
                     `;
 
-                // 3. [일반 텍스트 대화] 로직
+                // 3. 🌟 [팀 가입 신청 카드] 로직 (신규!)
+                } else if (msg.action_type === 'TEAM_JOIN') {
+                    let joinData = {};
+                    try { joinData = JSON.parse(msg.content); } catch(e) { joinData = { text: '지원서 오류', team_name: '알 수 없음' }; }
+                    
+                    const status = msg.action_status || 'PENDING';
+                    let cardContent = '';
+
+                    if (status === 'PENDING') {
+                        if (!isMe) { 
+                            cardContent = `
+                                <div class="flex gap-2 mt-3">
+                                    <button onclick="Boako.Messenger.View.replyTeamJoin('${msg.message_id}', 'ACCEPTED')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-2 rounded-lg transition-colors shadow-md">✅ 합류 수락</button>
+                                    <button onclick="Boako.Messenger.View.replyTeamJoin('${msg.message_id}', 'REJECTED')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-bold py-2 rounded-lg transition-colors border border-slate-300">거절</button>
+                                </div>
+                            `;
+                        } else { 
+                            cardContent = `<div class="mt-3 text-xs text-slate-500 font-bold text-center bg-slate-100 py-1.5 rounded-lg border border-slate-200">팀장의 결재 대기 중... ⏳</div>`;
+                        }
+                    } else if (status === 'ACCEPTED') {
+                        cardContent = `<div class="mt-3 text-xs text-blue-600 font-black text-center bg-blue-50 py-1.5 rounded-lg border border-blue-200">✅ 가입이 승인되었습니다.</div>`;
+                    } else if (status === 'REJECTED') {
+                        cardContent = `<div class="mt-3 text-xs text-red-500 font-bold text-center bg-red-50 py-1.5 rounded-lg border border-red-200">❌ 가입이 거절되었습니다.</div>`;
+                    }
+
+                    const cardHtml = `
+                        <div class="bg-white border border-blue-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="font-black text-blue-600 text-xs flex items-center gap-1">🛡️ 입단 지원서 도착</div>
+                            </div>
+                            <div class="text-sm font-bold text-slate-700 bg-slate-50 p-2.5 rounded-lg text-center shadow-inner border border-slate-100 mb-2">
+                                [${joinData.team_name}] 합류 희망!
+                            </div>
+                            ${cardContent}
+                        </div>
+                    `;
+
+                    messagesHtml += `
+                        <div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">
+                            ${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${msg.sender_name_override}</div>` : ''}
+                            <div class="flex items-end gap-2">
+                                ${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
+                                ${cardHtml}
+                                ${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                // 4. [일반 텍스트 대화] 로직
                 } else {
                     if (isMe) {
                         messagesHtml += `
@@ -501,13 +552,11 @@ Boako.Messenger = {
             Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
         },
 
-       // 🌟 [라이벌 도전장 수락/거절] 다이어트 완료 버전
         replyChallenge: async (messageId, matchId, status) => {
             const actionText = status === 'ACCEPTED' ? '수락' : '거절';
             if (!confirm(`이 라이벌 도전을 ${actionText}하시겠습니까?`)) return;
 
             try {
-                // 1. 서버(RPC) 호출 한 방으로 '진짜 매치 상태'와 '화면용 카드 상태' 동시 업데이트!
                 const { error: rpcError } = await Boako.db.rpc('respond_to_rival_match', {
                     p_match_id: matchId,
                     p_action: status
@@ -520,7 +569,35 @@ Boako.Messenger = {
 
                 Boako.Util.toast(`✅ 라이벌 도전을 ${actionText}했습니다!`);
 
-                // 2. 업데이트된 DB 데이터를 기반으로 채팅창 화면 새로고침
+                await Boako.Messenger.fetchUnreadCount();
+                await Boako.Messenger.View.refreshRoomList();
+                Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+                
+            } catch (err) {
+                alert(err.message);
+            }
+        },
+
+        // 🌟 [핵심 신규 기능] 가입 버튼 클릭 시 백엔드 RPC 호출
+        replyTeamJoin: async (messageId, status) => {
+            const actionText = status === 'ACCEPTED' ? '합류 수락' : '거절';
+            if (!confirm(`이 가입 신청을 ${actionText}하시겠습니까?`)) return;
+
+            try {
+                // 백엔드 함수(RPC) 한 방으로 검증 및 처리 완료
+                const { error: rpcError } = await Boako.db.rpc('respond_to_team_join', {
+                    p_message_id: messageId,
+                    p_action: status
+                });
+                
+                if (rpcError) {
+                    console.error("RPC Error:", rpcError);
+                    throw new Error("처리 실패: 정원이 초과되었거나 권한이 없습니다.");
+                }
+
+                Boako.Util.toast(`✅ 가입 신청을 ${actionText} 처리했습니다!`);
+
+                // UI 새로고침 (버튼을 완료 상태로 렌더링)
                 await Boako.Messenger.fetchUnreadCount();
                 await Boako.Messenger.View.refreshRoomList();
                 Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
