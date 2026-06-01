@@ -99,7 +99,7 @@ Boako.Rival = {
                     ? `<span class="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black shadow-sm absolute -top-2 -right-2 border-2 border-white">🔥 맞수</span>`
                     : '';
 
-                const logoSrc = match.game_logo_url || 'https://via.placeholder.com/150?text=GAME';
+                const logoSrc = match.game_logo_url || 'https://placehold.co/150x150?text=GAME';
                 
                 // 🌟 혼합 콘텐츠 에러(Mixed Content) 해결: http를 강제로 https로 변환
                 const profileSrc = match.rival_profile_url ? match.rival_profile_url.replace('http://', 'https://') : null;
@@ -114,7 +114,7 @@ Boako.Rival = {
                                 <span class="text-slate-300 font-bold w-4 text-center">${index + 1}</span>
                                 
                                 <div class="w-10 h-8 shrink-0 flex items-center justify-center bg-transparent">
-                                    <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-sm" onerror="this.src='https://via.placeholder.com/150?text=GAME'">
+                                    <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/150x150?text=GAME'">
                                 </div>
                                 
                                 <span class="text-[15px] group-hover:text-red-600 transition-colors">${match.game_name}</span>
@@ -131,7 +131,7 @@ Boako.Rival = {
                                 <div class="flex flex-col items-center mb-8">
                                     
                                     <div class="w-24 h-20 mb-3 transform -rotate-3 flex items-center justify-center">
-                                        <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-md" onerror="this.src='https://via.placeholder.com/150?text=GAME'">
+                                        <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=GAME'">
                                     </div>
                                     
                                     <h3 class="font-black text-2xl text-slate-800 tracking-tight">${match.game_name}</h3>
