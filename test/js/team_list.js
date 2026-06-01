@@ -96,12 +96,12 @@ Boako.TeamList = {
 
             let listHtml = '';
             teams.forEach(team => {
-                const logoSrc = team.logo_url || 'https://via.placeholder.com/150?text=NO+LOGO';
+                const logoSrc = team.logo_url || 'https://placehold.co/150x150?text=NO+LOGO';
                 const teamMotto = team.team_motto || '각오 한마디가 없습니다.';
                 const leaderName = team.leader_name || '팀장 미지정';
                 
                 // 해당 팀장의 아바타 URL 꺼내기 (없으면 기본 이미지)
-                const leaderAvatar = avatarMap[team.owner_id] || 'https://via.placeholder.com/50?text=👤';
+                const leaderAvatar = avatarMap[team.owner_id] || 'https://placehold.co/50x50?text=Profile';
                 
                 const currentTo = memberCounts[team.id] || 0;
                 const isFull = currentTo >= 4;
@@ -120,7 +120,7 @@ Boako.TeamList = {
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] group flex flex-col">
                         <div class="h-32 bg-slate-50 border-b border-slate-100 flex items-center justify-center relative overflow-hidden p-4">
                             <div class="absolute inset-0 opacity-5 bg-center bg-cover blur-sm transition-transform duration-500 group-hover:scale-110" style="background-image: url('${logoSrc}')"></div>
-                            <img src="${logoSrc}" class="h-full w-full object-contain relative z-10 drop-shadow-md" onerror="this.src='https://via.placeholder.com/150?text=NO+LOGO'">
+                            <img src="${logoSrc}" class="h-full w-full object-contain relative z-10 drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=NO+LOGO'">
                         </div>
                         <div class="p-5 flex-1 flex flex-col">
                             <h3 class="text-xl font-black text-slate-800 mb-1 group-hover:text-blue-600 transition-colors">${team.team_name}</h3>
