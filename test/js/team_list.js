@@ -1,5 +1,6 @@
 /**
- * [TEAM LIST] 생성된 팀 목록 및 현황을 보여주는 대시보드 (TO 표시 + 가입 신청 + 프로필 연동)
+ * [TEAM LIST] 생성된 팀 목록 및 현황 대시보드
+ * - 정렬 알고리즘: 1순위(구호 TO 부족 팀 우선) + 2순위(매일 자정 랜덤 셔플)
  */
 Boako.TeamList = {
     currentPage: 1,
@@ -17,11 +18,13 @@ Boako.TeamList = {
 
             <section class="section-card">
                 <div class="card-header flex justify-between items-center">
-                    <span>방명록 및 로스터</span>
+                    <div class="flex items-center gap-3">
+                        <span>방명록 및 로스터</span>
+                        <span id="total-team-count" class="bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full font-black shadow-inner">총 0개 팀</span>
+                    </div>
                 </div>
                 
                 <div class="card-body" style="background: #f8fafc; min-height: 400px; padding: 25px;">
-                    <!-- 검색 바 -->
                     <div class="flex gap-2 mb-8">
                         <div class="relative flex-1">
                             <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
@@ -30,10 +33,8 @@ Boako.TeamList = {
                         <button onclick="Boako.TeamList.loadTeams(1)" class="bg-slate-800 text-white px-6 rounded-xl font-bold text-sm hover:bg-slate-700 transition-colors shadow-sm">검색</button>
                     </div>
 
-                    <!-- 팀 카드 그리드 영역 -->
                     <div id="team-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
-                    <!-- 화살표 페이지 컨트롤 구역 -->
                     <div id="team-pagination-container" class="mt-10 flex justify-center items-center gap-4"></div>
                 </div>
             </section>
@@ -54,53 +55,76 @@ Boako.TeamList = {
         const container = document.getElementById('team-grid-container');
         const paginationContainer = document.getElementById('team-pagination-container');
         const searchWord = document.getElementById('team-search-input').value.trim();
+        const countBadge = document.getElementById('total-team-count');
         
-        container.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 font-bold flex flex-col items-center gap-2"><i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i>정보를 불러오는 중입니다...</div>`;
+        container.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 font-bold flex flex-col items-center gap-2"><i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i>팀 목록을 정리하는 중입니다...</div>`;
         paginationContainer.innerHTML = ''; 
 
         try {
-            const from = (page - 1) * Boako.TeamList.itemsPerPage;
-            const to = from + Boako.TeamList.itemsPerPage - 1;
-
-            let query = Boako.db
-                .from('teams')
-                .select('*', { count: 'exact' })
-                .order('created_at', { ascending: false });
+            // 🌟 1. 전체(또는 검색된) 팀 가져오기 (범위 제한 없이 모두 가져옴)
+            let query = Boako.db.from('teams').select('*');
 
             if (searchWord) {
                 query = query.or(`team_name.ilike.%${searchWord}%,leader_name.ilike.%${searchWord}%`);
             }
 
-            const { data: teams, count, error } = await query.range(from, to);
-
+            const { data: allTeams, error } = await query;
             if (error) throw error;
 
-            if (!teams || teams.length === 0) {
+            const totalCount = allTeams ? allTeams.length : 0;
+            if (countBadge) countBadge.innerText = `총 ${totalCount}개 팀`;
+
+            if (totalCount === 0) {
                 container.innerHTML = `<div class="col-span-full bg-white border border-slate-200 rounded-xl p-10 text-center flex flex-col items-center justify-center shadow-sm"><span class="text-4xl mb-3">📭</span><h4 class="font-black text-slate-600 text-lg mb-1">검색 결과 없음</h4></div>`;
                 return;
             }
 
-            const teamIds = teams.map(t => t.id);
-            const ownerIds = [...new Set(teams.map(t => t.owner_id))]; // 중복 제거된 리더 ID 목록
-
-            // 🌟 1. 팀장(Owner)들의 프로필 사진(아바타)을 DB에서 한 번에 긁어오기
-            const { data: profiles } = await Boako.db.from('profiles').select('id, avatar_url').in('id', ownerIds);
-            const avatarMap = {};
-            if (profiles) profiles.forEach(p => avatarMap[p.id] = p.avatar_url?.replace('http://', 'https://'));
-
-            // 🌟 2. 활동 중인 멤버 수 조회 (TO 계산)
-            const { data: members } = await Boako.db.from('team_members').select('team_id').in('team_id', teamIds).eq('is_active', true);
+            // 🌟 2. 전체 팀의 현재 멤버 수 계산 (TO 확인용)
+            const allTeamIds = allTeams.map(t => t.id);
+            const { data: members } = await Boako.db.from('team_members').select('team_id').in('team_id', allTeamIds).eq('is_active', true);
+            
             const memberCounts = {};
-            teamIds.forEach(id => memberCounts[id] = 0);
+            allTeamIds.forEach(id => memberCounts[id] = 0);
             if (members) members.forEach(m => memberCounts[m.team_id]++);
 
+            // 🌟 3. 하이브리드 정렬 알고리즘 적용 (TO + 일일 난수 셔플)
+            const today = new Date();
+            const dailySeedBase = today.getFullYear() + today.getMonth() + today.getDate(); // 날짜가 바뀌면 시드 변경
+
+            allTeams.sort((a, b) => {
+                const countA = memberCounts[a.id];
+                const countB = memberCounts[b.id];
+                
+                // 1순위: 멤버 수가 적은 팀(모집이 급한 팀)이 위로 올라옴 (오름차순)
+                if (countA !== countB) {
+                    return countA - countB; 
+                }
+                
+                // 2순위: 멤버 수가 같다면 '오늘 날짜'와 '팀 ID'를 조합한 고유 셔플 값으로 정렬
+                const randomA = Math.sin(a.id + dailySeedBase);
+                const randomB = Math.sin(b.id + dailySeedBase);
+                return randomA - randomB;
+            });
+
+            // 🌟 4. 정렬이 완료된 상태에서 현재 페이지(Pagination)에 맞게 배열 자르기
+            const from = (page - 1) * Boako.TeamList.itemsPerPage;
+            const paginatedTeams = allTeams.slice(from, from + Boako.TeamList.itemsPerPage);
+
+            // 🌟 5. 현재 화면에 표시될 팀장들의 아바타만 가져오기 (데이터 절약)
+            const ownerIds = [...new Set(paginatedTeams.map(t => t.owner_id).filter(id => id))]; 
+            const avatarMap = {};
+            if (ownerIds.length > 0) {
+                const { data: profiles } = await Boako.db.from('profiles').select('id, profile_url').in('id', ownerIds);
+                if (profiles) profiles.forEach(p => avatarMap[p.id] = p.profile_url?.replace('http://', 'https://'));
+            }
+
+            // 🌟 6. HTML 렌더링
             let listHtml = '';
-            teams.forEach(team => {
+            paginatedTeams.forEach(team => {
                 const logoSrc = team.logo_url || 'https://placehold.co/150x150?text=NO+LOGO';
                 const teamMotto = team.team_motto || '각오 한마디가 없습니다.';
                 const leaderName = team.leader_name || '팀장 미지정';
                 
-                // 해당 팀장의 아바타 URL 꺼내기 (없으면 기본 이미지)
                 const leaderAvatar = avatarMap[team.owner_id] || 'https://placehold.co/50x50?text=Profile';
                 
                 const currentTo = memberCounts[team.id] || 0;
@@ -110,12 +134,10 @@ Boako.TeamList = {
                     ? `<span class="bg-slate-100 text-slate-400 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-slate-200">정원 마감 (${currentTo}/4)</span>`
                     : `<span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-blue-200 animate-pulse">모집 중 (${currentTo}/4)</span>`;
 
-                // 🌟 requestJoin에 team.id를 추가로 넘겨줍니다!
                 const actionBtn = isFull
-                    ? `<button disabled class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200">모집 마감</button>`
-                    : `<button onclick="Boako.TeamList.requestJoin('${team.team_name}', '${leaderName}', ${team.id})" class="w-full mt-3 bg-slate-900 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><i data-lucide="send" class="w-4 h-4"></i> 가입 문의 쪽지 발송</button>`;
+                    ? `<button disabled class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200 text-center tracking-wide">모집 마감</button>`
+                    : `<button onclick="Boako.TeamList.requestJoin('${team.team_name}', '${leaderName}', ${team.id})" class="w-full mt-3 bg-slate-900 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 tracking-wide text-center">가입 신청</button>`;
 
-                // 🌟 마우스 호버 애니메이션 대폭 강화: hover:-translate-y-2 hover:scale-[1.02] hover:shadow-xl
                 listHtml += `
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] group flex flex-col">
                         <div class="h-32 bg-slate-50 border-b border-slate-100 flex items-center justify-center relative overflow-hidden p-4">
@@ -129,7 +151,6 @@ Boako.TeamList = {
                             <div class="mt-auto pt-4 border-t border-slate-100 flex flex-col gap-2">
                                 <div class="flex justify-between items-center">
                                     <div class="flex items-center gap-2">
-                                        <!-- 🌟 왕관 대신 팀장의 실제 프로필 사진 렌더링 -->
                                         <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-300 shadow-sm">
                                             <img src="${leaderAvatar}" class="w-full h-full object-cover">
                                         </div>
@@ -145,7 +166,7 @@ Boako.TeamList = {
             });
 
             container.innerHTML = listHtml;
-            Boako.TeamList.renderPagination(count);
+            Boako.TeamList.renderPagination(totalCount);
 
         } catch (err) {
             console.error("팀 목록 로드 실패:", err);
@@ -180,7 +201,6 @@ Boako.TeamList = {
         if(typeof lucide !== 'undefined') lucide.createIcons();
     },
 
-    // 🌟 가입 문의 발송 로직 (팀장이 [수락/거절] 버튼을 띄울 수 있도록 JSON 페이로드 발송)
     requestJoin: async (teamName, leaderName, teamId) => {
         if (!Boako.state.user) {
             Boako.Util.toast("카카오 로그인이 필요합니다.");
@@ -201,20 +221,14 @@ Boako.TeamList = {
 
             if (profileErr || !leaderProfile) throw new Error("팀장 정보를 찾을 수 없습니다.");
 
-            // 🌟 핵심 변경 포인트: 쪽지 내용을 단순 텍스트가 아닌 JSON 구조로 묶어서 보냅니다.
-            // 그래야 메신저에서 이 데이터를 뜯어서 [수락] [거절] 버튼에 teamId와 신청자 정보를 연결할 수 있습니다.
             const payload = {
                 sender_id: Boako.state.user.id,
                 receiver_id: leaderProfile.id,
-                
-                // 단순 텍스트가 아닌 JSON으로 압축해서 전송!
                 content: JSON.stringify({
                     text: `👋 안녕하세요! [${teamName}] 팀에 가입을 신청합니다!`,
                     team_id: teamId,
                     team_name: teamName
                 }),
-                
-                // 🌟 액션 타입을 'TEAM_JOIN'으로 명시! (메신저가 이걸 보고 버튼을 띄울 겁니다)
                 action_type: 'TEAM_JOIN' 
             };
 
