@@ -156,7 +156,10 @@ Boako.View = {
                     const { info: team, type } = Boako.state.team;
                     const isLeader = type === 'LEADER';
                     const { data: members } = await Boako.db.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
-                    
+                    // 🌟 여기서 바로 정렬해버리면 됩니다!
+        if (members) {
+            members.sort((a, b) => (a.role === 'LEADER' ? -1 : 1));
+        }
                     // 🌟 탭이 포함된 팀 레이아웃으로 변경
                     html = `
                     <div class="main-banner" style="margin-bottom: 20px;">
