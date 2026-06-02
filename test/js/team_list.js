@@ -1,10 +1,10 @@
 /**
  * [TEAM LIST] 생성된 팀 목록 및 현황 대시보드
- * - 정렬 알고리즘: 1순위(구호 TO 부족 팀 우선) + 2순위(매일 자정 랜덤 셔플)
+ * - 정렬 알고리즘: 1순위(전원 활동 중) -> 2순위(결원 많은 팀) -> 3순위(최신 창단 팀)
  */
 Boako.TeamList = {
     currentPage: 1,
-    itemsPerPage: 3, 
+    itemsPerPage: 6, // 리스트가 깔끔하게 보이도록 6개 추천
 
     init: async (containerId) => {
         const container = document.getElementById(containerId);
@@ -61,56 +61,34 @@ Boako.TeamList = {
         paginationContainer.innerHTML = ''; 
 
         try {
-            // 🌟 1. 전체(또는 검색된) 팀 가져오기 (범위 제한 없이 모두 가져옴)
-            let query = Boako.db.from('teams').select('*');
+            // 🌟 1. 현재 페이지의 데이터 범위만 계산
+            const from = (page - 1) * Boako.TeamList.itemsPerPage;
+            const to = from + Boako.TeamList.itemsPerPage - 1;
+
+            // 🌟 2. 새로 만든 뷰(View)에서 필요한 개수만큼만 가져오기
+            let query = Boako.db.from('view_team_list_sorted').select('*', { count: 'exact' });
 
             if (searchWord) {
                 query = query.or(`team_name.ilike.%${searchWord}%,leader_name.ilike.%${searchWord}%`);
             }
 
-            const { data: allTeams, error } = await query;
+            // DB단에서 완벽하게 정렬 후 반환 (자바스크립트 연산 0%)
+            const { data: paginatedTeams, count: totalCount, error } = await query
+                .order('is_fully_active', { ascending: false }) // 1순위: 전원 활동팀 우선
+                .order('member_count', { ascending: true })     // 2순위: 인원이 적은 순
+                .order('created_at', { ascending: false })      // 3순위: 신생 팀 우선
+                .range(from, to);
+
             if (error) throw error;
 
-            const totalCount = allTeams ? allTeams.length : 0;
-            if (countBadge) countBadge.innerText = `총 ${totalCount}개 팀`;
+            if (countBadge) countBadge.innerText = `총 ${totalCount || 0}개 팀`;
 
-            if (totalCount === 0) {
+            if (!paginatedTeams || paginatedTeams.length === 0) {
                 container.innerHTML = `<div class="col-span-full bg-white border border-slate-200 rounded-xl p-10 text-center flex flex-col items-center justify-center shadow-sm"><span class="text-4xl mb-3">📭</span><h4 class="font-black text-slate-600 text-lg mb-1">검색 결과 없음</h4></div>`;
                 return;
             }
 
-            // 🌟 2. 전체 팀의 현재 멤버 수 계산 (TO 확인용)
-            const allTeamIds = allTeams.map(t => t.id);
-            const { data: members } = await Boako.db.from('team_members').select('team_id').in('team_id', allTeamIds).eq('is_active', true);
-            
-            const memberCounts = {};
-            allTeamIds.forEach(id => memberCounts[id] = 0);
-            if (members) members.forEach(m => memberCounts[m.team_id]++);
-
-            // 🌟 3. 하이브리드 정렬 알고리즘 적용 (TO + 일일 난수 셔플)
-            const today = new Date();
-            const dailySeedBase = today.getFullYear() + today.getMonth() + today.getDate(); // 날짜가 바뀌면 시드 변경
-
-            allTeams.sort((a, b) => {
-                const countA = memberCounts[a.id];
-                const countB = memberCounts[b.id];
-                
-                // 1순위: 멤버 수가 적은 팀(모집이 급한 팀)이 위로 올라옴 (오름차순)
-                if (countA !== countB) {
-                    return countA - countB; 
-                }
-                
-                // 2순위: 멤버 수가 같다면 '오늘 날짜'와 '팀 ID'를 조합한 고유 셔플 값으로 정렬
-                const randomA = Math.sin(a.id + dailySeedBase);
-                const randomB = Math.sin(b.id + dailySeedBase);
-                return randomA - randomB;
-            });
-
-            // 🌟 4. 정렬이 완료된 상태에서 현재 페이지(Pagination)에 맞게 배열 자르기
-            const from = (page - 1) * Boako.TeamList.itemsPerPage;
-            const paginatedTeams = allTeams.slice(from, from + Boako.TeamList.itemsPerPage);
-
-            // 🌟 5. 현재 화면에 표시될 팀장들의 아바타만 가져오기 (데이터 절약)
+            // 🌟 3. 화면에 표시될 팀장들의 아바타만 따로 가져오기
             const ownerIds = [...new Set(paginatedTeams.map(t => t.owner_id).filter(id => id))]; 
             const avatarMap = {};
             if (ownerIds.length > 0) {
@@ -118,21 +96,21 @@ Boako.TeamList = {
                 if (profiles) profiles.forEach(p => avatarMap[p.id] = p.profile_url?.replace('http://', 'https://'));
             }
 
-            // 🌟 6. HTML 렌더링
+            // 🌟 4. HTML 렌더링
             let listHtml = '';
             paginatedTeams.forEach(team => {
                 const logoSrc = team.logo_url || 'https://placehold.co/150x150?text=NO+LOGO';
                 const teamMotto = team.team_motto || '각오 한마디가 없습니다.';
                 const leaderName = team.leader_name || '팀장 미지정';
-                
                 const leaderAvatar = avatarMap[team.owner_id] || 'https://placehold.co/50x50?text=Profile';
                 
-                const currentTo = memberCounts[team.id] || 0;
+                const currentTo = team.member_count || 0;
+                const activeTo = team.active_count || 0;
                 const isFull = currentTo >= 4;
 
                 const toBadge = isFull 
-                    ? `<span class="bg-slate-100 text-slate-400 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-slate-200">정원 마감 (${currentTo}/4)</span>`
-                    : `<span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-blue-200 animate-pulse">모집 중 (${currentTo}/4)</span>`;
+                    ? `<span class="bg-slate-100 text-slate-400 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-slate-200">마감 (${currentTo}/4) | 🔥${activeTo}명</span>`
+                    : `<span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-blue-200 animate-pulse">모집 중 (${currentTo}/4) | 🔥${activeTo}명</span>`;
 
                 const actionBtn = isFull
                     ? `<button disabled class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200 text-center tracking-wide">모집 마감</button>`
