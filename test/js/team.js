@@ -61,18 +61,43 @@ Boako.Team = {
         if (error) Boako.Util.toast("저장 실패: " + error.message);
         else { Boako.Util.toast("✅ 팀 정보가 업데이트되었습니다."); Boako.View.render('team'); }
     },
+    // Boako.Team 객체 안의 addMember를 이것으로 교체하세요.
     addMember: async () => {
-        const name = prompt("합류할 멤버의 닉네임을 정확히 입력하세요.");
+        const name = prompt("초대할 멤버의 닉네임을 정확히 입력하세요.");
         if (!name || !name.trim()) return;
-        const { error } = await Boako.db.from('team_members').insert([{ 
-            team_id: Boako.state.team.info.id, 
-            team_name: Boako.state.team.info.team_name, 
-            player_name: name.trim(), role: 'MEMBER', is_active: true 
-        }]);
-        if (error) {
-            if (error.code === '23505') Boako.Util.toast("실패: 이미 어딘가에 소속된 유저입니다.");
-            else Boako.Util.toast("오류: " + error.message);
-        } else { Boako.Util.toast(`✅ ${name} 님이 합류했습니다!`); Boako.View.render('team'); }
+
+        try {
+            // 1. 해당 닉네임을 가진 실제 유저의 프로필(UUID) 찾기
+            const { data: targetProfile, error: profileErr } = await Boako.db
+                .from('profiles')
+                .select('id')
+                .eq('full_name', name.trim())
+                .single();
+
+            if (profileErr || !targetProfile) throw new Error("해당 닉네임의 유저를 찾을 수 없습니다.");
+            if (targetProfile.id === Boako.state.user.id) throw new Error("자기 자신은 초대할 수 없습니다.");
+
+            // 2. 직접 INSERT 대신, 메신저 테이블로 '초대장' 발송
+            const payload = {
+                sender_id: Boako.state.user.id,
+                sender_name_override: Boako.state.user.nickname,
+                receiver_id: targetProfile.id,
+                receiver_name_override: name.trim(),
+                content: JSON.stringify({
+                    text: `👋 [${Boako.state.team.info.team_name}] 팀에서 귀하를 영입하고 싶어 합니다!`,
+                    team_id: Boako.state.team.info.id,
+                    team_name: Boako.state.team.info.team_name
+                }),
+                action_type: 'TEAM_INVITE' // 🌟 새로운 액션 타입!
+            };
+
+            const { error: msgErr } = await Boako.db.from('messages').insert([payload]);
+            if (msgErr) throw msgErr;
+
+            Boako.Util.toast(`🎉 ${name.trim()} 님에게 스카웃 제안서를 발송했습니다!`);
+        } catch (err) {
+            Boako.Util.toast("❌ 초대 실패: " + err.message);
+        }
     },
     kick: async (name) => {
         if (!confirm(`${name} 님을 방출하시겠습니까? 기록은 보존됩니다.`)) return;
