@@ -96,7 +96,7 @@ Boako.TeamList = {
                 if (profiles) profiles.forEach(p => avatarMap[p.id] = p.profile_url?.replace('http://', 'https://'));
             }
 
-            // 🌟 4. HTML 렌더링
+            // 🌟 4. HTML 렌더링 (숫자 표기 제거 & HOT 배지 추가)
             let listHtml = '';
             paginatedTeams.forEach(team => {
                 const logoSrc = team.logo_url || 'https://placehold.co/150x150?text=NO+LOGO';
@@ -105,12 +105,18 @@ Boako.TeamList = {
                 const leaderAvatar = avatarMap[team.owner_id] || 'https://placehold.co/50x50?text=Profile';
                 
                 const currentTo = team.member_count || 0;
-                const activeTo = team.active_count || 0;
                 const isFull = currentTo >= 4;
 
+                // 🌟 [추가된 로직] 전원이 활동 중인 팀(is_fully_active === 1)이면 HOT 배지 표시!
+                const isHot = team.is_fully_active === 1;
+                const hotBadge = isHot 
+                    ? `<span class="bg-gradient-to-r from-red-500 to-orange-400 text-white px-2 py-0.5 rounded text-[10px] font-black ml-2 shadow-sm animate-pulse">🔥 HOT</span>` 
+                    : '';
+
+                // 🌟 [수정된 로직] 촌스러운 숫자 표기(🔥0명) 삭제하고 깔끔하게 TO만 보여줌
                 const toBadge = isFull 
-                    ? `<span class="bg-slate-100 text-slate-400 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-slate-200">마감 (${currentTo}/4) | 🔥${activeTo}명</span>`
-                    : `<span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-blue-200 animate-pulse">모집 중 (${currentTo}/4) | 🔥${activeTo}명</span>`;
+                    ? `<span class="bg-slate-100 text-slate-400 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-slate-200">마감 (${currentTo}/4)</span>`
+                    : `<span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-blue-200 animate-pulse">모집 중 (${currentTo}/4)</span>`;
 
                 const actionBtn = isFull
                     ? `<button disabled class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200 text-center tracking-wide">모집 마감</button>`
@@ -123,7 +129,12 @@ Boako.TeamList = {
                             <img src="${logoSrc}" class="h-full w-full object-contain relative z-10 drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=NO+LOGO'">
                         </div>
                         <div class="p-5 flex-1 flex flex-col">
-                            <h3 class="text-xl font-black text-slate-800 mb-1 group-hover:text-blue-600 transition-colors">${team.team_name}</h3>
+                            
+                            <div class="flex items-center mb-1">
+                                <h3 class="text-xl font-black text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1">${team.team_name}</h3>
+                                ${hotBadge}
+                            </div>
+                            
                             <p class="text-sm text-blue-500 font-bold italic mb-4 line-clamp-2 leading-relaxed">"${teamMotto}"</p>
                             
                             <div class="mt-auto pt-4 border-t border-slate-100 flex flex-col gap-2">
