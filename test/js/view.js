@@ -156,6 +156,7 @@ Boako.View = {
                                     <button class="btn-edit-small" style="background:var(--primary); color:white; align-wide:flex-end;" onclick="Boako.Team.updateInfo('team_desc')">저장</button>
                                 </div>
                             </div>
+                            
                             <div class="member-section" style="margin-top:40px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
                                     <h4 style="font-weight:950; font-size:20px;">👥 팀 멤버 (${members?.length || 0}/4)</h4>
@@ -178,8 +179,19 @@ Boako.View = {
                                     }).join('')}
                                 </div>
                             </div>
+
+                            <div id="team-chat-container" class="mt-10 pt-8 border-t border-slate-200 w-full"></div>
+
                         </div>
                     </section>`;
+
+                    // 🌟 [신규 추가] HTML이 그려진 직후 채팅창 엔진 가동!
+                    setTimeout(() => {
+                        if (Boako.Team && Boako.Team.Chat && typeof Boako.Team.Chat.init === 'function') {
+                            Boako.Team.Chat.init('team-chat-container');
+                        }
+                    }, 0);
+
                 } else {
                     html = `
                     <div class="main-banner"><h1>🛡️ 팀 창단</h1></div>
