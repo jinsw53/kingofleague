@@ -150,7 +150,7 @@ Boako.Messenger = {
                         const roomId = newMsg.match_id || (newMsg.sender_id === myId ? newMsg.receiver_id : newMsg.sender_id);
                         
                         if (Boako.Messenger.currentRoomId === roomId) {
-                            Boako.Messenger.View.(roomId);
+                           Boako.Messenger.View.openRoom(roomId);
                         } else if (newMsg.receiver_id === myId) {
                             Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 새 메시지가 도착했습니다!`);
                         }
@@ -217,7 +217,7 @@ Boako.Messenger = {
                 const activeClass = Boako.Messenger.currentRoomId === room.id ? 'bg-white shadow-sm border-indigo-200' : 'border-transparent hover:bg-white/60';
                 
                 listHtml += `
-                    <div onclick="Boako.Messenger.View.('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
+                    <div onclick="Boako.Messenger.View.openRoom('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
                         <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center text-slate-500 font-black">
                             ${room.isMatch ? '⚔️' : room.title.charAt(0)}
                         </div>
@@ -414,7 +414,53 @@ Boako.Messenger = {
                             </div>
                         </div>
                     `;
+// 🌟 [팀 영입 제안서 카드] 로직 (팀장 -> 유저) 추가 부분
+                } else if (msg.action_type === 'TEAM_INVITE') {
+                    let inviteData = {};
+                    try { inviteData = JSON.parse(msg.content); } catch(e) { inviteData = { text: '초대장 오류', team_name: '알 수 없음' }; }
+                    
+                    const status = msg.action_status || 'PENDING';
+                    let cardContent = '';
 
+                    if (status === 'PENDING') {
+                        if (!isMe) { 
+                            cardContent = `
+                                <div class="flex gap-2 mt-3">
+                                    <button onclick="Boako.Messenger.View.replyTeamInvite('${msg.message_id}', 'ACCEPTED')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2 rounded-lg transition-colors shadow-md">✅ 스카웃 수락</button>
+                                    <button onclick="Boako.Messenger.View.replyTeamInvite('${msg.message_id}', 'REJECTED')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-bold py-2 rounded-lg transition-colors border border-slate-300">거절</button>
+                                </div>
+                            `;
+                        } else { 
+                            cardContent = `<div class="mt-3 text-xs text-slate-500 font-bold text-center bg-slate-100 py-1.5 rounded-lg border border-slate-200">상대방의 응답을 기다리는 중... ⏳</div>`;
+                        }
+                    } else if (status === 'ACCEPTED') {
+                        cardContent = `<div class="mt-3 text-xs text-emerald-600 font-black text-center bg-emerald-50 py-1.5 rounded-lg border border-emerald-200">✅ 영입 제안이 수락되었습니다. (팀 합류 완료)</div>`;
+                    } else if (status === 'REJECTED') {
+                        cardContent = `<div class="mt-3 text-xs text-red-500 font-bold text-center bg-red-50 py-1.5 rounded-lg border border-red-200">❌ 영입 제안이 거절되었습니다.</div>`;
+                    }
+
+                    const cardHtml = `
+                        <div class="bg-white border border-emerald-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="font-black text-emerald-600 text-xs flex items-center gap-1">💌 팀 스카웃 제안 도착</div>
+                            </div>
+                            <div class="text-sm font-bold text-slate-700 bg-slate-50 p-2.5 rounded-lg text-center shadow-inner border border-slate-100 mb-2">
+                                [${inviteData.team_name}] 합류 제안
+                            </div>
+                            ${cardContent}
+                        </div>
+                    `;
+
+                    messagesHtml += `
+                        <div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">
+                            ${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${msg.sender_name_override}</div>` : ''}
+                            <div class="flex items-end gap-2">
+                                ${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
+                                ${cardHtml}
+                                ${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
                 // 4. [일반 텍스트 대화] 로직
                 } else {
                     if (isMe) {
@@ -579,7 +625,7 @@ Boako.Messenger = {
             }
         },
 
-        // 🌟 [핵심 신규 기능] 가입 버튼 클릭 시 백엔드 RPC 호출
+        // 🌟 [핵심 기능] 가입 신청 결재
         replyTeamJoin: async (messageId, status) => {
             const actionText = status === 'ACCEPTED' ? '합류 수락' : '거절';
             if (!confirm(`이 가입 신청을 ${actionText}하시겠습니까?`)) return;
@@ -599,6 +645,35 @@ Boako.Messenger = {
                 Boako.Util.toast(`✅ 가입 신청을 ${actionText} 처리했습니다!`);
 
                 // UI 새로고침 (버튼을 완료 상태로 렌더링)
+                await Boako.Messenger.fetchUnreadCount();
+                await Boako.Messenger.View.refreshRoomList();
+                Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+                
+            } catch (err) {
+                alert(err.message);
+            }
+        }, // 🌟 <--- (중요) 여기에 쉼표가 들어갔습니다!
+
+        // 🌟 [핵심 신규 기능] 영입 제안 수락/거절 처리 (팀장이 보낸 스카웃 제안)
+        replyTeamInvite: async (messageId, status) => {
+            const actionText = status === 'ACCEPTED' ? '스카웃 제안을 수락' : '거절';
+            if (!confirm(`[${actionText}] 하시겠습니까?`)) return;
+
+            try {
+                // 백엔드 RPC 호출 (검증부터 INSERT까지 한 방에 처리)
+                const { error: rpcError } = await Boako.db.rpc('respond_to_team_invite', {
+                    p_message_id: messageId,
+                    p_action: status
+                });
+                
+                if (rpcError) {
+                    console.error("RPC Error:", rpcError);
+                    throw new Error("처리 실패: 이미 소속된 팀이 있거나, 정원이 초과되었습니다.");
+                }
+
+                Boako.Util.toast(`✅ 영입 제안을 ${actionText}했습니다!`);
+
+                // UI 새로고침
                 await Boako.Messenger.fetchUnreadCount();
                 await Boako.Messenger.View.refreshRoomList();
                 Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
