@@ -55,7 +55,8 @@ Boako.Messenger = {
                     }
 
                     // 🌟 팁: 쪽지가 팀 가입 신청서(TEAM_JOIN)일 경우 목록에 JSON 대신 안내 텍스트 표시
-                    const displayMessage = msg.action_type === 'TEAM_JOIN' ? '🛡️ 입단 지원서가 도착했습니다.' : msg.content;
+                    const displayMessage = msg.action_type === 'TEAM_JOIN' ? '🛡️ 입단 지원서가 도착했습니다.' : 
+                       (msg.action_type === 'TEAM_INVITE' ? '💌 팀 영입 제안서가 도착했습니다.' : msg.content);
 
                     Boako.Messenger.chatRooms[roomId] = {
                         id: roomId,
@@ -149,7 +150,7 @@ Boako.Messenger = {
                         const roomId = newMsg.match_id || (newMsg.sender_id === myId ? newMsg.receiver_id : newMsg.sender_id);
                         
                         if (Boako.Messenger.currentRoomId === roomId) {
-                            Boako.Messenger.View.openRoom(roomId);
+                            Boako.Messenger.View.(roomId);
                         } else if (newMsg.receiver_id === myId) {
                             Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 새 메시지가 도착했습니다!`);
                         }
@@ -216,7 +217,7 @@ Boako.Messenger = {
                 const activeClass = Boako.Messenger.currentRoomId === room.id ? 'bg-white shadow-sm border-indigo-200' : 'border-transparent hover:bg-white/60';
                 
                 listHtml += `
-                    <div onclick="Boako.Messenger.View.openRoom('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
+                    <div onclick="Boako.Messenger.View.('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
                         <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center text-slate-500 font-black">
                             ${room.isMatch ? '⚔️' : room.title.charAt(0)}
                         </div>
