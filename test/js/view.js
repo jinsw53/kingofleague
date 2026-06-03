@@ -11,31 +11,34 @@ Boako.View = {
         display.style.display = isNone ? 'none' : (type === 'motto' ? 'flex' : 'block');
     },
 
-    // 🌟 [신규 추가] 팀 탭 전환 로직
+    // 🌟 [수정된] 버튼형 팀 탭 전환 로직
     switchTeamTab: (tabId) => {
         // 모든 탭 내용 숨기기
         document.querySelectorAll('.team-tab-content').forEach(el => {
             el.style.display = 'none';
         });
-        // 모든 탭 버튼 스타일 초기화 (비활성 상태)
+        
+        // 버튼 스타일 (활성/비활성)
+        const activeClasses = ['bg-slate-800', 'text-white', 'shadow-sm'];
+        const inactiveClasses = ['bg-slate-100', 'text-slate-500', 'hover:bg-slate-200', 'hover:text-slate-700'];
+
+        // 모든 버튼을 비활성(회색) 상태로 초기화
         document.querySelectorAll('.team-tab-btn').forEach(el => {
-            el.classList.remove('border-indigo-600', 'text-indigo-600', 'font-black');
-            el.classList.add('border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300');
+            el.classList.remove(...activeClasses);
+            el.classList.add(...inactiveClasses);
         });
 
         // 선택한 탭 보이기
         const targetContent = document.getElementById(`tab-${tabId}`);
         if(targetContent) targetContent.style.display = 'block';
 
-        // 선택한 탭 버튼 하이라이트 (활성 상태)
+        // 선택한 버튼을 활성(진한색) 상태로 변경
         const activeBtn = document.getElementById(`btn-tab-${tabId}`);
         if (activeBtn) {
-            activeBtn.classList.remove('border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300');
-            activeBtn.classList.add('border-indigo-600', 'text-indigo-600', 'font-black');
+            activeBtn.classList.remove(...inactiveClasses);
+            activeBtn.classList.add(...activeClasses);
         }
 
-        // 🌟 팁: 채팅 탭으로 넘어갈 때 화면 렌더링 타이밍 탓에 
-        // 말풍선 스크롤이 맨 밑으로 안 내려가 있는 현상 방지
         if (tabId === 'chat' && Boako.Team && Boako.Team.Chat) {
             setTimeout(() => { Boako.Team.Chat.scrollToBottom(); }, 50);
         }
@@ -166,16 +169,20 @@ Boako.View = {
                         <h1>${team.team_name}</h1>
                     </div>
 
-                    <div class="flex gap-6 mb-6 border-b border-slate-200 px-2 mt-2">
-                        <button id="btn-tab-info" class="team-tab-btn pb-3 border-b-4 border-indigo-600 text-indigo-600 font-black text-sm transition-colors" onclick="Boako.View.switchTeamTab('info')">🛡️ 팀 본부</button>
-                        <button id="btn-tab-chat" class="team-tab-btn pb-3 border-b-4 border-transparent text-slate-500 font-bold hover:text-slate-700 hover:border-slate-300 text-sm transition-colors" onclick="Boako.View.switchTeamTab('chat')">💬 작전 회의실</button>
-                        <button id="btn-tab-record" class="team-tab-btn pb-3 border-b-4 border-transparent text-slate-500 font-bold hover:text-slate-700 hover:border-slate-300 text-sm transition-colors" onclick="Boako.View.switchTeamTab('record')">⚔️ 기록 및 일정</button>
-                    </div>
+                    <section class="section-card">
+                        <div class="card-header flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
+                            <span style="font-size: 18px;">나의 팀 대시보드</span>
+                            
+                            <div class="flex gap-2">
+                                <button id="btn-tab-info" class="team-tab-btn bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all" onclick="Boako.View.switchTeamTab('info')">🛡️ 팀 본부</button>
+                                <button id="btn-tab-chat" class="team-tab-btn bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.View.switchTeamTab('chat')">💬 작전 회의실</button>
+                                <button id="btn-tab-record" class="team-tab-btn bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.View.switchTeamTab('record')">⚔️ 기록 및 일정</button>
+                            </div>
+                        </div>
 
-                    <div id="tab-info" class="team-tab-content block animate-in fade-in duration-300">
-                        <section class="section-card">
-                            <div class="card-header">나의 팀 대시보드</div>
-                            <div class="card-body">
+                        <div class="card-body" style="padding-top: 0;">
+                            
+                            <div id="tab-info" class="team-tab-content block animate-in fade-in duration-300">
                                 <div class="team-profile-header">
                                     <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
                                     <div class="team-info-txt">
@@ -190,6 +197,7 @@ Boako.View = {
                                         </div>
                                     </div>
                                 </div>
+                                
                                 <div style="margin-top:20px; border-top:1px solid #f1f5f9; padding-top:30px;">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                                         <h4 style="font-weight:950; font-size:18px;">🛡️ 팀 상세 소개</h4>
@@ -225,21 +233,20 @@ Boako.View = {
                                     </div>
                                 </div>
                             </div>
-                        </section>
-                    </div>
 
-                    <div id="tab-chat" class="team-tab-content hidden animate-in fade-in duration-300 w-full">
-                        <div id="team-chat-container" class="w-full"></div>
-                    </div>
-
-                    <div id="tab-record" class="team-tab-content hidden animate-in fade-in duration-300">
-                        <section class="section-card mt-2">
-                            <div class="card-body flex flex-col items-center justify-center text-slate-400 font-bold py-20 gap-3">
-                                <span>🚧</span>
-                                <p>팀 기록 및 일정 관리 기능은 준비 중입니다.</p>
+                            <div id="tab-chat" class="team-tab-content hidden animate-in fade-in duration-300 w-full pt-4">
+                                <div id="team-chat-container" class="w-full"></div>
                             </div>
-                        </section>
-                    </div>
+
+                            <div id="tab-record" class="team-tab-content hidden animate-in fade-in duration-300 pt-4">
+                                <div class="flex flex-col items-center justify-center text-slate-400 font-bold py-20 gap-3 border border-dashed border-slate-300 rounded-xl bg-slate-50">
+                                    <span class="text-2xl">🚧</span>
+                                    <p>팀 기록 및 일정 관리 기능은 준비 중입니다.</p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </section>
                     `;
 
                     // 채팅창 엔진은 백그라운드에서 바로 가동시킵니다.
