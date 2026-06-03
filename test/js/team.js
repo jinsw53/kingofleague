@@ -208,6 +208,24 @@ users.forEach(u => {
     Chat: {
         channel: null,
 
+        // 🌟 [추가 1] 알림 뱃지 켜기 스위치
+        showNotification: () => {
+            const badge = document.getElementById('team-chat-badge');
+            if (badge) {
+                badge.classList.remove('hidden');
+                badge.style.display = 'flex'; // 버튼 UI의 inline 스타일 충돌 방지용 강제 표시
+            }
+        },
+
+        // 🌟 [추가 2] 알림 뱃지 끄기 스위치
+        clearNotification: () => {
+            const badge = document.getElementById('team-chat-badge');
+            if (badge) {
+                badge.classList.add('hidden');
+                badge.style.display = 'none'; // 강제 숨김
+            }
+        },
+
         init: async (containerId) => {
             if (!Boako.state.team) return;
             const teamId = Boako.state.team.info.id;
@@ -256,6 +274,10 @@ users.forEach(u => {
                          newMsg.profiles = { full_name: "팀원" }; 
                          Boako.Team.Chat.renderMessage(newMsg);
                          Boako.Team.Chat.scrollToBottom();
+
+                         // 🌟 [추가 3] 남이 쓴 채팅이 도착하면 스위치 켜기!
+                         Boako.Team.Chat.showNotification();
+                         Boako.Util.toast("💬 팀 작전 회의실에 새로운 메시지가 있습니다!");
                     }
                 })
                 .subscribe();
