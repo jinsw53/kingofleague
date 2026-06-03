@@ -1,5 +1,5 @@
 /**
- * [UTIL] 공통 유틸리티 (토스트, 프리뷰 + 동적 파일 배달원 추가)
+ * [UTIL] 공통 유틸리티 (토스트, 프리뷰 + 동적 파일 배달원 + 자동 스크롤)
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -49,5 +49,14 @@ Boako.Util = {
             script.onerror = () => reject(new Error(`파일 배달 실패: ${src}`));
             document.body.appendChild(script);
         });
+    }, // <-- 🌟 쉼표(,) 추가됨
+
+    // 🎯 5. [신규 추가] 메뉴바 자동 스크롤 엔진!
+    // 인벤토리/팀쳇 클릭 시 해당 메뉴가 화면 중앙으로 스르륵 따라오게 만듭니다.
+    scrollToMenu: (menuId) => {
+        const targetBtn = document.getElementById(menuId);
+        if (targetBtn) {
+            targetBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
     }
 };
