@@ -49,7 +49,7 @@ Boako.Auth = {
                 if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
 
                 // 🌟 수정된 부분! 🌟
-                Boako.Auth.renderWidget();
+                Boako.Auth.();
 
                 // 🌟 [신규 추가] 신규 로그인 직후에도 BGA 닉네임 설정 안 했으면 모달 띄우기
                 await Boako.Auth.requireBgaNickname();
@@ -64,7 +64,7 @@ Boako.Auth = {
                 if (verifyMenu) verifyMenu.style.display = 'none';
                 
                 // 🌟 수정된 부분! 🌟
-                Boako.Auth.renderWidget();
+                Boako.Auth.();
             }
         });
     },
@@ -85,6 +85,19 @@ Boako.Auth = {
                 ? `<span style="background:#ef4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; margin-left:4px; font-weight:bold;">${Boako.Messenger.unreadCount}</span>` 
                 : '';
 
+            // 소속 여부에 따른 뱃지 동적 생성
+            let membershipBadgeHtml = `<span class="badge-premium" style="display:inline-flex; align-items:center; justify-content:center; gap:4px; margin-top:12px; padding:4px 8px; background:#f1f5f9; border-radius:6px; font-size:11px; font-weight:700; color:#64748b;">🛡️ 아카이브 멤버</span>`;
+            
+            if (Boako.state.team && Boako.state.team.info) {
+                const teamName = Boako.state.team.info.team_name;
+                const teamLogo = Boako.state.team.info.logo_url || 'https://via.placeholder.com/16';
+                membershipBadgeHtml = `
+                <span class="badge-premium" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; margin-top:12px; padding:4px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:12px; font-weight:900; color:#1e40af; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                    <img src="${teamLogo}" style="width:16px; height:16px; border-radius:50%; object-fit:cover; border:1px solid #93c5fd;"> 
+                    ${teamName} 멤버
+                </span>`;
+            }
+
             area.innerHTML = `
             <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
                 ${avatarUrl ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
@@ -94,7 +107,7 @@ Boako.Auth = {
                 <button class="btn-edit-small" onclick="(async () => { if (!window.Boako.Shop) await Boako.Util.loadScript('js/shop.js'); Boako.Shop.buyItem('item_ticket_nick'); })()">수정</button>
             </div>
             <div style="margin-top: 8px; display: flex; justify-content: center; gap: 5px;">
-                <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 인벤토리</button>
+                <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 인벤</button>
                 <button class="btn-messenger" onclick="Boako.View.render('messenger')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">📬 쪽지${unreadBadge}</button>
 
                 <div id="team-chat-nav" style="position: relative; display: inline-block;">
@@ -107,8 +120,57 @@ Boako.Auth = {
                     </div>
                 </div>
             </div>
-            <span class="badge-premium" style="display:inline-block; margin-top:8px;">아카이브 멤버</span><br>
+            
+            ${membershipBadgeHtml}
+            
+            <div id="widget-badge-area" style="margin-top: 10px; min-height: 28px; display: flex; justify-content: center; align-items: center; gap: 6px;">
+                <span style="font-size:11px; color:#cbd5e1; font-weight:600;">배지 불러오는 중...</span>
+            </div>
+
             <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
+            
+            // 🌟 HTML을 그린 직후 DB에서 장착 중인 배지를 비동기로 불러와 꽂아 넣습니다.
+            Boako.Auth.loadWidgetBadges();
+        }
+    },
+
+    // 🌟 [신규 추가] 장착한 배지를 불러오는 함수
+    loadWidgetBadges: async () => {
+        if (!Boako.state.user) return;
+        const badgeArea = document.getElementById('widget-badge-area');
+        if (!badgeArea) return;
+
+        try {
+            // 💡 주의: 소장님의 DB 테이블 구조에 따라 'inventory'를 'user_items' 등으로 수정해야 할 수도 있습니다.
+            // 조인 쿼리를 통해 인벤토리와 상점 아이템(아이콘, 이름)을 동시에 가져옵니다.
+            const { data: equippedItems, error } = await Boako.db
+                .from('inventory') // <-- DB의 인벤토리 테이블명에 맞게 확인해 주세요!
+                .select('*, shop_items(name, icon)')
+                .eq('user_id', Boako.state.user.id)
+                .eq('is_equipped', true);
+
+            if (error) throw error;
+
+            if (equippedItems && equippedItems.length > 0) {
+                // 가져온 배지를 HTML로 변환
+                badgeArea.innerHTML = equippedItems.map(item => {
+                    const icon = item.shop_items?.icon || '🏅';
+                    const name = item.shop_items?.name || '배지';
+                    
+                    // 아이콘이 URL 형태(이미지)인지, 단순 이모지인지 판별
+                    if (icon.startsWith('http')) {
+                        return `<img src="${icon}" title="${name}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: help; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">`;
+                    } else {
+                        return `<span title="${name}" style="font-size: 24px; cursor: help; transition: transform 0.2s; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">${icon}</span>`;
+                    }
+                }).join('');
+            } else {
+                // 장착된 배지가 없는 경우
+                badgeArea.innerHTML = `<span style="font-size:11px; color:#cbd5e1; font-weight:600;">장착된 배지 없음</span>`;
+            }
+        } catch (err) {
+            console.error("위젯 배지 로드 오류:", err);
+            badgeArea.innerHTML = `<span style="font-size:11px; color:#ef4444;">로드 실패</span>`;
         }
     },
 
