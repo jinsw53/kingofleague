@@ -1,5 +1,5 @@
 /**
- * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달)
+ * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로)
  */
 Boako.Auth = {
     init: async () => {
@@ -48,7 +48,8 @@ Boako.Auth = {
                 if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
                 if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
 
-                Boako.Auth.();
+                // 🌟 수정된 부분! 🌟
+                Boako.Auth.renderWidget();
 
                 // 🌟 [신규 추가] 신규 로그인 직후에도 BGA 닉네임 설정 안 했으면 모달 띄우기
                 await Boako.Auth.requireBgaNickname();
@@ -61,7 +62,9 @@ Boako.Auth = {
                 if (adminMenu) adminMenu.style.display = 'none';
                 const verifyMenu = document.getElementById('menu-record-verify');
                 if (verifyMenu) verifyMenu.style.display = 'none';
-                Boako.Auth.();
+                
+                // 🌟 수정된 부분! 🌟
+                Boako.Auth.renderWidget();
             }
         });
     },
@@ -69,8 +72,6 @@ Boako.Auth = {
     login: () => Boako.db.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname } }),
     
     logout: async () => { await Boako.db.auth.signOut(); location.reload(); },
-    
-    // 🗑️ (불필요해진 editNick 임시 함수는 소장님의 완벽한 샵 아키텍처를 위해 완전히 제거했습니다!)
 
     renderWidget: () => {
         const area = document.getElementById('login-widget-area');
@@ -144,19 +145,15 @@ Boako.Auth = {
         } catch (err) { console.error(err); }
     },
 
-    // 🌟 [기능 유지] BGA 닉네임 설정 팝업 띄우기 (DB 테이블 조회 방식)
     requireBgaNickname: async () => {
-        // 이미 팝업이 띄워져 있다면 중복 실행 방지
         if (document.getElementById('bga-nick-modal')) return;
 
         try {
-            // DB의 profiles 테이블에서 is_nick_changed 값을 가져와 검사
             const { data: profile } = await Boako.db.from('profiles')
                 .select('is_nick_changed')
                 .eq('id', Boako.state.user.id)
                 .single();
 
-            // 값이 1(수정 완료)이라면 바로 종료 (팝업 안 띄움)
             if (profile && profile.is_nick_changed === 1) return;
 
         } catch (err) {
@@ -194,7 +191,6 @@ Boako.Auth = {
         }
     },
 
-    // 🌟 [기능 유지] BGA 닉네임 저장 및 팝업 닫기
     saveInitialNick: async () => {
         const inputEl = document.getElementById('bga-nick-input');
         const newValue = inputEl.value.trim();
@@ -206,7 +202,6 @@ Boako.Auth = {
         }
 
         try {
-            // DB 업데이트: 닉네임을 변경하고 is_nick_changed 값을 1로 확정
             const { error: updateErr } = await Boako.db.from('profiles').update({ 
                 full_name: newValue,
                 is_nick_changed: 1 
@@ -214,14 +209,11 @@ Boako.Auth = {
 
             if (updateErr) throw new Error(updateErr.message);
             
-            // 로컬 상태 업데이트
             Boako.state.user.nickname = newValue; 
             
-            // 모달 제거
             const modalEl = document.getElementById('bga-nick-modal');
             if (modalEl) modalEl.remove();
             
-            // 화면 새로고침하여 변경 반영
             Boako.Auth.renderWidget();
             Boako.Util.toast("🎉 BGA 닉네임이 완벽하게 연동되었습니다!");
             
