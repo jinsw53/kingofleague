@@ -125,23 +125,28 @@ Boako.Team = {
             }
 
             let listHtml = '';
-            users.forEach(u => {
-                if (u.id === Boako.state.user.id) return; // 나 자신은 제외
-                
-                listHtml += `
-                    <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-indigo-100 transition-all group">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border border-slate-200 flex-shrink-0">
-                                ${u.profile_url ? `<img src="${u.profile_url}" class="w-full h-full object-cover">` : '<span class="text-xl">👤</span>'}
-                            </div>
-                            <span class="font-black text-slate-700 text-sm">${u.full_name}</span>
-                        </div>
-                        <button onclick="Boako.Team.executeInvite('${u.id}', '${u.full_name}')" class="bg-white border border-emerald-500 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm whitespace-nowrap">
-                            💌 스카웃
-                        </button>
-                    </div>
-                `;
-            });
+            // [수정 후 코드]
+users.forEach(u => {
+    if (u.id === Boako.state.user.id) return; // 나 자신은 제외
+    
+    // 🌟 1. 카카오 프사 URL의 http를 https로 강제 변환하는 방어 코드 추가
+    const secureProfileUrl = u.profile_url ? u.profile_url.replace(/^http:\/\//i, 'https://') : null;
+    
+    listHtml += `
+        <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-indigo-100 transition-all group">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border border-slate-200 flex-shrink-0">
+                    <!-- 🌟 2. 변환된 안전한 URL(secureProfileUrl)을 사용 -->
+                    ${secureProfileUrl ? `<img src="${secureProfileUrl}" class="w-full h-full object-cover">` : '<span class="text-xl">👤</span>'}
+                </div>
+                <span class="font-black text-slate-700 text-sm">${u.full_name}</span>
+            </div>
+            <button onclick="Boako.Team.executeInvite('${u.id}', '${u.full_name}')" class="bg-white border border-emerald-500 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm whitespace-nowrap">
+                💌 스카웃
+            </button>
+        </div>
+    `;
+});
 
             if (listHtml === '') {
                 listHtml = `<div class="text-center text-slate-400 text-sm py-8 font-bold">초대 가능한 유저가 없습니다.</div>`;
