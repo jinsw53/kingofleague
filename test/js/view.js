@@ -48,9 +48,23 @@ Boako.View = {
         const area = document.getElementById('main-content-area');
         let html = '';
         
+        // 기존 켜져 있던 메뉴 불 끄기
         document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-        const navBtn = document.getElementById(pageId === 'team' ? 'menu-team' : `menu-${pageId}`);
-        if (navBtn) navBtn.classList.add('active');
+        
+        // 🌟 [핵심 수정] 타겟 메뉴 ID 스마트 지정!
+        let targetMenuId = `menu-${pageId}`;
+        
+        // 인벤토리를 눌렀다면 메뉴바는 '포인트샵(shop)' 위치로 맞춤
+        if (pageId === 'inventory') {
+            targetMenuId = 'menu-shop'; 
+        }
+
+        // 버튼 불 켜고 그 위치로 스르륵 이동!
+        const navBtn = document.getElementById(targetMenuId);
+        if (navBtn) {
+            navBtn.classList.add('active');
+            Boako.Util.scrollToMenu(targetMenuId); // 자동 스크롤 함수 호출
+        }
 
         switch(pageId) {
             case 'ranking':
