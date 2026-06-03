@@ -48,7 +48,7 @@ Boako.Auth = {
                 if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
                 if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
 
-                Boako.Auth.renderWidget();
+                Boako.Auth.();
 
                 // 🌟 [신규 추가] 신규 로그인 직후에도 BGA 닉네임 설정 안 했으면 모달 띄우기
                 await Boako.Auth.requireBgaNickname();
@@ -61,7 +61,7 @@ Boako.Auth = {
                 if (adminMenu) adminMenu.style.display = 'none';
                 const verifyMenu = document.getElementById('menu-record-verify');
                 if (verifyMenu) verifyMenu.style.display = 'none';
-                Boako.Auth.renderWidget();
+                Boako.Auth.();
             }
         });
     },
@@ -80,7 +80,6 @@ Boako.Auth = {
         } else {
             const avatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://');
             
-            // 📩 안 읽은 쪽지 뱃지 HTML 생성
             const unreadBadge = (Boako.Messenger && Boako.Messenger.unreadCount > 0) 
                 ? `<span style="background:#ef4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; margin-left:4px; font-weight:bold;">${Boako.Messenger.unreadCount}</span>` 
                 : '';
@@ -91,18 +90,15 @@ Boako.Auth = {
             </div>
             <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
                 <strong>${user.nickname || '사용자'}</strong>
-                
                 <button class="btn-edit-small" onclick="(async () => { if (!window.Boako.Shop) await Boako.Util.loadScript('js/shop.js'); Boako.Shop.buyItem('item_ticket_nick'); })()">수정</button>
-                
             </div>
             <div style="margin-top: 8px; display: flex; justify-content: center; gap: 5px;">
-                <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 인벤토리</button>
-                
+                <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 인벤</button>
                 <button class="btn-messenger" onclick="Boako.View.render('messenger')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">📬 쪽지${unreadBadge}</button>
 
                 <div id="team-chat-nav" style="position: relative; display: inline-block;">
                     <button class="btn-teamchat" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #c7d2fe; background: #e0e7ff; color: #4f46e5; font-size: 12px; font-weight: 800; transition: all 0.2s;" 
-                            onclick="Boako.View.render('team'); setTimeout(() => { if(Boako.View.switchTeamTab) Boako.View.switchTeamTab('chat'); }, 100); if(Boako.Team && Boako.Team.Chat) Boako.Team.Chat.clearNotification();">
+                            onclick="(async () => { await Boako.View.render('team'); if(Boako.View.switchTeamTab) Boako.View.switchTeamTab('chat'); if(Boako.Team && Boako.Team.Chat) Boako.Team.Chat.clearNotification(); })()">
                         💬 팀쳇
                     </button>
                     <div id="team-chat-badge" class="hidden absolute" style="top: -6px; right: -6px; background: #ef4444; color: white; font-size: 10px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
