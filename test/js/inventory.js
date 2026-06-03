@@ -1,247 +1,271 @@
 /**
- * ==============================================================================
- * [BOAKO INVENTORY SYSTEM - V4.0 FINAL]
- * ==============================================================================
- * 
- * 주요 해결 과제:
- * 1. 타입 불일치 해결: DB의 숫자(1)와 JSONB의 문자열("1") 비교 오류 완벽 차단
- * 2. 데이터 유효성 검사: DB 데이터가 배열이 아닌 경우(null, 숫자 등) 자동 복구
- * 3. 스마트 아이콘: 이미지 URL과 이모지를 자동 판별하여 최적화된 HTML 출력
- * 4. 사용자 피드백: 장착/해제 시 컨펌창(Confirm)을 통한 오클릭 방지
+ * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이)
  */
+Boako.Auth = {
+    init: async () => {
+        Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
-Boako.Inventory = {
+        // 1. 최초 접속 시 정상 로드
+        const { data: { session } } = await Boako.db.auth.getSession();
+        if (session?.user) {
+            Boako.state.user = session.user;
+            if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
+            await Boako.Team.syncStatus();
+            await Boako.Auth.checkAdminMenu();
+            await Boako.Auth.checkLeaderMenu();
 
-    /**
-     * [함수] 아이콘 HTML 생성기
-     * 아이콘 데이터가 이미지 주소인지 이모지인지 판단하여 적절한 태그를 반환합니다.
-     */
-    getIconHTML: function(icon, size) {
-        if (!icon) return `<span style="font-size:${size};">❓</span>`;
+            if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
+            if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
 
-        // 문자열이 'http'로 시작하면 <img> 태그로 생성
-        if (icon.startsWith('http')) {
-            return `<img src="${icon}" style="width:${size}; height:${size}; object-fit:contain; display:block;">`;
-        } 
-        // 그렇지 않으면 일반 텍스트(이모지)로 생성
-        else {
-            return `<span style="font-size:${size}; line-height:1; display:block;">${icon}</span>`;
+            await Boako.Auth.requireBgaNickname();
+        }
+        Boako.Auth.renderWidget();
+        Boako.View.render('main'); 
+
+        // 2. 상태 변화 감지 (탭 복귀 시)
+        Boako.db.auth.onAuthStateChange(async (e, s) => {
+            if (e === 'INITIAL_SESSION') return;
+
+            if (s?.user) {
+                if (e === 'TOKEN_REFRESHED' || (e === 'SIGNED_IN' && Boako.state.user?.id === s.user.id)) {
+                    return; 
+                }
+
+                Boako.state.user = s.user;
+                if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
+                await Boako.Team.syncStatus();
+                await Boako.Auth.checkAdminMenu();
+                await Boako.Auth.checkLeaderMenu();
+                
+                if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
+                if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
+
+                Boako.Auth.renderWidget();
+                await Boako.Auth.requireBgaNickname();
+                
+            } else {
+                Boako.state.user = null;
+                Boako.state.team = null;
+                const adminMenu = document.getElementById('menu-admin-review');
+                if (adminMenu) adminMenu.style.display = 'none';
+                const verifyMenu = document.getElementById('menu-record-verify');
+                if (verifyMenu) verifyMenu.style.display = 'none';
+                
+                Boako.Auth.renderWidget();
+            }
+        });
+    },
+
+    login: () => Boako.db.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname } }),
+    
+    logout: async () => { await Boako.db.auth.signOut(); location.reload(); },
+
+    // 🌟 [수정됨] 로그인 위젯 렌더링 + 팀 멤버 뱃지 + 인벤토리 배지 영역 추가
+    renderWidget: () => {
+        const area = document.getElementById('login-widget-area');
+        const user = Boako.state.user;
+        if (!user) {
+            area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
+        } else {
+            const avatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://');
+            
+            const unreadBadge = (Boako.Messenger && Boako.Messenger.unreadCount > 0) 
+                ? `<span style="background:#ef4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; margin-left:4px; font-weight:bold;">${Boako.Messenger.unreadCount}</span>` 
+                : '';
+
+            // 소속 여부에 따른 팀 뱃지 동적 생성
+            let membershipBadgeHtml = `<span class="badge-premium" style="display:inline-flex; align-items:center; justify-content:center; gap:4px; margin-top:12px; padding:4px 8px; background:#f1f5f9; border-radius:6px; font-size:11px; font-weight:700; color:#64748b;">🛡️ 아카이브 멤버</span>`;
+            
+            if (Boako.state.team && Boako.state.team.info) {
+                const teamName = Boako.state.team.info.team_name;
+                const teamLogo = Boako.state.team.info.logo_url || 'https://via.placeholder.com/16';
+                membershipBadgeHtml = `
+                <span class="badge-premium" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; margin-top:12px; padding:4px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:12px; font-weight:900; color:#1e40af; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                    <img src="${teamLogo}" style="width:16px; height:16px; border-radius:50%; object-fit:cover; border:1px solid #93c5fd;"> 
+                    ${teamName} 멤버
+                </span>`;
+            }
+
+            area.innerHTML = `
+            <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
+                ${avatarUrl ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
+            </div>
+            <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                <strong>${user.nickname || '사용자'}</strong>
+                <button class="btn-edit-small" onclick="(async () => { if (!window.Boako.Shop) await Boako.Util.loadScript('js/shop.js'); Boako.Shop.buyItem('item_ticket_nick'); })()">수정</button>
+            </div>
+            <div style="margin-top: 8px; display: flex; justify-content: center; gap: 5px;">
+                <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 인벤토리</button>
+                <button class="btn-messenger" onclick="Boako.View.render('messenger')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">📬 쪽지${unreadBadge}</button>
+
+                <div id="team-chat-nav" style="position: relative; display: inline-block;">
+                    <button class="btn-teamchat" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #c7d2fe; background: #e0e7ff; color: #4f46e5; font-size: 12px; font-weight: 800; transition: all 0.2s;" 
+                            onclick="(async () => { await Boako.View.render('team'); if(Boako.View.switchTeamTab) Boako.View.switchTeamTab('chat'); if(Boako.Team && Boako.Team.Chat) Boako.Team.Chat.clearNotification(); })()">
+                        💬 팀쳇
+                    </button>
+                    <div id="team-chat-badge" class="hidden absolute" style="top: -6px; right: -6px; background: #ef4444; color: white; font-size: 10px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        N
+                    </div>
+                </div>
+            </div>
+            
+            ${membershipBadgeHtml}
+            
+            <div id="widget-badge-area" style="margin-top: 12px; min-height: 28px; display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;">
+                </div>
+
+            <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
+            
+            // 🌟 HTML 렌더링 직후 DB에서 장착 중인 배지를 비동기로 불러오기
+            Boako.Auth.loadWidgetBadges();
         }
     },
 
-    /**
-     * [함수] 인벤토리 로드 및 전체 렌더링
-     * 프로필의 장착 슬롯과 가방의 아이템 리스트를 화면에 그립니다.
-     */
-    loadItems: async function() {
-        // 로그인 체크
-        if (!Boako.state.user) {
-            console.error("사용자 정보가 없습니다. 로그인을 확인하세요.");
-            return;
-        }
-
-        const badgeArea = document.getElementById('equipped-badges'); // 장착 슬롯 영역
-        const listArea = document.getElementById('inventory-list');   // 가방 목록 영역
+    // 🌟 [신규 추가] 소장님 스키마에 완벽히 맞춘 인벤토리 배지 로드 함수
+    loadWidgetBadges: async () => {
+        if (!Boako.state.user) return;
+        const badgeArea = document.getElementById('widget-badge-area');
+        if (!badgeArea) return;
 
         try {
-            // --- 1단계: 프로필 정보(배지 슬롯) 가져오기 ---
-            const { data: profile, error: pError } = await Boako.db
-                .from('profiles')
-                .select('equipped_badges, unlocked_badge_slots')
+            // inventory 테이블에서 is_equipped가 true인 것만 shop_items와 조인해서 가져옵니다.
+            const { data: equippedItems, error } = await Boako.db
+                .from('inventory')
+                .select('shop_items(name, icon)')
+                .eq('user_id', Boako.state.user.id)
+                .eq('is_equipped', true);
+
+            if (error) throw error;
+
+            if (equippedItems && equippedItems.length > 0) {
+                // 아이콘 타입(이미지 vs 이모지)에 맞춰 HTML 생성
+                badgeArea.innerHTML = equippedItems.map(item => {
+                    const icon = item.shop_items?.icon || '🏅';
+                    const name = item.shop_items?.name || '배지';
+                    
+                    if (icon.startsWith('http')) {
+                        return `<img src="${icon}" title="${name}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: help; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">`;
+                    } else {
+                        return `<span title="${name}" style="font-size: 22px; cursor: help; transition: transform 0.2s; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">${icon}</span>`;
+                    }
+                }).join('');
+            } else {
+                // 장착된 배지가 없는 경우 (공간만 차지하도록 처리하거나 연한 글씨 출력)
+                badgeArea.innerHTML = `<span style="font-size:11px; color:#cbd5e1; font-weight:600;">장착된 배지가 없습니다</span>`;
+            }
+        } catch (err) {
+            console.error("위젯 배지 로드 오류:", err);
+            badgeArea.innerHTML = `<span style="font-size:11px; color:#ef4444;">배지 로드 실패</span>`;
+        }
+    },
+
+    checkAdminMenu: async function() {
+        if (!Boako.state.user) return;
+        try {
+            const { data: profile } = await Boako.db.from('profiles').select('is_admin').eq('id', Boako.state.user.id).single();
+            if (profile && profile.is_admin) {
+                const adminMenu = document.getElementById('menu-admin-review');
+                if (adminMenu) {
+                    adminMenu.style.display = 'list-item'; 
+                    const { count } = await Boako.db.from('view_pending_review_games').select('*', { count: 'exact', head: true });
+                    if (count > 0) { adminMenu.style.background = '#fff1f2'; adminMenu.style.borderLeft = '4px solid #f43f5e'; adminMenu.style.fontWeight = '800'; } 
+                    else { adminMenu.style.background = 'transparent'; adminMenu.style.borderLeft = 'none'; adminMenu.style.fontWeight = 'normal'; }
+                }
+            }
+        } catch (err) { console.error(err); }
+    },
+
+    checkLeaderMenu: async function() {
+        if (!Boako.state.user || !Boako.state.team) return;
+        try {
+            const myTeamName = Boako.state.team.info.team_name;
+            const isLeader = Boako.state.team.type === 'LEADER';
+            const verifyMenu = document.getElementById('menu-record-verify');
+            if (!verifyMenu) return;
+
+            if (!isLeader) { verifyMenu.style.display = 'none'; return; }
+            verifyMenu.style.display = 'list-item';
+
+            const { count } = await Boako.db.from('v_boako_total_records').select('*', { count: 'exact', head: true }).neq('b_all_team', myTeamName).eq('is_verified', 1);
+            if (count > 0) { verifyMenu.style.background = '#fff1f2'; verifyMenu.style.borderLeft = '4px solid #10b981'; verifyMenu.style.fontWeight = '800'; } 
+            else { verifyMenu.style.background = 'transparent'; verifyMenu.style.borderLeft = 'none'; verifyMenu.style.fontWeight = 'normal'; }
+        } catch (err) { console.error(err); }
+    },
+
+    requireBgaNickname: async () => {
+        if (document.getElementById('bga-nick-modal')) return;
+
+        try {
+            const { data: profile } = await Boako.db.from('profiles')
+                .select('is_nick_changed')
                 .eq('id', Boako.state.user.id)
                 .single();
 
-            if (pError) throw pError;
-
-            /**
-             * 🛡️ [타입 세탁기]
-             * DB의 equipped_badges가 ["1"] 형태든 [1] 형태든, 혹은 그냥 숫자 1이든
-             * 무조건 자바스크립트에서 다루기 쉬운 '문자열 배열'로 변환합니다.
-             */
-            let equippedIds = [];
-            if (profile && profile.equipped_badges) {
-                if (Array.isArray(profile.equipped_badges)) {
-                    equippedIds = profile.equipped_badges.map(id => String(id));
-                } else {
-                    // 배열이 아닌 단일 값(숫자 등)이 들어있을 경우 배열로 감싸줌
-                    equippedIds = [String(profile.equipped_badges)];
-                }
-            }
-            
-            // 해금된 슬롯 수 (데이터가 없으면 기본 1개)
-            const maxSlots = profile.unlocked_badge_slots || 1;
-
-            // --- 2단계: 유저 인벤토리 아이템 가져오기 (상점 정보 조인) ---
-            const { data: myItems, error: iError } = await Boako.db
-                .from('inventory')
-                .select(`
-                    id, 
-                    item_id, 
-                    quantity, 
-                    shop_items ( name, icon, item_type )
-                `)
-                .eq('user_id', Boako.state.user.id);
-
-            if (iError) throw iError;
-
-            // 데이터 분류를 위한 바구니 준비
-            const equippedList = []; // 장착된 배지들
-            const bagList = [];      // 가방에 남은 아이템들
-
-            // --- 3단계: 장착 여부에 따른 리스트 분류 ---
-            (myItems || []).forEach(row => {
-                const info = row.shop_items;
-                if (!info) return; // 상점 정보가 없는 데이터는 패스
-
-                const itemData = { 
-                    inv_id: String(row.id), // 비교를 위해 ID를 문자열로 통일
-                    name: info.name, 
-                    icon: info.icon, 
-                    type: info.item_type,
-                    quantity: row.quantity 
-                };
-
-                // 프로필 장착 배열에 내 인벤토리 고유 ID가 들어있는지 확인
-                if (equippedIds.includes(itemData.inv_id)) {
-                    equippedList.push(itemData);
-                } else {
-                    bagList.push(itemData);
-                }
-            });
-
-            // --- 4단계: 장착 슬롯 화면 그리기 ---
-            let badgeHTML = `
-                <div style="margin-bottom:15px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
-                    <p style="font-size:13px; color:#475569; font-weight:800;">
-                        🛡️ 장착된 배지 <span style="color:#10b981;">(${equippedList.length}/${maxSlots})</span>
-                    </p>
-                </div>
-                <div style="display:flex; flex-wrap:wrap; gap:12px; min-height:60px; align-items:center;">
-            `;
-
-            if (equippedList.length === 0) {
-                badgeHTML += `<p style="color:#cbd5e1; font-size:13px; padding-left:5px;">장착된 배지가 없습니다.</p>`;
-            } else {
-                badgeHTML += equippedList.map(b => `
-                    <div onclick="Boako.Inventory.unequip('${b.inv_id}')" 
-                         style="background:white; border:2px solid #10b981; border-radius:50px; padding:8px 18px; display:flex; align-items:center; gap:10px; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); transition:transform 0.2s;"
-                         onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                        ${this.getIconHTML(b.icon, '22px')}
-                        <span style="font-weight:800; font-size:14px; color:#064e3b;">${b.name}</span>
-                    </div>
-                `).join('');
-            }
-            badgeHTML += `</div>`;
-            badgeArea.innerHTML = badgeHTML;
-
-            // --- 5단계: 가방 아이템 목록 그리기 ---
-            if (bagList.length === 0) {
-                listArea.innerHTML = `
-                    <div style="text-align:center; padding:60px 0; color:#94a3b8;">
-                        <div style="font-size:40px; margin-bottom:10px;">🎒</div>
-                        <p>가방이 비어 있습니다.</p>
-                    </div>
-                `;
-            } else {
-                let bagHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:16px;">`;
-                bagHTML += bagList.map(item => `
-                    <div style="background:white; border:1px solid #e2e8f0; border-radius:16px; padding:20px 10px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                        <div style="height:60px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; position:relative;">
-                            ${this.getIconHTML(item.icon, '48px')}
-                            ${item.quantity > 1 ? `
-                                <span style="position:absolute; bottom:0; right:15%; background:#ef4444; color:white; font-size:11px; font-weight:900; padding:2px 7px; border-radius:10px; border:2px solid white;">
-                                    x${item.quantity}
-                                </span>
-                            ` : ''}
-                        </div>
-                        <div style="font-size:13px; font-weight:800; color:#1e293b; margin-bottom:15px; height:36px; display:flex; align-items:center; justify-content:center; word-break:keep-all; padding:0 5px;">
-                            ${item.name}
-                        </div>
-                        <button style="width:100%; padding:9px; font-size:12px; font-weight:800; background:${item.type === 'BADGE' ? '#10b981' : '#f59e0b'}; color:white; border:none; border-radius:8px; cursor:pointer;"
-                                onclick="Boako.Inventory.useItem('${item.inv_id}', '${item.type}')">
-                            ${item.type === 'BADGE' ? '장착하기' : '사용하기'}
-                        </button>
-                    </div>
-                `).join('');
-                bagHTML += `</div>`;
-                listArea.innerHTML = bagHTML;
-            }
+            if (profile && profile.is_nick_changed === 1) return;
 
         } catch (err) {
-            console.error("인벤토리 로딩 오류:", err);
-            badgeArea.innerHTML = "데이터 연동 중 오류 발생";
+            console.error("닉네임 변경 여부 확인 실패:", err);
+        }
+
+        const modalHtml = `
+            <div id="bga-nick-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 transition-opacity">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden scale-100 transform transition-transform">
+                    <div class="bg-indigo-600 p-6 text-center relative">
+                        <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                            <i data-lucide="gamepad-2" class="w-8 h-8 text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-black text-white">BGA 닉네임 설정</h3>
+                        <p class="text-indigo-100 text-xs mt-2 font-bold">리그 기록 연동을 위해 꼭 필요합니다!</p>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-slate-600 text-sm mb-5 font-bold text-center leading-relaxed">
+                            현재 보드게임 아레나에서 사용 중인<br><span class="text-red-500 underline decoration-red-200 underline-offset-4">정확한 닉네임</span>을 입력해 주세요.
+                        </p>
+                        <input type="text" id="bga-nick-input" value="${Boako.state.user.nickname || ''}" placeholder="대소문자 구별하여 정확히 입력" class="w-full border-2 border-slate-200 rounded-xl p-3.5 text-center font-black text-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all mb-5 placeholder:text-sm placeholder:font-normal">
+                        
+                        <button onclick="Boako.Auth.saveInitialNick()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-4 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                            <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i> 확인 및 설정 완료
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
         }
     },
 
-    /**
-     * [함수] 아이템 사용 및 장착 처리
-     */
-    useItem: async function(inventoryId, itemType) {
-        if (itemType !== 'BADGE') {
-            alert("소모성 아이템은 현재 사용할 수 없습니다.");
+    saveInitialNick: async () => {
+        const inputEl = document.getElementById('bga-nick-input');
+        const newValue = inputEl.value.trim();
+        
+        if (!newValue) {
+            Boako.Util.toast("닉네임을 입력해 주세요!");
+            inputEl.focus();
             return;
         }
 
-        // 🌟 확인 창 띄우기
-        if (!confirm("이 배지를 장착하시겠습니까?")) return;
-
         try {
-            // 최신 슬롯 정보 조회
-            const { data: profile } = await Boako.db.from('profiles').select('equipped_badges, unlocked_badge_slots').eq('id', Boako.state.user.id).single();
+            const { error: updateErr } = await Boako.db.from('profiles').update({ 
+                full_name: newValue,
+                is_nick_changed: 1 
+            }).eq('id', Boako.state.user.id);
+
+            if (updateErr) throw new Error(updateErr.message);
             
-            let equipped = Array.isArray(profile.equipped_badges) ? profile.equipped_badges : [];
-            const maxSlots = profile.unlocked_badge_slots || 1;
-
-            // 슬롯 초과 체크
-            if (equipped.length >= maxSlots) {
-                alert(`장착 슬롯이 부족합니다! (현재 최대 ${maxSlots}개)`);
-                return;
-            }
-
-            // 중복 장착 방지 (이미 배열에 있다면 무시)
-            if (equipped.map(id => String(id)).includes(String(inventoryId))) return;
-
-            // 새로운 장착 목록 생성 (기존 목록 + 신규 ID)
-            const newEquipped = [...equipped, String(inventoryId)];
+            Boako.state.user.nickname = newValue; 
             
-            // 1. 프로필 테이블 업데이트 (JSONB 배열 갱신)
-            await Boako.db.from('profiles').update({ equipped_badges: newEquipped }).eq('id', Boako.state.user.id);
+            const modalEl = document.getElementById('bga-nick-modal');
+            if (modalEl) modalEl.remove();
             
-            // 2. 인벤토리 테이블 업데이트 (TRUE로 변경)
-            await Boako.db.from('inventory').update({ is_equipped: true }).eq('id', inventoryId);
-
-            this.loadItems(); // 화면 새로고침
-
+            Boako.Auth.renderWidget();
+            Boako.Util.toast("🎉 BGA 닉네임이 완벽하게 연동되었습니다!");
+            
         } catch (err) {
-            console.error("장착 중 오류:", err);
-            alert("장착 처리에 실패했습니다.");
-        }
-    },
-
-    /**
-     * [함수] 배지 해제 처리
-     */
-    unequip: async function(inventoryId) {
-        if (!confirm("이 배지를 장착 해제하시겠습니까?")) return;
-
-        try {
-            const { data: profile } = await Boako.db.from('profiles').select('equipped_badges').eq('id', Boako.state.user.id).single();
-            let equipped = Array.isArray(profile.equipped_badges) ? profile.equipped_badges : [];
-
-            // 배열에서 해당 ID만 제외 (필터링)
-            const newEquipped = equipped.filter(id => String(id) !== String(inventoryId));
-
-            // 1. 프로필 테이블 업데이트 (JSONB 배열 갱신)
-            await Boako.db.from('profiles').update({ equipped_badges: newEquipped }).eq('id', Boako.state.user.id);
-            
-            // 2. 인벤토리 테이블 업데이트 (FALSE로 변경)
-            await Boako.db.from('inventory').update({ is_equipped: false }).eq('id', inventoryId);
-
-            this.loadItems(); // 화면 새로고침
-
-        } catch (err) {
-            console.error("해제 중 오류:", err);
-            alert("해제 처리에 실패했습니다.");
+            Boako.Util.toast("수정 실패: " + err.message);
         }
     }
 };
