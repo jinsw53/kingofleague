@@ -242,24 +242,45 @@ users.forEach(u => {
         if (!contentArea) return;
 
         try {
-            // 1. 현재 시즌 정보 가져오기 (Boako.state.team.info 등에서 시즌 번호를 가져와야 합니다)
-            // 여기서는 일단 DB에서 최신 시즌 번호를 먼저 확인하도록 했습니다.
-            const { data: currentSeason } = await Boako.db
+            // 1. 현재 날짜 기준 진행 중인 시즌 조회
+            const { data: currentSeason, error: seasonError } = await Boako.db
                 .from('seasons')
                 .select('season_no')
-                .order('start_date', { ascending: false })
-                .limit(1)
-                .single();
+                .lte('start_date', new Date().toISOString())
+                .gte('end_date', new Date().toISOString())
+                .maybeSingle();
 
-            const seasonNo = currentSeason ? currentSeason.season_no : 1; // 기본값 1
-            console.log("현재 적용된 시즌 번호:", seasonNo); // <--- 이 로그가 제대로 찍히는지 확인
-            
-            // 2. grandprix_games 테이블에서 해당 시즌의 게임 목록 가져오기
+            // 2. [수정] 비시즌일 경우 무조건 1번을 주는 대신, 가장 최근에 종료된 시즌을 찾음
+            let seasonNo;
+            if (currentSeason) {
+                seasonNo = currentSeason.season_no;
+            } else {
+                // 오늘 날짜 이전인 것 중 가장 마지막 시즌을 가져옴
+                const { data: lastSeason } = await Boako.db
+                    .from('seasons')
+                    .select('season_no')
+                    .lt('end_date', new Date().toISOString())
+                    .order('end_date', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                
+                seasonNo = lastSeason ? lastSeason.season_no : null;
+            }
+
+            // 3. 만약 시즌 정보가 끝내 없다면 (DB가 비었거나 초기 상태)
+            if (!seasonNo) {
+                contentArea.innerHTML = `<div class="text-center py-12 text-slate-500 font-bold">현재 진행 중인 시즌이 없으며, 이전 시즌 데이터도 존재하지 않습니다.</div>`;
+                return;
+            }
+
+            console.log("적용된 시즌 번호:", seasonNo);
+
+            // 4. 게임 목록 호출 (이후 동일)
             const { data: games, error } = await Boako.db
                 .from('grandprix_games')
                 .select('id, game_name, game_logo_url')
                 .eq('season_no', seasonNo)
-                .order('selection_rank', { ascending: true }); // 랭킹 순으로 정렬
+                .order('selection_rank', { ascending: true });
 
             if (error) throw error;
 
