@@ -300,11 +300,10 @@ switch(seasonStatus.current_phase) {
                             </div>
 
                             <div id="tab-record" class="team-tab-content hidden animate-in fade-in duration-300 pt-4">
-                                <div class="flex flex-col items-center justify-center text-slate-400 font-bold py-20 gap-3 border border-dashed border-slate-300 rounded-xl bg-slate-50">
-                                    <span class="text-2xl">🚧</span>
-                                    <p>팀 기록 및 일정 관리 기능은 준비 중입니다.</p>
-                                </div>
+                                ${recordTabHtml}
                             </div>
+
+                        </div>
 
                         </div>
                     </section>
