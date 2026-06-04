@@ -236,41 +236,52 @@ users.forEach(u => {
         setTimeout(() => { Boako.Team.loadBanCandidates(); }, 500); 
     },
 
-    // 🌟 [추가 2] 팝업창 내부에 12개 후보 종목 리스트 렌더링
+    // 🌟 팝업창 내부에 실제 DB 데이터를 불러와 렌더링 (구조 수정 완료)
     loadBanCandidates: async () => {
         const contentArea = document.getElementById('ban-vote-content');
         if (!contentArea) return;
 
         try {
-            const { data: candidates, error } = await Boako.db
-                .from('grandprix_candidates')
-                .select('*')
-                .order('id', { ascending: true });
+            // 1. 현재 시즌 정보 가져오기 (Boako.state.team.info 등에서 시즌 번호를 가져와야 합니다)
+            // 여기서는 일단 DB에서 최신 시즌 번호를 먼저 확인하도록 했습니다.
+            const { data: currentSeason } = await Boako.db
+                .from('seasons')
+                .select('season_no')
+                .order('start_date', { ascending: false })
+                .limit(1)
+                .single();
+
+            const seasonNo = currentSeason ? currentSeason.season_no : 1; // 기본값 1
+
+            // 2. grandprix_games 테이블에서 해당 시즌의 게임 목록 가져오기
+            const { data: games, error } = await Boako.db
+                .from('grandprix_games')
+                .select('id, game_name, game_logo_url')
+                .eq('season_no', seasonNo)
+                .order('selection_rank', { ascending: true }); // 랭킹 순으로 정렬
 
             if (error) throw error;
 
-            if (!candidates || candidates.length === 0) {
-                contentArea.innerHTML = `<div class="text-center py-12 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl">아직 집계된 후보 종목이 없습니다.</div>`;
+            if (!games || games.length === 0) {
+                contentArea.innerHTML = `<div class="text-center py-12 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl">이번 시즌 등록된 후보 종목이 없습니다.</div>`;
                 return;
             }
 
-            // 12개 종목 투표 카드 UI 생성 (그리드 레이아웃)
+            // 3. 카드 UI 렌더링
             let html = `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
             
-            candidates.forEach(game => {
+            games.forEach(game => {
                 html += `
                     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col group">
-                        <div class="aspect-square bg-slate-100 flex items-center justify-center relative overflow-hidden">
-                            ${game.image_url 
-                                ? `<img src="${game.image_url}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">` 
+                        <div class="aspect-square bg-slate-100 flex items-center justify-center relative overflow-hidden border-b border-slate-100">
+                            ${game.game_logo_url 
+                                ? `<img src="${game.game_logo_url}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">` 
                                 : `<span class="text-5xl drop-shadow-md">🎲</span>`
                             }
-                            <div class="absolute inset-0 bg-red-600/0 group-hover:bg-red-600/10 transition-colors pointer-events-none"></div>
                         </div>
                         
                         <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3">
                             <h4 class="font-black text-slate-700 text-sm break-keep leading-tight">${game.game_name}</h4>
-                            
                             <button onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')" 
                                     class="w-full bg-slate-50 hover:bg-red-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 hover:border-red-600 shadow-sm active:scale-95">
                                 🚫 이 종목 밴(Ban)
