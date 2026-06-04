@@ -305,7 +305,6 @@ switch(seasonStatus.current_phase) {
 
                         </div>
 
-                        </div>
                     </section>
                     `;
 
