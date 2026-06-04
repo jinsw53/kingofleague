@@ -203,7 +203,100 @@ users.forEach(u => {
             .eq('team_id', Boako.state.team.info.id).eq('player_name', Boako.state.user.nickname).eq('is_active', true);
         location.reload();
     },
+// 🌟 [추가 1] 밴(Ban) 투표소 팝업 열기
+    openBanVote: async () => {
+        const existingModal = document.getElementById('ban-vote-modal');
+        if (existingModal) existingModal.remove();
 
+        const modalHtml = `
+            <div id="ban-vote-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onclick="if(event.target === this) this.remove()">
+                <!-- 팝업창 크기를 max-w-3xl로 넉넉하게 키워서 12개 카드가 예쁘게 들어가게 함 -->
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col" style="max-height: 90vh;">
+                    
+                    <div class="bg-red-600 px-6 py-4 flex justify-between items-center text-white">
+                        <div>
+                            <h2 class="text-xl font-black flex items-center gap-2"><span class="text-2xl">🚫</span> 대항전 밴(Ban) 투표소</h2>
+                            <p class="text-red-100 text-sm font-bold mt-1">우리 팀을 대표하여 밴할 종목을 선택하세요.</p>
+                        </div>
+                        <button onclick="document.getElementById('ban-vote-modal').remove()" class="text-white hover:text-red-200 font-bold text-3xl transition-colors leading-none">&times;</button>
+                    </div>
+
+                    <div id="ban-vote-content" class="p-6 overflow-y-auto flex-1 bg-slate-50 custom-scrollbar">
+                        <div class="text-center py-12">
+                            <span class="text-4xl inline-block animate-bounce mb-3">⏳</span>
+                            <h3 class="text-lg font-bold text-slate-600">투표 가능한 후보 종목을 불러오는 중...</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // 팝업 띄운 직후, 0.5초 뒤에 12개 리스트 렌더링 함수 자동 실행!
+        setTimeout(() => { Boako.Team.loadBanCandidates(); }, 500); 
+    },
+
+    // 🌟 [추가 2] 팝업창 내부에 12개 후보 종목 리스트 렌더링
+    loadBanCandidates: async () => {
+        const contentArea = document.getElementById('ban-vote-content');
+        if (!contentArea) return;
+
+        try {
+            const { data: candidates, error } = await Boako.db
+                .from('grandprix_candidates')
+                .select('*')
+                .order('id', { ascending: true });
+
+            if (error) throw error;
+
+            if (!candidates || candidates.length === 0) {
+                contentArea.innerHTML = `<div class="text-center py-12 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl">아직 집계된 후보 종목이 없습니다.</div>`;
+                return;
+            }
+
+            // 12개 종목 투표 카드 UI 생성 (그리드 레이아웃)
+            let html = `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
+            
+            candidates.forEach(game => {
+                html += `
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col group">
+                        <div class="aspect-square bg-slate-100 flex items-center justify-center relative overflow-hidden">
+                            ${game.image_url 
+                                ? `<img src="${game.image_url}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">` 
+                                : `<span class="text-5xl drop-shadow-md">🎲</span>`
+                            }
+                            <div class="absolute inset-0 bg-red-600/0 group-hover:bg-red-600/10 transition-colors pointer-events-none"></div>
+                        </div>
+                        
+                        <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3">
+                            <h4 class="font-black text-slate-700 text-sm break-keep leading-tight">${game.game_name}</h4>
+                            
+                            <button onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')" 
+                                    class="w-full bg-slate-50 hover:bg-red-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 hover:border-red-600 shadow-sm active:scale-95">
+                                🚫 이 종목 밴(Ban)
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            contentArea.innerHTML = html;
+
+        } catch (err) {
+            console.error("후보 로드 실패:", err);
+            contentArea.innerHTML = `<div class="text-center py-12 text-red-500 font-bold">데이터를 불러오지 못했습니다.</div>`;
+        }
+    },
+
+    // 🌟 [추가 3] 실제 투표 버튼을 눌렀을 때 작동할 함수 뼈대
+    submitBanVote: async (gameId, gameName) => {
+        const confirmVote = confirm(`정말 [${gameName}] 종목을 밴(Ban) 하시겠습니까?\n한 번 투표하면 번복할 수 없습니다.`);
+        
+        if (confirmVote) {
+            alert(`[${gameName}] 밴 투표가 접수되었습니다! (DB 연결 대기 중)`);
+            document.getElementById('ban-vote-modal').remove();
+        }
+    },
     // 🌟 팀 채팅 전용 모듈
     Chat: {
         channel: null,
