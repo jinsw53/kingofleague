@@ -252,7 +252,8 @@ users.forEach(u => {
                 .single();
 
             const seasonNo = currentSeason ? currentSeason.season_no : 1; // 기본값 1
-
+            console.log("현재 적용된 시즌 번호:", seasonNo); // <--- 이 로그가 제대로 찍히는지 확인
+            
             // 2. grandprix_games 테이블에서 해당 시즌의 게임 목록 가져오기
             const { data: games, error } = await Boako.db
                 .from('grandprix_games')
