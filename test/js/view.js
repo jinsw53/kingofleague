@@ -177,6 +177,53 @@ Boako.View = {
         if (members) {
             members.sort((a, b) => (a.role === 'LEADER' ? -1 : 1));
         }
+                    // [추가] 🌟 대항전 시즌 상태 DB에서 가져오기
+let seasonStatus = { current_phase: 0, title: '비시즌', day_count: 0 };
+try {
+    const { data } = await Boako.db.rpc('get_current_season_status');
+    if (data) seasonStatus = data;
+} catch (e) { 
+    console.error("시즌 상태 로드 실패:", e); 
+}
+
+// [추가] 🌟 페이즈(Phase)에 따른 '기록 및 일정 탭' UI 동적 생성
+let recordTabHtml = '';
+switch(seasonStatus.current_phase) {
+    case 1: // 준비기 (1~44일)
+        recordTabHtml = `
+            <div class="flex flex-col items-center justify-center text-slate-600 py-16 gap-4 border border-slate-200 rounded-xl bg-white shadow-sm">
+                <span class="text-4xl">⚔️</span>
+                <h3 class="text-xl font-black">${seasonStatus.title} 준비 기간</h3>
+                <p class="font-bold text-slate-400">후보 종목 선발을 위한 데이터가 집계 중입니다. (현재 ${seasonStatus.day_count}일 차)</p>
+                <button onclick="Boako.View.render('match')" class="mt-2 bg-indigo-50 text-indigo-600 px-6 py-2 rounded-lg font-bold hover:bg-indigo-100 transition-colors">실시간 랭킹 보러가기</button>
+            </div>`;
+        break;
+    case 2: // 밴 투표 기간 (45~51일)
+        recordTabHtml = `
+            <div class="flex flex-col items-center justify-center text-slate-600 py-16 gap-4 border border-red-200 rounded-xl bg-red-50 shadow-sm">
+                <span class="text-4xl">🚫</span>
+                <h3 class="text-xl font-black text-red-600">${seasonStatus.title} 밴(Ban) 투표 진행 중</h3>
+                <p class="font-bold text-red-400">우리 팀의 밴 투표 권한을 행사하세요! (마감까지 D-${52 - seasonStatus.day_count}일)</p>
+                <button onclick="Boako.Team.openBanVote()" class="mt-2 bg-red-600 text-white px-8 py-3 rounded-xl font-black shadow-md hover:bg-red-700 transition-colors hover:-translate-y-1">투표소 입장하기</button>
+            </div>`;
+        break;
+    case 3: // 엔트리 등록 기간 (52~59일)
+        recordTabHtml = `
+            <div class="flex flex-col items-center justify-center text-slate-600 py-16 gap-4 border border-emerald-200 rounded-xl bg-emerald-50 shadow-sm">
+                <span class="text-4xl">📝</span>
+                <h3 class="text-xl font-black text-emerald-700">${seasonStatus.title} 출전 엔트리 마감 임박</h3>
+                <p class="font-bold text-emerald-500">최종 확정된 종목에 출전할 선수를 등록하세요. (마감까지 D-${60 - seasonStatus.day_count}일)</p>
+                <button onclick="Boako.Team.openEntryForm()" class="mt-2 bg-emerald-600 text-white px-8 py-3 rounded-xl font-black shadow-md hover:bg-emerald-700 transition-colors hover:-translate-y-1">엔트리 작전판 열기</button>
+            </div>`;
+        break;
+    default: // 비시즌 (60일~)
+        recordTabHtml = `
+            <div class="flex flex-col items-center justify-center text-slate-400 font-bold py-20 gap-3 border border-dashed border-slate-300 rounded-xl bg-slate-50">
+                <span class="text-2xl">🏆</span>
+                <p>현재 진행 중인 대항전 일정이 없습니다. (비시즌)</p>
+            </div>`;
+        break;
+}
                     // 🌟 탭이 포함된 팀 레이아웃으로 변경
                     html = `
                     <div class="main-banner" style="margin-bottom: 20px;">
