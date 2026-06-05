@@ -242,20 +242,18 @@ users.forEach(u => {
         if (!contentArea) return;
 
         try {
-            // 1. 현재 날짜 기준 진행 중인 시즌 조회
-            const { data: currentSeason, error: seasonError } = await Boako.db
+            // 1. 시즌 번호 가져오기 (기존 동일)
+            const { data: currentSeason } = await Boako.db
                 .from('seasons')
                 .select('season_no')
                 .lte('start_date', new Date().toISOString())
                 .gte('end_date', new Date().toISOString())
                 .maybeSingle();
 
-            // 2. [수정] 비시즌일 경우 무조건 1번을 주는 대신, 가장 최근에 종료된 시즌을 찾음
             let seasonNo;
             if (currentSeason) {
                 seasonNo = currentSeason.season_no;
             } else {
-                // 오늘 날짜 이전인 것 중 가장 마지막 시즌을 가져옴
                 const { data: lastSeason } = await Boako.db
                     .from('seasons')
                     .select('season_no')
@@ -267,15 +265,22 @@ users.forEach(u => {
                 seasonNo = lastSeason ? lastSeason.season_no : null;
             }
 
-            // 3. 만약 시즌 정보가 끝내 없다면 (DB가 비었거나 초기 상태)
             if (!seasonNo) {
                 contentArea.innerHTML = `<div class="text-center py-12 text-slate-500 font-bold">현재 진행 중인 시즌이 없으며, 이전 시즌 데이터도 존재하지 않습니다.</div>`;
                 return;
             }
 
-            console.log("적용된 시즌 번호:", seasonNo);
+            // 🌟 2. [추가됨] 투표 내역(grandprix_ban_votes)에서 내 투표 불러오기
+            const { data: myVote } = await Boako.db
+                .from('grandprix_ban_votes')
+                .select('banned_game_name')
+                .eq('season_no', seasonNo)
+                .eq('voter_name', Boako.state.user.nickname)
+                .maybeSingle();
+            
+            const myBannedGame = myVote ? myVote.banned_game_name : null;
 
-            // 4. 게임 목록 호출 (이후 동일)
+            // 3. 게임 목록 호출
             const { data: games, error } = await Boako.db
                 .from('grandprix_games')
                 .select('id, game_name, game_logo_url')
@@ -289,24 +294,57 @@ users.forEach(u => {
                 return;
             }
 
-            // 3. 카드 UI 렌더링
-            let html = `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
+            // 4. UI 렌더링
+            let html = ``;
+            
+            // 🌟 상단에 내 밴 내역 표시 배너 추가
+            if (myBannedGame) {
+                html += `
+                    <div class="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl text-center shadow-sm flex items-center justify-center gap-2">
+                        <span class="text-red-600 font-bold text-sm">내가 현재 밴(Ban)한 종목:</span>
+                        <span class="text-red-900 font-black text-lg">🚫 ${myBannedGame}</span>
+                    </div>`;
+            } else {
+                html += `
+                    <div class="mb-5 p-4 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-500 font-bold text-sm shadow-sm">
+                        아직 밴(Ban)한 종목이 없습니다. 신중하게 선택해 주세요.
+                    </div>`;
+            }
+
+            html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
             
             games.forEach(game => {
+                // 이 게임이 내가 밴한 게임인지 체크
+                const isMyBan = myBannedGame === game.game_name;
+                
+                // 🌟 카드 디자인: 내가 밴한 게임은 테두리를 빨갛게 칠하고 버튼 스타일 변경
+                const cardClass = isMyBan 
+                    ? 'bg-red-50 border-2 border-red-500 ring-4 ring-red-100 shadow-md transform scale-[1.02]' 
+                    : 'bg-white border border-slate-200 shadow-sm hover:shadow-md';
+                
+                const btnClass = isMyBan 
+                    ? 'w-full bg-red-600 text-white text-xs font-bold py-2.5 rounded-lg transition-all shadow-sm'
+                    : 'w-full bg-slate-50 hover:bg-red-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 hover:border-red-600 shadow-sm active:scale-95';
+                
+                const btnText = isMyBan ? '✅ 현재 밴 적용됨' : '🚫 이 종목 밴(Ban)';
+                
+                // 🌟 이미지 잘림 해결: object-cover를 object-contain으로 바꾸고 패딩(p-3) 부여
+                const imgClass = 'w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-300';
+
                 html += `
-                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col group">
-                        <div class="aspect-square bg-slate-100 flex items-center justify-center relative overflow-hidden border-b border-slate-100">
+                    <div class="rounded-xl overflow-hidden transition-all flex flex-col group ${cardClass}">
+                        <div class="aspect-square flex items-center justify-center relative overflow-hidden border-b ${isMyBan ? 'border-red-200 bg-white' : 'border-slate-100 bg-slate-100'}">
                             ${game.game_logo_url 
-                                ? `<img src="${game.game_logo_url}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">` 
+                                ? `<img src="${game.game_logo_url}" class="${imgClass}">` 
                                 : `<span class="text-5xl drop-shadow-md">🎲</span>`
                             }
                         </div>
                         
                         <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3">
-                            <h4 class="font-black text-slate-700 text-sm break-keep leading-tight">${game.game_name}</h4>
+                            <h4 class="font-black ${isMyBan ? 'text-red-700' : 'text-slate-700'} text-sm break-keep leading-tight">${game.game_name}</h4>
                             <button onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')" 
-                                    class="w-full bg-slate-50 hover:bg-red-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 hover:border-red-600 shadow-sm active:scale-95">
-                                🚫 이 종목 밴(Ban)
+                                    class="${btnClass}">
+                                ${btnText}
                             </button>
                         </div>
                     </div>
@@ -339,8 +377,7 @@ users.forEach(u => {
                 // 투표 성공 시 팝업 닫기 및 알림
                 Boako.Util.toast(`[${gameName}] 밴 투표가 성공적으로 완료되었습니다!`);
                 
-                const modal = document.getElementById('ban-vote-modal');
-                if (modal) modal.remove();
+                Boako.Team.loadBanCandidates();
                 
             } catch (err) {
                 console.error("투표 에러:", err);
