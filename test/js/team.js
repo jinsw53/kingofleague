@@ -236,7 +236,7 @@ users.forEach(u => {
         setTimeout(() => { Boako.Team.loadBanCandidates(); }, 500); 
     },
 
-    // 🌟 팝업창 내부에 실제 DB 데이터를 불러와 렌더링
+   // 🌟 팝업창 내부에 실제 DB 데이터를 불러와 렌더링
     loadBanCandidates: async () => {
         const contentArea = document.getElementById('ban-vote-content');
         if (!contentArea) return;
@@ -268,29 +268,41 @@ users.forEach(u => {
                 return;
             }
 
-            // 2. 우리 팀 전체의 투표 내역 가져오기
+            // 🌟 2. 투표 내역 가져오기 (DB 외래키 Join 활용!)
             const teamName = Boako.state.team.info.team_name;
-            const leaderName = Boako.state.team.info.leader_name;
             const myName = Boako.state.user.nickname;
             const isLeader = Boako.state.team.type === 'LEADER';
 
+            // 💡 Supabase의 릴레이션 기능을 이용해 teams 테이블의 leader_name을 한 번에 가져옵니다.
             const { data: teamVotes, error: voteError } = await Boako.db
                 .from('grandprix_ban_votes')
-                .select('banned_game_name, voter_name, updated_at')
+                .select(`
+                    banned_game_name, 
+                    voter_name, 
+                    updated_at,
+                    teams ( leader_name )
+                `)
                 .eq('season_no', seasonNo)
                 .eq('team_name', teamName);
 
-            // =====================================================================
-            // 🚨 [복구된 부분] 변수 선언 및 투표 데이터 계산 반복문 (여기가 빠져있었습니다!)
+            if (voteError) throw voteError;
+
+            // 3. 현재 밴 종목 시뮬레이션
             let myBannedGame = null;
             let leaderVotedGame = null;
             const voteCounts = {}; 
             const firstVoteTimes = {}; 
 
             (teamVotes || []).forEach(v => {
+                // 내 투표 확인
                 if (v.voter_name === myName) myBannedGame = v.banned_game_name;
-                if (v.voter_name === leaderName) leaderVotedGame = v.banned_game_name;
+                
+                // 🌟 핵심: DB에서 연결된 팀장(teams.leader_name)과 투표자(voter_name)가 같으면 무조건 팀장 투표!
+                if (v.teams && v.voter_name === v.teams.leader_name) {
+                    leaderVotedGame = v.banned_game_name;
+                }
 
+                // 표 집계
                 if (!voteCounts[v.banned_game_name]) {
                     voteCounts[v.banned_game_name] = 0;
                     firstVoteTimes[v.banned_game_name] = new Date(v.updated_at).getTime();
@@ -302,18 +314,17 @@ users.forEach(u => {
                     firstVoteTimes[v.banned_game_name] = vTime;
                 }
             });
-            // =====================================================================
 
-            // 🌟 3. 현재 밴 종목 시뮬레이션 (팀장 우선순위 강제 적용)
+            // 🌟 4. 승자 가리기 로직 (팀장 권한 절대적 1순위)
             let leadingGame = null;
             let leadingReason = ''; 
             
-            // 팀장 투표가 있다면, 다른 모든 다수결/선착순 계산을 무시하고 무조건 팀장 픽을 1위로 올림
+            // 팀장 투표가 있다면, 다른 모든 표를 묵살하고 1위로 강제 확정!
             if (leaderVotedGame) {
                 leadingGame = leaderVotedGame;
                 leadingReason = 'LEADER';
             } else if (Object.keys(voteCounts).length > 0) {
-                // 팀장 투표가 없을 때만 다수결/선착순 로직 실행
+                // 팀장 투표가 없을 때만 다수결/선착순 룰 적용
                 let maxCount = 0;
                 let earliestTime = Infinity;
 
@@ -333,9 +344,7 @@ users.forEach(u => {
                 }
             }
 
-            // 4. 게임 목록 호출 (이하 코드 동일)
-
-            // 4. 게임 목록 호출
+            // 5. 게임 목록 호출
             const { data: games, error } = await Boako.db
                 .from('grandprix_games')
                 .select('id, game_name, game_logo_url')
@@ -349,10 +358,10 @@ users.forEach(u => {
                 return;
             }
 
-            // 🌟 5. UI 렌더링
+            // 🌟 6. UI 렌더링 (락다운 로직 포함)
             let html = ``;
-            const hasIVoted = myBannedGame !== null; // 내가 투표를 했는지 여부
-            const isBanConfirmed = leadingReason === 'LEADER'; // 🌟 팀장이 밴을 확정했는지 여부
+            const hasIVoted = myBannedGame !== null; 
+            const isBanConfirmed = leadingReason === 'LEADER'; // 팀장이 확정했는가?
             
             // 상단 전광판 브리핑
             if (isBanConfirmed) {
@@ -372,7 +381,7 @@ users.forEach(u => {
             } else {
                 html += `
                     <div class="mb-5 p-4 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-500 font-bold text-sm shadow-sm">
-                        아직 밴(Ban) 투표 내역이 없습니다. 의견을 내주세요!
+                        아직 밴(Ban) 투표 내역이 없습니다. 가장 먼저 의견을 내주세요!
                     </div>`;
             }
 
@@ -383,43 +392,36 @@ users.forEach(u => {
                 const isMyPick = myBannedGame === game.game_name;
                 const currentVotes = voteCounts[game.game_name] || 0;
                 
-                // 🌟 핵심: 팀장이 밴을 확정(isBanConfirmed)했거나, 내가 투표를 했을 때(hasIVoted)만 흑백 효과 적용
+                // 팀장이 확정했거나 내가 투표했을 때 선두 종목에 흑백(BANNED) 적용
                 const showBannedEffect = isLeading && (isBanConfirmed || hasIVoted);
 
-                // 카드 틀 디자인
                 const cardClass = showBannedEffect 
                     ? 'bg-slate-200 border-2 border-red-600 shadow-none' 
                     : (isMyPick && !isBanConfirmed ? 'bg-indigo-50 border-2 border-indigo-400 shadow-md' : 'bg-white border border-slate-200 shadow-sm hover:shadow-md');
                 
-                // 버튼 디자인 로직 (우선순위에 맞게 엄격하게 분기)
                 let btnClass = '';
                 let btnText = '';
 
                 if (isLeading && isBanConfirmed) {
-                    // 팀장이 확정한 밴 카드
                     btnClass = 'w-full bg-slate-800 text-yellow-400 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-700 shadow-inner';
                     btnText = '👑 팀장 밴 확정됨';
                 } else if (isBanConfirmed) {
-                    // 팀장이 확정해서 나머지 투표 못하게 닫힌 카드들
                     btnClass = 'w-full bg-slate-100 text-slate-400 text-xs font-bold py-2.5 rounded-lg cursor-not-allowed';
                     btnText = '🔒 투표 마감';
                 } else if (isMyPick) {
-                    // 다수결 진행 중, 내가 던진 픽
                     btnClass = 'w-full bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-lg cursor-default shadow-inner';
                     btnText = '✅ 내 투표 반영됨';
                 } else if (showBannedEffect) {
-                    // 다수결 진행 중 1위 종목
                     btnClass = 'w-full bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-800';
                     btnText = '🛑 현재 밴 유력';
                 } else {
-                    // 아직 확정 안 났고, 내가 투표 가능한 카드들
                     btnClass = isLeader 
                         ? 'w-full bg-slate-800 hover:bg-red-600 hover:text-white text-yellow-400 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-700 shadow-sm active:scale-95'
                         : 'w-full bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 shadow-sm active:scale-95';
                     btnText = isLeader ? '👑 팀장 밴 확정하기' : '✋ 이 종목 밴 투표';
                 }
                 
-                // 🌟 버튼 클릭 가능 여부 철저히 차단
+                // 팀장이 확정 지으면 투표 완전 봉쇄
                 const disableVote = isBanConfirmed || showBannedEffect || isMyPick;
 
                 const imgClass = showBannedEffect
@@ -430,7 +432,6 @@ users.forEach(u => {
 
                 html += `
                     <div class="rounded-xl overflow-hidden transition-all flex flex-col group ${cardClass} relative">
-                        <!-- 투표를 마쳤거나 팀장이 확정한 상태일 때 다른 유저의 투표 분포 노출 -->
                         ${currentVotes > 0 && (hasIVoted || isBanConfirmed) && !showBannedEffect ? `
                             <div class="absolute top-2 right-2 z-10 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-full shadow-md">
                                 👤 ${currentVotes}표
