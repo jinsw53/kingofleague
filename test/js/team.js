@@ -236,13 +236,13 @@ users.forEach(u => {
         setTimeout(() => { Boako.Team.loadBanCandidates(); }, 500); 
     },
 
-    // 🌟 팝업창 내부에 실제 DB 데이터를 불러와 렌더링 (구조 수정 완료)
+    // 🌟 팝업창 내부에 실제 DB 데이터를 불러와 렌더링
     loadBanCandidates: async () => {
         const contentArea = document.getElementById('ban-vote-content');
         if (!contentArea) return;
 
         try {
-            // 1. 시즌 번호 가져오기 (기존 동일)
+            // 1. 시즌 번호 가져오기
             const { data: currentSeason } = await Boako.db
                 .from('seasons')
                 .select('season_no')
@@ -270,7 +270,7 @@ users.forEach(u => {
                 return;
             }
 
-            // 🌟 2. [추가됨] 투표 내역(grandprix_ban_votes)에서 내 투표 불러오기
+            // 2. 투표 내역에서 내 투표 불러오기
             const { data: myVote } = await Boako.db
                 .from('grandprix_ban_votes')
                 .select('banned_game_name')
@@ -297,12 +297,12 @@ users.forEach(u => {
             // 4. UI 렌더링
             let html = ``;
             
-            // 🌟 상단에 내 밴 내역 표시 배너 추가
+            // 🌟 상단 배너 디자인 변경 (밴 목록답게 다크한 느낌으로)
             if (myBannedGame) {
                 html += `
-                    <div class="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl text-center shadow-sm flex items-center justify-center gap-2">
-                        <span class="text-red-600 font-bold text-sm">내가 현재 밴(Ban)한 종목:</span>
-                        <span class="text-red-900 font-black text-lg">🚫 ${myBannedGame}</span>
+                    <div class="mb-5 p-4 bg-slate-800 border border-slate-700 rounded-xl text-center shadow-md flex items-center justify-center gap-2">
+                        <span class="text-slate-300 font-bold text-sm">현재 우리 팀이 밴(Ban)한 종목:</span>
+                        <span class="text-red-500 font-black text-lg line-through decoration-red-600/50">🚫 ${myBannedGame}</span>
                     </div>`;
             } else {
                 html += `
@@ -314,35 +314,48 @@ users.forEach(u => {
             html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
             
             games.forEach(game => {
-                // 이 게임이 내가 밴한 게임인지 체크
                 const isMyBan = myBannedGame === game.game_name;
                 
-                // 🌟 카드 디자인: 내가 밴한 게임은 테두리를 빨갛게 칠하고 버튼 스타일 변경
+                // 🌟 카드 전체 틀: 밴 당하면 배경 회색 + 굵은 빨간 테두리
                 const cardClass = isMyBan 
-                    ? 'bg-red-50 border-2 border-red-500 ring-4 ring-red-100 shadow-md transform scale-[1.02]' 
+                    ? 'bg-slate-200 border-2 border-red-600 shadow-none' 
                     : 'bg-white border border-slate-200 shadow-sm hover:shadow-md';
                 
+                // 🌟 버튼: 밴 당하면 어두운 톤으로 눌리지 않는 느낌 주기
                 const btnClass = isMyBan 
-                    ? 'w-full bg-red-600 text-white text-xs font-bold py-2.5 rounded-lg transition-all shadow-sm'
+                    ? 'w-full bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-lg cursor-default shadow-inner border border-slate-800'
                     : 'w-full bg-slate-50 hover:bg-red-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 hover:border-red-600 shadow-sm active:scale-95';
                 
-                const btnText = isMyBan ? '✅ 현재 밴 적용됨' : '🚫 이 종목 밴(Ban)';
+                const btnText = isMyBan ? '🛑 밴(Ban) 적용됨' : '🚫 이 종목 밴(Ban)';
                 
-                // 🌟 이미지 잘림 해결: object-cover를 object-contain으로 바꾸고 패딩(p-3) 부여
-                const imgClass = 'w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-300';
+                // 🌟 이미지: 밴 당하면 흑백(grayscale) + 투명도 팍 낮추기(opacity)
+                const imgClass = isMyBan
+                    ? 'w-full h-full object-contain p-3 grayscale opacity-30'
+                    : 'w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-300';
+
+                // 🌟 텍스트: 밴 당하면 회색 처리 + 취소선
+                const textClass = isMyBan
+                    ? 'text-slate-400 line-through'
+                    : 'text-slate-700';
 
                 html += `
                     <div class="rounded-xl overflow-hidden transition-all flex flex-col group ${cardClass}">
-                        <div class="aspect-square flex items-center justify-center relative overflow-hidden border-b ${isMyBan ? 'border-red-200 bg-white' : 'border-slate-100 bg-slate-100'}">
+                        <div class="aspect-square flex items-center justify-center relative overflow-hidden border-b ${isMyBan ? 'border-red-600 bg-slate-300' : 'border-slate-100 bg-slate-100'}">
                             ${game.game_logo_url 
                                 ? `<img src="${game.game_logo_url}" class="${imgClass}">` 
-                                : `<span class="text-5xl drop-shadow-md">🎲</span>`
+                                : `<span class="text-5xl drop-shadow-md ${isMyBan ? 'grayscale opacity-30' : ''}">🎲</span>`
                             }
+                            
+                            ${isMyBan ? `
+                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <span class="text-red-600 font-black text-2xl tracking-widest rotate-[-15deg] border-4 border-red-600 px-2 py-1 rounded opacity-90 drop-shadow-md">BANNED</span>
+                                </div>
+                            ` : ''}
                         </div>
                         
-                        <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3">
-                            <h4 class="font-black ${isMyBan ? 'text-red-700' : 'text-slate-700'} text-sm break-keep leading-tight">${game.game_name}</h4>
-                            <button onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')" 
+                        <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3 ${isMyBan ? 'bg-slate-200' : ''}">
+                            <h4 class="font-black ${textClass} text-sm break-keep leading-tight">${game.game_name}</h4>
+                            <button ${isMyBan ? 'disabled' : `onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')"`} 
                                     class="${btnClass}">
                                 ${btnText}
                             </button>
