@@ -352,13 +352,15 @@ users.forEach(u => {
             // 🌟 5. UI 렌더링
             let html = ``;
             const hasIVoted = myBannedGame !== null; // 내가 투표를 했는지 여부
+            const isBanConfirmed = leadingReason === 'LEADER'; // 🌟 팀장이 밴을 확정했는지 여부
             
             // 상단 전광판 브리핑
-            if (leadingReason === 'LEADER') {
+            if (isBanConfirmed) {
                 html += `
                     <div class="mb-5 p-4 bg-slate-800 border border-slate-700 rounded-xl text-center shadow-md">
                         <span class="text-yellow-400 font-black text-sm block mb-1">👑 팀장 권한으로 밴 확정됨</span>
-                        <span class="text-red-500 font-black text-lg ${hasIVoted ? 'line-through decoration-red-600/50' : ''}">🚫 ${leadingGame}</span>
+                        <span class="text-red-500 font-black text-lg line-through decoration-red-600/50">🚫 ${leadingGame}</span>
+                        <p class="text-xs text-slate-400 mt-2 font-bold">팀장 권한으로 밴이 확정되어 투표가 마감되었습니다.</p>
                     </div>`;
             } else if (leadingGame) {
                 html += `
@@ -381,32 +383,45 @@ users.forEach(u => {
                 const isMyPick = myBannedGame === game.game_name;
                 const currentVotes = voteCounts[game.game_name] || 0;
                 
-                // 🌟 핵심: 내가 투표를 했을 때만 선두 게임을 흑백으로 칠함
-                const showBannedEffect = isLeading && hasIVoted;
+                // 🌟 핵심: 팀장이 밴을 확정(isBanConfirmed)했거나, 내가 투표를 했을 때(hasIVoted)만 흑백 효과 적용
+                const showBannedEffect = isLeading && (isBanConfirmed || hasIVoted);
 
                 // 카드 틀 디자인
                 const cardClass = showBannedEffect 
                     ? 'bg-slate-200 border-2 border-red-600 shadow-none' 
-                    : (isMyPick ? 'bg-indigo-50 border-2 border-indigo-400 shadow-md' : 'bg-white border border-slate-200 shadow-sm hover:shadow-md');
+                    : (isMyPick && !isBanConfirmed ? 'bg-indigo-50 border-2 border-indigo-400 shadow-md' : 'bg-white border border-slate-200 shadow-sm hover:shadow-md');
                 
-                // 버튼 디자인
+                // 버튼 디자인 로직 (우선순위에 맞게 엄격하게 분기)
                 let btnClass = '';
                 let btnText = '';
 
-                if (isMyPick) {
+                if (isLeading && isBanConfirmed) {
+                    // 팀장이 확정한 밴 카드
+                    btnClass = 'w-full bg-slate-800 text-yellow-400 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-700 shadow-inner';
+                    btnText = '👑 팀장 밴 확정됨';
+                } else if (isBanConfirmed) {
+                    // 팀장이 확정해서 나머지 투표 못하게 닫힌 카드들
+                    btnClass = 'w-full bg-slate-100 text-slate-400 text-xs font-bold py-2.5 rounded-lg cursor-not-allowed';
+                    btnText = '🔒 투표 마감';
+                } else if (isMyPick) {
+                    // 다수결 진행 중, 내가 던진 픽
                     btnClass = 'w-full bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-lg cursor-default shadow-inner';
                     btnText = '✅ 내 투표 반영됨';
                 } else if (showBannedEffect) {
+                    // 다수결 진행 중 1위 종목
                     btnClass = 'w-full bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-800';
                     btnText = '🛑 현재 밴 유력';
                 } else {
+                    // 아직 확정 안 났고, 내가 투표 가능한 카드들
                     btnClass = isLeader 
                         ? 'w-full bg-slate-800 hover:bg-red-600 hover:text-white text-yellow-400 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-700 shadow-sm active:scale-95'
                         : 'w-full bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 shadow-sm active:scale-95';
                     btnText = isLeader ? '👑 팀장 밴 확정하기' : '✋ 이 종목 밴 투표';
                 }
                 
-                // 이미지 & 텍스트 효과 (내가 투표 안 했으면 컬러 원본 유지)
+                // 🌟 버튼 클릭 가능 여부 철저히 차단
+                const disableVote = isBanConfirmed || showBannedEffect || isMyPick;
+
                 const imgClass = showBannedEffect
                     ? 'w-full h-full object-contain p-3 grayscale opacity-30'
                     : 'w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-300';
@@ -415,8 +430,8 @@ users.forEach(u => {
 
                 html += `
                     <div class="rounded-xl overflow-hidden transition-all flex flex-col group ${cardClass} relative">
-                        <!-- 🌟 투표를 마쳤거나, 누군가 표를 던진 게임에는 뱃지 표시 -->
-                        ${currentVotes > 0 && hasIVoted && !showBannedEffect ? `
+                        <!-- 투표를 마쳤거나 팀장이 확정한 상태일 때 다른 유저의 투표 분포 노출 -->
+                        ${currentVotes > 0 && (hasIVoted || isBanConfirmed) && !showBannedEffect ? `
                             <div class="absolute top-2 right-2 z-10 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-full shadow-md">
                                 👤 ${currentVotes}표
                             </div>
@@ -437,7 +452,7 @@ users.forEach(u => {
                         
                         <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3 ${showBannedEffect ? 'bg-slate-200' : ''}">
                             <h4 class="font-black ${textClass} text-sm break-keep leading-tight">${game.game_name}</h4>
-                            <button ${(showBannedEffect || isMyPick) ? 'disabled' : `onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')"`} 
+                            <button ${disableVote ? 'disabled' : `onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')"`} 
                                     class="${btnClass}">
                                 ${btnText}
                             </button>
