@@ -371,7 +371,7 @@ users.forEach(u => {
                     </div>`;
             }
 
-            html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
+            html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">`;
             
             games.forEach(game => {
                 const isLeading = leadingGame === game.game_name;
