@@ -280,11 +280,35 @@ users.forEach(u => {
                 .eq('season_no', seasonNo)
                 .eq('team_name', teamName);
 
+            // =====================================================================
+            // 🚨 [복구된 부분] 변수 선언 및 투표 데이터 계산 반복문 (여기가 빠져있었습니다!)
+            let myBannedGame = null;
+            let leaderVotedGame = null;
+            const voteCounts = {}; 
+            const firstVoteTimes = {}; 
+
+            (teamVotes || []).forEach(v => {
+                if (v.voter_name === myName) myBannedGame = v.banned_game_name;
+                if (v.voter_name === leaderName) leaderVotedGame = v.banned_game_name;
+
+                if (!voteCounts[v.banned_game_name]) {
+                    voteCounts[v.banned_game_name] = 0;
+                    firstVoteTimes[v.banned_game_name] = new Date(v.updated_at).getTime();
+                }
+                voteCounts[v.banned_game_name] += 1;
+                
+                const vTime = new Date(v.updated_at).getTime();
+                if (vTime < firstVoteTimes[v.banned_game_name]) {
+                    firstVoteTimes[v.banned_game_name] = vTime;
+                }
+            });
+            // =====================================================================
+
             // 🌟 3. 현재 밴 종목 시뮬레이션 (팀장 우선순위 강제 적용)
             let leadingGame = null;
             let leadingReason = ''; 
             
-            // [수정] 팀장 투표가 있다면, 다른 모든 다수결/선착순 계산을 무시하고 무조건 팀장 픽을 1위로 올림
+            // 팀장 투표가 있다면, 다른 모든 다수결/선착순 계산을 무시하고 무조건 팀장 픽을 1위로 올림
             if (leaderVotedGame) {
                 leadingGame = leaderVotedGame;
                 leadingReason = 'LEADER';
@@ -308,6 +332,8 @@ users.forEach(u => {
                     }
                 }
             }
+
+            // 4. 게임 목록 호출 (이하 코드 동일)
 
             // 4. 게임 목록 호출
             const { data: games, error } = await Boako.db
