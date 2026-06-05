@@ -323,11 +323,29 @@ users.forEach(u => {
 
     // 🌟 [추가 3] 실제 투표 버튼을 눌렀을 때 작동할 함수 뼈대
     submitBanVote: async (gameId, gameName) => {
-        const confirmVote = confirm(`정말 [${gameName}] 종목을 밴(Ban) 하시겠습니까?\n한 번 투표하면 번복할 수 없습니다.`);
+        const confirmVote = confirm(`정말 [${gameName}] 종목을 밴(Ban) 하시겠습니까?\n투표가 완료되면 결과가 반영됩니다.`);
         
         if (confirmVote) {
-            alert(`[${gameName}] 밴 투표가 접수되었습니다! (DB 연결 대기 중)`);
-            document.getElementById('ban-vote-modal').remove();
+            try {
+                // 소장님이 만드신 DB 함수 호출
+                // 시즌 번호는 DB 함수 내부 로직(MAX season_no)을 타도록 생략하거나 null로 넘깁니다.
+                const { error } = await Boako.db.rpc('fn_vote_grandprix_ban', {
+                    p_season_no: null, 
+                    p_banned_game_name: gameName
+                });
+
+                if (error) throw error;
+
+                // 투표 성공 시 팝업 닫기 및 알림
+                Boako.Util.toast(`[${gameName}] 밴 투표가 성공적으로 완료되었습니다!`);
+                
+                const modal = document.getElementById('ban-vote-modal');
+                if (modal) modal.remove();
+                
+            } catch (err) {
+                console.error("투표 에러:", err);
+                alert("투표 처리 중 오류가 발생했습니다:\n" + err.message);
+            }
         }
     },
     // 🌟 팀 채팅 전용 모듈
