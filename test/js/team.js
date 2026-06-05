@@ -280,38 +280,16 @@ users.forEach(u => {
                 .eq('season_no', seasonNo)
                 .eq('team_name', teamName);
 
-            // 3. 현재 밴 종목 시뮬레이션 (소장님 기획 룰 적용)
-            let myBannedGame = null;
-            let leaderVotedGame = null;
-            const voteCounts = {}; 
-            const firstVoteTimes = {}; // 동률 선착순 계산용
-
-            (teamVotes || []).forEach(v => {
-                if (v.voter_name === myName) myBannedGame = v.banned_game_name;
-                if (v.voter_name === leaderName) leaderVotedGame = v.banned_game_name;
-
-                if (!voteCounts[v.banned_game_name]) {
-                    voteCounts[v.banned_game_name] = 0;
-                    firstVoteTimes[v.banned_game_name] = new Date(v.updated_at).getTime();
-                }
-                voteCounts[v.banned_game_name] += 1;
-                
-                const vTime = new Date(v.updated_at).getTime();
-                if (vTime < firstVoteTimes[v.banned_game_name]) {
-                    firstVoteTimes[v.banned_game_name] = vTime;
-                }
-            });
-
-            // 🌟 승자 가리기 로직
+            // 🌟 3. 현재 밴 종목 시뮬레이션 (팀장 우선순위 강제 적용)
             let leadingGame = null;
             let leadingReason = ''; 
-
+            
+            // [수정] 팀장 투표가 있다면, 다른 모든 다수결/선착순 계산을 무시하고 무조건 팀장 픽을 1위로 올림
             if (leaderVotedGame) {
-                // 1순위: 팀장이 투표했으면 무조건 확정
                 leadingGame = leaderVotedGame;
                 leadingReason = 'LEADER';
             } else if (Object.keys(voteCounts).length > 0) {
-                // 2순위 & 3순위: 다수결 및 선착순 비교
+                // 팀장 투표가 없을 때만 다수결/선착순 로직 실행
                 let maxCount = 0;
                 let earliestTime = Infinity;
 
@@ -322,7 +300,6 @@ users.forEach(u => {
                         earliestTime = firstVoteTimes[gameName];
                         leadingReason = 'MAJORITY';
                     } else if (count === maxCount) {
-                        // 표가 같으면 updated_at이 더 빠른(작은) 것이 승리
                         if (firstVoteTimes[gameName] < earliestTime) {
                             leadingGame = gameName;
                             earliestTime = firstVoteTimes[gameName];
