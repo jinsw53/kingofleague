@@ -250,10 +250,9 @@ users.forEach(u => {
                 .gte('end_date', new Date().toISOString())
                 .maybeSingle();
 
-            let seasonNo;
-            if (currentSeason) {
-                seasonNo = currentSeason.season_no;
-            } else {
+            let seasonNo = currentSeason ? currentSeason.season_no : null;
+            
+            if (!seasonNo) {
                 const { data: lastSeason } = await Boako.db
                     .from('seasons')
                     .select('season_no')
@@ -261,26 +260,79 @@ users.forEach(u => {
                     .order('end_date', { ascending: false })
                     .limit(1)
                     .maybeSingle();
-                
                 seasonNo = lastSeason ? lastSeason.season_no : null;
             }
 
             if (!seasonNo) {
-                contentArea.innerHTML = `<div class="text-center py-12 text-slate-500 font-bold">현재 진행 중인 시즌이 없으며, 이전 시즌 데이터도 존재하지 않습니다.</div>`;
+                contentArea.innerHTML = `<div class="text-center py-12 text-slate-500 font-bold">진행 중인 시즌 정보가 없습니다.</div>`;
                 return;
             }
 
-            // 2. 투표 내역에서 내 투표 불러오기
-            const { data: myVote } = await Boako.db
-                .from('grandprix_ban_votes')
-                .select('banned_game_name')
-                .eq('season_no', seasonNo)
-                .eq('voter_name', Boako.state.user.nickname)
-                .maybeSingle();
-            
-            const myBannedGame = myVote ? myVote.banned_game_name : null;
+            // 2. 우리 팀 전체의 투표 내역 가져오기
+            const teamName = Boako.state.team.info.team_name;
+            const leaderName = Boako.state.team.info.leader_name;
+            const myName = Boako.state.user.nickname;
+            const isLeader = Boako.state.team.type === 'LEADER';
 
-            // 3. 게임 목록 호출
+            const { data: teamVotes, error: voteError } = await Boako.db
+                .from('grandprix_ban_votes')
+                .select('banned_game_name, voter_name, updated_at')
+                .eq('season_no', seasonNo)
+                .eq('team_name', teamName);
+
+            // 3. 현재 밴 종목 시뮬레이션 (소장님 기획 룰 적용)
+            let myBannedGame = null;
+            let leaderVotedGame = null;
+            const voteCounts = {}; 
+            const firstVoteTimes = {}; // 동률 선착순 계산용
+
+            (teamVotes || []).forEach(v => {
+                if (v.voter_name === myName) myBannedGame = v.banned_game_name;
+                if (v.voter_name === leaderName) leaderVotedGame = v.banned_game_name;
+
+                if (!voteCounts[v.banned_game_name]) {
+                    voteCounts[v.banned_game_name] = 0;
+                    firstVoteTimes[v.banned_game_name] = new Date(v.updated_at).getTime();
+                }
+                voteCounts[v.banned_game_name] += 1;
+                
+                const vTime = new Date(v.updated_at).getTime();
+                if (vTime < firstVoteTimes[v.banned_game_name]) {
+                    firstVoteTimes[v.banned_game_name] = vTime;
+                }
+            });
+
+            // 🌟 승자 가리기 로직
+            let leadingGame = null;
+            let leadingReason = ''; 
+
+            if (leaderVotedGame) {
+                // 1순위: 팀장이 투표했으면 무조건 확정
+                leadingGame = leaderVotedGame;
+                leadingReason = 'LEADER';
+            } else if (Object.keys(voteCounts).length > 0) {
+                // 2순위 & 3순위: 다수결 및 선착순 비교
+                let maxCount = 0;
+                let earliestTime = Infinity;
+
+                for (const [gameName, count] of Object.entries(voteCounts)) {
+                    if (count > maxCount) {
+                        maxCount = count;
+                        leadingGame = gameName;
+                        earliestTime = firstVoteTimes[gameName];
+                        leadingReason = 'MAJORITY';
+                    } else if (count === maxCount) {
+                        // 표가 같으면 updated_at이 더 빠른(작은) 것이 승리
+                        if (firstVoteTimes[gameName] < earliestTime) {
+                            leadingGame = gameName;
+                            earliestTime = firstVoteTimes[gameName];
+                            leadingReason = 'FIRST_COME';
+                        }
+                    }
+                }
+            }
+
+            // 4. 게임 목록 호출
             const { data: games, error } = await Boako.db
                 .from('grandprix_games')
                 .select('id, game_name, game_logo_url')
@@ -290,72 +342,99 @@ users.forEach(u => {
             if (error) throw error;
 
             if (!games || games.length === 0) {
-                contentArea.innerHTML = `<div class="text-center py-12 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl">이번 시즌 등록된 후보 종목이 없습니다.</div>`;
+                contentArea.innerHTML = `<div class="text-center py-12 text-slate-400 font-bold">후보 종목이 없습니다.</div>`;
                 return;
             }
 
-            // 4. UI 렌더링
+            // 🌟 5. UI 렌더링
             let html = ``;
+            const hasIVoted = myBannedGame !== null; // 내가 투표를 했는지 여부
             
-            // 🌟 상단 배너 디자인 변경 (밴 목록답게 다크한 느낌으로)
-            if (myBannedGame) {
+            // 상단 전광판 브리핑
+            if (leadingReason === 'LEADER') {
                 html += `
-                    <div class="mb-5 p-4 bg-slate-800 border border-slate-700 rounded-xl text-center shadow-md flex items-center justify-center gap-2">
-                        <span class="text-slate-300 font-bold text-sm">현재 우리 팀이 밴(Ban)한 종목:</span>
-                        <span class="text-red-500 font-black text-lg line-through decoration-red-600/50">🚫 ${myBannedGame}</span>
+                    <div class="mb-5 p-4 bg-slate-800 border border-slate-700 rounded-xl text-center shadow-md">
+                        <span class="text-yellow-400 font-black text-sm block mb-1">👑 팀장 권한으로 밴 확정됨</span>
+                        <span class="text-red-500 font-black text-lg ${hasIVoted ? 'line-through decoration-red-600/50' : ''}">🚫 ${leadingGame}</span>
+                    </div>`;
+            } else if (leadingGame) {
+                html += `
+                    <div class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-xl text-center shadow-sm">
+                        <span class="text-blue-600 font-black text-sm block mb-1">👥 현재 팀 밴 유력 종목 (다수결/선착순)</span>
+                        <span class="text-red-600 font-black text-lg ${hasIVoted ? 'line-through decoration-red-600/50' : ''}">🚫 ${leadingGame}</span>
+                        ${!hasIVoted ? `<p class="text-xs text-blue-500 mt-2 font-bold animate-pulse">투표를 완료해야 밴(Ban) 효과가 표시됩니다.</p>` : ''}
                     </div>`;
             } else {
                 html += `
                     <div class="mb-5 p-4 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-500 font-bold text-sm shadow-sm">
-                        아직 밴(Ban)한 종목이 없습니다. 신중하게 선택해 주세요.
+                        아직 밴(Ban) 투표 내역이 없습니다. 의견을 내주세요!
                     </div>`;
             }
 
             html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
             
             games.forEach(game => {
-                const isMyBan = myBannedGame === game.game_name;
+                const isLeading = leadingGame === game.game_name;
+                const isMyPick = myBannedGame === game.game_name;
+                const currentVotes = voteCounts[game.game_name] || 0;
                 
-                // 🌟 카드 전체 틀: 밴 당하면 배경 회색 + 굵은 빨간 테두리
-                const cardClass = isMyBan 
+                // 🌟 핵심: 내가 투표를 했을 때만 선두 게임을 흑백으로 칠함
+                const showBannedEffect = isLeading && hasIVoted;
+
+                // 카드 틀 디자인
+                const cardClass = showBannedEffect 
                     ? 'bg-slate-200 border-2 border-red-600 shadow-none' 
-                    : 'bg-white border border-slate-200 shadow-sm hover:shadow-md';
+                    : (isMyPick ? 'bg-indigo-50 border-2 border-indigo-400 shadow-md' : 'bg-white border border-slate-200 shadow-sm hover:shadow-md');
                 
-                // 🌟 버튼: 밴 당하면 어두운 톤으로 눌리지 않는 느낌 주기
-                const btnClass = isMyBan 
-                    ? 'w-full bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-lg cursor-default shadow-inner border border-slate-800'
-                    : 'w-full bg-slate-50 hover:bg-red-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 hover:border-red-600 shadow-sm active:scale-95';
+                // 버튼 디자인
+                let btnClass = '';
+                let btnText = '';
+
+                if (isMyPick) {
+                    btnClass = 'w-full bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-lg cursor-default shadow-inner';
+                    btnText = '✅ 내 투표 반영됨';
+                } else if (showBannedEffect) {
+                    btnClass = 'w-full bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-800';
+                    btnText = '🛑 현재 밴 유력';
+                } else {
+                    btnClass = isLeader 
+                        ? 'w-full bg-slate-800 hover:bg-red-600 hover:text-white text-yellow-400 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-700 shadow-sm active:scale-95'
+                        : 'w-full bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 shadow-sm active:scale-95';
+                    btnText = isLeader ? '👑 팀장 밴 확정하기' : '✋ 이 종목 밴 투표';
+                }
                 
-                const btnText = isMyBan ? '🛑 밴(Ban) 적용됨' : '🚫 이 종목 밴(Ban)';
-                
-                // 🌟 이미지: 밴 당하면 흑백(grayscale) + 투명도 팍 낮추기(opacity)
-                const imgClass = isMyBan
+                // 이미지 & 텍스트 효과 (내가 투표 안 했으면 컬러 원본 유지)
+                const imgClass = showBannedEffect
                     ? 'w-full h-full object-contain p-3 grayscale opacity-30'
                     : 'w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-300';
 
-                // 🌟 텍스트: 밴 당하면 회색 처리 + 취소선
-                const textClass = isMyBan
-                    ? 'text-slate-400 line-through'
-                    : 'text-slate-700';
+                const textClass = showBannedEffect ? 'text-slate-400 line-through' : 'text-slate-700';
 
                 html += `
-                    <div class="rounded-xl overflow-hidden transition-all flex flex-col group ${cardClass}">
-                        <div class="aspect-square flex items-center justify-center relative overflow-hidden border-b ${isMyBan ? 'border-red-600 bg-slate-300' : 'border-slate-100 bg-slate-100'}">
+                    <div class="rounded-xl overflow-hidden transition-all flex flex-col group ${cardClass} relative">
+                        <!-- 🌟 투표를 마쳤거나, 누군가 표를 던진 게임에는 뱃지 표시 -->
+                        ${currentVotes > 0 && hasIVoted && !showBannedEffect ? `
+                            <div class="absolute top-2 right-2 z-10 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-full shadow-md">
+                                👤 ${currentVotes}표
+                            </div>
+                        ` : ''}
+
+                        <div class="aspect-square flex items-center justify-center relative overflow-hidden border-b ${showBannedEffect ? 'border-red-600 bg-slate-300' : 'border-slate-100 bg-slate-100'}">
                             ${game.game_logo_url 
                                 ? `<img src="${game.game_logo_url}" class="${imgClass}">` 
-                                : `<span class="text-5xl drop-shadow-md ${isMyBan ? 'grayscale opacity-30' : ''}">🎲</span>`
+                                : `<span class="text-5xl drop-shadow-md ${showBannedEffect ? 'grayscale opacity-30' : ''}">🎲</span>`
                             }
                             
-                            ${isMyBan ? `
-                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <span class="text-red-600 font-black text-2xl tracking-widest rotate-[-15deg] border-4 border-red-600 px-2 py-1 rounded opacity-90 drop-shadow-md">BANNED</span>
+                            ${showBannedEffect ? `
+                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                                    <span class="text-red-600 font-black text-2xl tracking-widest rotate-[-15deg] border-4 border-red-600 px-2 py-1 rounded opacity-90 shadow-sm bg-white/50 backdrop-blur-sm">BANNED</span>
                                 </div>
                             ` : ''}
                         </div>
                         
-                        <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3 ${isMyBan ? 'bg-slate-200' : ''}">
+                        <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3 ${showBannedEffect ? 'bg-slate-200' : ''}">
                             <h4 class="font-black ${textClass} text-sm break-keep leading-tight">${game.game_name}</h4>
-                            <button ${isMyBan ? 'disabled' : `onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')"`} 
+                            <button ${(showBannedEffect || isMyPick) ? 'disabled' : `onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')"`} 
                                     class="${btnClass}">
                                 ${btnText}
                             </button>
@@ -367,7 +446,7 @@ users.forEach(u => {
             contentArea.innerHTML = html;
 
         } catch (err) {
-            console.error("후보 로드 실패:", err);
+            console.error("데이터 로드 실패:", err);
             contentArea.innerHTML = `<div class="text-center py-12 text-red-500 font-bold">데이터를 불러오지 못했습니다.</div>`;
         }
     },
