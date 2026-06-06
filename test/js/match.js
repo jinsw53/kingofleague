@@ -148,9 +148,13 @@ Boako.Match = {
         }
     },
 
-    // 🌟 4. [탭 1] 밴 결과 렌더링 (클릭 시 팀 투표소로 이동 적용)
+    // 🌟 4. [탭 1] 밴 결과 렌더링 (클릭 시 팀 투표소로 이동 적용 + 레이아웃 버그 수정)
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
+        
+        // 💡 [핵심 수정] 로딩용 중앙 정렬(flex) 속성을 해제하고 블록(block) 형태로 강제 전환하여 위아래로 쌓이게 만듭니다.
+        content.className = "w-full block"; 
+
         if (!games.length) {
             content.innerHTML = `<div class="text-center py-12 text-slate-400 font-bold">등록된 대회 종목이 없습니다.</div>`;
             return;
@@ -158,10 +162,10 @@ Boako.Match = {
 
         let html = '';
         
-        // ⏳ 정산 전(투표 중)일 때 띄워줄 상단 안내 배너
+        // ⏳ 정산 전(투표 중)일 때 띄워줄 상단 안내 배너 (이제 무조건 맨 위에 독립적으로 뜹니다)
         if (!isFinalized) {
             html += `
-                <div class="mb-5 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center shadow-sm animate-pulse">
+                <div class="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center shadow-sm animate-pulse w-full">
                     <div>
                         <h4 class="text-indigo-700 font-black text-sm">⏳ 현재 밴(Ban) 투표가 치열하게 진행 중입니다!</h4>
                         <p class="text-indigo-500 text-xs font-bold mt-1">원하는 종목을 클릭하여 우리 팀 투표소로 바로 이동하세요.</p>
@@ -171,24 +175,22 @@ Boako.Match = {
             `;
         }
 
-        html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
+        // 그 아래로 게임 종목 카드들이 그리드 형태로 깔립니다.
+        html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 w-full">`;
         
         games.forEach(game => {
             const isBanned = isFinalized && game.status !== 'FINAL';
-            const isCandidate = !isFinalized; // 아직 투표 진행 중인 후보 상태
+            const isCandidate = !isFinalized;
 
-            // 상태에 따른 카드 디자인 분기
             let cardClass = isBanned 
                 ? 'bg-slate-100 border-2 border-red-500/50 shadow-none' 
                 : 'bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-lg hover:-translate-y-1';
             
-            // 🌟 후보 상태일 때 클릭 포인터 추가
             if (isCandidate) cardClass += ' cursor-pointer ring-2 ring-transparent hover:ring-indigo-300';
 
             const textClass = isBanned ? 'text-slate-400 line-through decoration-red-500/50' : 'text-slate-800';
             const imgClass = isBanned ? 'grayscale opacity-30' : 'drop-shadow-sm';
 
-            // 🌟 핵심 로직: 후보 카드를 클릭하면 팀 메뉴 렌더링 후 'record(기록/일정)' 탭으로 자동 전환
             const clickEvent = isCandidate 
                 ? `onclick="Boako.View.render('team').then(() => setTimeout(() => Boako.View.switchTeamTab('record'), 100))"` 
                 : '';
