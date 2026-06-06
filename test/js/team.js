@@ -1,5 +1,5 @@
 /**
- * [TEAM] 팀 관리 (창단, 정보수정, 멤버관리 등)
+ * [TEAM] 팀 관리 (창단, 정보수정, 멤버관리, 밴 투표, 채팅 등)
  */
 Boako.Team = {
     syncStatus: async () => {
@@ -8,26 +8,31 @@ Boako.Team = {
         if (!user) { Boako.state.team = null; if (menuTxt) menuTxt.innerText = "팀 창단"; return; }
         
         try {
+            // 1. 내 닉네임 확보
             const { data: profile } = await Boako.db.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
             Boako.state.user.nickname = profile?.full_name || user.user_metadata?.full_name || "사용자";
 
-            const { data: leaderTeam } = await Boako.db.from('teams').select('*').eq('owner_id', user.id).maybeSingle();
-            if (leaderTeam) {
-                Boako.state.team = { type: 'LEADER', info: leaderTeam };
-                if (menuTxt) menuTxt.innerText = "팀 메뉴";
-                return;
-            }
+            // 🌟 2. 파편화 방지: 팀 소속 여부는 오직 'team_members'만 뒤져서 확인
+            const { data: memberEntry } = await Boako.db
+                .from('team_members')
+                .select('team_id, role') 
+                .eq('player_name', Boako.state.user.nickname)
+                .eq('is_active', true)
+                .maybeSingle();
 
-            const { data: memberEntry } = await Boako.db.from('team_members').select('team_id').eq('player_name', Boako.state.user.nickname).eq('is_active', true).maybeSingle();
             if (memberEntry) {
-                const { data: memberTeam } = await Boako.db.from('teams').select('*').eq('id', memberEntry.team_id).maybeSingle();
-                if (memberTeam) {
-                    Boako.state.team = { type: 'MEMBER', info: memberTeam };
+                const { data: teamInfo } = await Boako.db.from('teams').select('*').eq('id', memberEntry.team_id).maybeSingle();
+                if (teamInfo) {
+                    // 팀장 여부 판단 (DB 스키마 구조에 따라 memberEntry.role === 'LEADER' 등을 사용해도 무방)
+                    const isLeader = teamInfo.owner_id === user.id; 
+                    Boako.state.team = { type: isLeader ? 'LEADER' : 'MEMBER', info: teamInfo };
                     if (menuTxt) menuTxt.innerText = "팀 메뉴";
                     return;
                 }
             }
-            Boako.state.team = null; if (menuTxt) menuTxt.innerText = "팀 창단";
+            
+            Boako.state.team = null; 
+            if (menuTxt) menuTxt.innerText = "팀 창단";
         } catch (e) { console.error(e); }
     },
     
@@ -42,15 +47,27 @@ Boako.Team = {
             await Boako.db.storage.from('teams').upload(fName, file);
             const { data: uData } = Boako.db.storage.from('teams').getPublicUrl(fName);
             
-            const { error } = await Boako.db.from('teams').insert([{ 
+            // 🌟 1. 팀 데이터 생성 (존재하지 않는 leader_name 컬럼 삭제)
+            const { data: newTeam, error: teamError } = await Boako.db.from('teams').insert([{ 
                 team_name: document.getElementById('team_name').value.trim(), 
                 owner_id: Boako.state.user.id, 
-                leader_name: Boako.state.user.nickname, 
                 team_motto: document.getElementById('team_motto').value.trim(),
                 team_desc: document.getElementById('team_desc').value.trim(),
                 logo_url: uData.publicUrl 
+            }]).select().single();
+
+            if (teamError) throw teamError;
+
+            // 🌟 2. 치명적 누락 해결: 팀을 만든 본인을 team_members에 즉시 등록
+            const { error: memberError } = await Boako.db.from('team_members').insert([{
+                team_id: newTeam.id,
+                player_name: Boako.state.user.nickname,
+                role: 'LEADER', // DB 스키마 직급 컬럼에 맞게 수정 필요 시 수정
+                is_active: true
             }]);
-            if (error) throw error;
+
+            if (memberError) throw memberError;
+
             Boako.Util.toast("✅ 새로운 전설의 팀이 탄생했습니다!");
             Boako.View.render('team');
         } catch (err) { Boako.Util.toast(err.message); } 
@@ -64,7 +81,6 @@ Boako.Team = {
         else { Boako.Util.toast("✅ 팀 정보가 업데이트되었습니다."); Boako.View.render('team'); }
     },
 
-    // 🌟 1. 검색 모달창 열기 (기존 prompt 완벽 대체)
     addMember: () => {
         const existing = document.getElementById('boako-invite-modal');
         if (existing) existing.remove();
@@ -74,9 +90,7 @@ Boako.Team = {
                 <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
                     <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                         <h3 class="font-black text-lg text-slate-800 flex items-center gap-2">🔍 멤버 스카웃</h3>
-                        <button onclick="document.getElementById('boako-invite-modal').remove()" class="text-slate-400 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200">
-                            ✕
-                        </button>
+                        <button onclick="document.getElementById('boako-invite-modal').remove()" class="text-slate-400 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200">✕</button>
                     </div>
                     <div class="p-5">
                         <div class="flex gap-2 mb-4">
@@ -91,14 +105,12 @@ Boako.Team = {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
         setTimeout(() => {
             const input = document.getElementById('invite-search-input');
             if(input) input.focus();
         }, 100);
     },
 
-    // 🌟 2. DB에서 유저 프로필 검색하기
     searchUser: async () => {
         const keyword = document.getElementById('invite-search-input').value.trim();
         const resultContainer = document.getElementById('invite-search-results');
@@ -125,33 +137,28 @@ Boako.Team = {
             }
 
             let listHtml = '';
-            // [수정 후 코드]
-users.forEach(u => {
-    if (u.id === Boako.state.user.id) return; // 나 자신은 제외
-    
-    // 🌟 1. 카카오 프사 URL의 http를 https로 강제 변환하는 방어 코드 추가
-    const secureProfileUrl = u.profile_url ? u.profile_url.replace(/^http:\/\//i, 'https://') : null;
-    
-    listHtml += `
-        <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-indigo-100 transition-all group">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border border-slate-200 flex-shrink-0">
-                    <!-- 🌟 2. 변환된 안전한 URL(secureProfileUrl)을 사용 -->
-                    ${secureProfileUrl ? `<img src="${secureProfileUrl}" class="w-full h-full object-cover">` : '<span class="text-xl">👤</span>'}
-                </div>
-                <span class="font-black text-slate-700 text-sm">${u.full_name}</span>
-            </div>
-            <button onclick="Boako.Team.executeInvite('${u.id}', '${u.full_name}')" class="bg-white border border-emerald-500 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm whitespace-nowrap">
-                💌 스카웃
-            </button>
-        </div>
-    `;
-});
+            users.forEach(u => {
+                if (u.id === Boako.state.user.id) return;
+                
+                // 보안 연결 처리 방어 코드 적용
+                const secureProfileUrl = u.profile_url ? u.profile_url.replace(/^http:\/\//i, 'https://') : null;
+                
+                listHtml += `
+                    <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-indigo-100 transition-all group">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border border-slate-200 flex-shrink-0">
+                                ${secureProfileUrl ? `<img src="${secureProfileUrl}" class="w-full h-full object-cover">` : '<span class="text-xl">👤</span>'}
+                            </div>
+                            <span class="font-black text-slate-700 text-sm">${u.full_name}</span>
+                        </div>
+                        <button onclick="Boako.Team.executeInvite('${u.id}', '${u.full_name}')" class="bg-white border border-emerald-500 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm whitespace-nowrap">
+                            💌 스카웃
+                        </button>
+                    </div>
+                `;
+            });
 
-            if (listHtml === '') {
-                listHtml = `<div class="text-center text-slate-400 text-sm py-8 font-bold">초대 가능한 유저가 없습니다.</div>`;
-            }
-            
+            if (listHtml === '') listHtml = `<div class="text-center text-slate-400 text-sm py-8 font-bold">초대 가능한 유저가 없습니다.</div>`;
             resultContainer.innerHTML = listHtml;
 
         } catch (err) {
@@ -159,7 +166,6 @@ users.forEach(u => {
         }
     },
 
-    // 🌟 3. 검색된 유저에게 초대장 날리기 (실제 발송 로직)
     executeInvite: async (targetId, targetName) => {
         if (!confirm(`[${targetName}] 님에게 스카웃 제안을 발송하시겠습니까?`)) return;
 
@@ -181,7 +187,6 @@ users.forEach(u => {
             if (msgErr) throw msgErr;
 
             Boako.Util.toast(`🎉 ${targetName} 님에게 스카웃 제안서를 성공적으로 보냈습니다!`);
-            
             const existing = document.getElementById('boako-invite-modal');
             if (existing) existing.remove();
             
@@ -203,16 +208,14 @@ users.forEach(u => {
             .eq('team_id', Boako.state.team.info.id).eq('player_name', Boako.state.user.nickname).eq('is_active', true);
         location.reload();
     },
-// 🌟 [추가 1] 밴(Ban) 투표소 팝업 열기
+
     openBanVote: async () => {
         const existingModal = document.getElementById('ban-vote-modal');
         if (existingModal) existingModal.remove();
 
         const modalHtml = `
             <div id="ban-vote-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onclick="if(event.target === this) this.remove()">
-                <!-- 팝업창 크기를 max-w-3xl로 넉넉하게 키워서 12개 카드가 예쁘게 들어가게 함 -->
                 <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col" style="max-height: 90vh;">
-                    
                     <div class="bg-red-600 px-6 py-4 flex justify-between items-center text-white">
                         <div>
                             <h2 class="text-xl font-black flex items-center gap-2"><span class="text-2xl">🚫</span> 대항전 밴(Ban) 투표소</h2>
@@ -231,12 +234,9 @@ users.forEach(u => {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        // 팝업 띄운 직후, 0.5초 뒤에 12개 리스트 렌더링 함수 자동 실행!
         setTimeout(() => { Boako.Team.loadBanCandidates(); }, 500); 
     },
 
-   // 🌟 팝업창 내부에 실제 DB 데이터를 불러와 렌더링
     loadBanCandidates: async () => {
         const contentArea = document.getElementById('ban-vote-content');
         if (!contentArea) return;
@@ -268,41 +268,46 @@ users.forEach(u => {
                 return;
             }
 
-            // 🌟 2. 투표 내역 가져오기 (DB 외래키 Join 활용!)
+            const teamId = Boako.state.team.info.id;
             const teamName = Boako.state.team.info.team_name;
             const myName = Boako.state.user.nickname;
             const isLeader = Boako.state.team.type === 'LEADER';
 
-            // 💡 Supabase의 릴레이션 기능을 이용해 teams 테이블의 leader_name을 한 번에 가져옵니다.
+            // 🌟 2. 진실의 방: team_members 테이블만 뒤져서 진짜 팀장 닉네임 가져오기
+            // 소장님 DB 스키마에 맞춰 'role' 혹은 'is_leader' 등의 조건으로 팀장을 식별합니다.
+            const { data: leaderMember } = await Boako.db
+                .from('team_members')
+                .select('player_name')
+                .eq('team_id', teamId)
+                .eq('role', 'LEADER') // 💡 필요시 DB 스키마에 맞게 수정
+                .eq('is_active', true)
+                .maybeSingle();
+
+            const realLeaderName = leaderMember ? leaderMember.player_name : null;
+
+            // 🌟 3. 투표 내역 가져오기 (오류 없도록 단일 테이블 조회)
             const { data: teamVotes, error: voteError } = await Boako.db
                 .from('grandprix_ban_votes')
-                .select(`
-                    banned_game_name, 
-                    voter_name, 
-                    updated_at,
-                    teams ( leader_name )
-                `)
+                .select('banned_game_name, voter_name, updated_at')
                 .eq('season_no', seasonNo)
                 .eq('team_name', teamName);
 
             if (voteError) throw voteError;
 
-            // 3. 현재 밴 종목 시뮬레이션
+            // 🌟 4. 승자 가리기 로직
             let myBannedGame = null;
             let leaderVotedGame = null;
             const voteCounts = {}; 
             const firstVoteTimes = {}; 
 
             (teamVotes || []).forEach(v => {
-                // 내 투표 확인
                 if (v.voter_name === myName) myBannedGame = v.banned_game_name;
                 
-                // 🌟 핵심: DB에서 연결된 팀장(teams.leader_name)과 투표자(voter_name)가 같으면 무조건 팀장 투표!
-                if (v.teams && v.voter_name === v.teams.leader_name) {
+                // 🔥 팀장의 투표 발견 시 무조건 확정 변수에 저장
+                if (realLeaderName && v.voter_name === realLeaderName) {
                     leaderVotedGame = v.banned_game_name;
                 }
 
-                // 표 집계
                 if (!voteCounts[v.banned_game_name]) {
                     voteCounts[v.banned_game_name] = 0;
                     firstVoteTimes[v.banned_game_name] = new Date(v.updated_at).getTime();
@@ -315,16 +320,13 @@ users.forEach(u => {
                 }
             });
 
-            // 🌟 4. 승자 가리기 로직 (팀장 권한 절대적 1순위)
-            let leadingGame = null;
-            let leadingReason = ''; 
+            // 🌟 5. 팀장 권한을 절대적 1순위로 세팅
+            const isBanConfirmed = (leaderVotedGame !== null);
+            let leadingGame = leaderVotedGame; 
+            let leadingReason = isBanConfirmed ? 'LEADER' : '';
             
-            // 팀장 투표가 있다면, 다른 모든 표를 묵살하고 1위로 강제 확정!
-            if (leaderVotedGame) {
-                leadingGame = leaderVotedGame;
-                leadingReason = 'LEADER';
-            } else if (Object.keys(voteCounts).length > 0) {
-                // 팀장 투표가 없을 때만 다수결/선착순 룰 적용
+            // 팀장이 투표하지 않았을 때만 다수결 시뮬레이션
+            if (!isBanConfirmed && Object.keys(voteCounts).length > 0) {
                 let maxCount = 0;
                 let earliestTime = Infinity;
 
@@ -344,7 +346,6 @@ users.forEach(u => {
                 }
             }
 
-            // 5. 게임 목록 호출
             const { data: games, error } = await Boako.db
                 .from('grandprix_games')
                 .select('id, game_name, game_logo_url')
@@ -358,13 +359,12 @@ users.forEach(u => {
                 return;
             }
 
-            // 🌟 6. UI 렌더링 (락다운 로직 포함)
+            // 🌟 6. UI 렌더링
             let html = ``;
             const hasIVoted = myBannedGame !== null; 
-            const isBanConfirmed = leadingReason === 'LEADER'; // 팀장이 확정했는가?
             
-            // 상단 전광판 브리핑
             if (isBanConfirmed) {
+                // 팀장이 확정 지으면 다수결은 무시하고 최상단에 락다운 전광판 노출
                 html += `
                     <div class="mb-5 p-4 bg-slate-800 border border-slate-700 rounded-xl text-center shadow-md">
                         <span class="text-yellow-400 font-black text-sm block mb-1">👑 팀장 권한으로 밴 확정됨</span>
@@ -388,12 +388,13 @@ users.forEach(u => {
             html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">`;
             
             games.forEach(game => {
-                const isLeading = leadingGame === game.game_name;
+                const isConfirmed = isBanConfirmed && (game.game_name === leaderVotedGame);
+                const isLeading = (!isBanConfirmed) && (leadingGame === game.game_name);
                 const isMyPick = myBannedGame === game.game_name;
                 const currentVotes = voteCounts[game.game_name] || 0;
                 
-                // 팀장이 확정했거나 내가 투표했을 때 선두 종목에 흑백(BANNED) 적용
-                const showBannedEffect = isLeading && (isBanConfirmed || hasIVoted);
+                // 🔥 흑백 BANNED 효과 기준 완벽 통제
+                const showBannedEffect = isConfirmed || (isLeading && hasIVoted);
 
                 const cardClass = showBannedEffect 
                     ? 'bg-slate-200 border-2 border-red-600 shadow-none' 
@@ -402,7 +403,7 @@ users.forEach(u => {
                 let btnClass = '';
                 let btnText = '';
 
-                if (isLeading && isBanConfirmed) {
+                if (isConfirmed) {
                     btnClass = 'w-full bg-slate-800 text-yellow-400 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-700 shadow-inner';
                     btnText = '👑 팀장 밴 확정됨';
                 } else if (isBanConfirmed) {
@@ -421,7 +422,6 @@ users.forEach(u => {
                     btnText = isLeader ? '👑 팀장 밴 확정하기' : '✋ 이 종목 밴 투표';
                 }
                 
-                // 팀장이 확정 지으면 투표 완전 봉쇄
                 const disableVote = isBanConfirmed || showBannedEffect || isMyPick;
 
                 const imgClass = showBannedEffect
@@ -470,14 +470,11 @@ users.forEach(u => {
         }
     },
 
-    // 🌟 [추가 3] 실제 투표 버튼을 눌렀을 때 작동할 함수 뼈대
     submitBanVote: async (gameId, gameName) => {
         const confirmVote = confirm(`정말 [${gameName}] 종목을 밴(Ban) 하시겠습니까?\n투표가 완료되면 결과가 반영됩니다.`);
         
         if (confirmVote) {
             try {
-                // 소장님이 만드신 DB 함수 호출
-                // 시즌 번호는 DB 함수 내부 로직(MAX season_no)을 타도록 생략하거나 null로 넘깁니다.
                 const { error } = await Boako.db.rpc('fn_vote_grandprix_ban', {
                     p_season_no: null, 
                     p_banned_game_name: gameName
@@ -485,9 +482,7 @@ users.forEach(u => {
 
                 if (error) throw error;
 
-                // 투표 성공 시 팝업 닫기 및 알림
                 Boako.Util.toast(`[${gameName}] 밴 투표가 성공적으로 완료되었습니다!`);
-                
                 Boako.Team.loadBanCandidates();
                 
             } catch (err) {
@@ -496,28 +491,23 @@ users.forEach(u => {
             }
         }
     },
-    // 🌟 팀 채팅 전용 모듈
+
     Chat: {
         channel: null,
-
-        // 🌟 [추가 1] 알림 뱃지 켜기 스위치
         showNotification: () => {
             const badge = document.getElementById('team-chat-badge');
             if (badge) {
                 badge.classList.remove('hidden');
-                badge.style.display = 'flex'; // 버튼 UI의 inline 스타일 충돌 방지용 강제 표시
+                badge.style.display = 'flex';
             }
         },
-
-        // 🌟 [추가 2] 알림 뱃지 끄기 스위치
         clearNotification: () => {
             const badge = document.getElementById('team-chat-badge');
             if (badge) {
                 badge.classList.add('hidden');
-                badge.style.display = 'none'; // 강제 숨김
+                badge.style.display = 'none';
             }
         },
-
         init: async (containerId) => {
             if (!Boako.state.team) return;
             const teamId = Boako.state.team.info.id;
@@ -566,15 +556,12 @@ users.forEach(u => {
                          newMsg.profiles = { full_name: "팀원" }; 
                          Boako.Team.Chat.renderMessage(newMsg);
                          Boako.Team.Chat.scrollToBottom();
-
-                         // 🌟 [추가 3] 남이 쓴 채팅이 도착하면 스위치 켜기!
                          Boako.Team.Chat.showNotification();
                          Boako.Util.toast("💬 팀 작전 회의실에 새로운 메시지가 있습니다!");
                     }
                 })
                 .subscribe();
         },
-
         renderMessage: (msg) => {
             const container = document.getElementById('chat-messages');
             if (!container) return;
@@ -598,7 +585,6 @@ users.forEach(u => {
             `;
             container.insertAdjacentHTML('beforeend', html);
         },
-
         send: async () => {
             const input = document.getElementById('chat-input');
             const content = input.value.trim();
@@ -622,7 +608,6 @@ users.forEach(u => {
                 console.error("채팅 전송 실패:", error);
             }
         },
-
         scrollToBottom: () => {
             const el = document.getElementById('chat-messages');
             if (el) el.scrollTop = el.scrollHeight;
