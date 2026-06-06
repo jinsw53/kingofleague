@@ -148,11 +148,9 @@ Boako.Match = {
         }
     },
 
-    // 🌟 4. [탭 1] 밴 결과 렌더링 (클릭 시 팀 투표소로 이동 적용 + 레이아웃 버그 수정)
+    // 🌟 4. [탭 1] 밴 결과 렌더링 (PC 기준 5열 배치 적용)
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
-        
-        // 💡 [핵심 수정] 로딩용 중앙 정렬(flex) 속성을 해제하고 블록(block) 형태로 강제 전환하여 위아래로 쌓이게 만듭니다.
         content.className = "w-full block"; 
 
         if (!games.length) {
@@ -162,7 +160,6 @@ Boako.Match = {
 
         let html = '';
         
-        // ⏳ 정산 전(투표 중)일 때 띄워줄 상단 안내 배너 (이제 무조건 맨 위에 독립적으로 뜹니다)
         if (!isFinalized) {
             html += `
                 <div class="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center shadow-sm animate-pulse w-full">
@@ -175,8 +172,9 @@ Boako.Match = {
             `;
         }
 
-        // 그 아래로 게임 종목 카드들이 그리드 형태로 깔립니다.
-        html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 w-full">`;
+        // 💡 [핵심 수정] md:grid-cols-4 였던 부분을 md:grid-cols-5 로 변경했습니다.
+        // 모바일: 2개 / 태블릿: 3개 / PC: 5개씩 나옵니다.
+        html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full">`;
         
         games.forEach(game => {
             const isBanned = isFinalized && game.status !== 'FINAL';
