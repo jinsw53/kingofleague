@@ -241,27 +241,23 @@ Boako.Team = {
         const contentArea = document.getElementById('ban-vote-content');
         if (!contentArea) return;
 
+        console.log("========================================");
+        console.log("🕵️‍♂️ [추적 시작] 밴 투표소 로드 및 팀장 밴픽 판별 로직");
+        console.log("========================================");
+
         try {
             // 1. 시즌 번호 가져오기
-            const { data: currentSeason } = await Boako.db
-                .from('seasons')
-                .select('season_no')
-                .lte('start_date', new Date().toISOString())
-                .gte('end_date', new Date().toISOString())
-                .maybeSingle();
-
+            const { data: currentSeason } = await Boako.db.from('seasons')
+                .select('season_no').lte('start_date', new Date().toISOString()).gte('end_date', new Date().toISOString()).maybeSingle();
             let seasonNo = currentSeason ? currentSeason.season_no : null;
             
             if (!seasonNo) {
-                const { data: lastSeason } = await Boako.db
-                    .from('seasons')
-                    .select('season_no')
-                    .lt('end_date', new Date().toISOString())
-                    .order('end_date', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
+                const { data: lastSeason } = await Boako.db.from('seasons')
+                    .select('season_no').lt('end_date', new Date().toISOString()).order('end_date', { ascending: false }).limit(1).maybeSingle();
                 seasonNo = lastSeason ? lastSeason.season_no : null;
             }
+
+            console.log("▶️ 1. 시즌 번호:", seasonNo);
 
             if (!seasonNo) {
                 contentArea.innerHTML = `<div class="text-center py-12 text-slate-500 font-bold">진행 중인 시즌 정보가 없습니다.</div>`;
@@ -273,19 +269,19 @@ Boako.Team = {
             const myName = Boako.state.user.nickname;
             const isLeader = Boako.state.team.type === 'LEADER';
 
-            // 🌟 2. 진실의 방: team_members 테이블만 뒤져서 진짜 팀장 닉네임 가져오기
-            // 소장님 DB 스키마에 맞춰 'role' 혹은 'is_leader' 등의 조건으로 팀장을 식별합니다.
-            const { data: leaderMember } = await Boako.db
+            console.log(`▶️ 2. 접속자 닉네임: [${myName}], 권한상태: [${Boako.state.team.type}]`);
+
+            // 🌟 [소장님 로직 구현 1단계] 현재 팀의 모든 멤버 데이터를 가져옵니다.
+            const { data: teamMembers, error: memErr } = await Boako.db
                 .from('team_members')
-                .select('player_name')
+                .select('player_name, role')
                 .eq('team_id', teamId)
-                .eq('role', 'LEADER') // 💡 필요시 DB 스키마에 맞게 수정
-                .eq('is_active', true)
-                .maybeSingle();
+                .eq('is_active', true);
 
-            const realLeaderName = leaderMember ? leaderMember.player_name : null;
+            if (memErr) throw memErr;
+            console.log("▶️ 3. [team_members] 데이터 로드 완료:", teamMembers);
 
-            // 🌟 3. 투표 내역 가져오기 (오류 없도록 단일 테이블 조회)
+            // 🌟 [소장님 로직 구현 2단계] 투표 내역을 가져옵니다.
             const { data: teamVotes, error: voteError } = await Boako.db
                 .from('grandprix_ban_votes')
                 .select('banned_game_name, voter_name, updated_at')
@@ -293,21 +289,34 @@ Boako.Team = {
                 .eq('team_name', teamName);
 
             if (voteError) throw voteError;
+            console.log("▶️ 4. [grandprix_ban_votes] 투표 내역 로드 완료:", teamVotes);
 
-            // 🌟 4. 승자 가리기 로직
+            // 🌟 3. 투표 대조 및 팀장 판별
             let myBannedGame = null;
             let leaderVotedGame = null;
             const voteCounts = {}; 
             const firstVoteTimes = {}; 
 
+            console.log("▶️ 5. 투표자 ↔ 팀 멤버 직급 대조 시작");
             (teamVotes || []).forEach(v => {
-                if (v.voter_name === myName) myBannedGame = v.banned_game_name;
-                
-                // 🔥 팀장의 투표 발견 시 무조건 확정 변수에 저장
-                if (realLeaderName && v.voter_name === realLeaderName) {
-                    leaderVotedGame = v.banned_game_name;
+                if (v.voter_name === myName) {
+                    myBannedGame = v.banned_game_name;
                 }
 
+                // 🔥 [소장님 로직 구현 3단계] voter_name과 일치하는 player_name을 찾고, 그 사람의 role이 LEADER인지 확인
+                const matchedMember = teamMembers.find(m => m.player_name === v.voter_name);
+                
+                if (matchedMember) {
+                    console.log(`   👉 투표자 [${v.voter_name}] 매칭 성공 -> 직급(role): [${matchedMember.role}]`);
+                    if (matchedMember.role === 'LEADER') {
+                        leaderVotedGame = v.banned_game_name;
+                        console.log(`      👑 [팀장 투표 감지!] 팀장 권한 밴 종목 확정: [${leaderVotedGame}]`);
+                    }
+                } else {
+                    console.log(`   👉 투표자 [${v.voter_name}] 매칭 실패 (팀 멤버 목록에 없음)`);
+                }
+
+                // 다수결 집계
                 if (!voteCounts[v.banned_game_name]) {
                     voteCounts[v.banned_game_name] = 0;
                     firstVoteTimes[v.banned_game_name] = new Date(v.updated_at).getTime();
@@ -320,7 +329,7 @@ Boako.Team = {
                 }
             });
 
-            // 🌟 5. 팀장 권한을 절대적 1순위로 세팅
+            // 🌟 4. 전광판 렌더링 최우선순위 설정
             const isBanConfirmed = (leaderVotedGame !== null);
             let leadingGame = leaderVotedGame; 
             let leadingReason = isBanConfirmed ? 'LEADER' : '';
@@ -346,6 +355,8 @@ Boako.Team = {
                 }
             }
 
+            console.log(`▶️ 6. 최종 판독 결과 -> 밴 확정 여부: [${isBanConfirmed}], 표기될 게임: [${leadingGame}], 사유: [${leadingReason}]`);
+
             const { data: games, error } = await Boako.db
                 .from('grandprix_games')
                 .select('id, game_name, game_logo_url')
@@ -359,12 +370,11 @@ Boako.Team = {
                 return;
             }
 
-            // 🌟 6. UI 렌더링
+            // 🌟 5. UI 렌더링
             let html = ``;
             const hasIVoted = myBannedGame !== null; 
             
             if (isBanConfirmed) {
-                // 팀장이 확정 지으면 다수결은 무시하고 최상단에 락다운 전광판 노출
                 html += `
                     <div class="mb-5 p-4 bg-slate-800 border border-slate-700 rounded-xl text-center shadow-md">
                         <span class="text-yellow-400 font-black text-sm block mb-1">👑 팀장 권한으로 밴 확정됨</span>
@@ -388,13 +398,12 @@ Boako.Team = {
             html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">`;
             
             games.forEach(game => {
-                const isConfirmed = isBanConfirmed && (game.game_name === leaderVotedGame);
-                const isLeading = (!isBanConfirmed) && (leadingGame === game.game_name);
+                const isLeaderPick = isBanConfirmed && (game.game_name === leaderVotedGame);
                 const isMyPick = myBannedGame === game.game_name;
+                const isLeadingByMajority = (!isBanConfirmed) && (leadingGame === game.game_name);
                 const currentVotes = voteCounts[game.game_name] || 0;
                 
-                // 🔥 흑백 BANNED 효과 기준 완벽 통제
-                const showBannedEffect = isConfirmed || (isLeading && hasIVoted);
+                const showBannedEffect = isLeaderPick || (isLeadingByMajority && hasIVoted);
 
                 const cardClass = showBannedEffect 
                     ? 'bg-slate-200 border-2 border-red-600 shadow-none' 
@@ -402,27 +411,45 @@ Boako.Team = {
                 
                 let btnClass = '';
                 let btnText = '';
+                let disableVote = false;
 
-                if (isConfirmed) {
-                    btnClass = 'w-full bg-slate-800 text-yellow-400 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-700 shadow-inner';
-                    btnText = '👑 팀장 밴 확정됨';
-                } else if (isBanConfirmed) {
-                    btnClass = 'w-full bg-slate-100 text-slate-400 text-xs font-bold py-2.5 rounded-lg cursor-not-allowed';
-                    btnText = '🔒 투표 마감';
-                } else if (isMyPick) {
-                    btnClass = 'w-full bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-lg cursor-default shadow-inner';
-                    btnText = '✅ 내 투표 반영됨';
-                } else if (showBannedEffect) {
-                    btnClass = 'w-full bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-800';
-                    btnText = '🛑 현재 밴 유력';
+                // 🔥 팀장/팀원 권한별 버튼 상태 분리
+                if (isLeader) {
+                    if (isMyPick) {
+                        btnClass = 'w-full bg-slate-800 text-yellow-400 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-700 shadow-inner';
+                        btnText = '👑 팀장 밴 확정됨';
+                        disableVote = true; 
+                    } else {
+                        btnClass = 'w-full bg-slate-800 hover:bg-red-600 hover:text-white text-yellow-400 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-700 shadow-sm active:scale-95';
+                        btnText = '👑 이 종목으로 변경';
+                        disableVote = false; 
+                    }
                 } else {
-                    btnClass = isLeader 
-                        ? 'w-full bg-slate-800 hover:bg-red-600 hover:text-white text-yellow-400 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-700 shadow-sm active:scale-95'
-                        : 'w-full bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 shadow-sm active:scale-95';
-                    btnText = isLeader ? '👑 팀장 밴 확정하기' : '✋ 이 종목 밴 투표';
+                    if (isBanConfirmed) {
+                        if (isLeaderPick) {
+                            btnClass = 'w-full bg-slate-800 text-yellow-400 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-700 shadow-inner';
+                            btnText = '👑 팀장 밴 확정됨';
+                        } else {
+                            btnClass = 'w-full bg-slate-100 text-slate-400 text-xs font-bold py-2.5 rounded-lg cursor-not-allowed';
+                            btnText = '🔒 투표 마감';
+                        }
+                        disableVote = true;
+                    } else {
+                        if (isMyPick) {
+                            btnClass = 'w-full bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-lg cursor-default shadow-inner';
+                            btnText = '✅ 내 투표 반영됨';
+                            disableVote = true; 
+                        } else if (showBannedEffect) {
+                            btnClass = 'w-full bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-lg cursor-default border border-slate-800';
+                            btnText = '🛑 현재 밴 유력';
+                            disableVote = false;
+                        } else {
+                            btnClass = 'w-full bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-600 text-xs font-bold py-2.5 rounded-lg transition-all border border-slate-200 shadow-sm active:scale-95';
+                            btnText = '✋ 이 종목 밴 투표';
+                            disableVote = false;
+                        }
+                    }
                 }
-                
-                const disableVote = isBanConfirmed || showBannedEffect || isMyPick;
 
                 const imgClass = showBannedEffect
                     ? 'w-full h-full object-contain p-3 grayscale opacity-30'
@@ -463,6 +490,9 @@ Boako.Team = {
             });
             html += `</div>`;
             contentArea.innerHTML = html;
+            console.log("========================================");
+            console.log("🏁 [추적 종료] 렌더링 완료");
+            console.log("========================================");
 
         } catch (err) {
             console.error("데이터 로드 실패:", err);
