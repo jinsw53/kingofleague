@@ -148,7 +148,7 @@ Boako.Match = {
         }
     },
 
-    // 🌟 4. [탭 1] 밴 결과 렌더링
+    // 🌟 4. [탭 1] 밴 결과 렌더링 (클릭 시 팀 투표소로 이동 적용)
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
         if (!games.length) {
@@ -156,20 +156,45 @@ Boako.Match = {
             return;
         }
 
-        let html = `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
+        let html = '';
+        
+        // ⏳ 정산 전(투표 중)일 때 띄워줄 상단 안내 배너
+        if (!isFinalized) {
+            html += `
+                <div class="mb-5 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center shadow-sm animate-pulse">
+                    <div>
+                        <h4 class="text-indigo-700 font-black text-sm">⏳ 현재 밴(Ban) 투표가 치열하게 진행 중입니다!</h4>
+                        <p class="text-indigo-500 text-xs font-bold mt-1">원하는 종목을 클릭하여 우리 팀 투표소로 바로 이동하세요.</p>
+                    </div>
+                    <span class="text-2xl">🗳️</span>
+                </div>
+            `;
+        }
+
+        html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
         
         games.forEach(game => {
             const isBanned = isFinalized && game.status !== 'FINAL';
+            const isCandidate = !isFinalized; // 아직 투표 진행 중인 후보 상태
 
-            const cardClass = isBanned 
+            // 상태에 따른 카드 디자인 분기
+            let cardClass = isBanned 
                 ? 'bg-slate-100 border-2 border-red-500/50 shadow-none' 
                 : 'bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-lg hover:-translate-y-1';
             
+            // 🌟 후보 상태일 때 클릭 포인터 추가
+            if (isCandidate) cardClass += ' cursor-pointer ring-2 ring-transparent hover:ring-indigo-300';
+
             const textClass = isBanned ? 'text-slate-400 line-through decoration-red-500/50' : 'text-slate-800';
             const imgClass = isBanned ? 'grayscale opacity-30' : 'drop-shadow-sm';
 
+            // 🌟 핵심 로직: 후보 카드를 클릭하면 팀 메뉴 렌더링 후 'record(기록/일정)' 탭으로 자동 전환
+            const clickEvent = isCandidate 
+                ? `onclick="Boako.View.render('team').then(() => setTimeout(() => Boako.View.switchTeamTab('record'), 100))"` 
+                : '';
+
             html += `
-                <div class="rounded-2xl p-5 flex flex-col items-center justify-between text-center transition-all duration-200 relative ${cardClass}">
+                <div ${clickEvent} class="rounded-2xl p-5 flex flex-col items-center justify-between text-center transition-all duration-200 relative ${cardClass}">
                     
                     ${isBanned ? `
                         <div class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10 rotate-12">
@@ -181,22 +206,22 @@ Boako.Match = {
                         </div>
                     `}
                     
-                    <div class="w-20 h-20 mb-4 flex items-center justify-center relative">
+                    <div class="w-20 h-20 mb-4 flex items-center justify-center relative pointer-events-none">
                         ${game.game_logo_url 
                             ? `<img src="${game.game_logo_url}" class="max-h-full max-w-full object-contain ${imgClass}">` 
                             : `<span class="text-5xl ${imgClass}">🎲</span>`
                         }
                     </div>
                     
-                    <h4 class="font-black text-sm break-keep mb-2 ${textClass}">${game.game_name}</h4>
+                    <h4 class="font-black text-sm break-keep mb-2 ${textClass} pointer-events-none">${game.game_name}</h4>
                     
                     ${isBanned ? `
-                        <div class="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded-lg w-full truncate border border-red-100">
+                        <div class="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded-lg w-full truncate border border-red-100 pointer-events-none">
                             밴(Ban) 확정 종목
                         </div>
                     ` : `
-                        <div class="text-[11px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg w-full border border-slate-100">
-                            ${isFinalized ? '본선 진출 종목' : '밴 투표 후보'}
+                        <div class="text-[11px] font-bold ${isCandidate ? 'text-indigo-600 bg-indigo-50 border-indigo-200' : 'text-slate-400 bg-slate-50 border-slate-100'} px-2 py-1 rounded-lg w-full border pointer-events-none">
+                            ${isFinalized ? '본선 진출 종목' : '👉 투표하러 가기'}
                         </div>
                     `}
                 </div>
