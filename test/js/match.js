@@ -110,16 +110,45 @@ Boako.Match = {
                 document.getElementById('match-season-date').innerText = `📅 ${currentSeason.start_date} ~ ${currentSeason.end_date}`;
             }
 
-            // 3-2. 전체 후보 종목 로드
-            const { data: games, error: gamesErr } = await Boako.db
+            // 🌟 3-2. [핵심 로직] 투표 확정 전후 분기 처리
+            let displayGames = [];
+            let isFinalized = false; // 정산 완료 여부
+
+            // 1단계: 먼저 'FINAL' 상태인 종목이 있는지 검사 (정산 함수가 돌았는지 확인)
+            const { data: finalGames, error: fErr } = await Boako.db
                 .from('grandprix_games')
                 .select('*')
                 .eq('season_no', seasonNo)
+                .eq('status', 'FINAL')
                 .order('selection_rank', { ascending: true });
             
-            if (gamesErr) throw gamesErr;
+            if (fErr) throw fErr;
 
-            // 3-3. 밴 투표 내역 로드 (소장님이 돌리실 정산 함수가 완료된 결과물)
+            if (finalGames && finalGames.length > 0) {
+                // ✅ [정산 완료] 투표가 결정됨: status가 'FINAL'인 녀석들만 보여줌
+                displayGames = finalGames;
+                isFinalized = true;
+                
+                // 전광판 상태 업데이트 (엔트리 제출 단계로 불 켜기)
+                document.getElementById('status-ban').classList.replace('bg-blue-600', 'bg-slate-700');
+                document.getElementById('status-ban').classList.replace('text-white', 'text-slate-400');
+                document.getElementById('status-entry').classList.replace('text-slate-400', 'bg-blue-600');
+                document.getElementById('status-entry').classList.add('text-white', 'shadow-lg');
+            } else {
+                // ⏳ [정산 전] 투표 진행 중: status가 'CANDIDATE'인 녀석들만 최대 10개 보여줌
+                const { data: candidateGames, error: cErr } = await Boako.db
+                    .from('grandprix_games')
+                    .select('*')
+                    .eq('season_no', seasonNo)
+                    .eq('status', 'CANDIDATE')
+                    .order('selection_rank', { ascending: true })
+                    .limit(10); // 👈 10개까지만 노출 제약
+                
+                if (cErr) throw cErr;
+                displayGames = candidateGames || [];
+            }
+
+            // 3-3. 밴 투표 내역 로드 
             const { data: bans, error: bansErr } = await Boako.db
                 .from('grandprix_ban_votes')
                 .select('banned_game_name, team_name')
@@ -127,9 +156,9 @@ Boako.Match = {
 
             if (bansErr) throw bansErr;
 
-            // 🌟 4. 데이터 가공 후 각각의 탭 렌더링 함수로 넘김
-            Boako.Match.renderBanTab(games || [], bans || []);
-            Boako.Match.renderEntryTab(games || [], bans || []);
+            // 🌟 4. 분류된 데이터를 바탕으로 화면 렌더링
+            Boako.Match.renderBanTab(displayGames, bans || [], isFinalized);
+            Boako.Match.renderEntryTab(displayGames, bans || [], isFinalized);
 
         } catch (err) {
             console.error("대항전 데이터 로드 에러:", err);
