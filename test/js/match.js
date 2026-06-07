@@ -211,9 +211,10 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
-    // 🌟 5. [탭 2] 게임별 매치업
+   // 🌟 5. [탭 2] 게임별 매치업 (다인전 유연 배치 및 블라인드 처리 적용)
     renderEntryTab: (games, isFinalized) => {
         const content = document.getElementById('match-entry-content');
+        content.className = "w-full block";
         
         // 정산 전이면 엔트리 탭 차단
         if (!isFinalized) {
@@ -234,7 +235,12 @@ Boako.Match = {
         }
 
         let html = `<div class="space-y-6">`;
+        
         survivingGames.forEach(game => {
+            // 💡 [임시 로직] 나중에 DB에서 is_finalized = true 인 엔트리를 가져와 여기에 넣습니다.
+            // 지금은 크론이 돌기 전(빈 배열)이라고 가정하여 블라인드 상태가 뜨게 합니다.
+            const entries = []; // 예시: [{ team_name: 'A팀', players: '진시월, 홍길동' }]
+            
             html += `
                 <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                     
@@ -245,7 +251,7 @@ Boako.Match = {
                             </div>
                             <div>
                                 <h3 class="font-black text-white text-lg">${game.game_name}</h3>
-                                <span class="text-slate-300 text-xs font-bold">본선 매치업</span>
+                                <span class="text-slate-300 text-xs font-bold">본선 출전 엔트리</span>
                             </div>
                         </div>
                         
@@ -254,22 +260,25 @@ Boako.Match = {
                         </button>
                     </div>
 
-                    <div class="p-6">
-                        <div class="flex flex-col md:flex-row items-stretch justify-center gap-4 md:gap-8 relative">
-                            <div class="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-red-500 text-white font-black italic rounded-full items-center justify-center border-4 border-white shadow-sm z-10">VS</div>
-
-                            <div class="flex-1 bg-blue-50/50 border-2 border-blue-100 rounded-2xl p-5 text-center relative overflow-hidden">
-                                <span class="text-blue-600 font-black text-sm mb-3 block">HOME TEAM</span>
-                                <div class="text-slate-400 font-bold text-sm bg-white py-4 rounded-xl border border-slate-200 shadow-inner">아직 엔트리가 제출되지 않았습니다.</div>
+                    <div class="p-6 bg-slate-50/50">
+                        ${entries.length > 0 ? `
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                ${entries.map(entry => `
+                                    <div class="bg-white border-2 border-indigo-100 rounded-xl p-4 text-center shadow-sm">
+                                        <span class="text-indigo-600 font-black text-sm mb-2 block">${entry.team_name}</span>
+                                        <div class="text-slate-700 font-bold text-sm bg-slate-50 py-3 rounded-lg border border-slate-200">
+                                            ${entry.players}
+                                        </div>
+                                    </div>
+                                `).join('')}
                             </div>
-                            
-                            <div class="md:hidden flex justify-center py-2"><span class="bg-red-500 text-white font-black italic px-3 py-1 rounded-full text-xs">VS</span></div>
-
-                            <div class="flex-1 bg-red-50/50 border-2 border-red-100 rounded-2xl p-5 text-center relative overflow-hidden">
-                                <span class="text-red-600 font-black text-sm mb-3 block">AWAY TEAM</span>
-                                <div class="text-slate-400 font-bold text-sm bg-white py-4 rounded-xl border border-slate-200 shadow-inner">아직 엔트리가 제출되지 않았습니다.</div>
+                        ` : `
+                            <div class="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-slate-300 rounded-xl bg-slate-100/50">
+                                <span class="text-3xl mb-2">🔒</span>
+                                <h4 class="text-slate-600 font-black text-sm">엔트리 제출 및 블라인드 진행 중</h4>
+                                <p class="text-slate-400 font-bold text-xs mt-1">상대방의 꼼수를 막기 위해, 제출 마감일 전까지 모든 엔트리는 비공개됩니다.</p>
                             </div>
-                        </div>
+                        `}
                     </div>
                 </div>
             `;
