@@ -41,37 +41,48 @@ Boako.Team = {
         const btn = document.getElementById('btn_f');
         const file = document.getElementById('team_logo').files[0];
         btn.disabled = true; btn.innerText = "창단 처리 중...";
+        
         try {
             const fExt = file.name.split('.').pop();
             const fName = `${Date.now()}.${fExt}`;
             await Boako.db.storage.from('teams').upload(fName, file);
             const { data: uData } = Boako.db.storage.from('teams').getPublicUrl(fName);
+
+            // 🌟 1. 내 닉네임 확실하게 검증해서 확보하기
+            let myName = Boako.state.user.nickname;
+            if (!myName) {
+                const { data: profile } = await Boako.db.from('profiles')
+                    .select('full_name')
+                    .eq('id', Boako.state.user.id)
+                    .maybeSingle();
+                myName = profile?.full_name || Boako.state.user.user_metadata?.full_name || "이름없음";
+                Boako.state.user.nickname = myName;
+            }
             
-            // 🌟 1. 팀 데이터 생성 (존재하지 않는 leader_name 컬럼 삭제)
+            // 🌟 2. 팀 데이터 생성 (💡 백엔드 트리거를 위해 leader_name을 반드시 함께 보냅니다!)
             const { data: newTeam, error: teamError } = await Boako.db.from('teams').insert([{ 
                 team_name: document.getElementById('team_name').value.trim(), 
                 owner_id: Boako.state.user.id, 
+                leader_name: myName, // 👈 [핵심] 이 값이 백엔드 NEW.leader_name으로 들어갑니다!
                 team_motto: document.getElementById('team_motto').value.trim(),
                 team_desc: document.getElementById('team_desc').value.trim(),
-                logo_url: uData.publicUrl 
+                logo_url: uData.publicUrl,
+                logo_url_origin: uData.publicUrl 
             }]).select().single();
 
             if (teamError) throw teamError;
 
-            // 🌟 2. 치명적 누락 해결: 팀을 만든 본인을 team_members에 즉시 등록
-            const { error: memberError } = await Boako.db.from('team_members').insert([{
-                team_id: newTeam.id,
-                player_name: Boako.state.user.nickname,
-                role: 'LEADER', // DB 스키마 직급 컬럼에 맞게 수정 필요 시 수정
-                is_active: true
-            }]);
-
-            if (memberError) throw memberError;
+            // 프론트엔드에서의 team_members INSERT 로직은 백엔드 트리거가 대신해주므로 생략합니다!
 
             Boako.Util.toast("✅ 새로운 전설의 팀이 탄생했습니다!");
             Boako.View.render('team');
-        } catch (err) { Boako.Util.toast(err.message); } 
-        finally { btn.disabled = false; btn.innerText = "전설의 팀 창단하기"; }
+            
+        } catch (err) { 
+            Boako.Util.toast(err.message); 
+        } finally { 
+            btn.disabled = false; 
+            btn.innerText = "전설의 팀 창단하기"; 
+        }
     },
     
     updateInfo: async (col) => {
