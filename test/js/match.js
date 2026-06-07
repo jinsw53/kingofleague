@@ -211,12 +211,11 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
-   // 🌟 5. [탭 2] 게임별 매치업 (다인전 유연 배치 및 블라인드 처리 적용)
-    renderEntryTab: (games, isFinalized) => {
+  // 🌟 5. [탭 2] 게임별 매치업 (클릭 시 엔트리 작전판 오픈 기능 추가)
+    renderEntryTab: (games, isFinalized, entries) => {
         const content = document.getElementById('match-entry-content');
         content.className = "w-full block";
         
-        // 정산 전이면 엔트리 탭 차단
         if (!isFinalized) {
             content.innerHTML = `
                 <div class="bg-slate-50 border border-slate-200 p-10 rounded-2xl text-center">
@@ -237,46 +236,59 @@ Boako.Match = {
         let html = `<div class="space-y-6">`;
         
         survivingGames.forEach(game => {
-            // 💡 [임시 로직] 나중에 DB에서 is_finalized = true 인 엔트리를 가져와 여기에 넣습니다.
-            // 지금은 크론이 돌기 전(빈 배열)이라고 가정하여 블라인드 상태가 뜨게 합니다.
-            const entries = []; // 예시: [{ team_name: 'A팀', players: '진시월, 홍길동' }]
+            // 💡 해당 종목의 확정된 엔트리만 필터링
+            const gameEntries = entries.filter(e => e.game_name === game.game_name);
             
             html += `
                 <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                     
+                    <!-- 💡 헤더 영역 (로고/제목 클릭 시 작전판 열림) -->
                     <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm p-1">
+                        <div class="flex items-center gap-3 cursor-pointer group" onclick="Boako.Team.openEntryForm()">
+                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm p-1 group-hover:scale-110 transition-transform duration-300">
                                 ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="w-full h-full object-contain">` : '🎲'}
                             </div>
                             <div>
-                                <h3 class="font-black text-white text-lg">${game.game_name}</h3>
+                                <h3 class="font-black text-white text-lg group-hover:text-indigo-300 transition-colors">${game.game_name}</h3>
                                 <span class="text-slate-300 text-xs font-bold">본선 출전 엔트리</span>
                             </div>
                         </div>
                         
-                        <button onclick="Boako.Util.toast('해당 종목 선수들의 소통 채널이 열립니다.')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
-                            💬 출전자 소통 / 일정 조율
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <!-- 💡 확정 전(블라인드)일 때 헤더에도 엔트리 작성 버튼 노출 -->
+                            ${gameEntries.length === 0 ? `
+                                <button onclick="Boako.Team.openEntryForm()" class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-2">
+                                    📝 작전판 열기
+                                </button>
+                            ` : ''}
+                            <button onclick="Boako.Util.toast('해당 종목 선수들의 소통 채널이 열립니다.')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
+                                💬 소통 채널
+                            </button>
+                        </div>
                     </div>
 
                     <div class="p-6 bg-slate-50/50">
-                        ${entries.length > 0 ? `
+                        ${gameEntries.length > 0 ? `
+                            <!-- 크론 정산 후: 확정된 엔트리 명단 공개 -->
                             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                ${entries.map(entry => `
-                                    <div class="bg-white border-2 border-indigo-100 rounded-xl p-4 text-center shadow-sm">
-                                        <span class="text-indigo-600 font-black text-sm mb-2 block">${entry.team_name}</span>
-                                        <div class="text-slate-700 font-bold text-sm bg-slate-50 py-3 rounded-lg border border-slate-200">
-                                            ${entry.players}
+                                ${gameEntries.map(entry => `
+                                    <div class="bg-white border-2 border-indigo-100 rounded-xl p-4 text-center shadow-sm relative overflow-hidden">
+                                        <span class="text-indigo-600 font-black text-sm mb-2 block relative z-10">${entry.team_name}</span>
+                                        <div class="text-slate-700 font-bold text-sm bg-slate-50 py-3 rounded-lg border border-slate-200 relative z-10">
+                                            ${entry.player_name}
                                         </div>
                                     </div>
                                 `).join('')}
                             </div>
                         ` : `
-                            <div class="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-slate-300 rounded-xl bg-slate-100/50">
-                                <span class="text-3xl mb-2">🔒</span>
-                                <h4 class="text-slate-600 font-black text-sm">엔트리 제출 및 블라인드 진행 중</h4>
-                                <p class="text-slate-400 font-bold text-xs mt-1">상대방의 꼼수를 막기 위해, 제출 마감일 전까지 모든 엔트리는 비공개됩니다.</p>
+                            <!-- 💡 크론 정산 전: 블라인드 박스 전체를 클릭 가능하게 변경 -->
+                            <div onclick="Boako.Team.openEntryForm()" class="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-indigo-200 rounded-xl bg-indigo-50/50 cursor-pointer hover:bg-indigo-100/50 hover:border-indigo-400 transition-all group">
+                                <span class="text-4xl mb-3 group-hover:scale-125 transition-transform duration-300">🔒</span>
+                                <h4 class="text-indigo-700 font-black text-sm">엔트리 제출 및 블라인드 진행 중</h4>
+                                <p class="text-slate-500 font-bold text-xs mt-1 mb-4">상대방의 꼼수를 막기 위해, 제출 마감일 전까지 모든 엔트리는 비공개됩니다.</p>
+                                <span class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md group-hover:bg-indigo-700 transition-colors group-active:scale-95">
+                                    👇 여기를 클릭하여 우리 팀 엔트리 작성하기
+                                </span>
                             </div>
                         `}
                     </div>
