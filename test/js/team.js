@@ -522,11 +522,9 @@ Boako.Team = {
         }
     },
 
-    // 🌟 1. 엔트리 작전판(모달) 열기
+    // 🌟 1. 엔트리 작전판(모달) 열기 (로딩 함수 제거)
     openEntryForm: async () => {
         try {
-            Boako.Util.showLoading('작전판을 불러오는 중...');
-
             // 1. 현재 시즌 정보 가져오기
             const { data: currentSeason } = await Boako.db.from('seasons')
                 .select('*')
@@ -545,7 +543,6 @@ Boako.Team = {
                 .order('selection_rank', { ascending: true });
 
             if (!finalGames || finalGames.length === 0) {
-                Boako.Util.hideLoading();
                 Boako.Util.toast('본선 확정 종목이 없습니다. 정산을 기다려주세요.', 'error');
                 return;
             }
@@ -556,13 +553,11 @@ Boako.Team = {
                 .eq('team_id', Boako.state.team.info.id)
                 .eq('is_active', true);
 
-            // 4. 기존에 저장해둔 엔트리가 있는지 불러오기 (불러와서 폼에 미리 채워둠)
+            // 4. 기존에 저장해둔 엔트리가 있는지 불러오기
             const { data: existingEntries } = await Boako.db.from('grandprix_entries')
                 .select('*')
                 .eq('season_no', seasonNo)
                 .eq('team_name', teamName);
-
-            Boako.Util.hideLoading();
 
             // 5. 모달 UI 생성
             let html = `
@@ -584,7 +579,6 @@ Boako.Team = {
             `;
 
             finalGames.forEach(game => {
-                // 기존 저장된 플레이어가 있는지 확인
                 const saved = existingEntries?.find(e => e.game_name === game.game_name);
                 const savedPlayer = saved ? saved.player_name : '';
 
@@ -635,42 +629,36 @@ Boako.Team = {
             document.body.insertAdjacentHTML('beforeend', html);
 
         } catch (err) {
-            Boako.Util.hideLoading();
             console.error("작전판 로드 에러:", err);
             Boako.Util.toast('엔트리 작전판을 여는 중 오류가 발생했습니다.', 'error');
         }
     },
 
-    // 🌟 2. 엔트리 데이터 DB에 저장 (UPSERT 마법 적용!)
+    // 🌟 2. 엔트리 데이터 DB에 저장 (로딩 함수 제거)
     saveEntry: async (e, seasonNo, teamName) => {
         e.preventDefault();
         try {
-            Boako.Util.showLoading('작전판 데이터 동기화 중...');
-            
             const formData = new FormData(e.target);
             const upsertData = [];
-            const gamesToDelete = []; // '미정(빈값)'으로 바꾼 종목들은 삭제를 위해 분리
+            const gamesToDelete = []; 
 
             for (const [key, value] of formData.entries()) {
                 if (key.startsWith('entry_game_')) {
                     const gameName = key.replace('entry_game_', '');
                     if (value) {
-                        // 선수가 선택된 경우 UPSERT 배열에 담기
                         upsertData.push({
                             season_no: seasonNo,
                             team_name: teamName,
                             game_name: gameName,
                             player_name: value,
-                            registered_by: Boako.state.user.nickname // 등록한 사람(팀장) 닉네임 기록
+                            registered_by: Boako.state.user.nickname
                         });
                     } else {
-                        // "미정 / 출전 포기"를 선택한 경우 삭제 배열에 담기
                         gamesToDelete.push(gameName);
                     }
                 }
             }
 
-            // 1. "미정"으로 변경된 종목들은 DB에서 깔끔하게 삭제
             if (gamesToDelete.length > 0) {
                 await Boako.db.from('grandprix_entries')
                     .delete()
@@ -679,24 +667,21 @@ Boako.Team = {
                     .in('game_name', gamesToDelete);
             }
 
-            // 2. 값이 있는 종목들은 UPSERT! (소장님이 만드신 Unique 제약조건을 기준으로 덮어쓰기)
             if (upsertData.length > 0) {
                 const { error: upsertErr } = await Boako.db.from('grandprix_entries')
                     .upsert(upsertData, { 
-                        onConflict: 'season_no, team_name, game_name' // 💡 충돌 기준 명시!
+                        onConflict: 'season_no, team_name, game_name' 
                     });
                 
                 if (upsertErr) throw upsertErr;
             }
 
-            Boako.Util.hideLoading();
             Boako.Util.toast('✅ 엔트리가 성공적으로 업데이트 되었습니다!');
             
             // 모달 닫기
             document.getElementById('entry-modal-overlay').remove();
             
         } catch (err) {
-            Boako.Util.hideLoading();
             console.error("엔트리 저장 에러:", err);
             Boako.Util.toast('저장 중 오류가 발생했습니다. 다시 시도해 주세요.', 'error');
         }
