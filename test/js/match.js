@@ -74,7 +74,7 @@ Boako.Match = {
         activeBtn.classList.add('border-indigo-600', 'text-indigo-600');
     },
 
-    // 🌟 3. 데이터 로드 (엔트리 테이블 조회 및 파라미터 전달)
+    // 🌟 3. 데이터 로드 (쿼리 수정)
     loadData: async () => {
         try {
             const { data: currentSeason } = await Boako.db.from('seasons')
@@ -117,21 +117,20 @@ Boako.Match = {
                 displayGames = allGames.filter(g => g.status === 'CANDIDATE').slice(0, 10);
             }
 
-            // 💡 [핵심] 마감/확정(is_finalized = true)된 엔트리 긁어오기
             let confirmedEntries = [];
             if (isFinalized) {
+                // 💡 [핵심] 여기서 teams 테이블을 JOIN하여 logo_url을 함께 가져옵니다!
                 const { data: entriesData, error: entriesErr } = await Boako.db
                     .from('grandprix_entries')
-                    .select('*')
+                    .select('*, teams(logo_url)') 
                     .eq('season_no', seasonNo)
-                    .eq('is_finalized', true); // 확정된 것만!
+                    .eq('is_finalized', true);
                 
                 if (entriesErr) console.error("엔트리 로드 에러:", entriesErr);
                 else confirmedEntries = entriesData || [];
             }
 
             Boako.Match.renderBanTab(displayGames, isFinalized);
-            // 💡 렌더링 함수에 긁어온 confirmedEntries를 확실하게 전달!
             Boako.Match.renderEntryTab(displayGames, isFinalized, confirmedEntries);
 
         } catch (err) {
@@ -223,7 +222,7 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
-  // 🌟 5. [탭 2] 게임별 매치업 (entries = [] 기본값 처리로 undefined 완벽 방어)
+  // 🌟 5. [탭 2] 게임별 매치업 (로고 렌더링 적용)
     renderEntryTab: (games, isFinalized, entries = []) => {
         const content = document.getElementById('match-entry-content');
         content.className = "w-full block";
@@ -248,7 +247,6 @@ Boako.Match = {
         let html = `<div class="space-y-6">`;
         
         survivingGames.forEach(game => {
-            // 💡 entries가 undefined로 넘어와도 위에서 []로 받았기 때문에 안전하게 filter 작동!
             const gameEntries = entries.filter(e => e.game_name === game.game_name);
             
             html += `
@@ -281,9 +279,12 @@ Boako.Match = {
                         ${gameEntries.length > 0 ? `
                             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                 ${gameEntries.map(entry => `
-                                    <div class="bg-white border-2 border-indigo-100 rounded-xl p-4 text-center shadow-sm relative overflow-hidden">
+                                    <div class="bg-white border-2 border-indigo-100 rounded-xl p-4 text-center shadow-sm relative overflow-hidden flex flex-col items-center">
+                                        <div class="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shadow-sm flex items-center justify-center mb-2 z-10">
+                                            ${entry.teams?.logo_url ? `<img src="${entry.teams.logo_url}" class="w-full h-full object-cover">` : '<span class="text-xl">🏴</span>'}
+                                        </div>
                                         <span class="text-indigo-600 font-black text-sm mb-2 block relative z-10">${entry.team_name}</span>
-                                        <div class="text-slate-700 font-bold text-sm bg-slate-50 py-3 rounded-lg border border-slate-200 relative z-10">
+                                        <div class="text-slate-700 font-bold text-sm bg-slate-50 py-3 rounded-lg border border-slate-200 relative z-10 w-full">
                                             ${entry.player_name}
                                         </div>
                                     </div>
