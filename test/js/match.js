@@ -118,7 +118,7 @@ Boako.Match = {
                 displayGames = allGames.filter(g => g.status === 'CANDIDATE').slice(0, 10);
             }
 
-            Boako.Match.renderBanTab(displayGames, isFinalized);
+            Boako.Match.(displayGames, isFinalized);
             Boako.Match.renderEntryTab(displayGames, isFinalized);
 
         } catch (err) {
@@ -131,7 +131,7 @@ Boako.Match = {
         }
     },
 
-    // 🌟 4. [탭 1] 밴 결과 렌더링 (CANDIDATE 배지 삭제, 버튼 클릭으로 이동)
+    // 🌟 4. [탭 1] 밴 결과 렌더링 (SURVIVED 삭제, 텍스트 넘침 방지)
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
         content.className = "w-full block"; 
@@ -161,7 +161,6 @@ Boako.Match = {
             const isBanned = isFinalized && game.status !== 'FINAL';
             const isCandidate = !isFinalized;
 
-            // 카드 클릭 효과 제거
             let cardClass = isBanned 
                 ? 'bg-slate-100 border-2 border-red-500/50 shadow-none' 
                 : 'bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-lg hover:-translate-y-1';
@@ -169,7 +168,6 @@ Boako.Match = {
             const textClass = isBanned ? 'text-slate-400 line-through decoration-red-500/50' : 'text-slate-800';
             const imgClass = isBanned ? 'grayscale opacity-30' : 'drop-shadow-sm';
 
-            // 버튼 클릭 이벤트
             const clickEvent = isCandidate 
                 ? `onclick="Boako.View.render('team').then(() => setTimeout(() => Boako.View.switchTeamTab('record'), 100))"` 
                 : '';
@@ -177,10 +175,9 @@ Boako.Match = {
             html += `
                 <div class="rounded-2xl p-5 flex flex-col items-center justify-between text-center transition-all duration-200 relative ${cardClass}">
                     
+                    <!-- 💡 SURVIVED 배지 삭제, BANNED만 남김 -->
                     ${isBanned ? `
                         <div class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10 rotate-12">BANNED</div>
-                    ` : isFinalized ? `
-                        <div class="absolute top-3 right-3 bg-emerald-100 text-emerald-600 text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10">SURVIVED</div>
                     ` : ''}
                     
                     <div class="w-20 h-20 mb-4 flex items-center justify-center relative">
@@ -192,9 +189,10 @@ Boako.Match = {
                     
                     <h4 class="font-black text-sm break-keep mb-3 ${textClass}">${game.game_name}</h4>
                     
+                    <!-- 💡 하단 텍스트 수정 (글씨 넘침 방지) -->
                     ${isBanned ? `
                         <div class="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-lg w-full truncate border border-red-100">
-                            밴(Ban) 확정 종목
+                            밴 확정 종목
                         </div>
                     ` : isCandidate ? `
                         <button ${clickEvent} class="text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2 py-1.5 rounded-lg w-full shadow-sm transition-colors cursor-pointer active:scale-95">
