@@ -74,7 +74,7 @@ Boako.Match = {
         activeBtn.classList.add('border-indigo-600', 'text-indigo-600');
     },
 
-    // 🌟 3. 데이터 로드 (시즌 로고 처리 추가)
+    // 🌟 3. 데이터 로드 (엔트리 테이블 조회 및 파라미터 전달)
     loadData: async () => {
         try {
             const { data: currentSeason } = await Boako.db.from('seasons')
@@ -88,7 +88,6 @@ Boako.Match = {
             if (currentSeason) {
                 document.getElementById('match-season-title').innerText = currentSeason.title || `시즌 ${seasonNo} 대항전`;
                 
-                // 날짜 대신 시즌 로고 렌더링
                 const logoArea = document.getElementById('match-season-logo-area');
                 if (currentSeason.logo_url) {
                     logoArea.innerHTML = `<img src="${currentSeason.logo_url}" class="h-10 object-contain drop-shadow-md">`;
@@ -118,9 +117,22 @@ Boako.Match = {
                 displayGames = allGames.filter(g => g.status === 'CANDIDATE').slice(0, 10);
             }
 
-            // 💡 이 부분이 수정되었습니다! 함수 이름을 명확히 적어주었습니다.
+            // 💡 [핵심] 마감/확정(is_finalized = true)된 엔트리 긁어오기
+            let confirmedEntries = [];
+            if (isFinalized) {
+                const { data: entriesData, error: entriesErr } = await Boako.db
+                    .from('grandprix_entries')
+                    .select('*')
+                    .eq('season_no', seasonNo)
+                    .eq('is_finalized', true); // 확정된 것만!
+                
+                if (entriesErr) console.error("엔트리 로드 에러:", entriesErr);
+                else confirmedEntries = entriesData || [];
+            }
+
             Boako.Match.renderBanTab(displayGames, isFinalized);
-            Boako.Match.renderEntryTab(displayGames, isFinalized);
+            // 💡 렌더링 함수에 긁어온 confirmedEntries를 확실하게 전달!
+            Boako.Match.renderEntryTab(displayGames, isFinalized, confirmedEntries);
 
         } catch (err) {
             console.error("대항전 데이터 로드 에러:", err);
@@ -211,8 +223,8 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
-  // 🌟 5. [탭 2] 게임별 매치업 (클릭 시 엔트리 작전판 오픈 기능 추가)
-    renderEntryTab: (games, isFinalized, entries) => {
+  // 🌟 5. [탭 2] 게임별 매치업 (entries = [] 기본값 처리로 undefined 완벽 방어)
+    renderEntryTab: (games, isFinalized, entries = []) => {
         const content = document.getElementById('match-entry-content');
         content.className = "w-full block";
         
@@ -236,13 +248,12 @@ Boako.Match = {
         let html = `<div class="space-y-6">`;
         
         survivingGames.forEach(game => {
-            // 💡 해당 종목의 확정된 엔트리만 필터링
+            // 💡 entries가 undefined로 넘어와도 위에서 []로 받았기 때문에 안전하게 filter 작동!
             const gameEntries = entries.filter(e => e.game_name === game.game_name);
             
             html += `
                 <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                     
-                    <!-- 💡 헤더 영역 (로고/제목 클릭 시 작전판 열림) -->
                     <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
                         <div class="flex items-center gap-3 cursor-pointer group" onclick="Boako.Team.openEntryForm()">
                             <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm p-1 group-hover:scale-110 transition-transform duration-300">
@@ -255,7 +266,6 @@ Boako.Match = {
                         </div>
                         
                         <div class="flex items-center gap-2">
-                            <!-- 💡 확정 전(블라인드)일 때 헤더에도 엔트리 작성 버튼 노출 -->
                             ${gameEntries.length === 0 ? `
                                 <button onclick="Boako.Team.openEntryForm()" class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-2">
                                     📝 작전판 열기
@@ -269,7 +279,6 @@ Boako.Match = {
 
                     <div class="p-6 bg-slate-50/50">
                         ${gameEntries.length > 0 ? `
-                            <!-- 크론 정산 후: 확정된 엔트리 명단 공개 -->
                             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                 ${gameEntries.map(entry => `
                                     <div class="bg-white border-2 border-indigo-100 rounded-xl p-4 text-center shadow-sm relative overflow-hidden">
@@ -281,7 +290,6 @@ Boako.Match = {
                                 `).join('')}
                             </div>
                         ` : `
-                            <!-- 💡 크론 정산 전: 블라인드 박스 전체를 클릭 가능하게 변경 -->
                             <div onclick="Boako.Team.openEntryForm()" class="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-indigo-200 rounded-xl bg-indigo-50/50 cursor-pointer hover:bg-indigo-100/50 hover:border-indigo-400 transition-all group">
                                 <span class="text-4xl mb-3 group-hover:scale-125 transition-transform duration-300">🔒</span>
                                 <h4 class="text-indigo-700 font-black text-sm">엔트리 제출 및 블라인드 진행 중</h4>
