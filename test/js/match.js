@@ -118,7 +118,8 @@ Boako.Match = {
                 displayGames = allGames.filter(g => g.status === 'CANDIDATE').slice(0, 10);
             }
 
-            Boako.Match.(displayGames, isFinalized);
+            // 💡 이 부분이 수정되었습니다! 함수 이름을 명확히 적어주었습니다.
+            Boako.Match.renderBanTab(displayGames, isFinalized);
             Boako.Match.renderEntryTab(displayGames, isFinalized);
 
         } catch (err) {
