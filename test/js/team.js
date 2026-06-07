@@ -1,5 +1,5 @@
 /**
- * [TEAM] 팀 관리 (창단, 정보수정, 멤버관리, 밴 투표, 채팅 등)
+ * [TEAM] 팀 관리 (창단, 정보수정, 멤버관리, 밴 투표, 작전판, 채팅 등)
  */
 Boako.Team = {
     syncStatus: async () => {
@@ -519,6 +519,186 @@ Boako.Team = {
                 console.error("투표 에러:", err);
                 alert("투표 처리 중 오류가 발생했습니다:\n" + err.message);
             }
+        }
+    },
+
+    // 🌟 1. 엔트리 작전판(모달) 열기
+    openEntryForm: async () => {
+        try {
+            Boako.Util.showLoading('작전판을 불러오는 중...');
+
+            // 1. 현재 시즌 정보 가져오기
+            const { data: currentSeason } = await Boako.db.from('seasons')
+                .select('*')
+                .lte('start_date', new Date().toISOString())
+                .gte('end_date', new Date().toISOString())
+                .maybeSingle();
+            
+            const seasonNo = currentSeason ? currentSeason.season_no : 1;
+            const teamName = Boako.state.team.info.team_name;
+
+            // 2. 본선(FINAL) 확정된 종목만 가져오기
+            const { data: finalGames } = await Boako.db.from('grandprix_games')
+                .select('*')
+                .eq('season_no', seasonNo)
+                .eq('status', 'FINAL')
+                .order('selection_rank', { ascending: true });
+
+            if (!finalGames || finalGames.length === 0) {
+                Boako.Util.hideLoading();
+                Boako.Util.toast('본선 확정 종목이 없습니다. 정산을 기다려주세요.', 'error');
+                return;
+            }
+
+            // 3. 우리 팀 멤버 목록 가져오기 (드롭다운 옵션용)
+            const { data: members } = await Boako.db.from('team_members')
+                .select('*')
+                .eq('team_id', Boako.state.team.info.id)
+                .eq('is_active', true);
+
+            // 4. 기존에 저장해둔 엔트리가 있는지 불러오기 (불러와서 폼에 미리 채워둠)
+            const { data: existingEntries } = await Boako.db.from('grandprix_entries')
+                .select('*')
+                .eq('season_no', seasonNo)
+                .eq('team_name', teamName);
+
+            Boako.Util.hideLoading();
+
+            // 5. 모달 UI 생성
+            let html = `
+                <div id="entry-modal-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        
+                        <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 flex justify-between items-center text-white shrink-0">
+                            <div>
+                                <h2 class="text-2xl font-black flex items-center gap-2"><span class="text-3xl">📝</span> 엔트리 작전판</h2>
+                                <p class="text-emerald-100 text-sm font-bold mt-1">마감 전까지 자유롭게 선수 교체가 가능합니다.</p>
+                            </div>
+                            <button onclick="document.getElementById('entry-modal-overlay').remove()" class="text-white hover:text-emerald-200 p-2 transition-colors">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+
+                        <div class="p-6 overflow-y-auto custom-scrollbar bg-slate-50 flex-1">
+                            <form id="team-entry-form" onsubmit="Boako.Team.saveEntry(event, ${seasonNo}, '${teamName}')" class="space-y-4">
+            `;
+
+            finalGames.forEach(game => {
+                // 기존 저장된 플레이어가 있는지 확인
+                const saved = existingEntries?.find(e => e.game_name === game.game_name);
+                const savedPlayer = saved ? saved.player_name : '';
+
+                html += `
+                    <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 hover:border-emerald-300 transition-colors shadow-sm">
+                        
+                        <div class="w-16 h-16 shrink-0 bg-slate-100 rounded-xl flex items-center justify-center p-2 border border-slate-200 relative">
+                            ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="max-h-full max-w-full object-contain">` : '<span class="text-3xl">🎲</span>'}
+                        </div>
+                        
+                        <div class="flex-1 text-center sm:text-left w-full">
+                            <h4 class="font-black text-slate-800 text-lg">${game.game_name}</h4>
+                            <p class="text-slate-400 text-xs font-bold mt-1">출전 선수를 할당하세요.</p>
+                        </div>
+                        
+                        <div class="w-full sm:w-48 shrink-0 relative">
+                            <select name="entry_game_${game.game_name}" class="w-full appearance-none bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-3 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer text-sm shadow-inner transition-all">
+                                <option value="">미정 / 출전 포기</option>
+                                ${members.map(m => `
+                                    <option value="${m.player_name}" ${m.player_name === savedPlayer ? 'selected' : ''}>
+                                        ${m.player_name} ${m.role === 'LEADER' ? '(팀장)' : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-600">
+                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                            </form>
+                        </div>
+                        
+                        <div class="p-6 bg-white border-t border-slate-100 shrink-0">
+                            <button type="submit" form="team-entry-form" class="w-full bg-emerald-600 text-white font-black text-lg py-4 rounded-2xl shadow-lg hover:bg-emerald-700 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2">
+                                💾 작전판 임시 저장하기
+                            </button>
+                            <p class="text-center text-slate-400 text-xs font-bold mt-3">저장해도 마감 전까지 다른 팀에게는 🔒 비공개 처리됩니다.</p>
+                        </div>
+
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', html);
+
+        } catch (err) {
+            Boako.Util.hideLoading();
+            console.error("작전판 로드 에러:", err);
+            Boako.Util.toast('엔트리 작전판을 여는 중 오류가 발생했습니다.', 'error');
+        }
+    },
+
+    // 🌟 2. 엔트리 데이터 DB에 저장 (UPSERT 마법 적용!)
+    saveEntry: async (e, seasonNo, teamName) => {
+        e.preventDefault();
+        try {
+            Boako.Util.showLoading('작전판 데이터 동기화 중...');
+            
+            const formData = new FormData(e.target);
+            const upsertData = [];
+            const gamesToDelete = []; // '미정(빈값)'으로 바꾼 종목들은 삭제를 위해 분리
+
+            for (const [key, value] of formData.entries()) {
+                if (key.startsWith('entry_game_')) {
+                    const gameName = key.replace('entry_game_', '');
+                    if (value) {
+                        // 선수가 선택된 경우 UPSERT 배열에 담기
+                        upsertData.push({
+                            season_no: seasonNo,
+                            team_name: teamName,
+                            game_name: gameName,
+                            player_name: value,
+                            registered_by: Boako.state.user.nickname // 등록한 사람(팀장) 닉네임 기록
+                        });
+                    } else {
+                        // "미정 / 출전 포기"를 선택한 경우 삭제 배열에 담기
+                        gamesToDelete.push(gameName);
+                    }
+                }
+            }
+
+            // 1. "미정"으로 변경된 종목들은 DB에서 깔끔하게 삭제
+            if (gamesToDelete.length > 0) {
+                await Boako.db.from('grandprix_entries')
+                    .delete()
+                    .eq('season_no', seasonNo)
+                    .eq('team_name', teamName)
+                    .in('game_name', gamesToDelete);
+            }
+
+            // 2. 값이 있는 종목들은 UPSERT! (소장님이 만드신 Unique 제약조건을 기준으로 덮어쓰기)
+            if (upsertData.length > 0) {
+                const { error: upsertErr } = await Boako.db.from('grandprix_entries')
+                    .upsert(upsertData, { 
+                        onConflict: 'season_no, team_name, game_name' // 💡 충돌 기준 명시!
+                    });
+                
+                if (upsertErr) throw upsertErr;
+            }
+
+            Boako.Util.hideLoading();
+            Boako.Util.toast('✅ 엔트리가 성공적으로 업데이트 되었습니다!');
+            
+            // 모달 닫기
+            document.getElementById('entry-modal-overlay').remove();
+            
+        } catch (err) {
+            Boako.Util.hideLoading();
+            console.error("엔트리 저장 에러:", err);
+            Boako.Util.toast('저장 중 오류가 발생했습니다. 다시 시도해 주세요.', 'error');
         }
     },
 
