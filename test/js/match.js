@@ -269,7 +269,7 @@ Boako.Match = {
                                     📝 작전판 열기
                                 </button>
                             ` : ''}
-                            // (renderEntryTab 함수 안의 버튼 HTML 부분 수정)
+                           
 <button onclick="Boako.Match.Chat.open(${game.season_no}, '${game.game_name}')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
     💬 소통 채널
 </button>
