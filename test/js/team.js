@@ -522,10 +522,10 @@ Boako.Team = {
         }
     },
 
-    // 🌟 1. 엔트리 작전판(모달) 열기 (로딩 함수 제거)
+   // 🌟 1. 엔트리 작전판(모달) 열기 (팀장/팀원 권한 분리 적용)
     openEntryForm: async () => {
         try {
-            // 1. 현재 시즌 정보 가져오기
+            // 1. 현재 시즌 및 팀 정보 가져오기
             const { data: currentSeason } = await Boako.db.from('seasons')
                 .select('*')
                 .lte('start_date', new Date().toISOString())
@@ -534,6 +534,8 @@ Boako.Team = {
             
             const seasonNo = currentSeason ? currentSeason.season_no : 1;
             const teamName = Boako.state.team.info.team_name;
+            const isLeader = Boako.state.team.type === 'LEADER'; // 💡 팀장 여부 확인
+            const myName = Boako.state.user.nickname; // 💡 내 닉네임
 
             // 2. 본선(FINAL) 확정된 종목만 가져오기
             const { data: finalGames } = await Boako.db.from('grandprix_games')
@@ -547,7 +549,7 @@ Boako.Team = {
                 return;
             }
 
-            // 3. 우리 팀 멤버 목록 가져오기 (드롭다운 옵션용)
+            // 3. 우리 팀 멤버 목록 (팀장용 드롭다운에 사용)
             const { data: members } = await Boako.db.from('team_members')
                 .select('*')
                 .eq('team_id', Boako.state.team.info.id)
@@ -566,8 +568,12 @@ Boako.Team = {
                         
                         <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 flex justify-between items-center text-white shrink-0">
                             <div>
-                                <h2 class="text-2xl font-black flex items-center gap-2"><span class="text-3xl">📝</span> 엔트리 작전판</h2>
-                                <p class="text-emerald-100 text-sm font-bold mt-1">마감 전까지 자유롭게 선수 교체가 가능합니다.</p>
+                                <h2 class="text-2xl font-black flex items-center gap-2">
+                                    <span class="text-3xl">📝</span> 엔트리 작전판 ${isLeader ? '<span class="text-sm bg-yellow-500 text-black px-2 py-0.5 rounded ml-2">팀장 모드</span>' : ''}
+                                </h2>
+                                <p class="text-emerald-100 text-sm font-bold mt-1">
+                                    ${isLeader ? '팀장은 전체 엔트리를 자유롭게 수정할 수 있습니다.' : '출전을 원하는 종목에 본인을 등록하세요.'}
+                                </p>
                             </div>
                             <button onclick="document.getElementById('entry-modal-overlay').remove()" class="text-white hover:text-emerald-200 p-2 transition-colors">
                                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -581,31 +587,60 @@ Boako.Team = {
             finalGames.forEach(game => {
                 const saved = existingEntries?.find(e => e.game_name === game.game_name);
                 const savedPlayer = saved ? saved.player_name : '';
+                
+                let selectHtml = '';
+
+                // 🔥 [핵심 로직] 권한에 따른 드롭다운 분기 처리
+                if (isLeader) {
+                    // 👑 1. 팀장: 모든 팀원을 선택할 수 있는 전권 드롭다운
+                    selectHtml = `
+                        <select name="entry_game_${game.game_name}" class="w-full appearance-none bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-3 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer text-sm shadow-inner transition-all">
+                            <option value="">미정 / 출전 포기</option>
+                            ${members.map(m => `
+                                <option value="${m.player_name}" ${m.player_name === savedPlayer ? 'selected' : ''}>
+                                    ${m.player_name} ${m.role === 'LEADER' ? '(팀장)' : ''}
+                                </option>
+                            `).join('')}
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-600">▼</div>
+                    `;
+                } else {
+                    // 👤 2. 일반 팀원 로직
+                    if (savedPlayer && savedPlayer !== myName) {
+                        // 다른 사람이 이미 선점한 경우 -> 수정 불가 (읽기 전용)
+                        selectHtml = `
+                            <select disabled class="w-full appearance-none bg-slate-100 border border-slate-200 text-slate-500 font-bold py-3 px-4 rounded-xl cursor-not-allowed text-sm">
+                                <option>${savedPlayer} 출전 예정</option>
+                            </select>
+                            <div class="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400">🔒</div>
+                            <!-- 폼 제출 시 빈값 날아가는 걸 방지하기 위해 hidden input으로 값 유지 -->
+                            <input type="hidden" name="entry_game_${game.game_name}" value="${savedPlayer}">
+                        `;
+                    } else {
+                        // 빈자리이거나, 내가 선점한 자리인 경우 -> 본인 선택 또는 취소(미정) 가능
+                        selectHtml = `
+                            <select name="entry_game_${game.game_name}" class="w-full appearance-none bg-white border border-blue-200 text-blue-700 font-bold py-3 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm shadow-sm transition-all hover:bg-blue-50">
+                                <option value="">미정 (빈자리)</option>
+                                <option value="${myName}" ${savedPlayer === myName ? 'selected' : ''}>🙋‍♂️ ${myName} (본인 출전)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-blue-500">▼</div>
+                        `;
+                    }
+                }
 
                 html += `
                     <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 hover:border-emerald-300 transition-colors shadow-sm">
-                        
                         <div class="w-16 h-16 shrink-0 bg-slate-100 rounded-xl flex items-center justify-center p-2 border border-slate-200 relative">
                             ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="max-h-full max-w-full object-contain">` : '<span class="text-3xl">🎲</span>'}
                         </div>
-                        
                         <div class="flex-1 text-center sm:text-left w-full">
                             <h4 class="font-black text-slate-800 text-lg">${game.game_name}</h4>
                             <p class="text-slate-400 text-xs font-bold mt-1">출전 선수를 할당하세요.</p>
                         </div>
                         
+                        <!-- 렌더링된 드롭다운 삽입 -->
                         <div class="w-full sm:w-48 shrink-0 relative">
-                            <select name="entry_game_${game.game_name}" class="w-full appearance-none bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-3 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer text-sm shadow-inner transition-all">
-                                <option value="">미정 / 출전 포기</option>
-                                ${members.map(m => `
-                                    <option value="${m.player_name}" ${m.player_name === savedPlayer ? 'selected' : ''}>
-                                        ${m.player_name} ${m.role === 'LEADER' ? '(팀장)' : ''}
-                                    </option>
-                                `).join('')}
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-600">
-                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                            </div>
+                            ${selectHtml}
                         </div>
                     </div>
                 `;
