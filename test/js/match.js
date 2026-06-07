@@ -2,9 +2,8 @@
  * [MATCH] 대항전 메인 대시보드 관리
  */
 Boako.Match = {
-    // 🌟 1. 대시보드 초기화 (view.js에서 넘겨주는 containerId를 받아서 처리)
+    // 🌟 1. 대시보드 초기화 (상단 UI 군더더기 제거 및 로고 영역 추가)
     init: async (containerId) => {
-        // 넘겨받은 ID가 있으면 쓰고, 없으면 기본값 적용
         const targetId = containerId || 'main-content';
         const container = document.getElementById(targetId); 
         
@@ -13,55 +12,39 @@ Boako.Match = {
             return;
         }
 
-        // HTML 레이아웃 (탭 메뉴, 전광판) 렌더링
         container.innerHTML = `
             <div class="max-w-5xl mx-auto p-4 space-y-6" style="animation: fadeIn 0.3s ease-out;">
                 
-                <!-- 👑 상단 전광판 (Hero Section) -->
                 <div class="bg-slate-900 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
                     <div class="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-indigo-500 rounded-full blur-[80px] opacity-40 pointer-events-none"></div>
                     <div class="absolute bottom-0 left-0 -ml-12 -mb-12 w-48 h-48 bg-blue-600 rounded-full blur-[80px] opacity-30 pointer-events-none"></div>
                     
                     <div class="relative z-10 flex flex-col md:flex-row justify-between md:items-end gap-4">
                         <div>
-                            <span class="inline-block px-3 py-1 bg-white/10 text-blue-200 text-xs font-black rounded-lg mb-3 tracking-wider backdrop-blur-sm">GRAND PRIX</span>
-                            <h1 class="text-3xl md:text-4xl font-black mb-2" id="match-season-title">대항전 데이터 로딩 중...</h1>
-                            <p class="text-slate-400 font-bold text-sm" id="match-season-date">일정 정보 불러오는 중</p>
+                            <h1 class="text-3xl md:text-4xl font-black mb-3" id="match-season-title">대항전 데이터 로딩 중...</h1>
+                            <div id="match-season-logo-area" class="h-10 flex items-center">
+                                <span class="text-white/50 text-sm font-bold border border-white/20 px-3 py-1 rounded-lg animate-pulse">로고 데이터 대기 중...</span>
+                            </div>
                         </div>
                         
-                        <!-- 직관적인 진행 상태 타임라인 -->
                         <div class="flex items-center gap-2 text-xs font-black bg-black/30 p-2 rounded-2xl backdrop-blur-md border border-white/10">
-                            <span class="px-4 py-2 rounded-xl bg-blue-600 text-white shadow-lg" id="status-ban">🚫 밴픽 진행</span>
+                            <span class="px-4 py-2 rounded-xl bg-blue-600 text-white shadow-lg transition-colors" id="status-ban">🚫 밴픽 진행</span>
                             <span class="text-slate-600">▶</span>
-                            <span class="px-4 py-2 rounded-xl text-slate-400" id="status-entry">⚔️ 엔트리 제출</span>
+                            <span class="px-4 py-2 rounded-xl text-slate-400 transition-colors" id="status-entry">⚔️ 엔트리 제출</span>
                             <span class="text-slate-600">▶</span>
-                            <span class="px-4 py-2 rounded-xl text-slate-400" id="status-play">🏆 본선 경기</span>
+                            <span class="px-4 py-2 rounded-xl text-slate-400 transition-colors" id="status-play">🏆 본선 경기</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- 🗂️ 탭 네비게이션 -->
                 <div class="flex gap-1 border-b-2 border-slate-100 pb-px overflow-x-auto custom-scrollbar">
                     <button onclick="Boako.Match.switchTab('tab-ban')" id="btn-tab-ban" class="whitespace-nowrap px-6 py-3 text-sm font-black border-b-4 border-indigo-600 text-indigo-600 transition-colors">🚫 밴(Ban) 결과</button>
                     <button onclick="Boako.Match.switchTab('tab-entry')" id="btn-tab-entry" class="whitespace-nowrap px-6 py-3 text-sm font-black border-b-4 border-transparent text-slate-400 hover:text-slate-700 transition-colors">⚔️ 게임별 매치업</button>
                     <button onclick="Boako.Match.switchTab('tab-score')" id="btn-tab-score" class="whitespace-nowrap px-6 py-3 text-sm font-black border-b-4 border-transparent text-slate-400 hover:text-slate-700 transition-colors">📊 스코어보드</button>
                 </div>
 
-                <!-- 📺 탭 1: 밴 결과 컨텐츠 -->
-                <div id="tab-ban" class="space-y-4">
-                    <div id="match-ban-content" class="min-h-[300px] flex items-center justify-center text-slate-400 font-bold">
-                        <span class="animate-pulse">데이터 베이스 통신 중... ⏳</span>
-                    </div>
-                </div>
-
-                <!-- 📺 탭 2: 매치업 & 엔트리 컨텐츠 -->
-                <div id="tab-entry" class="hidden space-y-4">
-                    <div id="match-entry-content" class="min-h-[300px] flex items-center justify-center text-slate-400 font-bold">
-                        <span class="animate-pulse">대진표 구성 중... ⏳</span>
-                    </div>
-                </div>
-
-                <!-- 📺 탭 3: 스코어보드 컨텐츠 -->
+                <div id="tab-ban" class="space-y-4"><div id="match-ban-content"></div></div>
+                <div id="tab-entry" class="hidden space-y-4"><div id="match-entry-content"></div></div>
                 <div id="tab-score" class="hidden space-y-4">
                     <div class="bg-white p-12 rounded-3xl text-center border border-slate-200 shadow-sm">
                         <span class="text-6xl block mb-4 drop-shadow-md">🏆</span>
@@ -73,11 +56,10 @@ Boako.Match = {
             </div>
         `;
 
-        // 레이아웃을 그린 직후 DB 데이터 로드 실행
         await Boako.Match.loadData();
     },
 
-    // 🌟 2. 탭 전환 로직
+    // (switchTab 함수는 그대로 유지)
     switchTab: (tabId) => {
         ['tab-ban', 'tab-entry', 'tab-score'].forEach(id => {
             document.getElementById(id).classList.add('hidden');
@@ -92,7 +74,7 @@ Boako.Match = {
         activeBtn.classList.add('border-indigo-600', 'text-indigo-600');
     },
 
-    // 🌟 3. 데이터 로드 (투표 내역 테이블 조회 완전 삭제, 비밀 룰 적용)
+    // 🌟 3. 데이터 로드 (시즌 로고 처리 추가)
     loadData: async () => {
         try {
             const { data: currentSeason } = await Boako.db.from('seasons')
@@ -105,10 +87,16 @@ Boako.Match = {
             
             if (currentSeason) {
                 document.getElementById('match-season-title').innerText = currentSeason.title || `시즌 ${seasonNo} 대항전`;
-                document.getElementById('match-season-date').innerText = `📅 ${currentSeason.start_date} ~ ${currentSeason.end_date}`;
+                
+                // 날짜 대신 시즌 로고 렌더링
+                const logoArea = document.getElementById('match-season-logo-area');
+                if (currentSeason.logo_url) {
+                    logoArea.innerHTML = `<img src="${currentSeason.logo_url}" class="h-10 object-contain drop-shadow-md">`;
+                } else {
+                    logoArea.innerHTML = `<span class="text-white/50 text-sm font-bold border border-white/20 px-3 py-1 rounded-lg">시즌 로고 대기 중</span>`;
+                }
             }
 
-            // 이번 시즌의 전체 종목 '한 번만' 싹 다 불러오기
             const { data: allGames, error: gamesErr } = await Boako.db
                 .from('grandprix_games')
                 .select('*')
@@ -117,21 +105,16 @@ Boako.Match = {
             
             if (gamesErr) throw gamesErr;
 
-            // 정산이 끝났는지(FINAL 상태인 녀석이 하나라도 있는지) 확인
             const isFinalized = allGames.some(g => g.status === 'FINAL');
             let displayGames = [];
 
             if (isFinalized) {
-                // ✅ [정산 완료] 전체 종목을 넘김 (렌더링 함수에서 status로 밴 여부 구분)
                 displayGames = allGames;
-                
-                // 전광판 상태 업데이트 (엔트리 단계로 전환)
                 document.getElementById('status-ban').classList.replace('bg-blue-600', 'bg-slate-700');
                 document.getElementById('status-ban').classList.replace('text-white', 'text-slate-400');
                 document.getElementById('status-entry').classList.replace('text-slate-400', 'bg-blue-600');
                 document.getElementById('status-entry').classList.add('text-white', 'shadow-lg');
             } else {
-                // ⏳ [정산 전] CANDIDATE 상태인 녀석들만 10개 커트해서 넘김
                 displayGames = allGames.filter(g => g.status === 'CANDIDATE').slice(0, 10);
             }
 
@@ -148,7 +131,7 @@ Boako.Match = {
         }
     },
 
-    // 🌟 4. [탭 1] 밴 결과 렌더링 (PC 기준 5열 배치 적용)
+    // 🌟 4. [탭 1] 밴 결과 렌더링 (CANDIDATE 배지 삭제, 버튼 클릭으로 이동)
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
         content.className = "w-full block"; 
@@ -162,66 +145,64 @@ Boako.Match = {
         
         if (!isFinalized) {
             html += `
-                <div class="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center shadow-sm animate-pulse w-full">
+                <div class="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center shadow-sm w-full">
                     <div>
                         <h4 class="text-indigo-700 font-black text-sm">⏳ 현재 밴(Ban) 투표가 치열하게 진행 중입니다!</h4>
-                        <p class="text-indigo-500 text-xs font-bold mt-1">원하는 종목을 클릭하여 우리 팀 투표소로 바로 이동하세요.</p>
+                        <p class="text-indigo-500 text-xs font-bold mt-1">투표하러 가기 버튼을 클릭하여 우리 팀 투표소로 이동하세요.</p>
                     </div>
-                    <span class="text-2xl">🗳️</span>
+                    <span class="text-2xl animate-pulse">🗳️</span>
                 </div>
             `;
         }
 
-        // 💡 [핵심 수정] md:grid-cols-4 였던 부분을 md:grid-cols-5 로 변경했습니다.
-        // 모바일: 2개 / 태블릿: 3개 / PC: 5개씩 나옵니다.
         html += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full">`;
         
         games.forEach(game => {
             const isBanned = isFinalized && game.status !== 'FINAL';
             const isCandidate = !isFinalized;
 
+            // 카드 클릭 효과 제거
             let cardClass = isBanned 
                 ? 'bg-slate-100 border-2 border-red-500/50 shadow-none' 
                 : 'bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-lg hover:-translate-y-1';
-            
-            if (isCandidate) cardClass += ' cursor-pointer ring-2 ring-transparent hover:ring-indigo-300';
 
             const textClass = isBanned ? 'text-slate-400 line-through decoration-red-500/50' : 'text-slate-800';
             const imgClass = isBanned ? 'grayscale opacity-30' : 'drop-shadow-sm';
 
+            // 버튼 클릭 이벤트
             const clickEvent = isCandidate 
                 ? `onclick="Boako.View.render('team').then(() => setTimeout(() => Boako.View.switchTeamTab('record'), 100))"` 
                 : '';
 
             html += `
-                <div ${clickEvent} class="rounded-2xl p-5 flex flex-col items-center justify-between text-center transition-all duration-200 relative ${cardClass}">
+                <div class="rounded-2xl p-5 flex flex-col items-center justify-between text-center transition-all duration-200 relative ${cardClass}">
                     
                     ${isBanned ? `
-                        <div class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10 rotate-12">
-                            BANNED
-                        </div>
-                    ` : `
-                        <div class="absolute top-3 right-3 bg-emerald-100 text-emerald-600 text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10">
-                            ${isFinalized ? 'SURVIVED' : 'CANDIDATE'}
-                        </div>
-                    `}
+                        <div class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10 rotate-12">BANNED</div>
+                    ` : isFinalized ? `
+                        <div class="absolute top-3 right-3 bg-emerald-100 text-emerald-600 text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10">SURVIVED</div>
+                    ` : ''}
                     
-                    <div class="w-20 h-20 mb-4 flex items-center justify-center relative pointer-events-none">
+                    <div class="w-20 h-20 mb-4 flex items-center justify-center relative">
                         ${game.game_logo_url 
                             ? `<img src="${game.game_logo_url}" class="max-h-full max-w-full object-contain ${imgClass}">` 
                             : `<span class="text-5xl ${imgClass}">🎲</span>`
                         }
                     </div>
                     
-                    <h4 class="font-black text-sm break-keep mb-2 ${textClass} pointer-events-none">${game.game_name}</h4>
+                    <h4 class="font-black text-sm break-keep mb-3 ${textClass}">${game.game_name}</h4>
                     
                     ${isBanned ? `
-                        <div class="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded-lg w-full truncate border border-red-100 pointer-events-none">
+                        <div class="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-lg w-full truncate border border-red-100">
                             밴(Ban) 확정 종목
                         </div>
+                    ` : isCandidate ? `
+                        <button ${clickEvent} class="text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2 py-1.5 rounded-lg w-full shadow-sm transition-colors cursor-pointer active:scale-95">
+                            👉 투표하러 가기
+                        </button>
                     ` : `
-                        <div class="text-[11px] font-bold ${isCandidate ? 'text-indigo-600 bg-indigo-50 border-indigo-200' : 'text-slate-400 bg-slate-50 border-slate-100'} px-2 py-1 rounded-lg w-full border pointer-events-none">
-                            ${isFinalized ? '본선 진출 종목' : '👉 투표하러 가기'}
+                        <div class="text-[11px] font-bold text-slate-400 bg-slate-50 px-2 py-1.5 rounded-lg w-full border border-slate-100">
+                            본선 진출 종목
                         </div>
                     `}
                 </div>
