@@ -1,7 +1,7 @@
 /**
  * [MESSENGER - V3.2] 아카이브 통신망
  * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 라이벌 매치 통합 / 팀 가입 결재 시스템 
- * - 🌟 [신규] 대항전 소통 채널 목록 연동 및 브릿지 추가
+ * - 🌟 [신규] 대항전 소통 채널 목록 연동 (가짜 데이터 필터링 완벽 적용)
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -78,34 +78,45 @@ Boako.Messenger = {
                 Boako.Messenger.chatRooms[roomId].messages.unshift(msg); 
             });
 
-            // 🌟 [신규 추가] 내가 출전 중인 대항전 소통채널을 쪽지 목록에 강제 주입
+            // 🌟 [수정됨] 내가 출전 중인 대항전 소통채널 강제 주입 (가짜 데이터 필터링 적용)
             try {
-    // 💡 player_id 대신 player_name(내 닉네임)으로 조회
-    const { data: myEntries } = await Boako.db.from('grandprix_entries')
-        .select('game_name, season_no')
-        .eq('player_name', Boako.state.user.nickname) // 💡 player_name 사용
-        .eq('is_finalized', true);
+                // 1단계: grandprix_games 테이블에서 실제로 '본선(FINAL)' 상태인 종목만 먼저 찾습니다.
+                const { data: finalGames } = await Boako.db.from('grandprix_games')
+                    .select('game_name, season_no')
+                    .eq('status', 'FINAL');
+                
+                if (finalGames && finalGames.length > 0) {
+                    // 본선 종목 이름만 따로 배열로 뽑아냅니다.
+                    const finalGameNames = finalGames.map(g => g.game_name);
+                    
+                    // 2단계: 내 엔트리를 찾을 때, 방금 뽑아낸 '본선 종목' 목록에 있는 것만 가져옵니다.
+                    const { data: myEntries } = await Boako.db.from('grandprix_entries')
+                        .select('game_name, season_no')
+                        .eq('player_name', Boako.state.user.nickname)
+                        .eq('is_finalized', true)
+                        .in('game_name', finalGameNames); // 💡 여기서 가짜 데이터가 완벽하게 걸러집니다.
 
-    if (myEntries) {
-        myEntries.forEach(entry => {
-            const roomId = `match_channel_${entry.season_no}_${entry.game_name}`;
-            Boako.Messenger.chatRooms[roomId] = {
-                id: roomId,
-                isMatchChannel: true, 
-                seasonNo: entry.season_no,
-                gameName: entry.game_name,
-                title: `[${entry.game_name}] 소통 채널`,
-                badge: `<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>`,
-                lastMessage: '👉 클릭하여 소통 채널 모달 열기',
-                lastTime: new Date().toISOString(),
-                unread: 0,
-                messages: []
-            };
-        });
-    }
-} catch (e) {
-    console.error("소통채널 목록 연동 실패:", e);
-}
+                    if (myEntries) {
+                        myEntries.forEach(entry => {
+                            const roomId = `match_channel_${entry.season_no}_${entry.game_name}`;
+                            Boako.Messenger.chatRooms[roomId] = {
+                                id: roomId,
+                                isMatchChannel: true, 
+                                seasonNo: entry.season_no,
+                                gameName: entry.game_name,
+                                title: `[${entry.game_name}] 소통 채널`,
+                                badge: `<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>`,
+                                lastMessage: '👉 클릭하여 소통 채널 모달 열기',
+                                lastTime: new Date().toISOString(),
+                                unread: 0,
+                                messages: []
+                            };
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("소통채널 목록 연동 실패:", e);
+            }
 
             return Boako.Messenger.chatRooms;
         } catch (err) {
@@ -245,7 +256,6 @@ Boako.Messenger = {
                 const unreadBadge = room.unread > 0 ? `<div class="bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full">${room.unread}</div>` : '';
                 const activeClass = Boako.Messenger.currentRoomId === room.id ? 'bg-white shadow-sm border-indigo-200' : 'border-transparent hover:bg-white/60';
                 
-                // 💡 소통채널(isMatchChannel)일 경우 아이콘을 📣 로 변경
                 const icon = room.isMatchChannel ? '📣' : (room.isMatch ? '⚔️' : room.title.charAt(0));
 
                 listHtml += `
@@ -270,10 +280,14 @@ Boako.Messenger = {
         },
 
         openRoom: (roomId) => {
-            // 🌟 [신규 추가] 만약 클릭한 방이 '대항전 소통채널'이면 쪽지창 대신 채팅 모달을 띄우고 중단
+            // 🌟 [수정됨] 대항전 소통채널 클릭 시 에러 방지 처리 (Boako.Match 안전 호출)
             if (Boako.Messenger.chatRooms[roomId]?.isMatchChannel) {
                 const room = Boako.Messenger.chatRooms[roomId];
-                Boako.Match.Chat.open(room.seasonNo, room.gameName);
+                if (Boako.Match && Boako.Match.Chat) {
+                    Boako.Match.Chat.open(room.seasonNo, room.gameName);
+                } else {
+                    Boako.Util.toast("채널 모듈을 로드 중입니다. 잠시 후 다시 클릭해주세요.");
+                }
                 return; 
             }
 
