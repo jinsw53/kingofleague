@@ -381,23 +381,27 @@ Boako.Match = {
             }
 
             
-            // 3. 실시간 통신(Supabase Realtime) 연결
+           // 3. 실시간 통신(Supabase Realtime) 연결
             if (Boako.Match.Chat.channel) Boako.db.removeChannel(Boako.Match.Chat.channel);
 
             Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${seasonNo}-${gameName}`)
                 .on('postgres_changes', { 
                     event: 'INSERT', 
                     schema: 'public', 
-                    table: 'grandprix_match_chats',
-                    filter: `season_no=eq.${seasonNo}&game_name=eq.${gameName}`
+                    table: 'grandprix_match_chats'
+                    // 💡 여기에 있던 filter 줄을 지웠습니다!
                 }, (payload) => {
                     const newMsg = payload.new;
-                    // 내가 보낸 메시지가 아니면 화면에 그리기 (내가 보낸 건 send() 함수에서 즉시 그림)
+                    
+                    // 💡 여기에 로그를 추가했습니다.
+                    console.log("🚨 [테스트 수신 완료] 리얼타임 데이터 도착:", newMsg);
+
                     if (newMsg.sender_id !== Boako.state.user.id) {
-                         // 실시간 이벤트에는 profile 조인이 안 들어오므로 프론트에서 가라로 처리하거나 다시 조회
                          newMsg.profiles = { full_name: "상대 선수" }; 
-                         Boako.Match.Chat.renderMessage(newMsg);
-                         Boako.Match.Chat.scrollToBottom();
+                         
+                         // 💡 화면이 뒤섞이는 걸 막기 위해, 화면에 그리는 부분만 잠시 꺼둡니다. (주석 처리)
+                         // Boako.Match.Chat.renderMessage(newMsg);
+                         // Boako.Match.Chat.scrollToBottom();
                     }
                 })
                 .subscribe();
