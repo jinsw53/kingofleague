@@ -389,19 +389,18 @@ Boako.Match = {
                     event: 'INSERT', 
                     schema: 'public', 
                     table: 'grandprix_match_chats'
-                    // 💡 여기에 있던 filter 줄을 지웠습니다!
+                    // 💡 서버 필터는 공백 인식이 깨지므로 삭제했습니다.
                 }, (payload) => {
                     const newMsg = payload.new;
-                    
-                    // 💡 여기에 로그를 추가했습니다.
-                    console.log("🚨 [테스트 수신 완료] 리얼타임 데이터 도착:", newMsg);
 
-                    if (newMsg.sender_id !== Boako.state.user.id) {
-                         newMsg.profiles = { full_name: "상대 선수" }; 
-                         
-                         // 💡 화면이 뒤섞이는 걸 막기 위해, 화면에 그리는 부분만 잠시 꺼둡니다. (주석 처리)
-                         // Boako.Match.Chat.renderMessage(newMsg);
-                         // Boako.Match.Chat.scrollToBottom();
+                    // 💡 [해결책] 자바스크립트(프론트엔드)에서 직접 정확하게 필터링합니다.
+                    if (String(newMsg.season_no) === String(seasonNo) && newMsg.game_name === gameName) {
+                        // 내가 보낸 메시지가 아닐 때만 화면에 그리기
+                        if (newMsg.sender_id !== Boako.state.user.id) {
+                             newMsg.profiles = { full_name: "상대 선수" }; 
+                             Boako.Match.Chat.renderMessage(newMsg);
+                             Boako.Match.Chat.scrollToBottom();
+                        }
                     }
                 })
                 .subscribe();
