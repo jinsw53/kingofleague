@@ -388,7 +388,7 @@ Boako.Match = {
                     event: 'INSERT', 
                     schema: 'public', 
                     table: 'grandprix_match_chats',
-                    filter: `season_no=eq.${seasonNo}&game_name=eq.${gameName}`
+                    //filter: `season_no=eq.${seasonNo}&game_name=eq.${gameName}`
                 }, (payload) => {
                     const newMsg = payload.new;
                     // 내가 보낸 메시지가 아니면 화면에 그리기 (내가 보낸 건 send() 함수에서 즉시 그림)
