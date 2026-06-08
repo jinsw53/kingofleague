@@ -80,31 +80,32 @@ Boako.Messenger = {
 
             // 🌟 [신규 추가] 내가 출전 중인 대항전 소통채널을 쪽지 목록에 강제 주입
             try {
-                const { data: myEntries } = await Boako.db.from('grandprix_entries')
-                    .select('game_name, season_no')
-                    .eq('player_id', myId)
-                    .eq('is_finalized', true); // 확정된 엔트리만
+    // 💡 player_id 대신 player_name(내 닉네임)으로 조회
+    const { data: myEntries } = await Boako.db.from('grandprix_entries')
+        .select('game_name, season_no')
+        .eq('player_name', Boako.state.user.nickname) // 💡 player_name 사용
+        .eq('is_finalized', true);
 
-                if (myEntries) {
-                    myEntries.forEach(entry => {
-                        const roomId = `match_channel_${entry.season_no}_${entry.game_name}`;
-                        Boako.Messenger.chatRooms[roomId] = {
-                            id: roomId,
-                            isMatchChannel: true, // 💡 소통채널 식별 플래그
-                            seasonNo: entry.season_no,
-                            gameName: entry.game_name,
-                            title: `[${entry.game_name}] 소통 채널`,
-                            badge: `<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>`,
-                            lastMessage: '👉 클릭하여 소통 채널 모달 열기',
-                            lastTime: new Date().toISOString(), // 목록 최상단에 띄우기 위해 현재 시간 부여
-                            unread: 0,
-                            messages: []
-                        };
-                    });
-                }
-            } catch (e) {
-                console.error("소통채널 목록 연동 실패:", e);
-            }
+    if (myEntries) {
+        myEntries.forEach(entry => {
+            const roomId = `match_channel_${entry.season_no}_${entry.game_name}`;
+            Boako.Messenger.chatRooms[roomId] = {
+                id: roomId,
+                isMatchChannel: true, 
+                seasonNo: entry.season_no,
+                gameName: entry.game_name,
+                title: `[${entry.game_name}] 소통 채널`,
+                badge: `<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>`,
+                lastMessage: '👉 클릭하여 소통 채널 모달 열기',
+                lastTime: new Date().toISOString(),
+                unread: 0,
+                messages: []
+            };
+        });
+    }
+} catch (e) {
+    console.error("소통채널 목록 연동 실패:", e);
+}
 
             return Boako.Messenger.chatRooms;
         } catch (err) {
