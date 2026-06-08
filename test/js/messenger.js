@@ -1,6 +1,7 @@
 /**
- * [MESSENGER - V3.1] 아카이브 통신망
- * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 라이벌 매치 통합 / 🌟 팀 가입 결재 시스템 추가
+ * [MESSENGER - V3.2] 아카이브 통신망
+ * - 실시간 수신 / 스마트 방 나가기 / 매치 일정 카드 제안 / 라이벌 매치 통합 / 팀 가입 결재 시스템 
+ * - 🌟 [신규] 대항전 소통 채널 목록 연동 및 브릿지 추가
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -54,7 +55,6 @@ Boako.Messenger = {
                         matchBadge = `<span class="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">${msg.metadata?.match_type || 'MATCH'}</span>`;
                     }
 
-                    // 🌟 팁: 쪽지가 팀 가입 신청서(TEAM_JOIN)일 경우 목록에 JSON 대신 안내 텍스트 표시
                     const displayMessage = msg.action_type === 'TEAM_JOIN' ? '🛡️ 입단 지원서가 도착했습니다.' : 
                        (msg.action_type === 'TEAM_INVITE' ? '💌 팀 영입 제안서가 도착했습니다.' : msg.content);
 
@@ -77,6 +77,34 @@ Boako.Messenger = {
                 
                 Boako.Messenger.chatRooms[roomId].messages.unshift(msg); 
             });
+
+            // 🌟 [신규 추가] 내가 출전 중인 대항전 소통채널을 쪽지 목록에 강제 주입
+            try {
+                const { data: myEntries } = await Boako.db.from('grandprix_entries')
+                    .select('game_name, season_no')
+                    .eq('player_id', myId)
+                    .eq('is_finalized', true); // 확정된 엔트리만
+
+                if (myEntries) {
+                    myEntries.forEach(entry => {
+                        const roomId = `match_channel_${entry.season_no}_${entry.game_name}`;
+                        Boako.Messenger.chatRooms[roomId] = {
+                            id: roomId,
+                            isMatchChannel: true, // 💡 소통채널 식별 플래그
+                            seasonNo: entry.season_no,
+                            gameName: entry.game_name,
+                            title: `[${entry.game_name}] 소통 채널`,
+                            badge: `<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>`,
+                            lastMessage: '👉 클릭하여 소통 채널 모달 열기',
+                            lastTime: new Date().toISOString(), // 목록 최상단에 띄우기 위해 현재 시간 부여
+                            unread: 0,
+                            messages: []
+                        };
+                    });
+                }
+            } catch (e) {
+                console.error("소통채널 목록 연동 실패:", e);
+            }
 
             return Boako.Messenger.chatRooms;
         } catch (err) {
@@ -216,10 +244,13 @@ Boako.Messenger = {
                 const unreadBadge = room.unread > 0 ? `<div class="bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full">${room.unread}</div>` : '';
                 const activeClass = Boako.Messenger.currentRoomId === room.id ? 'bg-white shadow-sm border-indigo-200' : 'border-transparent hover:bg-white/60';
                 
+                // 💡 소통채널(isMatchChannel)일 경우 아이콘을 📣 로 변경
+                const icon = room.isMatchChannel ? '📣' : (room.isMatch ? '⚔️' : room.title.charAt(0));
+
                 listHtml += `
                     <div onclick="Boako.Messenger.View.openRoom('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
                         <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center text-slate-500 font-black">
-                            ${room.isMatch ? '⚔️' : room.title.charAt(0)}
+                            ${icon}
                         </div>
                         <div class="flex-1 min-w-0 pr-4">
                             <div class="font-bold text-sm text-slate-800 truncate flex items-center">${room.title} ${room.badge}</div>
@@ -238,6 +269,13 @@ Boako.Messenger = {
         },
 
         openRoom: (roomId) => {
+            // 🌟 [신규 추가] 만약 클릭한 방이 '대항전 소통채널'이면 쪽지창 대신 채팅 모달을 띄우고 중단
+            if (Boako.Messenger.chatRooms[roomId]?.isMatchChannel) {
+                const room = Boako.Messenger.chatRooms[roomId];
+                Boako.Match.Chat.open(room.seasonNo, room.gameName);
+                return; 
+            }
+
             Boako.Messenger.currentRoomId = roomId;
             const room = Boako.Messenger.chatRooms[roomId];
             const contentContainer = document.getElementById('chat-room-content');
@@ -367,7 +405,7 @@ Boako.Messenger = {
                         </div>
                     `;
 
-                // 3. 🌟 [팀 가입 신청 카드] 로직 (신규!)
+                // 3. 🌟 [팀 가입 신청 카드] 로직 
                 } else if (msg.action_type === 'TEAM_JOIN') {
                     let joinData = {};
                     try { joinData = JSON.parse(msg.content); } catch(e) { joinData = { text: '지원서 오류', team_name: '알 수 없음' }; }
@@ -414,7 +452,7 @@ Boako.Messenger = {
                             </div>
                         </div>
                     `;
-// 🌟 [팀 영입 제안서 카드] 로직 (팀장 -> 유저) 추가 부분
+// 🌟 [팀 영입 제안서 카드] 로직 (팀장 -> 유저)
                 } else if (msg.action_type === 'TEAM_INVITE') {
                     let inviteData = {};
                     try { inviteData = JSON.parse(msg.content); } catch(e) { inviteData = { text: '초대장 오류', team_name: '알 수 없음' }; }
@@ -652,7 +690,7 @@ Boako.Messenger = {
             } catch (err) {
                 alert(err.message);
             }
-        }, // 🌟 <--- (중요) 여기에 쉼표가 들어갔습니다!
+        },
 
         // 🌟 [핵심 신규 기능] 영입 제안 수락/거절 처리 (팀장이 보낸 스카웃 제안)
         replyTeamInvite: async (messageId, status) => {
