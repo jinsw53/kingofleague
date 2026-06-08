@@ -126,22 +126,30 @@ Boako.Messenger = {
     },
 
     send: async (receiverId, content, receiverName, actionType = 'DEFAULT', metadata = {}, matchId = null) => {
-        try {
-            const payload = {
-                sender_id: Boako.state.user.id,
-                sender_name_override: Boako.state.user.nickname,
-                receiver_id: receiverId,
-                receiver_name_override: receiverName,
-                content: content,
-                action_type: actionType,
-                metadata: metadata,
-                match_id: matchId
-            };
-            const { error } = await Boako.db.from('messages').insert([payload]);
-            if (error) throw error;
-            return true;
-        } catch (err) {
-            console.error(err);
+       try {
+                const { data: finalGames } = await Boako.db.from('grandprix_games')
+                    .select('game_name, season_no').eq('status', 'FINAL');
+                
+                if (finalGames?.length > 0) {
+                    const finalGameNames = finalGames.map(g => g.game_name);
+                    const { data: myEntries } = await Boako.db.from('grandprix_entries')
+                        .select('game_name, season_no')
+                        .eq('player_name', Boako.state.user.nickname)
+                        .eq('is_finalized', true)
+                        .in('game_name', finalGameNames);
+
+                    myEntries?.forEach(entry => {
+                        const roomId = `match_channel_${entry.season_no}_${entry.game_name}`;
+                        Boako.Messenger.chatRooms[roomId] = {
+                            id: roomId, isMatchChannel: true, seasonNo: entry.season_no,
+                            gameName: entry.game_name, title: `[${entry.game_name}] 소통 채널`,
+                            badge: '<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>',
+                            lastMessage: '👉 클릭하여 소통 채널 열기', lastTime: new Date().toISOString(),
+                            unread: 0, messages: []
+                        };
+                    });
+                }
+            } catch (e) { console.error("소통채널 로드 실패:", e); }
             return false;
         }
     },
