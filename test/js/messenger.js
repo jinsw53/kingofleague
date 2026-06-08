@@ -279,28 +279,18 @@ Boako.Messenger = {
             lucide.createIcons(); 
         },
 
-        openRoom: async (roomId) => { // 💡 async 추가
-            // 1. 소통채널 클릭 시
-            if (Boako.Messenger.chatRooms[roomId]?.isMatchChannel) {
-                const room = Boako.Messenger.chatRooms[roomId];
-                
-                // 💡 [핵심] Match 모듈이 없으면 동적으로 로드 (이미 로드됐으면 pass)
-                if (!Boako.Match || !Boako.Match.Chat) {
-                    Boako.Util.toast("매치 시스템을 연결 중입니다...");
-                    try {
-                        // Core JS가 사용하는 로딩 방식을 따릅니다. 
-                        // 예시: await import('./Match.js'); 혹은 기존 core 로더 사용
-                        await Boako.Core.loadModule('Match.js'); 
-                    } catch (e) {
-                        Boako.Util.toast("매치 시스템 연결에 실패했습니다.");
-                        return;
-                    }
-                }
-                
-                // 이제는 확실히 존재함
-                Boako.Match.Chat.open(room.seasonNo, room.gameName);
-                return; 
-            }
+        openRoom: (roomId) => {
+    // 이미 Match.js가 로드되어 있으니 바로 실행하면 됩니다.
+    if (Boako.Messenger.chatRooms[roomId]?.isMatchChannel) {
+        const room = Boako.Messenger.chatRooms[roomId];
+        
+        if (Boako.Match && Boako.Match.Chat) {
+            Boako.Match.Chat.open(room.seasonNo, room.gameName);
+        } else {
+            Boako.Util.toast("매치 시스템을 아직 로드 중입니다. 1초만 기다려주세요.");
+        }
+        return; 
+    }
 
             Boako.Messenger.currentRoomId = roomId;
             const room = Boako.Messenger.chatRooms[roomId];
