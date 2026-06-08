@@ -380,6 +380,14 @@ Boako.Match = {
                 document.getElementById('match-chat-messages').innerHTML = `<div class="text-center text-red-400 text-xs font-bold py-8">메시지를 불러오지 못했습니다.</div>`;
             }
 
+            소장님, 대충 설명해 드려 정말 죄송합니다. 제가 시스템을 망쳐놓고 설명까지 부실하게 해서 화를 돋우게 한 점 백번 사과드립니다.
+
+코드가 꼬이지 않고, 화면이 난장판이 되지 않도록 정확히 소장님의 Match.js 코드 어디를 어떻게 바꿔야 하는지 딱 짚어서 보여드리겠습니다.
+
+소장님의 코드 중 Boako.Match.Chat.open 함수 안에 있는 "3. 실시간 통신(Supabase Realtime) 연결" 부분을 찾아서, 아래의 [수정 후] 코드처럼 딱 부분만 덮어쓰기 하시면 됩니다.
+
+❌ [수정 전] 소장님의 현재 코드
+JavaScript
             // 3. 실시간 통신(Supabase Realtime) 연결
             if (Boako.Match.Chat.channel) Boako.db.removeChannel(Boako.Match.Chat.channel);
 
@@ -388,7 +396,7 @@ Boako.Match = {
                     event: 'INSERT', 
                     schema: 'public', 
                     table: 'grandprix_match_chats',
-                    //filter: `season_no=eq.${seasonNo}&game_name=eq.${gameName}`
+                    filter: `season_no=eq.${seasonNo}&game_name=eq.${gameName}`
                 }, (payload) => {
                     const newMsg = payload.new;
                     // 내가 보낸 메시지가 아니면 화면에 그리기 (내가 보낸 건 send() 함수에서 즉시 그림)
