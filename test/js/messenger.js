@@ -141,11 +141,16 @@ Boako.Messenger = {
                     myEntries?.forEach(entry => {
                         const roomId = `match_channel_${entry.season_no}_${entry.game_name}`;
                         Boako.Messenger.chatRooms[roomId] = {
-                            id: roomId, isMatchChannel: true, seasonNo: entry.season_no,
-                            gameName: entry.game_name, title: `[${entry.game_name}] 소통 채널`,
+                            id: roomId,
+                            isMatchChannel: true,
+                            seasonNo: entry.season_no,
+                            gameName: entry.game_name,
+                            title: `[${entry.game_name}] 소통 채널`,
                             badge: '<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>',
-                            lastMessage: '👉 클릭하여 소통 채널 열기', lastTime: new Date().toISOString(),
-                            unread: 0, messages: []
+                            lastMessage: '👉 클릭하여 소통 채널 열기',
+                            lastTime: new Date().toISOString(),
+                            unread: 0,
+                            messages: []
                         };
                     });
                 }
@@ -289,16 +294,15 @@ Boako.Messenger = {
 
         openRoom: (roomId) => {
     // 이미 Match.js가 로드되어 있으니 바로 실행하면 됩니다.
-    if (Boako.Messenger.chatRooms[roomId]?.isMatchChannel) {
-        const room = Boako.Messenger.chatRooms[roomId];
-        
-        if (Boako.Match && Boako.Match.Chat) {
-            Boako.Match.Chat.open(room.seasonNo, room.gameName);
-        } else {
-            Boako.Util.toast("매치 시스템을 아직 로드 중입니다. 1초만 기다려주세요.");
-        }
-        return; 
-    }
+   if (Boako.Messenger.chatRooms[roomId]?.isMatchChannel) {
+                if (typeof Boako.Match !== 'undefined' && Boako.Match.Chat) {
+                    const room = Boako.Messenger.chatRooms[roomId];
+                    Boako.Match.Chat.open(room.seasonNo, room.gameName);
+                } else {
+                    Boako.Util.toast("매치 모듈 로딩 중...");
+                }
+                return; // 💡 여기서 나가야 아래의 '오른쪽 구역 렌더링 코드'가 안 실행됩니다.
+            }
 
             Boako.Messenger.currentRoomId = roomId;
             const room = Boako.Messenger.chatRooms[roomId];
