@@ -315,7 +315,6 @@ Boako.Match = {
         currentSeason: null,
         currentGame: null,
 
-        // 💬 채팅방 모달 열기 (messenger.js에서도 이 함수를 호출하면 됨!)
         open: async (seasonNo, gameName) => {
             Boako.Match.Chat.currentSeason = seasonNo;
             Boako.Match.Chat.currentGame = gameName;
@@ -323,9 +322,9 @@ Boako.Match = {
             const existingModal = document.getElementById('match-chat-modal');
             if (existingModal) existingModal.remove();
 
-            // 1. 모달 뼈대 생성
+            // 💡 z-index를 9999로 올려 메뉴바 가림 현상 해결 & 헤더에 [📅 일정 제안] 버튼 추가
             const modalHtml = `
-                <div id="match-chat-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div id="match-chat-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div class="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col h-[80vh] overflow-hidden">
                         
                         <div class="bg-indigo-600 px-5 py-4 flex justify-between items-center text-white shrink-0 shadow-md z-10">
@@ -333,9 +332,14 @@ Boako.Match = {
                                 <h2 class="text-lg font-black flex items-center gap-2">💬 [${gameName}] 소통 채널</h2>
                                 <p class="text-indigo-200 text-xs font-bold mt-0.5">상대 팀 선수들과 일정을 조율하세요.</p>
                             </div>
-                            <button onclick="Boako.Match.Chat.close()" class="text-white hover:text-indigo-200 transition-colors p-1">
-                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <button onclick="Boako.Match.Chat.promptSchedule()" class="text-xs bg-white text-indigo-600 px-3 py-1.5 rounded-lg font-black hover:bg-indigo-50 shadow-sm transition-colors">
+                                    📅 일정 제안
+                                </button>
+                                <button onclick="Boako.Match.Chat.close()" class="text-white hover:text-indigo-200 transition-colors p-1">
+                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
                         </div>
 
                         <div id="match-chat-messages" class="flex-1 p-4 overflow-y-auto flex flex-col gap-4 bg-slate-100 custom-scrollbar">
@@ -344,44 +348,37 @@ Boako.Match = {
 
                         <div class="p-3 bg-white border-t border-slate-200 shrink-0 flex gap-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                             <input type="text" id="match-chat-input" placeholder="메시지를 입력하세요 (엔터 전송)" class="flex-1 px-4 py-2.5 bg-slate-100 border border-transparent rounded-xl text-sm font-bold focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all" onkeypress="if(event.key === 'Enter') Boako.Match.Chat.send()">
-                            <button onclick="Boako.Match.Chat.send()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow-sm">
-                                전송
-                            </button>
+                            <button onclick="Boako.Match.Chat.send()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-indigo-700 active:scale-95 transition-all shadow-sm">전송</button>
                         </div>
                     </div>
                 </div>
             `;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-            // 2. 과거 채팅 기록 불러오기 (최신 50개)
             try {
+                // 💡 단일 필터(room_id)를 사용하여 에러 방지
                 const { data: messages, error } = await Boako.db
                     .from('grandprix_match_chats')
                     .select('*, profiles(full_name, profile_url)')
-                    .eq('season_no', seasonNo)
-                    .eq('game_name', gameName)
+                    .eq('room_id', `${seasonNo}_${gameName}`) 
                     .order('created_at', { ascending: false })
                     .limit(50);
                 
                 if (error) throw error;
                 
                 const container = document.getElementById('match-chat-messages');
-                container.innerHTML = ''; // 로딩 텍스트 제거
+                container.innerHTML = ''; 
 
                 if (messages && messages.length > 0) {
-                    // 시간순으로 정렬하기 위해 reverse
                     messages.reverse().forEach(msg => Boako.Match.Chat.renderMessage(msg));
                     Boako.Match.Chat.scrollToBottom();
                 } else {
-                    container.innerHTML = `<div class="text-center text-slate-400 text-xs font-bold py-8">아직 메시지가 없습니다. 첫인사를 건네보세요!</div>`;
+                    container.innerHTML = `<div class="text-center text-slate-400 text-xs font-bold py-8">아직 메시지가 없습니다. 일정을 조율해 보세요!</div>`;
                 }
             } catch (err) {
                 console.error("채팅 로드 실패:", err);
-                document.getElementById('match-chat-messages').innerHTML = `<div class="text-center text-red-400 text-xs font-bold py-8">메시지를 불러오지 못했습니다.</div>`;
             }
 
-            
-           // 3. 실시간 통신(Supabase Realtime) 연결
             if (Boako.Match.Chat.channel) Boako.db.removeChannel(Boako.Match.Chat.channel);
 
             Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${seasonNo}-${gameName}`)
@@ -389,91 +386,149 @@ Boako.Match = {
                     event: 'INSERT', 
                     schema: 'public', 
                     table: 'grandprix_match_chats',
-                    filter: `room_id=eq.${seasonNo}_${gameName}` // 💡 소장님 말씀대로 이 한 줄만 추가
+                    filter: `room_id=eq.${seasonNo}_${gameName}`
                 }, (payload) => {
                     const newMsg = payload.new;
-
-                    // 💡 서버가 완벽하게 걸러서 주므로, 자바스크립트 if문은 없애도 됩니다.
                     if (newMsg.sender_id !== Boako.state.user.id) {
                          newMsg.profiles = { full_name: "상대 선수" }; 
                          Boako.Match.Chat.renderMessage(newMsg);
                          Boako.Match.Chat.scrollToBottom();
                     }
                 })
+                .on('postgres_changes', { 
+                    event: 'UPDATE', // 💡 일정 수락/거절 시 실시간 갱신 감지
+                    schema: 'public', 
+                    table: 'grandprix_match_chats',
+                    filter: `room_id=eq.${seasonNo}_${gameName}`
+                }, (payload) => {
+                    // 상태가 변경되면 모달창을 새로 그려서 버튼을 변경합니다
+                    Boako.Match.Chat.open(seasonNo, gameName);
+                })
                 .subscribe();
             
             setTimeout(() => document.getElementById('match-chat-input').focus(), 100);
         },
 
-        // 💬 채팅방 닫기 및 통신 해제
         close: () => {
             const modal = document.getElementById('match-chat-modal');
             if (modal) modal.remove();
-            
             if (Boako.Match.Chat.channel) {
                 Boako.db.removeChannel(Boako.Match.Chat.channel);
                 Boako.Match.Chat.channel = null;
             }
         },
 
-        // 💬 메시지 전송 로직
         send: async () => {
             const input = document.getElementById('match-chat-input');
             const content = input.value.trim();
             if (!content) return;
+            input.value = ''; 
 
-            input.value = ''; // 전송 즉시 입력창 비우기
-
-            // 내가 속한 팀 이름 가져오기 (관전자인 경우 null)
             const myTeamName = Boako.state.team?.info?.team_name || null;
-
             const payload = {
                 season_no: Boako.Match.Chat.currentSeason,
                 game_name: Boako.Match.Chat.currentGame,
                 sender_id: Boako.state.user.id,
-                team_name: myTeamName, // 💡 방금 설정한 CASCADE 외래키!
+                team_name: myTeamName,
                 content: content
             };
 
-            // 1. 화면에 내 메시지 먼저 즉시 그리기 (체감 속도 0.1초)
-            const tempMsg = { 
-                ...payload, 
-                profiles: { full_name: Boako.state.user.nickname } 
-            };
-            
-            // 만약 방금 전까지 '메시지가 없습니다' 문구가 있었다면 지우기
+            const tempMsg = { ...payload, profiles: { full_name: Boako.state.user.nickname } };
             const container = document.getElementById('match-chat-messages');
-            if (container.innerHTML.includes('첫인사')) container.innerHTML = '';
+            if (container.innerHTML.includes('아직 메시지가 없습니다')) container.innerHTML = '';
 
             Boako.Match.Chat.renderMessage(tempMsg);
             Boako.Match.Chat.scrollToBottom();
 
-            // 2. DB에 진짜로 저장하기
+            await Boako.db.from('grandprix_match_chats').insert([payload]);
+        },
+
+        // 💡 [신규] 일정 제안 전송 기능
+        promptSchedule: async () => {
+            const inputTime = prompt("제안할 날짜와 시간을 입력해주세요.\n(입력 예시: 2026-06-05 20:00)");
+            if (!inputTime) return;
+
+            const myTeamName = Boako.state.team?.info?.team_name || null;
+            const payload = {
+                season_no: Boako.Match.Chat.currentSeason,
+                game_name: Boako.Match.Chat.currentGame,
+                sender_id: Boako.state.user.id,
+                team_name: myTeamName,
+                content: "매치 일정을 제안합니다.",
+                action_type: 'SCHEDULE_PROPOSE',
+                metadata: { proposed_time: inputTime }
+            };
+
             const { error } = await Boako.db.from('grandprix_match_chats').insert([payload]);
+            if (!error) Boako.Util.toast("📅 일정 제안이 전송되었습니다.");
+        },
+
+        // 💡 [신규] 일정 수락/거절 처리
+        replySchedule: async (messageId, status) => {
+            if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
+
+            const { error } = await Boako.db.from('grandprix_match_chats')
+                .update({ action_status: status })
+                .eq('id', messageId);
+
             if (error) {
-                Boako.Util.toast("전송 실패: " + error.message, "error");
-                console.error("채팅 전송 실패:", error);
+                Boako.Util.toast("❌ 처리 중 오류가 발생했습니다.");
+            } else {
+                Boako.Util.toast(status === 'ACCEPTED' ? "✅ 일정이 확정되었습니다!" : "❌ 일정을 거절했습니다.");
             }
         },
 
-        // 💬 화면에 말풍선 그리기
         renderMessage: (msg) => {
             const container = document.getElementById('match-chat-messages');
             if (!container) return;
 
             const isMe = msg.sender_id === Boako.state.user.id;
             const senderName = msg.profiles?.full_name || "알 수 없음";
-            
-            // 소속 팀 배지 생성
-            const teamBadge = msg.team_name 
-                ? `<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] mr-1 font-black shadow-sm">[${msg.team_name}]</span>` 
-                : `<span class="bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded text-[10px] mr-1 font-black shadow-sm">[관전]</span>`;
+            const teamBadge = msg.team_name ? `<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] mr-1 font-black shadow-sm">[${msg.team_name}]</span>` : '';
 
-            // 내가 보낸 건 파란색 오른쪽, 남이 보낸 건 흰색 왼쪽
+            let displayContent = msg.content;
+
+            // 💡 [신규] 일정 카드 UI 조립
+            if (msg.action_type === 'SCHEDULE_PROPOSE') {
+                const proposedTime = msg.metadata?.proposed_time || '미정';
+                const status = msg.action_status || 'PENDING';
+                
+                let actionButtons = '';
+                let statusBadge = '';
+
+                if (status === 'PENDING') {
+                    if (!isMe) {
+                        actionButtons = `
+                            <div class="flex gap-2 mt-3">
+                                <button onclick="Boako.Match.Chat.replySchedule('${msg.id}', 'ACCEPTED')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm">🟢 수락</button>
+                                <button onclick="Boako.Match.Chat.replySchedule('${msg.id}', 'REJECTED')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold py-2 rounded-lg transition-colors">❌ 거절</button>
+                            </div>
+                        `;
+                    } else {
+                        statusBadge = `<div class="mt-3 text-xs text-slate-500 font-bold text-center bg-white/50 py-1.5 rounded-lg">상대방의 응답 대기 중...</div>`;
+                    }
+                } else if (status === 'ACCEPTED') {
+                    statusBadge = `<div class="mt-3 text-xs text-emerald-600 font-bold text-center bg-emerald-50 py-1.5 rounded-lg border border-emerald-100">✅ 매치 일정 확정됨</div>`;
+                } else if (status === 'REJECTED') {
+                    statusBadge = `<div class="mt-3 text-xs text-red-500 font-bold text-center bg-red-50 py-1.5 rounded-lg border border-red-100">❌ 거절됨</div>`;
+                }
+
+                displayContent = `
+                    <div class="bg-indigo-50/80 border border-indigo-200 rounded-xl p-3 shadow-sm text-slate-800 w-56 my-1">
+                        <div class="font-black text-indigo-900 text-xs mb-2 flex items-center gap-1">📅 일정 제안</div>
+                        <div class="text-sm font-black bg-white p-2.5 rounded-lg text-center border border-indigo-100 shadow-inner">
+                            ${proposedTime}
+                        </div>
+                        ${actionButtons}
+                        ${statusBadge}
+                    </div>
+                `;
+            }
+
             const html = isMe ? `
                 <div class="flex flex-col items-end gap-1 animate-in slide-in-from-right-2 duration-200">
                     <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%] text-sm shadow-md break-words font-medium">
-                        ${msg.content}
+                        ${displayContent.replace(/\n/g, '<br>')}
                     </div>
                 </div>
             ` : `
@@ -482,14 +537,13 @@ Boako.Match = {
                         ${teamBadge} ${senderName}
                     </span>
                     <div class="bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%] text-sm shadow-md break-words font-medium">
-                        ${msg.content}
+                        ${displayContent.replace(/\n/g, '<br>')}
                     </div>
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', html);
         },
 
-        // 💬 스크롤 맨 아래로 내리기
         scrollToBottom: () => {
             const el = document.getElementById('match-chat-messages');
             if (el) el.scrollTop = el.scrollHeight;
