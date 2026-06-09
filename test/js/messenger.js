@@ -343,7 +343,7 @@ Boako.Messenger = {
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                 
                 // 대항전 채널 메시지와 일반 쪽지의 발신자명 분기 처리
-                const senderName = room.isMatchChannel ? (msg.profiles?.nickname || '참여자') : msg.sender_name_override;
+                const senderName = room.isMatchChannel ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override;
 
                 if (msg.action_type === 'SCHEDULE_PROPOSE') {
                     const proposedTime = msg.metadata?.proposed_time ? new Date(msg.metadata.proposed_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '미정';
