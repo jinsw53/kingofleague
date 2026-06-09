@@ -60,7 +60,7 @@ Boako.Messenger = {
 
                     // 대항전 테이블에서 해당 방들의 메시지 가져오기 (작성자 프로필 조인)
                     const { data: matchMsgs } = await Boako.db.from('grandprix_match_chats')
-                        .select('*, profiles(nickname)')
+                        .select('*, profiles(full_name)')
                         .in('room_id', validRoomIds)
                         .order('created_at', { ascending: false });
 
