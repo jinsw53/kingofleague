@@ -449,27 +449,27 @@ Boako.Match = {
         selectedTimesState: [], // 내 후보지들 ['2026-06-12 20:00', ...]
         currentFixedTime: '20:00', // 소장님이 말씀하신 고정 시간 (기본 20시)
 
-        openPollModal: () => {
-            const existing = document.getElementById('poll-calendar-modal');
+       openPollModal: () => {
+            const existing = document.getElementById('poll-input-modal');
             if (existing) existing.remove();
 
+            // 1. 소장님이 지적하신 필수 상태값 복구
             Boako.Match.Chat.calYear = new Date().getFullYear();
             Boako.Match.Chat.calMonth = new Date().getMonth() + 1;
             Boako.Match.Chat.selectedTimesState = [];
             Boako.Match.Chat.currentFixedTime = '20:00';
 
-          // 3. UI 렌더링
             const pModalHtml = `
                 <div id="poll-input-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <div class="bg-white rounded-2xl p-6 w-80 space-y-4 shadow-xl border border-slate-100">
                         <div class="flex justify-between items-center">
-                            <h3 class="text-sm font-black text-slate-800">📅 일정 조율 (제출 버튼 클릭)</h3>
+                            <h3 class="text-sm font-black text-slate-800">📅 일정 조율</h3>
                             <button onclick="document.getElementById('poll-input-modal').remove()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
                         </div>
                         
                         <div class="bg-indigo-50 p-3 border border-indigo-100 rounded-xl flex items-center gap-2">
                             <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 시간</span>
-                            <select id="poll-fixed-time-select" onchange="Boako.Match.Chat.currentFixedTime = this.value" class="flex-1 bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
+                            <select id="poll-fixed-time-select" class="flex-1 bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
                                 <option value="시간 상관없음">시간 상관없음</option>
                                 ${Array.from({length: 24}, (_, i) => {
                                     const t = String(i).padStart(2, '0') + ':00';
@@ -493,13 +493,24 @@ Boako.Match = {
                 </div>
             `;
             document.body.insertAdjacentHTML('beforeend', pModalHtml);
-            
-            // 날짜 기본값 세팅
-            const todayStr = new Date().toISOString().split('T')[0];
-            document.getElementById('poll-date-picker').value = todayStr;
+            document.getElementById('poll-date-picker').value = new Date().toISOString().split('T')[0];
         },
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            Boako.Match.Chat.renderCalendarGrid();
+
+        addTimeToList: () => {
+            const dateVal = document.getElementById('poll-date-picker').value;
+            // 🌟 드롭다운에서 직접 값을 가져와서 에러 원천 차단
+            const timeVal = document.getElementById('poll-fixed-time-select').value;
+            
+            if (!dateVal) return;
+            
+            const combined = `${dateVal} ${timeVal}`;
+            if (Boako.Match.Chat.selectedTimesState.includes(combined)) return;
+
+            Boako.Match.Chat.selectedTimesState.push(combined);
+            Boako.Match.Chat.selectedTimesState.sort();
+            
+            const listEl = document.getElementById('poll-selected-list');
+            listEl.innerHTML = Boako.Match.Chat.selectedTimesState.map(i => `<div class="py-1 border-b border-slate-50">${i}</div>`).join('');
         },
 
         changeFixedTime: (val) => {
