@@ -309,7 +309,7 @@ Boako.Match = {
         html += `</div>`;
         content.innerHTML = html;
     },
-  // 🌟 6. [전역 모듈] 종목별 소통 채널 (원클릭 달력 투표 시스템 및 타임라인 통합)
+ // 🌟 6. [전역 모듈] 종목별 소통 채널 (원클릭 다중 투표 + 일괄 제출 시스템)
     Chat: {
         channel: null,
         currentSeason: null,
@@ -357,7 +357,6 @@ Boako.Match = {
 
             await Boako.Match.Chat.loadMessagesAndPolls();
 
-            // 실시간 구독 활성화
             if (Boako.Match.Chat.channel) Boako.db.removeChannel(Boako.Match.Chat.channel);
 
             Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${roomId}`)
@@ -369,7 +368,6 @@ Boako.Match = {
                     }
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls', filter: `target_id=eq.${roomId}` }, () => {
-                    // 투표판 데이터가 생성되거나 업데이트(JSONB 변동)되면 화면을 동적으로 리로드
                     Boako.Match.Chat.loadMessagesAndPolls();
                 })
                 .subscribe();
@@ -391,13 +389,11 @@ Boako.Match = {
         loadMessagesAndPolls: async () => {
             const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
             try {
-                // 1. 순수 채팅 기록 조회
                 const { data: chats } = await Boako.db.from('grandprix_match_chats')
                     .select('*, profiles(full_name)')
                     .eq('room_id', roomId)
                     .order('created_at', { ascending: false }).limit(40);
 
-                // 2. 현재 방에 연결된 민주적 투표 현황 데이터 조회
                 const { data: polls } = await Boako.db.from('schedule_polls')
                     .select('*')
                     .eq('target_id', roomId)
@@ -406,7 +402,6 @@ Boako.Match = {
                 const container = document.getElementById('match-chat-messages');
                 container.innerHTML = '';
 
-                // 투표판 객체와 기존 일반 채팅을 결합하여 시간순 정렬할 주머니 생성
                 let totalTimeline = [];
                 if (chats) chats.forEach(c => totalTimeline.push({ type: 'CHAT', time: new Date(c.created_at), data: c }));
                 if (polls) polls.forEach(p => totalTimeline.push({ type: 'POLL', time: new Date(p.created_at), data: p }));
@@ -448,10 +443,11 @@ Boako.Match = {
             await Boako.db.from('grandprix_match_chats').insert([payload]);
         },
 
-        // 🌟 [원클릭 자동 투표 달력 시스템] 
+        // 🌟 [UI 전면 개편] 시간을 고정하고 날짜를 클릭하여 다중 누적하는 혁신적 캘린더
         calYear: new Date().getFullYear(),
         calMonth: new Date().getMonth() + 1,
-        selectedDateStr: null,
+        selectedTimesState: [], // 내 후보지들 ['2026-06-12 20:00', ...]
+        currentFixedTime: '20:00', // 소장님이 말씀하신 고정 시간 (기본 20시)
 
         openPollModal: () => {
             const existing = document.getElementById('poll-calendar-modal');
@@ -459,7 +455,8 @@ Boako.Match = {
 
             Boako.Match.Chat.calYear = new Date().getFullYear();
             Boako.Match.Chat.calMonth = new Date().getMonth() + 1;
-            Boako.Match.Chat.selectedDateStr = null;
+            Boako.Match.Chat.selectedTimesState = [];
+            Boako.Match.Chat.currentFixedTime = '20:00';
 
             const modalHtml = `
                 <div id="poll-calendar-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
@@ -472,27 +469,27 @@ Boako.Match = {
                         </div>
                         <button onclick="document.getElementById('poll-calendar-modal').remove()" class="absolute top-3 right-3 text-white/50 hover:text-white font-black text-xl z-20">×</button>
 
-                        <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-slate-50 py-2 border-b border-slate-200">
+                        <div class="bg-indigo-50 p-3 border-b border-indigo-100 flex items-center gap-2">
+                            <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 고정 시간</span>
+                            <select id="poll-fixed-time-select" onchange="Boako.Match.Chat.changeFixedTime(this.value)" class="flex-1 bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
+                                <option value="19:00">19:00 (오후 7시)</option>
+                                <option value="20:00" selected>20:00 (오후 8시)</option>
+                                <option value="21:00">21:00 (오후 9시)</option>
+                                <option value="22:00">22:00 (오후 10시)</option>
+                                <option value="23:00">23:00 (오후 11시)</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-white pt-3 pb-1">
                             <div class="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-400">토</div>
                         </div>
 
-                        <div id="cal-days-grid" class="grid grid-cols-7 gap-1 p-3 bg-white"></div>
+                        <div id="cal-days-grid" class="grid grid-cols-7 gap-1.5 p-3 bg-white mb-2"></div>
 
-                        <div id="cal-action-panel" class="bg-slate-50 p-4 border-t border-slate-200 hidden animate-in slide-in-from-bottom-2 duration-150">
-                            <div class="flex justify-between items-center mb-3">
-                                <span id="cal-selected-date-label" class="text-xs font-black text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md"></span>
-                                <span class="text-[10px] font-bold text-slate-500">클릭 시 즉시 투표 누적</span>
-                            </div>
-                            <div class="grid grid-cols-4 gap-2 mb-2">
-                                <button onclick="Boako.Match.Chat.instantVote('20:00')" class="bg-white border border-slate-200 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-xs font-black py-2 rounded-xl transition-all shadow-sm active:scale-95">20:00</button>
-                                <button onclick="Boako.Match.Chat.instantVote('21:00')" class="bg-white border border-slate-200 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-xs font-black py-2 rounded-xl transition-all shadow-sm active:scale-95">21:00</button>
-                                <button onclick="Boako.Match.Chat.instantVote('22:00')" class="bg-white border border-slate-200 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-xs font-black py-2 rounded-xl transition-all shadow-sm active:scale-95">22:00</button>
-                                <button onclick="Boako.Match.Chat.instantVote('23:00')" class="bg-white border border-slate-200 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-xs font-black py-2 rounded-xl transition-all shadow-sm active:scale-95">23:00</button>
-                            </div>
-                            <div class="flex gap-2">
-                                <input type="time" id="cal-custom-time" class="flex-1 border border-slate-200 rounded-xl p-2 text-xs font-bold focus:outline-none focus:border-indigo-500 bg-white">
-                                <button onclick="Boako.Match.Chat.instantVote('CUSTOM')" class="bg-slate-800 text-white text-xs font-black px-4 rounded-xl hover:bg-slate-900 transition-colors shadow-sm active:scale-95">입력</button>
-                            </div>
+                        <div class="p-3 bg-white border-t border-slate-100">
+                            <button id="poll-submit-btn" onclick="Boako.Match.Chat.submitPollData()" class="w-full bg-slate-200 text-slate-500 text-xs font-black py-3 rounded-xl transition-all shadow-sm cursor-not-allowed" disabled>
+                                날짜를 클릭하여 선택하세요
+                            </button>
                         </div>
 
                     </div>
@@ -500,6 +497,11 @@ Boako.Match = {
             `;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             Boako.Match.Chat.renderCalendarGrid();
+        },
+
+        changeFixedTime: (val) => {
+            Boako.Match.Chat.currentFixedTime = val;
+            Boako.Util.toast(`⏰ 클릭 시 적용될 시간이 ${val}로 변경되었습니다.`, 1000);
         },
 
         changeMonth: (delta) => {
@@ -520,6 +522,7 @@ Boako.Match = {
             const firstDay = new Date(year, month - 1, 1).getDay();
             const lastDate = new Date(year, month, 0).getDate();
             const today = new Date();
+            today.setHours(0,0,0,0);
             
             let gridHtml = '';
             
@@ -529,73 +532,97 @@ Boako.Match = {
 
             for (let day = 1; day <= lastDate; day++) {
                 const currentCellDate = new Date(year, month - 1, day);
-                const isPast = currentCellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                
+                const isPast = currentCellDate < today;
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const isSelected = Boako.Match.Chat.selectedDateStr === dateStr;
                 
-                let cellClass = "w-full aspect-square flex items-center justify-center rounded-xl text-xs font-bold transition-all ";
+                // 해당 날짜에 선택된 시간 배열 찾기
+                const dayTimes = Boako.Match.Chat.selectedTimesState.filter(t => t.startsWith(dateStr));
+                const isSelected = dayTimes.length > 0;
+                
+                let cellClass = "w-full aspect-square flex flex-col items-center justify-center rounded-xl transition-all relative ";
+                let innerHtml = `<span class="text-xs font-bold">${day}</span>`;
                 
                 if (isPast) {
                     cellClass += "text-slate-300 cursor-not-allowed bg-slate-50/50";
                 } else if (isSelected) {
-                    cellClass += "bg-indigo-600 text-white shadow-md transform scale-105";
+                    // 도장 찍힌 상태 UI
+                    cellClass += "bg-indigo-600 text-white shadow-md transform scale-105 cursor-pointer ring-2 ring-indigo-200 ring-offset-1";
+                    // 몇 시인지 조그맣게 표시
+                    innerHtml += `<span class="text-[8px] font-mono mt-0.5 opacity-90">${dayTimes[0].split(' ')[1]}</span>`;
                 } else {
-                    cellClass += "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer";
+                    cellClass += "text-slate-700 bg-slate-50 hover:bg-indigo-100 hover:text-indigo-700 cursor-pointer border border-slate-100";
                 }
 
-                gridHtml += `<div onclick="${isPast ? '' : `Boako.Match.Chat.selectCalendarDate('${dateStr}')`}" class="${cellClass}">${day}</div>`;
+                gridHtml += `<div onclick="${isPast ? '' : `Boako.Match.Chat.toggleDate('${dateStr}')`}" class="${cellClass}">${innerHtml}</div>`;
             }
 
             document.getElementById('cal-days-grid').innerHTML = gridHtml;
+            Boako.Match.Chat.updateSubmitButton();
         },
 
-        selectCalendarDate: (dateStr) => {
-            Boako.Match.Chat.selectedDateStr = dateStr;
-            Boako.Match.Chat.renderCalendarGrid(); 
-
-            const panel = document.getElementById('cal-action-panel');
-            panel.classList.remove('hidden');
-            document.getElementById('cal-selected-date-label').innerText = `📅 ${dateStr}`;
-        },
-
-        instantVote: async (timeVal) => {
-            let finalTime = timeVal;
-            if (timeVal === 'CUSTOM') {
-                finalTime = document.getElementById('cal-custom-time').value;
-                if (!finalTime) { alert("시간을 지정해주세요."); return; }
+        // 🌟 [원클릭 토글 로직] 날짜 누르면 추가, 또 누르면 삭제
+        toggleDate: (dateStr) => {
+            const timeStr = Boako.Match.Chat.currentFixedTime;
+            const combined = `${dateStr} ${timeStr}`;
+            
+            const idx = Boako.Match.Chat.selectedTimesState.indexOf(combined);
+            if (idx > -1) {
+                // 이미 있으면 제거 (토글 OFF)
+                Boako.Match.Chat.selectedTimesState.splice(idx, 1);
+            } else {
+                // 없으면 추가 (토글 ON)
+                // 만약 같은 날짜에 다른 시간이 들어있다면 덮어쓰기 로직
+                Boako.Match.Chat.selectedTimesState = Boako.Match.Chat.selectedTimesState.filter(t => !t.startsWith(dateStr));
+                Boako.Match.Chat.selectedTimesState.push(combined);
             }
+            
+            Boako.Match.Chat.renderCalendarGrid();
+        },
+
+        updateSubmitButton: () => {
+            const btn = document.getElementById('poll-submit-btn');
+            const count = Boako.Match.Chat.selectedTimesState.length;
+            
+            if (count > 0) {
+                btn.disabled = false;
+                btn.className = "w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-3 rounded-xl transition-all shadow-md active:scale-95 flex justify-center items-center gap-2";
+                btn.innerHTML = `<span class="bg-white text-indigo-700 px-1.5 py-0.5 rounded-md text-[10px] leading-none">${count}</span> 개 일정 일괄 제출하기`;
+            } else {
+                btn.disabled = true;
+                btn.className = "w-full bg-slate-200 text-slate-500 text-xs font-black py-3 rounded-xl transition-all shadow-sm cursor-not-allowed";
+                btn.innerHTML = "달력의 날짜를 클릭하여 선택하세요";
+            }
+        },
+
+        // 🌟 [일괄 제출 로직] 배열 째로 DB에 던져서 교집합 스캔
+        submitPollData: async () => {
+            const myTimes = Boako.Match.Chat.selectedTimesState;
+            if (myTimes.length === 0) return;
 
             const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
             const myId = Boako.state.user.id;
-            const combinedDateTime = `${Boako.Match.Chat.selectedDateStr} ${finalTime}`;
 
             const { data: existingPoll } = await Boako.db.from('schedule_polls')
                 .select('*').eq('target_id', roomId).eq('status', 'OPEN').maybeSingle();
 
-            let currentVotes = existingPoll ? (existingPoll.votes || {}) : {};
-            let myTimes = currentVotes[myId] || [];
-
-            if (myTimes.includes(combinedDateTime)) {
-                Boako.Util.toast("이미 해당 시간에 투표하셨습니다.");
-                return;
-            }
-
-            myTimes.push(combinedDateTime);
-            currentVotes[myId] = myTimes;
-
             if (!existingPoll) {
+                const initialVotes = {};
+                initialVotes[myId] = myTimes;
+
                 const insertPayload = {
                     target_id: roomId,
                     target_type: 'MATCH_CHANNEL',
                     game_name: Boako.Match.Chat.currentGame,
                     mode: 'SWISS',
                     proposer_id: myId,
-                    votes: currentVotes,
+                    votes: initialVotes,
                     status: 'OPEN'
                 };
                 await Boako.db.from('schedule_polls').insert([insertPayload]);
             } else {
+                const currentVotes = existingPoll.votes || {};
+                currentVotes[myId] = myTimes;
+
                 const timeMap = {};
                 const voters = Object.keys(currentVotes);
                 voters.forEach(voterId => {
@@ -613,19 +640,16 @@ Boako.Match = {
                 if (perfectMatchTime) {
                     updatePayload.proposed_time = perfectMatchTime;
                     updatePayload.status = 'PROPOSED';
-                    
-                    const calModal = document.getElementById('poll-calendar-modal');
-                    if (calModal) calModal.remove();
                 }
 
                 await Boako.db.from('schedule_polls').update(updatePayload).eq('poll_id', existingPoll.poll_id);
             }
 
-            Boako.Util.toast(`➕ ${finalTime} 투표 누적 완료!`);
+            document.getElementById('poll-calendar-modal').remove();
+            Boako.Util.toast(`📅 ${myTimes.length}개의 후보 일정이 성공적으로 제출되었습니다!`);
             await Boako.Match.Chat.loadMessagesAndPolls();
         },
 
-        // 🌟 [누락 복원] 투표 진행 상태판 카드를 채팅창에 그리는 전용 렌더러
         renderPollCard: (poll) => {
             const container = document.getElementById('match-chat-messages');
             if (!container) return;
@@ -641,7 +665,7 @@ Boako.Match = {
                     <div class="font-black text-indigo-900 text-xs mb-1 flex items-center gap-1">📊 일정 조율 투표 진행 중</div>
                     <p class="text-[11px] text-slate-500 font-bold mb-3">현재 ${votersCount}명의 참여자가 일정을 제출했습니다.</p>
                     <div class="text-xs text-center bg-indigo-600 text-white p-2 rounded-xl font-black shadow-sm cursor-pointer hover:bg-indigo-700 active:scale-95 transition-all" onclick="Boako.Match.Chat.openPollModal()">
-                        나도 시간 제출하기
+                        나도 달력으로 시간 찍기
                     </div>
                 `;
             } else if (status === 'PROPOSED') {
@@ -691,7 +715,6 @@ Boako.Match = {
             container.insertAdjacentHTML('beforeend', wrapperHtml);
         },
 
-        // 🌟 [누락 복원] 교집합 제안 시간에 대한 전원 민주적 수락 체크 
         acceptProposedTime: async (pollId) => {
             if (!confirm("도출된 교집합 시간으로 매치 일정을 최종 확정하시겠습니까?")) return;
 
