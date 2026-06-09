@@ -458,43 +458,40 @@ Boako.Match = {
             Boako.Match.Chat.selectedTimesState = [];
             Boako.Match.Chat.currentFixedTime = '20:00';
 
-            const modalHtml = `
-                <div id="poll-calendar-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div class="bg-white rounded-3xl w-80 shadow-2xl overflow-hidden flex flex-col relative">
-                        
-                        <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10">
-                            <button onclick="Boako.Match.Chat.changeMonth(-1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">◀</button>
-                            <h3 id="cal-month-title" class="font-black text-sm tracking-widest"></h3>
-                            <button onclick="Boako.Match.Chat.changeMonth(1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">▶</button>
-                        </div>
-                        <button onclick="document.getElementById('poll-calendar-modal').remove()" class="absolute top-3 right-3 text-white/50 hover:text-white font-black text-xl z-20">×</button>
+            // 1. 달력 모달 상단 헤더 바로 아래에 배치할 새로운 시간 패널
+const modalHtml = `
+    <div id="poll-calendar-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div class="bg-white rounded-3xl w-80 shadow-2xl overflow-hidden flex flex-col relative">
+            
+            <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10">
+                <button onclick="Boako.Match.Chat.changeMonth(-1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">◀</button>
+                <h3 id="cal-month-title" class="font-black text-sm tracking-widest"></h3>
+                <button onclick="Boako.Match.Chat.changeMonth(1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">▶</button>
+            </div>
+            <button onclick="document.getElementById('poll-calendar-modal').remove()" class="absolute top-3 right-3 text-white/50 hover:text-white font-black text-xl z-20">×</button>
 
-                        <div class="bg-indigo-50 p-3 border-b border-indigo-100 flex items-center gap-2">
-                            <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 고정 시간</span>
-                            <select id="poll-fixed-time-select" onchange="Boako.Match.Chat.changeFixedTime(this.value)" class="flex-1 bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
-                                <option value="19:00">19:00 (오후 7시)</option>
-                                <option value="20:00" selected>20:00 (오후 8시)</option>
-                                <option value="21:00">21:00 (오후 9시)</option>
-                                <option value="22:00">22:00 (오후 10시)</option>
-                                <option value="23:00">23:00 (오후 11시)</option>
-                            </select>
-                        </div>
-
-                        <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-white pt-3 pb-1">
-                            <div class="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-400">토</div>
-                        </div>
-
-                        <div id="cal-days-grid" class="grid grid-cols-7 gap-1.5 p-3 bg-white mb-2"></div>
-
-                        <div class="p-3 bg-white border-t border-slate-100">
-                            <button id="poll-submit-btn" onclick="Boako.Match.Chat.submitPollData()" class="w-full bg-slate-200 text-slate-500 text-xs font-black py-3 rounded-xl transition-all shadow-sm cursor-not-allowed" disabled>
-                                날짜를 클릭하여 선택하세요
-                            </button>
-                        </div>
-
-                    </div>
+            <div class="bg-slate-50 p-4 border-b border-slate-200">
+                <button onclick="Boako.Match.Chat.instantVote('시간 상관없음')" class="w-full mb-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-black py-2.5 rounded-xl shadow-md hover:opacity-90 active:scale-95 transition-all">
+                    ☀️ 시간 상관없음
+                </button>
+                
+                <div class="grid grid-cols-4 gap-1.5 mb-2">
+                    ${Array.from({length: 8}, (_, i) => {
+                        const time = String(i * 3).padStart(2, '0') + ':00';
+                        return `<button onclick="Boako.Match.Chat.instantVote('${time}')" class="bg-white border border-slate-200 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-[10px] font-black py-2 rounded-lg transition-all shadow-sm active:scale-95">
+                            ${time}
+                        </button>`;
+                    }).join('')}
                 </div>
-            `;
+            </div>
+
+            <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-white pt-3 pb-1">
+                <div class="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-400">토</div>
+            </div>
+            <div id="cal-days-grid" class="grid grid-cols-7 gap-1.5 p-3 bg-white"></div>
+        </div>
+    </div>
+`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             Boako.Match.Chat.renderCalendarGrid();
         },
