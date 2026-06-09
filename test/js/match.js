@@ -458,37 +458,37 @@ Boako.Match = {
             Boako.Match.Chat.selectedTimesState = [];
             Boako.Match.Chat.currentFixedTime = '20:00';
 
-            // 1. 달력 모달 상단 헤더 바로 아래에 배치할 새로운 시간 패널
-const modalHtml = `
-    <div id="poll-calendar-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-        <div class="bg-white rounded-3xl w-80 shadow-2xl overflow-hidden flex flex-col relative">
+           // openPollModal 내의 시간 선택 패널 부분입니다.
+const pModalHtml = `
+    <div id="poll-input-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-6 w-80 space-y-4 shadow-xl border border-slate-100">
+            <div class="flex justify-between items-center">
+                <h3 class="text-sm font-black text-slate-800">📅 일정 조율</h3>
+                <button onclick="document.getElementById('poll-input-modal').remove()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
+            </div>
             
-            <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10">
-                <button onclick="Boako.Match.Chat.changeMonth(-1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">◀</button>
-                <h3 id="cal-month-title" class="font-black text-sm tracking-widest"></h3>
-                <button onclick="Boako.Match.Chat.changeMonth(1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">▶</button>
-            </div>
-            <button onclick="document.getElementById('poll-calendar-modal').remove()" class="absolute top-3 right-3 text-white/50 hover:text-white font-black text-xl z-20">×</button>
-
-            <div class="bg-slate-50 p-4 border-b border-slate-200">
-                <button onclick="Boako.Match.Chat.instantVote('시간 상관없음')" class="w-full mb-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-black py-2.5 rounded-xl shadow-md hover:opacity-90 active:scale-95 transition-all">
-                    ☀️ 시간 상관없음
-                </button>
-                
-                <div class="grid grid-cols-4 gap-1.5 mb-2">
-                    ${Array.from({length: 8}, (_, i) => {
-                        const time = String(i * 3).padStart(2, '0') + ':00';
-                        return `<button onclick="Boako.Match.Chat.instantVote('${time}')" class="bg-white border border-slate-200 text-slate-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-[10px] font-black py-2 rounded-lg transition-all shadow-sm active:scale-95">
-                            ${time}
-                        </button>`;
+            <div class="bg-indigo-50 p-3 border border-indigo-100 rounded-xl flex items-center gap-2">
+                <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 시간</span>
+                <select id="poll-fixed-time-select" class="flex-1 bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
+                    <option value="시간 상관없음">시간 상관없음</option>
+                    ${Array.from({length: 24}, (_, i) => {
+                        const t = String(i).padStart(2, '0') + ':00';
+                        return `<option value="${t}" ${t === '20:00' ? 'selected' : ''}>${t}</option>`;
                     }).join('')}
-                </div>
+                </select>
             </div>
 
-            <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-white pt-3 pb-1">
-                <div class="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-400">토</div>
-            </div>
-            <div id="cal-days-grid" class="grid grid-cols-7 gap-1.5 p-3 bg-white"></div>
+            <input type="date" id="poll-date-picker" class="w-full border border-slate-200 rounded-lg p-2 text-xs font-bold focus:outline-none focus:border-indigo-500 bg-white">
+            
+            <button onclick="Boako.Match.Chat.addTimeToList()" class="w-full bg-slate-800 text-white text-xs font-black py-2 rounded-lg transition-colors hover:bg-slate-900">
+                ➕ 추가
+            </button>
+            
+            <div id="poll-selected-list" class="max-h-32 overflow-y-auto text-xs text-slate-500 py-2 border-t border-slate-100"></div>
+
+            <button onclick="Boako.Match.Chat.submitPollData()" class="w-full bg-indigo-600 text-white text-xs font-black py-3 rounded-xl shadow-sm hover:bg-indigo-700">
+                최종 제출
+            </button>
         </div>
     </div>
 `;
