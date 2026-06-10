@@ -717,33 +717,67 @@ Boako.Match = {
             } else if (status === 'PROPOSED') {
                 const confirmedUsers = poll.confirmations || [];
                 const isAcceptedByMe = confirmedUsers.includes(myId);
+                
+                // 🌟 [핵심] 과반수 및 시간 계산 로직
+                const majorityCount = Math.floor(votersCount / 2) + 1; // 과반수 계산 (예: 3명중 2명, 4명중 3명)
+                const confirmedCount = confirmedUsers.length;
+                const isMajorityReached = confirmedCount >= majorityCount;
+                
+                // 생성된 시간으로부터 몇 시간이 지났는지 계산 (여기서는 임시로 created_at 사용)
+                const proposedTime = new Date(poll.created_at).getTime(); 
+                const hoursPassed = (new Date().getTime() - proposedTime) / (1000 * 60 * 60);
+                const TIME_LIMIT_HOURS = 12; // ⏳ 12시간 뒤 자동 확정 (원하시는 시간으로 변경 가능)
+
+                // 💡 [자동 확정 트리거] 과반수가 넘었고 & 12시간이 지났다면? 누군가 창을 여는 순간 즉시 확정!
+                if (isMajorityReached && hoursPassed >= TIME_LIMIT_HOURS) {
+                    Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id);
+                    return; // 렌더링 중단하고 확정 로직으로 토스
+                }
+
+                let statusHtml = '';
+                if (isMajorityReached) {
+                    statusHtml = `
+                        <div class="bg-amber-50 border border-amber-200 text-amber-700 p-2.5 rounded-xl text-[11px] font-black mb-3">
+                            🔥 과반수 수락 완료! (${confirmedCount}/${votersCount}명)<br>
+                            <span class="font-bold text-amber-600 mt-0.5 block">남은 인원의 응답이 없어도 ${TIME_LIMIT_HOURS}시간 뒤 자동 확정됩니다.</span>
+                        </div>
+                    `;
+                } else {
+                    statusHtml = `
+                        <div class="bg-slate-50 border border-slate-200 text-slate-600 p-2.5 rounded-xl text-[11px] font-black mb-3 flex justify-between items-center">
+                            <span>수락 진행도: ${confirmedCount} / ${votersCount}명</span>
+                            <span class="text-indigo-600">과반수(${majorityCount}명) 필요</span>
+                        </div>
+                    `;
+                }
 
                 let btnHtml = '';
                 if (!isAcceptedByMe) {
                     btnHtml = `
-                        <button onclick="Boako.Match.Chat.acceptProposedTime('${poll.poll_id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2 rounded-xl shadow-sm transition-colors cursor-pointer active:scale-95">
-                            🟢 위 시간 최종 수락
+                        <button onclick="Boako.Match.Chat.acceptProposedTime('${poll.poll_id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2.5 rounded-xl shadow-sm transition-colors cursor-pointer active:scale-95">
+                            🟢 이 시간으로 수락하기
                         </button>
                     `;
                 } else {
                     btnHtml = `
-                        <div class="text-xs text-center bg-slate-100 text-slate-400 py-2 rounded-xl font-bold border border-slate-200">
-                            ⏳ 타 참여자 최종 승인 대기 중 (${confirmedUsers.length}명 수락완료)
+                        <div class="text-xs text-center bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold border border-slate-200">
+                            ✅ 나는 수락 완료 (다른 팀원 대기 중)
                         </div>
                     `;
                 }
 
                 cardInnerHtml = `
-                    <div class="font-black text-emerald-800 text-xs mb-1 flex items-center gap-1">🎯 교집합 일정 자동 도출 완료!</div>
-                    <p class="text-[11px] text-slate-500 font-bold mb-3">모두가 상호 수용 가능한 최적의 교집합 시간입니다.</p>
+                    <div class="font-black text-emerald-800 text-xs mb-1 flex items-center gap-1">🎯 교집합 일정 제안됨!</div>
+                    <p class="text-[11px] text-slate-500 font-bold mb-3">가장 유력한 최적의 시간입니다. 수락을 눌러주세요.</p>
                     <div class="text-sm font-black text-indigo-900 bg-white p-3 rounded-xl border border-indigo-200 text-center shadow-inner mb-3">
                         ${poll.proposed_time}
                     </div>
+                    ${statusHtml}
                     ${btnHtml}
                 `;
             } else if (status === 'CONFIRMED') {
                 cardInnerHtml = `
-                    <div class="font-black text-slate-700 text-xs mb-1 flex items-center gap-1">🏁 전원 수락 완료</div>
+                    <div class="font-black text-slate-700 text-xs mb-1 flex items-center gap-1">🏁 일정 최종 확정!</div>
                     <div class="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl text-center shadow-sm">
                         🎉 확정 일정: ${poll.confirmed_time}<br>
                         <span class="text-[10px] text-slate-400 font-bold mt-1 block">(대항전 스케줄러 자동 이관 완료)</span>
@@ -762,7 +796,7 @@ Boako.Match = {
         },
 
         acceptProposedTime: async (pollId) => {
-            if (!confirm("도출된 교집합 시간으로 매치 일정을 최종 확정하시겠습니까?")) return;
+            if (!confirm("이 제안된 시간을 최종 일정으로 수락하시겠습니까?")) return;
 
             const myId = Boako.state.user.id;
             const { data: poll } = await Boako.db.from('schedule_polls').select('*').eq('poll_id', pollId).single();
@@ -773,31 +807,39 @@ Boako.Match = {
                 currentConfirmations.push(myId);
             }
 
+            // 🌟 수락 시 전원 만장일치일 경우 즉시 확정 처리 (시간 기다릴 필요 없음)
             const totalExpectedVoters = Object.keys(poll.votes || {}).length;
 
             if (currentConfirmations.length >= totalExpectedVoters) {
-                await Boako.db.from('schedule_polls').update({
-                    confirmations: currentConfirmations,
-                    status: 'CONFIRMED',
-                    confirmed_time: poll.proposed_time
-                }).eq('poll_id', pollId);
-
-                const schedulePayload = {
-                    proposer_id: poll.proposer_id,
-                    responder_id: myId, 
-                    game_name: poll.game_name,
-                    match_type: 'GRANDPRIX',
-                    scheduled_time: new Date(poll.proposed_time).toISOString(),
-                    status: 'UPCOMING',
-                    reference_id: poll.target_id
-                };
-                await Boako.db.from('match_schedules').insert([schedulePayload]);
-                Boako.Util.toast("🎉 전원 합의 성공! 일정이 공식 캘린더에 등재되었습니다.");
+                await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id);
             } else {
                 await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
-                Boako.Util.toast("🟢 수락 처리가 기록되었습니다. 다른 참여자들의 승인을 기다립니다.");
+                Boako.Util.toast("🟢 수락 처리가 기록되었습니다. 과반수 달성 시 유예기간 후 자동 확정됩니다.");
+                await Boako.Match.Chat.loadMessagesAndPolls();
             }
+        },
 
+        // 🌟 [신규 함수] 강제 확정 및 스케줄러 이관 로직 분리
+        forceConfirmPoll: async (pollId, confirmedTime, proposerId) => {
+            const myId = Boako.state.user.id;
+            
+            await Boako.db.from('schedule_polls').update({
+                status: 'CONFIRMED',
+                confirmed_time: confirmedTime
+            }).eq('poll_id', pollId);
+
+            const schedulePayload = {
+                proposer_id: proposerId,
+                responder_id: myId, 
+                game_name: Boako.Match.Chat.currentGame,
+                match_type: 'GRANDPRIX',
+                scheduled_time: new Date(confirmedTime).toISOString(),
+                status: 'UPCOMING',
+                reference_id: `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`
+            };
+            await Boako.db.from('match_schedules').insert([schedulePayload]);
+            
+            Boako.Util.toast("🎉 일정 조건(과반수 또는 전원합의)이 충족되어 공식 캘린더에 최종 등재되었습니다!");
             await Boako.Match.Chat.loadMessagesAndPolls();
         },
 
