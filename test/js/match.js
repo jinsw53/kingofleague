@@ -604,10 +604,17 @@ Boako.Match = {
             const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
             const myId = Boako.state.user.id;
 
-            const { data: existingPoll } = await Boako.db.from('schedule_polls')
-                .select('*').eq('target_id', roomId).eq('status', 'OPEN').maybeSingle();
+            const { data: existingPolls } = await Boako.db.from('schedule_polls')
+                .select('*')
+                .eq('target_id', roomId)
+                .in('status', ['OPEN', 'PROPOSED'])
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            const existingPoll = existingPolls && existingPolls.length > 0 ? existingPolls[0] : null;
 
             if (!existingPoll) {
+                // 첫 투표자일 경우
                 const initialVotes = {};
                 initialVotes[myId] = myTimes;
 
@@ -622,26 +629,63 @@ Boako.Match = {
                 };
                 await Boako.db.from('schedule_polls').insert([insertPayload]);
             } else {
+                // 기존 투표함이 있을 경우 (나의 투표 추가/업데이트)
                 const currentVotes = existingPoll.votes || {};
                 currentVotes[myId] = myTimes;
 
-                const timeMap = {};
                 const voters = Object.keys(currentVotes);
-                voters.forEach(voterId => {
-                    currentVotes[voterId].forEach(time => {
-                        timeMap[time] = (timeMap[time] || 0) + 1;
-                    });
-                });
-
                 let perfectMatchTime = null;
-                for (const [timeStr, count] of Object.entries(timeMap)) {
-                    if (count === voters.length) { perfectMatchTime = timeStr; break; }
+                
+                // 💡 [핵심] 최소 2명 이상일 때, '시간 상관없음'을 와일드카드로 처리하는 교집합 로직
+                if (voters.length >= 2) {
+                    // 1. 모든 유저가 제출한 모든 (날짜+시간) 후보를 중복 없이 싹 모음
+                    const allUniqueSubmissions = new Set();
+                    voters.forEach(v => currentVotes[v].forEach(t => allUniqueSubmissions.add(t)));
+
+                    // 2. 각 후보 시간에 대해 모든 유저가 동의하는지 검사
+                    for (const candidate of allUniqueSubmissions) {
+                        const [candDate, candTime] = candidate.split(' '); // ex) ["2026-06-12", "20:00"]
+                        
+                        let allAccept = true;
+                        
+                        for (const voter of voters) {
+                            const myChoices = currentVotes[voter] || [];
+                            
+                            // 조건 A: 내가 이 후보 시간을 정확히 똑같이 선택했거나
+                            let accepts = myChoices.includes(candidate);
+                            
+                            // 조건 B: 후보가 특정 시간(예: 20:00)인데, 내가 "해당 날짜 시간 상관없음"을 제출했다면 => OK (와일드카드 통과!)
+                            if (!accepts && candTime !== '시간 상관없음') {
+                                if (myChoices.includes(`${candDate} 시간 상관없음`)) {
+                                    accepts = true;
+                                }
+                            }
+                            
+                            if (!accepts) {
+                                allAccept = false;
+                                break;
+                            }
+                        }
+
+                        // 모두가 동의한 시간(또는 와일드카드로 커버된 시간)이 발견되면 즉시 확정!
+                        if (allAccept) {
+                            perfectMatchTime = candidate;
+                            break; 
+                        }
+                    }
                 }
 
                 const updatePayload = { votes: currentVotes };
+                
                 if (perfectMatchTime) {
+                    // 교집합 발견
                     updatePayload.proposed_time = perfectMatchTime;
                     updatePayload.status = 'PROPOSED';
+                } else {
+                    // 교집합이 아직 없거나 깨짐 (다시 OPEN)
+                    updatePayload.proposed_time = null;
+                    updatePayload.status = 'OPEN';
+                    updatePayload.confirmations = [];
                 }
 
                 await Boako.db.from('schedule_polls').update(updatePayload).eq('poll_id', existingPoll.poll_id);
