@@ -447,7 +447,7 @@ Boako.Match = {
         selectedTimesState: [], // 내 후보지들 ['2026-06-12 20:00', ...]
         currentFixedTime: '20:00', // 소장님이 말씀하신 고정 시간 (기본 20시)
 
-        openPollModal: () => {
+       openPollModal: () => {
             const existing = document.getElementById('poll-calendar-modal');
             if (existing) existing.remove();
 
@@ -475,7 +475,7 @@ Boako.Match = {
                                     const time = String(i).padStart(2, '0') + ':00';
                                     const ampm = i < 12 ? '오전' : '오후';
                                     const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
-                                    return \`<option value="\${time}" \${time === '20:00' ? 'selected' : ''}>\${time} (\${ampm} \${h}시)</option>\`;
+                                    return `<option value="${time}" ${time === '20:00' ? 'selected' : ''}>${time} (${ampm} ${h}시)</option>`;
                                 }).join('')}
                             </select>
                         </div>
