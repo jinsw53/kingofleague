@@ -119,7 +119,6 @@ Boako.Match = {
 
             let confirmedEntries = [];
             if (isFinalized) {
-                // 💡 [핵심] 여기서 teams 테이블을 JOIN하여 logo_url을 함께 가져옵니다!
                 const { data: entriesData, error: entriesErr } = await Boako.db
                     .from('grandprix_entries')
                     .select('*, teams(logo_url)') 
@@ -143,7 +142,7 @@ Boako.Match = {
         }
     },
 
-    // 🌟 4. [탭 1] 밴 결과 렌더링 (SURVIVED 삭제, 텍스트 넘침 방지)
+    // 🌟 4. [탭 1] 밴 결과 렌더링
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
         content.className = "w-full block"; 
@@ -187,7 +186,6 @@ Boako.Match = {
             html += `
                 <div class="rounded-2xl p-5 flex flex-col items-center justify-between text-center transition-all duration-200 relative ${cardClass}">
                     
-                    <!-- 💡 SURVIVED 배지 삭제, BANNED만 남김 -->
                     ${isBanned ? `
                         <div class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-md shadow-sm z-10 rotate-12">BANNED</div>
                     ` : ''}
@@ -201,7 +199,6 @@ Boako.Match = {
                     
                     <h4 class="font-black text-sm break-keep mb-3 ${textClass}">${game.game_name}</h4>
                     
-                    <!-- 💡 하단 텍스트 수정 (글씨 넘침 방지) -->
                     ${isBanned ? `
                         <div class="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-lg w-full truncate border border-red-100">
                             밴 확정 종목
@@ -222,7 +219,7 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
-  // 🌟 5. [탭 2] 게임별 매치업 (로고 렌더링 적용)
+  // 🌟 5. [탭 2] 게임별 매치업
     renderEntryTab: (games, isFinalized, entries = []) => {
         const content = document.getElementById('match-entry-content');
         content.className = "w-full block";
@@ -269,7 +266,7 @@ Boako.Match = {
                                     📝 작전판 열기
                                 </button>
                             ` : ''}
-                           
+                            
 <button onclick="Boako.Match.Chat.open(${game.season_no}, '${game.game_name}')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
     💬 소통 채널
 </button>
@@ -309,6 +306,7 @@ Boako.Match = {
         html += `</div>`;
         content.innerHTML = html;
     },
+
  // 🌟 6. [전역 모듈] 종목별 소통 채널 (원클릭 다중 투표 + 일괄 제출 시스템)
     Chat: {
         channel: null,
@@ -472,11 +470,13 @@ Boako.Match = {
                         <div class="bg-indigo-50 p-3 border-b border-indigo-100 flex items-center gap-2">
                             <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 고정 시간</span>
                             <select id="poll-fixed-time-select" onchange="Boako.Match.Chat.changeFixedTime(this.value)" class="flex-1 bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
-                                <option value="19:00">19:00 (오후 7시)</option>
-                                <option value="20:00" selected>20:00 (오후 8시)</option>
-                                <option value="21:00">21:00 (오후 9시)</option>
-                                <option value="22:00">22:00 (오후 10시)</option>
-                                <option value="23:00">23:00 (오후 11시)</option>
+                                <option value="시간 상관없음">☀️ 시간 상관없음</option>
+                                ${Array.from({length: 24}, (_, i) => {
+                                    const time = String(i).padStart(2, '0') + ':00';
+                                    const ampm = i < 12 ? '오전' : '오후';
+                                    const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
+                                    return \`<option value="\${time}" \${time === '20:00' ? 'selected' : ''}>\${time} (\${ampm} \${h}시)</option>\`;
+                                }).join('')}
                             </select>
                         </div>
 
@@ -548,7 +548,9 @@ Boako.Match = {
                     // 도장 찍힌 상태 UI
                     cellClass += "bg-indigo-600 text-white shadow-md transform scale-105 cursor-pointer ring-2 ring-indigo-200 ring-offset-1";
                     // 몇 시인지 조그맣게 표시
-                    innerHtml += `<span class="text-[8px] font-mono mt-0.5 opacity-90">${dayTimes[0].split(' ')[1]}</span>`;
+                    const timeVal = dayTimes[0].split(' ')[1];
+                    const displayTime = timeVal === '상관없음' ? '☀️' : timeVal;
+                    innerHtml += `<span class="text-[8px] font-mono mt-0.5 opacity-90">${displayTime}</span>`;
                 } else {
                     cellClass += "text-slate-700 bg-slate-50 hover:bg-indigo-100 hover:text-indigo-700 cursor-pointer border border-slate-100";
                 }
