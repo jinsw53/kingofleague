@@ -255,8 +255,12 @@ Boako.Match = {
                                 ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="w-full h-full object-contain">` : '🎲'}
                             </div>
                             <div>
-                                <h3 class="font-black text-white text-lg group-hover:text-indigo-300 transition-colors">${game.game_name}</h3>
-                                <span class="text-slate-300 text-xs font-bold">본선 출전 엔트리</span>
+                                <h3 class="font-black text-white text-lg group-hover:text-indigo-300 transition-colors mb-1">${game.game_name}</h3>
+                                <div class="flex items-center gap-2">
+                                    ${game.tournament_format_logo ? `<img src="${game.tournament_format_logo}" class="w-4 h-4 object-contain">` : ''}
+                                    <span class="px-2 py-0.5 bg-indigo-500/30 text-indigo-100 text-[10px] font-bold rounded border border-indigo-400/30">${game.tournament_format || '룰셋 미정'}</span>
+                                    <span class="text-slate-300 text-[10px] font-bold border-l border-slate-500 pl-2" title="${game.description || ''}">엔트리 ${game.entry_count || 0}명</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -267,9 +271,9 @@ Boako.Match = {
                                 </button>
                             ` : ''}
                             
-<button onclick="Boako.Match.Chat.open(${game.season_no}, '${game.game_name}')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
-    💬 소통 채널
-</button>
+                            <button onclick="Boako.Match.Chat.open(${game.season_no}, '${game.game_name}', ${game.entry_count || 0}, '${game.tournament_format || 'SWISS'}')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
+                                💬 소통 채널
+                            </button>
                         </div>
                     </div>
 
@@ -312,10 +316,16 @@ Boako.Match = {
         channel: null,
         currentSeason: null,
         currentGame: null,
+        // 💡 [수정됨] 현재 종목의 인원수와 룰셋 포맷을 보관할 상태 변수 추가
+        currentEntryCount: 0,
+        currentFormat: 'SWISS',
 
-        open: async (seasonNo, gameName) => {
+        // 💡 [수정됨] 매개변수로 entryCount와 format 추가
+        open: async (seasonNo, gameName, entryCount = 0, format = 'SWISS') => {
             Boako.Match.Chat.currentSeason = seasonNo;
             Boako.Match.Chat.currentGame = gameName;
+            Boako.Match.Chat.currentEntryCount = entryCount;
+            Boako.Match.Chat.currentFormat = format;
             const roomId = `${seasonNo}_${gameName}`;
 
             const existingModal = document.getElementById('match-chat-modal');
@@ -328,7 +338,10 @@ Boako.Match = {
                         <div class="bg-indigo-600 px-5 py-4 flex justify-between items-center text-white shrink-0 shadow-md z-10">
                             <div>
                                 <h2 class="text-lg font-black flex items-center gap-2">💬 [${gameName}] 소통 채널</h2>
-                                <p class="text-indigo-200 text-xs font-bold mt-0.5">참여자 전원 일치 교집합 일정 투표 시스템</p>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <p class="text-indigo-200 text-xs font-bold">참여자 전원 일치 일정 투표</p>
+                                    <span class="bg-indigo-800 text-indigo-100 text-[10px] font-black px-1.5 py-0.5 rounded">엔트리 ${entryCount}명 (${format})</span>
+                                </div>
                             </div>
                             <div class="flex items-center gap-2">
                                 <button onclick="Boako.Match.Chat.openPollModal()" class="text-xs bg-white text-indigo-600 px-3 py-1.5 rounded-lg font-black hover:bg-indigo-50 shadow-sm transition-colors">
@@ -622,7 +635,7 @@ Boako.Match = {
                     target_id: roomId,
                     target_type: 'MATCH_CHANNEL',
                     game_name: Boako.Match.Chat.currentGame,
-                    mode: 'SWISS',
+                    mode: Boako.Match.Chat.currentFormat || 'SWISS', // 💡 [수정됨] 하드코딩 제거, DB 룰셋 주입
                     proposer_id: myId,
                     votes: initialVotes,
                     status: 'OPEN'
@@ -636,8 +649,10 @@ Boako.Match = {
                 const voters = Object.keys(currentVotes);
                 let perfectMatchTime = null;
                 
-                // 💡 [핵심] 최소 2명 이상일 때, '시간 상관없음'을 와일드카드로 처리하는 교집합 로직
-                if (voters.length >= 2) {
+                // 💡 [수정됨] 기존 2명 고정값 제거, '진짜 과반수'가 달성되었을 때만 교집합 탐색
+                const majorityCount = Math.floor(Boako.Match.Chat.currentEntryCount / 2) + 1;
+
+                if (voters.length >= majorityCount) {
                     // 1. 모든 유저가 제출한 모든 (날짜+시간) 후보를 중복 없이 싹 모음
                     const allUniqueSubmissions = new Set();
                     voters.forEach(v => currentVotes[v].forEach(t => allUniqueSubmissions.add(t)));
@@ -707,9 +722,10 @@ Boako.Match = {
             let cardInnerHtml = '';
 
             if (status === 'OPEN') {
+                // 💡 [수정됨] 전체 출전 엔트리 수(currentEntryCount) 기반 안내
                 cardInnerHtml = `
                     <div class="font-black text-indigo-900 text-xs mb-1 flex items-center gap-1">📊 일정 조율 투표 진행 중</div>
-                    <p class="text-[11px] text-slate-500 font-bold mb-3">현재 ${votersCount}명의 참여자가 일정을 제출했습니다.</p>
+                    <p class="text-[11px] text-slate-500 font-bold mb-3">전체 ${Boako.Match.Chat.currentEntryCount}명 중 ${votersCount}명이 일정을 제출했습니다.</p>
                     <div class="text-xs text-center bg-indigo-600 text-white p-2 rounded-xl font-black shadow-sm cursor-pointer hover:bg-indigo-700 active:scale-95 transition-all" onclick="Boako.Match.Chat.openPollModal()">
                         나도 달력으로 시간 찍기
                     </div>
@@ -718,7 +734,8 @@ Boako.Match = {
                 const confirmedUsers = poll.confirmations || [];
                 const isAcceptedByMe = confirmedUsers.includes(myId);
                 
-                const majorityCount = Math.floor(votersCount / 2) + 1;
+                // 💡 [수정됨] 투표자가 아닌, DB 엔트리 카운트 기준 진짜 과반수 체크
+                const majorityCount = Math.floor(Boako.Match.Chat.currentEntryCount / 2) + 1;
                 const confirmedCount = confirmedUsers.length;
                 const isMajorityReached = confirmedCount >= majorityCount;
                 
@@ -735,14 +752,14 @@ Boako.Match = {
                 if (isMajorityReached) {
                     statusHtml = `
                         <div class="bg-amber-50 border border-amber-200 text-amber-700 p-2.5 rounded-xl text-[11px] font-black mb-3">
-                            🔥 과반수 수락 완료! (${confirmedCount}/${votersCount}명)<br>
+                            🔥 과반수 수락 완료! (${confirmedCount}/${Boako.Match.Chat.currentEntryCount}명)<br>
                             <span class="font-bold text-amber-600 mt-0.5 block">남은 인원의 응답이 없어도 ${TIME_LIMIT_HOURS}시간 뒤 자동 확정됩니다.</span>
                         </div>
                     `;
                 } else {
                     statusHtml = `
                         <div class="bg-slate-50 border border-slate-200 text-slate-600 p-2.5 rounded-xl text-[11px] font-black mb-3 flex justify-between items-center">
-                            <span>수락 진행도: ${confirmedCount} / ${votersCount}명</span>
+                            <span>수락 진행도: ${confirmedCount} / ${Boako.Match.Chat.currentEntryCount}명</span>
                             <span class="text-indigo-600">과반수(${majorityCount}명) 필요</span>
                         </div>
                     `;
@@ -814,7 +831,8 @@ Boako.Match = {
                 currentConfirmations.push(myId);
             }
 
-            const totalExpectedVoters = Object.keys(poll.votes || {}).length;
+            // 💡 [수정됨] 투표 제출자 수가 아닌 전체 엔트리 인원수 기준 달성 여부 체크
+            const totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
 
             if (currentConfirmations.length >= totalExpectedVoters) {
                 await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id);
