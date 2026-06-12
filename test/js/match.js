@@ -880,36 +880,56 @@ Boako.Match = {
             Boako.Match.Chat.openPollModal();
         },
 
-        // 🌟 [수정된 함수] 강제 확정 및 스케줄러 이관 로직 (날짜 파싱 버그 수정)
+        // 🌟 [최종 완성] 강제 확정 및 스케줄러 이관 로직 (JSONB participants 반영)
         forceConfirmPoll: async (pollId, confirmedTime, proposerId) => {
-            const myId = Boako.state.user.id;
             
-            // 💡 1. "2026-06-12 20:00" 포맷을 "2026-06-12T20:00:00" 형태로 안전하게 보정
+            // 1. 날짜 안전 변환 (Invalid Date 방지)
             let safeTimeISO;
             try {
                 const formattedTimeStr = confirmedTime.replace(' ', 'T') + ':00';
                 safeTimeISO = new Date(formattedTimeStr).toISOString();
             } catch (dateErr) {
                 console.error("날짜 포맷팅 에러 발생:", dateErr);
-                // 혹시라도 파싱이 실패할 경우를 대비한 2차 백업 세이프티
                 safeTimeISO = new Date().toISOString(); 
             }
             
-            // 2. 수락 상태 업데이트
+            // 2. 투표(조율) 상태 업데이트
             await Boako.db.from('schedule_polls').update({
                 status: 'CONFIRMED',
                 confirmed_time: confirmedTime
             }).eq('poll_id', pollId);
 
-            // 3. 공식 스케줄러 데이터 인서트
+            // 💡 3. [핵심 신규 로직] 해당 종목의 출전 엔트리 전원 정보 조회
+            const { data: entries, error: entryErr } = await Boako.db
+                .from('grandprix_entries')
+                .select('*') // 출전 선수 명단 조회
+                .eq('season_no', Boako.Match.Chat.currentSeason)
+                .eq('game_name', Boako.Match.Chat.currentGame);
+
+            if (entryErr) {
+                console.error("엔트리 참가자 조회 실패:", entryErr);
+                alert("참가자 목록을 불러오는 중 오류가 발생했습니다.");
+                return;
+            }
+
+            // 💡 4. JSONB 컬럼에 넣을 participants 배열 구조화
+            // (선수들의 고유 ID, 이름, 팀명, 그리고 최초 제안자 여부 기록)
+            const participantsData = (entries || []).map(entry => ({
+                user_id: entry.user_id, // 엔트리 테이블의 유저 고유 ID
+                player_name: entry.player_name,
+                team_name: entry.team_name,
+                role: (String(entry.user_id) === String(proposerId)) ? 'PROPOSER' : 'PARTICIPANT'
+            }));
+
+            // 5. 공식 스케줄러 테이블(match_schedules) 인서트
             const schedulePayload = {
-                proposer_id: proposerId,
-                responder_id: myId, 
                 game_name: Boako.Match.Chat.currentGame,
                 match_type: 'GRANDPRIX',
-                scheduled_time: safeTimeISO, // 💡 Invalid Date 대신 안전한 ISO 문자열 주입
+                scheduled_time: safeTimeISO,
                 status: 'UPCOMING',
-                reference_id: `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`
+                source_type: 'MATCH_CHANNEL',
+                reference_id: `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`,
+                participants: participantsData // 🚀 새롭게 생성된 JSONB 컬럼에 참가자 전원 밀어넣기
             };
             
             const { error: insertErr } = await Boako.db.from('match_schedules').insert([schedulePayload]);
@@ -920,7 +940,7 @@ Boako.Match = {
                 return;
             }
             
-            Boako.Util.toast("🎉 일정 조건(과반수 또는 전원합의)이 충족되어 공식 캘린더에 최종 등재되었습니다!");
+            Boako.Util.toast("🎉 참가자 전원의 일정이 공식 캘린더에 성공적으로 등재되었습니다!");
             await Boako.Match.Chat.loadMessagesAndPolls();
         },
 
