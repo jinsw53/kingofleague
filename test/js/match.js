@@ -2,7 +2,7 @@
  * [MATCH] 대항전 메인 대시보드 관리
  */
 Boako.Match = {
-    // 🌟 1. 대시보드 초기화 (상단 UI 군더더기 제거 및 로고 영역 추가)
+    // 🌟 1. 대시보드 초기화
     init: async (containerId) => {
         const targetId = containerId || 'main-content';
         const container = document.getElementById(targetId); 
@@ -59,7 +59,7 @@ Boako.Match = {
         await Boako.Match.loadData();
     },
 
-    // (switchTab 함수는 그대로 유지)
+    // 🌟 2. 탭 전환
     switchTab: (tabId) => {
         ['tab-ban', 'tab-entry', 'tab-score'].forEach(id => {
             document.getElementById(id).classList.add('hidden');
@@ -74,7 +74,7 @@ Boako.Match = {
         activeBtn.classList.add('border-indigo-600', 'text-indigo-600');
     },
 
-    // 🌟 3. 데이터 로드 (쿼리 수정)
+    // 🌟 3. 데이터 로드
     loadData: async () => {
         try {
             const { data: currentSeason } = await Boako.db.from('seasons')
@@ -316,11 +316,9 @@ Boako.Match = {
         channel: null,
         currentSeason: null,
         currentGame: null,
-        // 💡 [수정됨] 현재 종목의 인원수와 룰셋 포맷을 보관할 상태 변수 추가
         currentEntryCount: 0,
         currentFormat: 'SWISS',
 
-        // 💡 [수정됨] 매개변수로 entryCount와 format 추가
         open: async (seasonNo, gameName, entryCount = 0, format = 'SWISS') => {
             Boako.Match.Chat.currentSeason = seasonNo;
             Boako.Match.Chat.currentGame = gameName;
@@ -372,7 +370,7 @@ Boako.Match = {
 
             Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${roomId}`)
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats', filter: `room_id=eq.${roomId}` }, (payload) => {
-                    if (payload.new.sender_id !== Boako.state.user.id) {
+                    if (String(payload.new.sender_id) !== String(Boako.state.user.id)) {
                         payload.new.profiles = { full_name: payload.new.sender_name_override || "참여자" };
                         Boako.Match.Chat.renderMessage(payload.new);
                         Boako.Match.Chat.scrollToBottom();
@@ -454,11 +452,10 @@ Boako.Match = {
             await Boako.db.from('grandprix_match_chats').insert([payload]);
         },
 
-        // 🌟 [UI 전면 개편] 시간을 고정하고 날짜를 클릭하여 다중 누적하는 혁신적 캘린더
         calYear: new Date().getFullYear(),
         calMonth: new Date().getMonth() + 1,
-        selectedTimesState: [], // 내 후보지들 ['2026-06-12 20:00', ...]
-        currentFixedTime: '20:00', // 소장님이 말씀하신 고정 시간 (기본 20시)
+        selectedTimesState: [], 
+        currentFixedTime: '20:00', 
 
        openPollModal: () => {
             const existing = document.getElementById('poll-calendar-modal');
@@ -548,7 +545,6 @@ Boako.Match = {
                 const isPast = currentCellDate < today;
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
-                // 해당 날짜에 선택된 시간 배열 찾기
                 const dayTimes = Boako.Match.Chat.selectedTimesState.filter(t => t.startsWith(dateStr));
                 const isSelected = dayTimes.length > 0;
                 
@@ -558,9 +554,7 @@ Boako.Match = {
                 if (isPast) {
                     cellClass += "text-slate-300 cursor-not-allowed bg-slate-50/50";
                 } else if (isSelected) {
-                    // 도장 찍힌 상태 UI
                     cellClass += "bg-indigo-600 text-white shadow-md transform scale-105 cursor-pointer ring-2 ring-indigo-200 ring-offset-1";
-                    // 몇 시인지 조그맣게 표시
                     const timeVal = dayTimes[0].split(' ')[1];
                     const displayTime = timeVal === '상관없음' ? '☀️' : timeVal;
                     innerHtml += `<span class="text-[8px] font-mono mt-0.5 opacity-90">${displayTime}</span>`;
@@ -575,18 +569,14 @@ Boako.Match = {
             Boako.Match.Chat.updateSubmitButton();
         },
 
-        // 🌟 [원클릭 토글 로직] 날짜 누르면 추가, 또 누르면 삭제
         toggleDate: (dateStr) => {
             const timeStr = Boako.Match.Chat.currentFixedTime;
             const combined = `${dateStr} ${timeStr}`;
             
             const idx = Boako.Match.Chat.selectedTimesState.indexOf(combined);
             if (idx > -1) {
-                // 이미 있으면 제거 (토글 OFF)
                 Boako.Match.Chat.selectedTimesState.splice(idx, 1);
             } else {
-                // 없으면 추가 (토글 ON)
-                // 만약 같은 날짜에 다른 시간이 들어있다면 덮어쓰기 로직
                 Boako.Match.Chat.selectedTimesState = Boako.Match.Chat.selectedTimesState.filter(t => !t.startsWith(dateStr));
                 Boako.Match.Chat.selectedTimesState.push(combined);
             }
@@ -609,13 +599,12 @@ Boako.Match = {
             }
         },
 
-        // 🌟 [일괄 제출 로직] 배열 째로 DB에 던져서 교집합 스캔
         submitPollData: async () => {
             const myTimes = Boako.Match.Chat.selectedTimesState;
             if (myTimes.length === 0) return;
 
             const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
-            const myId = Boako.state.user.id;
+            const myId = String(Boako.state.user.id);
 
             const { data: existingPolls } = await Boako.db.from('schedule_polls')
                 .select('*')
@@ -627,7 +616,6 @@ Boako.Match = {
             const existingPoll = existingPolls && existingPolls.length > 0 ? existingPolls[0] : null;
 
             if (!existingPoll) {
-                // 첫 투표자일 경우
                 const initialVotes = {};
                 initialVotes[myId] = myTimes;
 
@@ -635,41 +623,35 @@ Boako.Match = {
                     target_id: roomId,
                     target_type: 'MATCH_CHANNEL',
                     game_name: Boako.Match.Chat.currentGame,
-                    mode: Boako.Match.Chat.currentFormat || 'SWISS', // 💡 [수정됨] 하드코딩 제거, DB 룰셋 주입
+                    mode: Boako.Match.Chat.currentFormat || 'SWISS', 
                     proposer_id: myId,
                     votes: initialVotes,
                     status: 'OPEN'
                 };
                 await Boako.db.from('schedule_polls').insert([insertPayload]);
             } else {
-                // 기존 투표함이 있을 경우 (나의 투표 추가/업데이트)
                 const currentVotes = existingPoll.votes || {};
                 currentVotes[myId] = myTimes;
 
                 const voters = Object.keys(currentVotes);
                 let perfectMatchTime = null;
                 
-                // 💡 [수정됨] 기존 2명 고정값 제거, '진짜 과반수'가 달성되었을 때만 교집합 탐색
                 const majorityCount = Math.floor(Boako.Match.Chat.currentEntryCount / 2) + 1;
 
                 if (voters.length >= majorityCount) {
-                    // 1. 모든 유저가 제출한 모든 (날짜+시간) 후보를 중복 없이 싹 모음
                     const allUniqueSubmissions = new Set();
                     voters.forEach(v => currentVotes[v].forEach(t => allUniqueSubmissions.add(t)));
 
-                    // 2. 각 후보 시간에 대해 모든 유저가 동의하는지 검사
                     for (const candidate of allUniqueSubmissions) {
-                        const [candDate, candTime] = candidate.split(' '); // ex) ["2026-06-12", "20:00"]
+                        const [candDate, candTime] = candidate.split(' '); 
                         
                         let allAccept = true;
                         
                         for (const voter of voters) {
                             const myChoices = currentVotes[voter] || [];
                             
-                            // 조건 A: 내가 이 후보 시간을 정확히 똑같이 선택했거나
                             let accepts = myChoices.includes(candidate);
                             
-                            // 조건 B: 후보가 특정 시간(예: 20:00)인데, 내가 "해당 날짜 시간 상관없음"을 제출했다면 => OK (와일드카드 통과!)
                             if (!accepts && candTime !== '시간 상관없음') {
                                 if (myChoices.includes(`${candDate} 시간 상관없음`)) {
                                     accepts = true;
@@ -682,7 +664,6 @@ Boako.Match = {
                             }
                         }
 
-                        // 모두가 동의한 시간(또는 와일드카드로 커버된 시간)이 발견되면 즉시 확정!
                         if (allAccept) {
                             perfectMatchTime = candidate;
                             break; 
@@ -693,11 +674,9 @@ Boako.Match = {
                 const updatePayload = { votes: currentVotes };
                 
                 if (perfectMatchTime) {
-                    // 교집합 발견
                     updatePayload.proposed_time = perfectMatchTime;
                     updatePayload.status = 'PROPOSED';
                 } else {
-                    // 교집합이 아직 없거나 깨짐 (다시 OPEN)
                     updatePayload.proposed_time = null;
                     updatePayload.status = 'OPEN';
                     updatePayload.confirmations = [];
@@ -715,14 +694,13 @@ Boako.Match = {
             const container = document.getElementById('match-chat-messages');
             if (!container) return;
 
-            const myId = Boako.state.user.id;
+            const myId = String(Boako.state.user.id);
             const votersCount = Object.keys(poll.votes || {}).length;
             const status = poll.status;
 
             let cardInnerHtml = '';
 
             if (status === 'OPEN') {
-                // 💡 [수정됨] 전체 출전 엔트리 수(currentEntryCount) 기반 안내
                 cardInnerHtml = `
                     <div class="font-black text-indigo-900 text-xs mb-1 flex items-center gap-1">📊 일정 조율 투표 진행 중</div>
                     <p class="text-[11px] text-slate-500 font-bold mb-3">전체 ${Boako.Match.Chat.currentEntryCount}명 중 ${votersCount}명이 일정을 제출했습니다.</p>
@@ -732,9 +710,9 @@ Boako.Match = {
                 `;
             } else if (status === 'PROPOSED') {
                 const confirmedUsers = poll.confirmations || [];
-                const isAcceptedByMe = confirmedUsers.includes(myId);
+                // 💡 [핵심 버그 수정] String 타입 강제 변환 후 includes 체크로 타입 충돌 방지
+                const isAcceptedByMe = confirmedUsers.some(id => String(id) === myId);
                 
-                // 💡 [수정됨] 투표자가 아닌, DB 엔트리 카운트 기준 진짜 과반수 체크
                 const majorityCount = Math.floor(Boako.Match.Chat.currentEntryCount / 2) + 1;
                 const confirmedCount = confirmedUsers.length;
                 const isMajorityReached = confirmedCount >= majorityCount;
@@ -822,16 +800,17 @@ Boako.Match = {
         acceptProposedTime: async (pollId) => {
             if (!confirm("이 제안된 시간을 최종 일정으로 수락하시겠습니까?")) return;
 
-            const myId = Boako.state.user.id;
+            const myId = String(Boako.state.user.id);
+            
+            // 💡 [버그 수정] 통신 지연 방지를 위해 DB에서 최신 데이터를 명확히 다시 불러옵니다.
             const { data: poll } = await Boako.db.from('schedule_polls').select('*').eq('poll_id', pollId).single();
             if (!poll) return;
 
             let currentConfirmations = poll.confirmations || [];
-            if (!currentConfirmations.includes(myId)) {
+            if (!currentConfirmations.some(id => String(id) === myId)) {
                 currentConfirmations.push(myId);
             }
 
-            // 💡 [수정됨] 투표 제출자 수가 아닌 전체 엔트리 인원수 기준 달성 여부 체크
             const totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
 
             if (currentConfirmations.length >= totalExpectedVoters) {
@@ -839,25 +818,22 @@ Boako.Match = {
             } else {
                 await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
                 Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
-                // 🌟 즉각 반영: 수파베이스 네트워크 지연 전 즉시 화면 강제 재갱신
+                // 💡 즉시 렌더링 호출을 통해 내가 버튼을 누르자마자 '✅ 수락 완료' 상태로 화면을 바꿉니다.
                 await Boako.Match.Chat.loadMessagesAndPolls();
             }
         },
 
-        // 🌟 [신규 추가] 거절(이의제기) 처리 및 즉각 리렌더링 로직
         rejectProposedTime: async (pollId) => {
             if (!confirm("이 제안을 거절하고 일정을 다시 조율하시겠습니까?\n거절 시 기존 교집합 제안이 취소되고 재투표가 진행됩니다.")) return;
 
-            const myId = Boako.state.user.id;
+            const myId = String(Boako.state.user.id);
             const { data: poll } = await Boako.db.from('schedule_polls').select('*').eq('poll_id', pollId).single();
             if (!poll) return;
 
-            // 1. 수락 명단(confirmations)에서 나를 빼고, 내 기존 투표 내역(votes)을 리셋하여 교집합 파괴
-            let currentConfirmations = (poll.confirmations || []).filter(id => id !== myId);
+            let currentConfirmations = (poll.confirmations || []).filter(id => String(id) !== myId);
             let currentVotes = poll.votes || {};
-            currentVotes[myId] = []; // 내 선택지 비우기
+            currentVotes[myId] = []; 
 
-            // 2. 내 투표가 빠졌으므로 교집합은 무조건 깨짐 -> 상태를 OPEN으로 되돌림
             const updatePayload = {
                 votes: currentVotes,
                 confirmations: currentConfirmations,
@@ -868,12 +844,10 @@ Boako.Match = {
             await Boako.db.from('schedule_polls').update(updatePayload).eq('poll_id', pollId);
             Boako.Util.toast("🔴 거절 처리되었습니다. 새로운 시간대를 선택해 주세요.");
             
-            // 3. 즉각 반영: 화면을 딜레이 없이 즉시 갱신한 후 투표 모달을 열어줌
             await Boako.Match.Chat.loadMessagesAndPolls();
             Boako.Match.Chat.openPollModal();
         },
 
-        // 🌟 [신규 함수] 강제 확정 및 스케줄러 이관 로직 분리
         forceConfirmPoll: async (pollId, confirmedTime, proposerId) => {
             const myId = Boako.state.user.id;
             
@@ -901,7 +875,7 @@ Boako.Match = {
             const container = document.getElementById('match-chat-messages');
             if (!container) return;
 
-            const isMe = msg.sender_id === Boako.state.user.id;
+            const isMe = String(msg.sender_id) === String(Boako.state.user.id);
             const senderName = msg.profiles?.full_name || msg.sender_name_override || "참여자";
             const teamBadge = msg.team_name ? `<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] mr-1 font-black shadow-sm">[${msg.team_name}]</span>` : '';
 
