@@ -818,8 +818,9 @@ Boako.Match = {
                 const hoursPassed = (new Date().getTime() - proposedTime) / (1000 * 60 * 60);
                 const TIME_LIMIT_HOURS = 12;
 
+                // 🌟 [수정 완료] 함수명(forceConfirmPoll) 누락 해결 1
                 if (isMajorityReached && hoursPassed >= TIME_LIMIT_HOURS) {
-                    Boako.Match.Chat.(poll.poll_id, poll.proposed_time, poll.proposer_id);
+                    Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id);
                     return;
                 }
 
@@ -910,8 +911,9 @@ Boako.Match = {
 
             const totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
 
+            // 🌟 [수정 완료] 함수명(forceConfirmPoll) 누락 해결 2
             if (currentConfirmations.length >= totalExpectedVoters) {
-                await Boako.Match.Chat.(pollId, poll.proposed_time, poll.proposer_id);
+                await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id);
             } else {
                 await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
                 Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
