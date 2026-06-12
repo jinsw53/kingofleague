@@ -312,8 +312,6 @@ Boako.Match = {
     },
 
  // 🌟 6. [전역 모듈] 종목별 소통 채널 (원클릭 다중 투표 + 일괄 제출 시스템)
-    Chat 모듈 전체 교체용)
-JavaScript
     Chat: {
         channel: null,
         currentSeason: null,
