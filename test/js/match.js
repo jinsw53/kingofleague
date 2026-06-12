@@ -413,7 +413,18 @@ Boako.Match = {
 
                 let totalTimeline = [];
                 if (chats) chats.forEach(c => totalTimeline.push({ type: 'CHAT', time: new Date(c.created_at), data: c }));
-                if (polls) polls.forEach(p => totalTimeline.push({ type: 'POLL', time: new Date(p.created_at), data: p }));
+
+                // 💡 [동기화 픽스 1] 여러 개의 조율 카드가 꼬이지 않도록, 확정(CONFIRMED)된 게 아니라면 '가장 최신' 투표 카드 1개만 화면에 렌더링
+                if (polls) {
+                    const activePolls = polls.filter(p => p.status === 'OPEN' || p.status === 'PROPOSED');
+                    const latestActiveId = activePolls.length > 0 ? activePolls[activePolls.length - 1].poll_id : null;
+
+                    polls.forEach(p => {
+                        if (p.status === 'CONFIRMED' || p.poll_id === latestActiveId) {
+                            totalTimeline.push({ type: 'POLL', time: new Date(p.created_at), data: p });
+                        }
+                    });
+                }
 
                 totalTimeline.sort((a, b) => a.time - b.time);
 
@@ -642,7 +653,10 @@ Boako.Match = {
                     const allUniqueSubmissions = new Set();
                     voters.forEach(v => currentVotes[v].forEach(t => allUniqueSubmissions.add(t)));
 
-                    for (const candidate of allUniqueSubmissions) {
+                    // 💡 [동기화 픽스 2] 가능한 교집합 날짜가 13일, 20일 여러 개일 경우, 무조건 빠른 날짜(오름차순)부터 검사하여 싱크 어긋남 방지
+                    const sortedCandidates = Array.from(allUniqueSubmissions).sort();
+
+                    for (const candidate of sortedCandidates) {
                         const [candDate, candTime] = candidate.split(' '); 
                         
                         let allAccept = true;
@@ -666,7 +680,7 @@ Boako.Match = {
 
                         if (allAccept) {
                             perfectMatchTime = candidate;
-                            break; 
+                            break; // 가장 빠른 교집합 날짜를 찾는 즉시 반복 종료!
                         }
                     }
                 }
