@@ -219,7 +219,7 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
-  // 🌟 5. [탭 2] 게임별 매치업
+ // 🌟 5. [탭 2] 게임별 매치업
     renderEntryTab: (games, isFinalized, entries = []) => {
         const content = document.getElementById('match-entry-content');
         content.className = "w-full block";
@@ -246,26 +246,37 @@ Boako.Match = {
         survivingGames.forEach(game => {
             const gameEntries = entries.filter(e => e.game_name === game.game_name);
             
+            // 💡 [수정] 엔트리가 비어있을 때(제출 기간)만 true, 마감되어 데이터가 있으면 false
+            const isEntryOpen = gameEntries.length === 0;
+            
             html += `
                 <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                     
-                    <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div class="flex items-center gap-3 cursor-pointer group" onclick="Boako.Team.openEntryForm()">
-                            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm p-1 group-hover:scale-110 transition-transform duration-300">
-                                ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="w-full h-full object-contain">` : '🎲'}
+                    <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        
+                        <div class="flex items-center gap-4 ${isEntryOpen ? 'cursor-pointer group' : ''}" ${isEntryOpen ? `onclick="Boako.Team.openEntryForm()"` : ''}>
+                            
+                            <div class="w-14 h-14 shrink-0 rounded-xl bg-white flex items-center justify-center shadow-sm p-1 ${isEntryOpen ? 'group-hover:scale-110 transition-transform duration-300' : ''}">
+                                ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="w-full h-full object-contain">` : '<span class="text-2xl">🎲</span>'}
                             </div>
-                            <div>
-                                <h3 class="font-black text-white text-lg group-hover:text-indigo-300 transition-colors mb-1">${game.game_name}</h3>
+                            
+                            <div class="flex flex-col justify-center">
+                                <h3 class="font-black text-white text-lg ${isEntryOpen ? 'group-hover:text-indigo-300 transition-colors' : ''} mb-1">${game.game_name}</h3>
                                 <div class="flex items-center gap-2">
-                                    ${game.tournament_format_logo ? `<img src="${game.tournament_format_logo}" class="w-4 h-4 object-contain">` : ''}
                                     <span class="px-2 py-0.5 bg-indigo-500/30 text-indigo-100 text-[10px] font-bold rounded border border-indigo-400/30">${game.tournament_format || '룰셋 미정'}</span>
                                     <span class="text-slate-300 text-[10px] font-bold border-l border-slate-500 pl-2" title="${game.description || ''}">엔트리 ${game.entry_count || 0}명</span>
                                 </div>
                             </div>
+
+                            ${game.tournament_format_logo ? `
+                                <div class="ml-2 pl-4 border-l border-slate-600 flex items-center shrink-0">
+                                    <img src="${game.tournament_format_logo}" class="h-10 w-auto object-contain drop-shadow-md opacity-90" title="${game.tournament_format || '토너먼트 방식'}">
+                                </div>
+                            ` : ''}
                         </div>
                         
-                        <div class="flex items-center gap-2">
-                            ${gameEntries.length === 0 ? `
+                        <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+                            ${isEntryOpen ? `
                                 <button onclick="Boako.Team.openEntryForm()" class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-2">
                                     📝 작전판 열기
                                 </button>
