@@ -368,7 +368,9 @@ Boako.Match = {
 
             if (Boako.Match.Chat.channel) Boako.db.removeChannel(Boako.Match.Chat.channel);
 
+            // 🌟 [리얼타임 업그레이드] 실시간 데이터 감지 및 즉각 알림
             Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${roomId}`)
+                // 1. 채팅이 올라왔을 때
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats', filter: `room_id=eq.${roomId}` }, (payload) => {
                     if (String(payload.new.sender_id) !== String(Boako.state.user.id)) {
                         payload.new.profiles = { full_name: payload.new.sender_name_override || "참여자" };
@@ -376,8 +378,24 @@ Boako.Match = {
                         Boako.Match.Chat.scrollToBottom();
                     }
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls', filter: `target_id=eq.${roomId}` }, () => {
+                // 2. 누군가 일정을 건드렸을 때 (투표, 거절, 확정 등)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls', filter: `target_id=eq.${roomId}` }, (payload) => {
+                    // 화면 즉각 갱신
                     Boako.Match.Chat.loadMessagesAndPolls();
+                    
+                    // 내가 한 행동이 아닌데 상태가 변했다면 '리얼타임' 알림 띄우기
+                    if (payload.eventType === 'UPDATE') {
+                        const oldStatus = payload.old?.status;
+                        const newStatus = payload.new?.status;
+                        
+                        if (oldStatus !== 'PROPOSED' && newStatus === 'PROPOSED') {
+                            Boako.Util.toast("🎯 삐빅! 전원이 참석 가능한 교집합 일정이 방금 발견되었습니다!");
+                        } else if (oldStatus !== 'CONFIRMED' && newStatus === 'CONFIRMED') {
+                            Boako.Util.toast("🏁 방금 상대방이 수락하여 일정이 최종 확정되었습니다!");
+                        } else if (oldStatus === 'PROPOSED' && newStatus === 'OPEN') {
+                            Boako.Util.toast("🔄 상대방이 일정을 거절하여 교집합이 깨졌습니다. 다시 조율해주세요.");
+                        }
+                    }
                 })
                 .subscribe();
             
