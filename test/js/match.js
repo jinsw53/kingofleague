@@ -967,17 +967,6 @@ Boako.Match = {
                 alert("일정 테이블 이관 중 오류가 발생했습니다: " + err.message);
             }
         },
-
-            // 5. 공식 스케줄러 테이블(match_schedules) 인서트
-            const schedulePayload = {
-                game_name: Boako.Match.Chat.currentGame,
-                match_type: 'GRANDPRIX',
-                scheduled_time: safeTimeISO,
-                status: 'UPCOMING',
-                source_type: 'MATCH_CHANNEL',
-                reference_id: `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`,
-                participants: participantsData // 🚀 새롭게 생성된 JSONB 컬럼에 참가자 전원 밀어넣기
-            };
             
             const { error: insertErr } = await Boako.db.from('match_schedules').insert([schedulePayload]);
             
