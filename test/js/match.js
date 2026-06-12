@@ -312,6 +312,8 @@ Boako.Match = {
     },
 
  // 🌟 6. [전역 모듈] 종목별 소통 채널 (원클릭 다중 투표 + 일괄 제출 시스템)
+    Chat 모듈 전체 교체용)
+JavaScript
     Chat: {
         channel: null,
         currentSeason: null,
@@ -364,13 +366,16 @@ Boako.Match = {
             `;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
 
+            // 🌟 1. 데이터 로드
             await Boako.Match.Chat.loadMessagesAndPolls();
 
+            // 🌟 2. 첫 방문 튜토리얼 체크 (profiles 테이블 연동)
+            await Boako.Match.Chat.checkAndShowTutorial();
+
+            // 🌟 3. 리얼타임 구독
             if (Boako.Match.Chat.channel) Boako.db.removeChannel(Boako.Match.Chat.channel);
 
-            // 🌟 [리얼타임 업그레이드] 실시간 데이터 감지 및 즉각 알림
             Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${roomId}`)
-                // 1. 채팅이 올라왔을 때
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats', filter: `room_id=eq.${roomId}` }, (payload) => {
                     if (String(payload.new.sender_id) !== String(Boako.state.user.id)) {
                         payload.new.profiles = { full_name: payload.new.sender_name_override || "참여자" };
@@ -378,23 +383,13 @@ Boako.Match = {
                         Boako.Match.Chat.scrollToBottom();
                     }
                 })
-                // 2. 누군가 일정을 건드렸을 때 (투표, 거절, 확정 등)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls', filter: `target_id=eq.${roomId}` }, (payload) => {
-                    // 화면 즉각 갱신
                     Boako.Match.Chat.loadMessagesAndPolls();
-                    
-                    // 내가 한 행동이 아닌데 상태가 변했다면 '리얼타임' 알림 띄우기
                     if (payload.eventType === 'UPDATE') {
                         const oldStatus = payload.old?.status;
                         const newStatus = payload.new?.status;
-                        
-                        if (oldStatus !== 'PROPOSED' && newStatus === 'PROPOSED') {
-                            Boako.Util.toast("🎯 삐빅! 전원이 참석 가능한 교집합 일정이 방금 발견되었습니다!");
-                        } else if (oldStatus !== 'CONFIRMED' && newStatus === 'CONFIRMED') {
-                            Boako.Util.toast("🏁 방금 상대방이 수락하여 일정이 최종 확정되었습니다!");
-                        } else if (oldStatus === 'PROPOSED' && newStatus === 'OPEN') {
-                            Boako.Util.toast("🔄 상대방이 일정을 거절하여 교집합이 깨졌습니다. 다시 조율해주세요.");
-                        }
+                        if (oldStatus !== 'PROPOSED' && newStatus === 'PROPOSED') Boako.Util.toast("🎯 교집합 일정이 방금 발견되었습니다!");
+                        else if (oldStatus !== 'CONFIRMED' && newStatus === 'CONFIRMED') Boako.Util.toast("🏁 방금 일정이 최종 확정되었습니다!");
                     }
                 })
                 .subscribe();
@@ -410,6 +405,66 @@ Boako.Match = {
             if (Boako.Match.Chat.channel) {
                 Boako.db.removeChannel(Boako.Match.Chat.channel);
                 Boako.Match.Chat.channel = null;
+            }
+        },
+
+        // 🌟 [신규] 튜토리얼 노출 로직 (JSONB 활용)
+        checkAndShowTutorial: async () => {
+            try {
+                // 내 프로필에서 tutorial_status 조회 (user id 컬럼명이 다르면 맞게 수정 필요)
+                const { data: profile } = await Boako.db.from('profiles').select('tutorial_status').eq('id', Boako.state.user.id).single();
+                const status = profile?.tutorial_status || {};
+                
+                // match_chat_tutorial 키가 없거나 false면 튜토리얼 띄우기
+                if (!status.match_chat_tutorial) {
+                    Boako.Match.Chat.showTutorialModal();
+                }
+            } catch (err) {
+                console.error("튜토리얼 상태 확인 중 에러:", err);
+            }
+        },
+
+        showTutorialModal: () => {
+            const html = `
+                <div id="match-tutorial-overlay" class="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in zoom-in-95 duration-300">
+                    <div class="bg-white rounded-3xl p-6 w-[90%] max-w-sm shadow-2xl relative">
+                        <div class="absolute -top-8 left-1/2 -translate-x-1/2 text-5xl drop-shadow-md">💡</div>
+                        <h3 class="text-xl font-black text-indigo-900 text-center mt-6 mb-3">일정 조율 가이드</h3>
+                        
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-xs text-indigo-800 font-bold space-y-2 mb-5">
+                            <p class="flex items-start gap-1"><span class="shrink-0">📅</span> 달력에서 편한 날짜를 전부 클릭하세요.</p>
+                            <p class="flex items-start gap-1"><span class="shrink-0">📤</span> 여러 개의 일정을 일괄 제출할 수 있습니다.</p>
+                            <p class="flex items-start gap-1"><span class="shrink-0">🎯</span> 시스템이 참가자 전원의 교집합을 자동 스캔합니다.</p>
+                            <div class="bg-white p-2 rounded-lg mt-2 text-[11px] text-slate-600 shadow-sm border border-slate-100">
+                                🚨 교집합 일정은 <b>과반수 수락 시 12시간 뒤</b>에 자동 확정되니 유의해주세요!
+                            </div>
+                        </div>
+
+                        <button onclick="Boako.Match.Chat.closeTutorial()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl transition-all shadow-md active:scale-95">
+                            확인했습니다 (다시 보지 않기)
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', html);
+        },
+
+        closeTutorial: async () => {
+            const overlay = document.getElementById('match-tutorial-overlay');
+            if (overlay) overlay.remove();
+
+            try {
+                // 기존 상태 가져오기
+                const { data: profile } = await Boako.db.from('profiles').select('tutorial_status').eq('id', Boako.state.user.id).single();
+                let currentStatus = profile?.tutorial_status || {};
+                
+                // 해당 기능 튜토리얼 완료 처리
+                currentStatus.match_chat_tutorial = true;
+
+                // 업데이트 (JSONB 객체를 통째로 덮어씌움)
+                await Boako.db.from('profiles').update({ tutorial_status: currentStatus }).eq('id', Boako.state.user.id);
+            } catch (err) {
+                console.error("튜토리얼 상태 저장 실패:", err);
             }
         },
 
@@ -429,10 +484,22 @@ Boako.Match = {
                 const container = document.getElementById('match-chat-messages');
                 container.innerHTML = '';
 
+                // 🌟 [상시 안내 배너] 채팅창 최상단에 고정
+                const bannerHtml = `
+                    <div class="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 rounded-xl p-3 flex items-start gap-2 shadow-sm shrink-0 mb-2">
+                        <span class="text-xl drop-shadow-sm">📢</span>
+                        <div>
+                            <h4 class="text-indigo-800 font-black text-xs mb-0.5">상시 안내</h4>
+                            <p class="text-[10px] text-slate-500 font-bold leading-tight break-keep">달력 탭을 열어 편한 시간을 클릭하세요. 시스템이 최적의 교집합 시간을 찾아 자동으로 조율을 진행합니다.</p>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', bannerHtml);
+
                 let totalTimeline = [];
                 if (chats) chats.forEach(c => totalTimeline.push({ type: 'CHAT', time: new Date(c.created_at), data: c }));
 
-                // 💡 [동기화 픽스 1] 여러 개의 조율 카드가 꼬이지 않도록, 확정(CONFIRMED)된 게 아니라면 '가장 최신' 투표 카드 1개만 화면에 렌더링
+                // 여러 개의 투표함 방지 동기화 로직
                 if (polls) {
                     const activePolls = polls.filter(p => p.status === 'OPEN' || p.status === 'PROPOSED');
                     const latestActiveId = activePolls.length > 0 ? activePolls[activePolls.length - 1].poll_id : null;
@@ -453,7 +520,7 @@ Boako.Match = {
                     });
                     Boako.Match.Chat.scrollToBottom();
                 } else {
-                    container.innerHTML = `<div class="text-center text-slate-400 text-xs font-bold py-8">아직 대화 및 조율 기록이 없습니다. 일정을 제안해 보세요!</div>`;
+                    container.insertAdjacentHTML('beforeend', `<div class="text-center text-slate-400 text-xs font-bold py-8">아직 대화 기록이 없습니다. 일정을 제안해 보세요!</div>`);
                 }
             } catch (err) { console.error("데이터 로드 실패:", err); }
         },
@@ -880,46 +947,28 @@ Boako.Match = {
             Boako.Match.Chat.openPollModal();
         },
 
-        // 🌟 [최종 완성] 강제 확정 및 스케줄러 이관 로직 (JSONB participants 반영)
+       // 🌟 [수정됨] 백엔드 함수(RPC) 연동으로 극도로 간결해진 확정 로직
         forceConfirmPoll: async (pollId, confirmedTime, proposerId) => {
-            
-            // 1. 날짜 안전 변환 (Invalid Date 방지)
-            let safeTimeISO;
             try {
-                const formattedTimeStr = confirmedTime.replace(' ', 'T') + ':00';
-                safeTimeISO = new Date(formattedTimeStr).toISOString();
-            } catch (dateErr) {
-                console.error("날짜 포맷팅 에러 발생:", dateErr);
-                safeTimeISO = new Date().toISOString(); 
+                // 1. 프론트엔드에서는 복잡한 로직 없이, 백엔드에 만들어둔 함수만 호출!
+                const { error } = await Boako.db.rpc('confirm_match_schedule', {
+                    p_poll_id: pollId,
+                    p_confirmed_time: confirmedTime,
+                    p_proposer_id: proposerId,
+                    p_season_no: Boako.Match.Chat.currentSeason,
+                    p_game_name: Boako.Match.Chat.currentGame
+                });
+
+                if (error) throw error;
+                
+                Boako.Util.toast("🎉 참가자 전원의 일정이 공식 캘린더에 성공적으로 등재되었습니다!");
+                await Boako.Match.Chat.loadMessagesAndPolls();
+
+            } catch (err) {
+                console.error("일정 확정 (RPC) 에러:", err);
+                alert("일정 테이블 이관 중 오류가 발생했습니다: " + err.message);
             }
-            
-            // 2. 투표(조율) 상태 업데이트
-            await Boako.db.from('schedule_polls').update({
-                status: 'CONFIRMED',
-                confirmed_time: confirmedTime
-            }).eq('poll_id', pollId);
-
-            // 💡 3. [핵심 신규 로직] 해당 종목의 출전 엔트리 전원 정보 조회
-            const { data: entries, error: entryErr } = await Boako.db
-                .from('grandprix_entries')
-                .select('*') // 출전 선수 명단 조회
-                .eq('season_no', Boako.Match.Chat.currentSeason)
-                .eq('game_name', Boako.Match.Chat.currentGame);
-
-            if (entryErr) {
-                console.error("엔트리 참가자 조회 실패:", entryErr);
-                alert("참가자 목록을 불러오는 중 오류가 발생했습니다.");
-                return;
-            }
-
-            // 💡 4. JSONB 컬럼에 넣을 participants 배열 구조화
-            // (선수들의 고유 ID, 이름, 팀명, 그리고 최초 제안자 여부 기록)
-            const participantsData = (entries || []).map(entry => ({
-                user_id: entry.user_id, // 엔트리 테이블의 유저 고유 ID
-                player_name: entry.player_name,
-                team_name: entry.team_name,
-                role: (String(entry.user_id) === String(proposerId)) ? 'PROPOSER' : 'PARTICIPANT'
-            }));
+        },
 
             // 5. 공식 스케줄러 테이블(match_schedules) 인서트
             const schedulePayload = {
