@@ -819,7 +819,7 @@ Boako.Match = {
                 const TIME_LIMIT_HOURS = 12;
 
                 if (isMajorityReached && hoursPassed >= TIME_LIMIT_HOURS) {
-                    Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id);
+                    Boako.Match.Chat.(poll.poll_id, poll.proposed_time, poll.proposer_id);
                     return;
                 }
 
@@ -911,7 +911,7 @@ Boako.Match = {
             const totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
 
             if (currentConfirmations.length >= totalExpectedVoters) {
-                await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id);
+                await Boako.Match.Chat.(pollId, poll.proposed_time, poll.proposer_id);
             } else {
                 await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
                 Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
@@ -966,18 +966,6 @@ Boako.Match = {
                 console.error("일정 확정 (RPC) 에러:", err);
                 alert("일정 테이블 이관 중 오류가 발생했습니다: " + err.message);
             }
-        },
-            
-            const { error: insertErr } = await Boako.db.from('match_schedules').insert([schedulePayload]);
-            
-            if (insertErr) {
-                console.error("스케줄 인서트 실패:", insertErr);
-                alert("일정 테이블 이관 중 오류가 발생했습니다: " + insertErr.message);
-                return;
-            }
-            
-            Boako.Util.toast("🎉 참가자 전원의 일정이 공식 캘린더에 성공적으로 등재되었습니다!");
-            await Boako.Match.Chat.loadMessagesAndPolls();
         },
 
         renderMessage: (msg) => {
