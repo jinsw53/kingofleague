@@ -848,24 +848,45 @@ Boako.Match = {
             Boako.Match.Chat.openPollModal();
         },
 
+        // 🌟 [수정된 함수] 강제 확정 및 스케줄러 이관 로직 (날짜 파싱 버그 수정)
         forceConfirmPoll: async (pollId, confirmedTime, proposerId) => {
             const myId = Boako.state.user.id;
             
+            // 💡 1. "2026-06-12 20:00" 포맷을 "2026-06-12T20:00:00" 형태로 안전하게 보정
+            let safeTimeISO;
+            try {
+                const formattedTimeStr = confirmedTime.replace(' ', 'T') + ':00';
+                safeTimeISO = new Date(formattedTimeStr).toISOString();
+            } catch (dateErr) {
+                console.error("날짜 포맷팅 에러 발생:", dateErr);
+                // 혹시라도 파싱이 실패할 경우를 대비한 2차 백업 세이프티
+                safeTimeISO = new Date().toISOString(); 
+            }
+            
+            // 2. 수락 상태 업데이트
             await Boako.db.from('schedule_polls').update({
                 status: 'CONFIRMED',
                 confirmed_time: confirmedTime
             }).eq('poll_id', pollId);
 
+            // 3. 공식 스케줄러 데이터 인서트
             const schedulePayload = {
                 proposer_id: proposerId,
                 responder_id: myId, 
                 game_name: Boako.Match.Chat.currentGame,
                 match_type: 'GRANDPRIX',
-                scheduled_time: new Date(confirmedTime).toISOString(),
+                scheduled_time: safeTimeISO, // 💡 Invalid Date 대신 안전한 ISO 문자열 주입
                 status: 'UPCOMING',
                 reference_id: `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`
             };
-            await Boako.db.from('match_schedules').insert([schedulePayload]);
+            
+            const { error: insertErr } = await Boako.db.from('match_schedules').insert([schedulePayload]);
+            
+            if (insertErr) {
+                console.error("스케줄 인서트 실패:", insertErr);
+                alert("일정 테이블 이관 중 오류가 발생했습니다: " + insertErr.message);
+                return;
+            }
             
             Boako.Util.toast("🎉 일정 조건(과반수 또는 전원합의)이 충족되어 공식 캘린더에 최종 등재되었습니다!");
             await Boako.Match.Chat.loadMessagesAndPolls();
