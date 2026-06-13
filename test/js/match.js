@@ -4,6 +4,26 @@
 Boako.Match = {
     // 🌟 1. 대시보드 초기화
     init: async (containerId) => {
+        // [신규 추가] 토너먼트 이미지 마우스 오버 확대 CSS 자동 주입
+        if (!document.getElementById('boako-match-styles')) {
+            const style = document.createElement('style');
+            style.id = 'boako-match-styles';
+            style.innerHTML = `
+                .tournament-thumbnail {
+                    transition: transform 0.2s ease-in-out;
+                    cursor: zoom-in;
+                    position: relative;
+                    z-index: 10;
+                }
+                .tournament-thumbnail:hover {
+                    transform: scale(3.5); /* 3.5배 부드럽게 확대 */
+                    z-index: 9999;
+                    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3));
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         const targetId = containerId || 'main-content';
         const container = document.getElementById(targetId); 
         
@@ -219,7 +239,7 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
- // 🌟 5. [탭 2] 게임별 매치업
+    // 🌟 5. [탭 2] 게임별 매치업
     renderEntryTab: (games, isFinalized, entries = []) => {
         const content = document.getElementById('match-entry-content');
         content.className = "w-full block";
@@ -246,7 +266,7 @@ Boako.Match = {
         survivingGames.forEach(game => {
             const gameEntries = entries.filter(e => e.game_name === game.game_name);
             
-            // 💡 [수정] 엔트리가 비어있을 때(제출 기간)만 true, 마감되어 데이터가 있으면 false
+            // 엔트리가 비어있을 때(제출 기간)만 true, 마감되어 데이터가 있으면 false
             const isEntryOpen = gameEntries.length === 0;
             
             html += `
@@ -263,14 +283,18 @@ Boako.Match = {
                             <div class="flex flex-col justify-center">
                                 <h3 class="font-black text-white text-lg ${isEntryOpen ? 'group-hover:text-indigo-300 transition-colors' : ''} mb-1">${game.game_name}</h3>
                                 <div class="flex items-center gap-2">
-                                    <span class="px-2 py-0.5 bg-indigo-500/30 text-indigo-100 text-[10px] font-bold rounded border border-indigo-400/30">${game.tournament_format || '룰셋 미정'}</span>
+                                    ${!isEntryOpen ? `
+                                        <span class="px-2 py-0.5 bg-indigo-500/30 text-indigo-100 text-[10px] font-bold rounded border border-indigo-400/30">${game.tournament_format || '룰셋 미정'}</span>
+                                    ` : `
+                                        <span class="px-2 py-0.5 bg-slate-600 text-slate-300 text-[10px] font-bold rounded border border-slate-500">방식 미공개 (엔트리 대기)</span>
+                                    `}
                                     <span class="text-slate-300 text-[10px] font-bold border-l border-slate-500 pl-2" title="${game.description || ''}">엔트리 ${game.entry_count || 0}명</span>
                                 </div>
                             </div>
 
-                            ${game.tournament_format_logo ? `
+                            ${!isEntryOpen && game.tournament_format_logo ? `
                                 <div class="ml-2 pl-4 border-l border-slate-600 flex items-center shrink-0">
-                                    <img src="${game.tournament_format_logo}" class="h-10 w-auto object-contain drop-shadow-md opacity-90" title="${game.tournament_format || '토너먼트 방식'}">
+                                    <img src="${game.tournament_format_logo}" class="h-10 w-auto object-contain drop-shadow-md opacity-90 tournament-thumbnail" title="${game.tournament_format || '토너먼트 방식'}">
                                 </div>
                             ` : ''}
                         </div>
