@@ -2,28 +2,76 @@
  * [MATCH] 대항전 메인 대시보드 관리
  */
 Boako.Match = {
-    // 🌟 1. 대시보드 초기화
-    init: async (containerId) => {
-        // [신규 추가] 토너먼트 이미지 마우스 오버 확대 CSS 자동 주입
-        if (!document.getElementById('boako-match-styles')) {
-            const style = document.createElement('style');
-            style.id = 'boako-match-styles';
-            style.innerHTML = `
-                .tournament-thumbnail {
-                    transition: transform 0.2s ease-in-out;
-                    cursor: zoom-in;
-                    position: relative;
-                    z-index: 10;
-                }
-                .tournament-thumbnail:hover {
-                    transform: scale(3.5); /* 3.5배 부드럽게 확대 */
-                    z-index: 9999;
-                    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3));
-                }
-            `;
-            document.head.appendChild(style);
-        }
+    // 🌟 [최신화] 스타일 및 확대용 포탈 자동 주입
+    injectStylesAndPortal: () => {
+        if (document.getElementById('boako-match-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'boako-match-styles';
+        // tournament-thumbnail에서 :hover 영역을 삭제했습니다 (JS로 처리)
+        style.innerHTML = `
+            .tournament-thumbnail {
+                width: 50px; height: 50px; object-fit: cover;
+                border-radius: 8px; cursor: zoom-in;
+                border: 2px solid #e2e8f0;
+                transition: border-color 0.2s;
+            }
+            .tournament-thumbnail:hover {
+                border-color: #6366f1;
+            }
+            /* 🌟 [신규] 화면 최상단에 뜰 절대 짤리지 않는 이미지 포탈 스타일 */
+            #boako-magnifier-overlay {
+                position: fixed; inset: 0;
+                z-index: 100000; /* 어떤 UI보다 위에 둠 */
+                display: none;
+                pointer-events: none; /* 마우스 이벤트가 아래로 통과하게 함 (부드러운 퇴장용) */
+                justify-content: center; align-items: center;
+                transition: opacity 0.2s; opacity: 0;
+            }
+            #boako-magnifier-overlay.active {
+                display: flex; opacity: 1;
+            }
+            #boako-magnifier-image {
+                max-width: 80vw; max-height: 80vh; /* 화면 크기의 80%를 넘지 않게 조절 */
+                border-radius: 16px;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+                transform: scale(0.9);
+                transition: transform 0.3s ease-out;
+            }
+            #boako-magnifier-overlay.active #boako-magnifier-image {
+                transform: scale(1);
+            }
+        `;
+        document.head.appendChild(style);
 
+        // [신규] 포탈용 DOM 구조 생성 (HTML 하단에 부착)
+        if (!document.getElementById('boako-magnifier-overlay')) {
+            const overlayHtml = `
+                <div id="boako-magnifier-overlay">
+                    <img id="boako-magnifier-image" src="" alt="확대됨">
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', overlayHtml);
+        }
+    },
+
+    // 🌟 [신규] JS 이미지 확대 실행/해제 함수
+    magnify: (url, isShow) => {
+        const overlay = document.getElementById('boako-magnifier-overlay');
+        const img = document.getElementById('boako-magnifier-image');
+        if (!overlay || !img) return;
+
+        if (isShow) {
+            img.src = url;
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+            // 부드럽게 사라진 후 주소 지우기 (다음 번 로딩 대기 현상 방지)
+            setTimeout(() => { if(!overlay.classList.contains('active')) img.src = ''; }, 200);
+        }
+    },
+
+    init: async (containerId) => {
+        Boako.Match.injectStylesAndPortal(); // 스타일 및 포탈 초기화
         const targetId = containerId || 'main-content';
         const container = document.getElementById(targetId); 
         
@@ -294,7 +342,11 @@ Boako.Match = {
 
                             ${!isEntryOpen && game.tournament_format_logo ? `
                                 <div class="ml-2 pl-4 border-l border-slate-600 flex items-center shrink-0">
-                                    <img src="${game.tournament_format_logo}" class="h-10 w-auto object-contain drop-shadow-md opacity-90 tournament-thumbnail" title="${game.tournament_format || '토너먼트 방식'}">
+                                    <img src="${game.tournament_format_logo}" 
+                                         class="h-10 w-auto object-contain drop-shadow-md opacity-90 tournament-thumbnail" 
+                                         title="크게 보려면 마우스를 올리세요"
+                                         onmouseover="Boako.Match.magnify('${game.tournament_format_logo}', true)"
+                                         onmouseout="Boako.Match.magnify('', false)">
                                 </div>
                             ` : ''}
                         </div>
