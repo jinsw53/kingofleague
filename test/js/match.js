@@ -2,12 +2,11 @@
  * [MATCH] 대항전 메인 대시보드 관리
  */
 Boako.Match = {
-    // 🌟 [최신화] 스타일 및 확대용 포탈 자동 주입
+    // 🌟 1. 스타일 및 확대용 포탈 자동 주입
     injectStylesAndPortal: () => {
         if (document.getElementById('boako-match-styles')) return;
         const style = document.createElement('style');
         style.id = 'boako-match-styles';
-        // tournament-thumbnail에서 :hover 영역을 삭제했습니다 (JS로 처리)
         style.innerHTML = `
             .tournament-thumbnail {
                 width: 50px; height: 50px; object-fit: cover;
@@ -40,6 +39,18 @@ Boako.Match = {
             #boako-magnifier-overlay.active #boako-magnifier-image {
                 transform: scale(1);
             }
+            /* 🚨 [신규] 페널티 UI (공개 처형 스타일) */
+            .cell-penalty { position: relative; cursor: help; }
+            .score-original { text-decoration: line-through; color: #94a3b8; font-size: 0.75rem; margin-right: 4px; }
+            .cell-penalty::after {
+                content: attr(data-tooltip);
+                position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+                background-color: #ef4444; color: white; padding: 6px 10px; border-radius: 6px;
+                font-size: 0.75rem; font-weight: bold; white-space: nowrap;
+                opacity: 0; pointer-events: none; transition: opacity 0.2s; margin-bottom: 6px; z-index: 50;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            }
+            .cell-penalty:hover::after { opacity: 1; }
         `;
         document.head.appendChild(style);
 
@@ -120,7 +131,6 @@ Boako.Match = {
                         <p class="text-sm text-slate-500 font-bold mt-2">본선 경기가 시작되면 각 팀의 실시간 승점이 기록됩니다.</p>
                     </div>
                 </div>
-
             </div>
         `;
 
@@ -186,6 +196,8 @@ Boako.Match = {
             }
 
             let confirmedEntries = [];
+            let gameScores = [];
+
             if (isFinalized) {
                 const { data: entriesData, error: entriesErr } = await Boako.db
                     .from('grandprix_entries')
@@ -195,10 +207,19 @@ Boako.Match = {
                 
                 if (entriesErr) console.error("엔트리 로드 에러:", entriesErr);
                 else confirmedEntries = entriesData || [];
+
+                const { data: scoresData, error: scoresErr } = await Boako.db
+                    .from('grandprix_game_scores')
+                    .select('*')
+                    .eq('season_no', seasonNo);
+                
+                if (scoresErr) console.error("스코어 로드 에러:", scoresErr);
+                else gameScores = scoresData || [];
             }
 
             Boako.Match.renderBanTab(displayGames, isFinalized);
             Boako.Match.renderEntryTab(displayGames, isFinalized, confirmedEntries);
+            Boako.Match.renderScoreTab(displayGames, isFinalized, confirmedEntries, gameScores);
 
         } catch (err) {
             console.error("대항전 데이터 로드 에러:", err);
@@ -398,7 +419,131 @@ Boako.Match = {
         content.innerHTML = html;
     },
 
- // 🌟 6. [전역 모듈] 종목별 소통 채널 (원클릭 다중 투표 + 일괄 제출 시스템)
+    // 🌟 6. [탭 3] 스코어보드 렌더링 로직 (완성판)
+    renderScoreTab: (games, isFinalized, entries, scores) => {
+        const content = document.getElementById('tab-score');
+        
+        if (!isFinalized) {
+            return; 
+        }
+
+        const survivingGames = games.filter(g => g.status === 'FINAL');
+        
+        // 1. 엔트리 기반으로 팀 뼈대 세팅
+        let teamData = {};
+        entries.forEach(entry => {
+            if (!teamData[entry.team_name]) {
+                teamData[entry.team_name] = { totalScore: 0, gameScores: {} };
+            }
+            teamData[entry.team_name].gameScores[entry.game_name] = { entered: true, detail: null };
+        });
+
+        // 2. DB 스코어 데이터 매핑 (경기 진행 일시, URL 포함)
+        scores.forEach(scoreRow => {
+            const gameName = scoreRow.game_name;
+            const currentScores = scoreRow.scores || {};
+            const originalScores = scoreRow.original_scores || {};
+            const penaltyReasons = scoreRow.penalty_reasons || {};
+            const url = scoreRow.source_url || '#';
+            
+            const dateStr = scoreRow.created_at 
+                ? new Date(scoreRow.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : '일시 미상';
+
+            Object.keys(currentScores).forEach(teamName => {
+                if (!teamData[teamName]) return;
+                
+                const score = Number(currentScores[teamName]) || 0;
+                teamData[teamName].totalScore += score;
+                
+                if (teamData[teamName].gameScores[gameName]) {
+                    teamData[teamName].gameScores[gameName].detail = {
+                        score: score,
+                        originalScore: originalScores[teamName],
+                        penaltyReason: penaltyReasons[teamName],
+                        url: url,
+                        date: dateStr
+                    };
+                }
+            });
+        });
+
+        // 3. 총점 기준 내림차순 정렬
+        const rankedTeams = Object.keys(teamData).map(teamName => ({
+            teamName: teamName,
+            ...teamData[teamName]
+        })).sort((a, b) => b.totalScore - a.totalScore);
+
+        // 4. HTML 조립
+        let html = `
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-sm text-center">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-black">
+                            <tr>
+                                <th class="p-4 w-16 whitespace-nowrap">순위</th>
+                                <th class="p-4 text-left min-w-[120px] whitespace-nowrap">팀명</th>
+                                <th class="p-4 bg-indigo-50/50 text-indigo-700 whitespace-nowrap">🏆 종합 점수</th>
+                                ${survivingGames.map(g => `<th class="p-4 whitespace-nowrap text-[11px] md:text-sm">${g.game_name}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+        `;
+
+        if (rankedTeams.length === 0) {
+            html += `<tr><td colspan="${survivingGames.length + 3}" class="p-8 text-slate-400 font-bold">아직 엔트리 데이터가 없습니다.</td></tr>`;
+        }
+
+        rankedTeams.forEach((team, index) => {
+            let rankBadge = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}위`;
+            let rankClass = index < 3 ? 'text-lg' : 'text-slate-500 font-bold';
+
+            html += `<tr class="hover:bg-slate-50 transition-colors group">
+                        <td class="p-4 ${rankClass}">${rankBadge}</td>
+                        <td class="p-4 text-left font-black text-slate-800">${team.teamName}</td>
+                        <td class="p-4 font-black text-indigo-600 text-lg bg-indigo-50/30 group-hover:bg-indigo-100/50 transition-colors">${team.totalScore}점</td>`;
+
+            survivingGames.forEach(game => {
+                const gameData = team.gameScores[game.game_name];
+                
+                if (!gameData) {
+                    html += `<td class="p-4 text-slate-300 font-bold">-</td>`;
+                } else if (!gameData.detail) {
+                    html += `<td class="p-4 text-slate-400 font-bold"><span class="bg-slate-100 px-2 py-1 rounded text-xs">0점</span></td>`;
+                } else {
+                    const detail = gameData.detail;
+                    if (detail.penaltyReason) {
+                        const tooltipText = `${detail.penaltyReason} | ⏰ ${detail.date}`;
+                        html += `
+                            <td class="p-4 cell-penalty" data-tooltip="${tooltipText}">
+                                <a href="${detail.url}" target="_blank" class="block w-full h-full">
+                                    <span class="score-original">${detail.originalScore}</span>
+                                    <span class="text-red-500 font-black">${detail.score}점</span>
+                                </a>
+                            </td>`;
+                    } else {
+                        html += `
+                            <td class="p-4 font-bold text-slate-700 hover:bg-indigo-50 transition-colors rounded-lg cursor-pointer">
+                                <a href="${detail.url}" target="_blank" class="block w-full h-full text-indigo-600 hover:text-indigo-800" title="⏰ 진행: ${detail.date} (클릭 시 기록 확인)">
+                                    ${detail.score > 0 ? detail.score + '점' : '0점'}
+                                </a>
+                            </td>`;
+                    }
+                }
+            });
+
+            html += `</tr>`;
+        });
+
+        html += `       </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        content.innerHTML = html;
+    },
+
+    // 🌟 7. [전역 모듈] 종목별 소통 채널 (원클릭 다중 투표 + 일괄 제출 시스템)
     Chat: {
         channel: null,
         currentSeason: null,
@@ -454,7 +599,7 @@ Boako.Match = {
             // 🌟 1. 데이터 로드
             await Boako.Match.Chat.loadMessagesAndPolls();
 
-            // 🌟 2. 첫 방문 튜토리얼 체크 (profiles 테이블 연동)
+            // 🌟 2. 첫 방문 튜토리얼 체크
             await Boako.Match.Chat.checkAndShowTutorial();
 
             // 🌟 3. 리얼타임 구독
@@ -493,14 +638,11 @@ Boako.Match = {
             }
         },
 
-        // 🌟 [신규] 튜토리얼 노출 로직 (JSONB 활용)
         checkAndShowTutorial: async () => {
             try {
-                // 내 프로필에서 tutorial_status 조회 (user id 컬럼명이 다르면 맞게 수정 필요)
                 const { data: profile } = await Boako.db.from('profiles').select('tutorial_status').eq('id', Boako.state.user.id).single();
                 const status = profile?.tutorial_status || {};
                 
-                // match_chat_tutorial 키가 없거나 false면 튜토리얼 띄우기
                 if (!status.match_chat_tutorial) {
                     Boako.Match.Chat.showTutorialModal();
                 }
@@ -539,14 +681,11 @@ Boako.Match = {
             if (overlay) overlay.remove();
 
             try {
-                // 기존 상태 가져오기
                 const { data: profile } = await Boako.db.from('profiles').select('tutorial_status').eq('id', Boako.state.user.id).single();
                 let currentStatus = profile?.tutorial_status || {};
                 
-                // 해당 기능 튜토리얼 완료 처리
                 currentStatus.match_chat_tutorial = true;
 
-                // 업데이트 (JSONB 객체를 통째로 덮어씌움)
                 await Boako.db.from('profiles').update({ tutorial_status: currentStatus }).eq('id', Boako.state.user.id);
             } catch (err) {
                 console.error("튜토리얼 상태 저장 실패:", err);
@@ -569,7 +708,6 @@ Boako.Match = {
                 const container = document.getElementById('match-chat-messages');
                 container.innerHTML = '';
 
-                // 🌟 [상시 안내 배너] 채팅창 최상단에 고정
                 const bannerHtml = `
                     <div class="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 rounded-xl p-3 flex items-start gap-2 shadow-sm shrink-0 mb-2">
                         <span class="text-xl drop-shadow-sm">📢</span>
@@ -584,7 +722,6 @@ Boako.Match = {
                 let totalTimeline = [];
                 if (chats) chats.forEach(c => totalTimeline.push({ type: 'CHAT', time: new Date(c.created_at), data: c }));
 
-                // 여러 개의 투표함 방지 동기화 로직
                 if (polls) {
                     const activePolls = polls.filter(p => p.status === 'OPEN' || p.status === 'PROPOSED');
                     const latestActiveId = activePolls.length > 0 ? activePolls[activePolls.length - 1].poll_id : null;
@@ -638,7 +775,7 @@ Boako.Match = {
         selectedTimesState: [], 
         currentFixedTime: '20:00', 
 
-       openPollModal: () => {
+        openPollModal: () => {
             const existing = document.getElementById('poll-calendar-modal');
             if (existing) existing.remove();
 
@@ -823,7 +960,6 @@ Boako.Match = {
                     const allUniqueSubmissions = new Set();
                     voters.forEach(v => currentVotes[v].forEach(t => allUniqueSubmissions.add(t)));
 
-                    // 💡 [동기화 픽스 2] 가능한 교집합 날짜가 13일, 20일 여러 개일 경우, 무조건 빠른 날짜(오름차순)부터 검사하여 싱크 어긋남 방지
                     const sortedCandidates = Array.from(allUniqueSubmissions).sort();
 
                     for (const candidate of sortedCandidates) {
@@ -850,7 +986,7 @@ Boako.Match = {
 
                         if (allAccept) {
                             perfectMatchTime = candidate;
-                            break; // 가장 빠른 교집합 날짜를 찾는 즉시 반복 종료!
+                            break; 
                         }
                     }
                 }
@@ -894,7 +1030,6 @@ Boako.Match = {
                 `;
             } else if (status === 'PROPOSED') {
                 const confirmedUsers = poll.confirmations || [];
-                // 💡 [핵심 버그 수정] String 타입 강제 변환 후 includes 체크로 타입 충돌 방지
                 const isAcceptedByMe = confirmedUsers.some(id => String(id) === myId);
                 
                 const majorityCount = Math.floor(Boako.Match.Chat.currentEntryCount / 2) + 1;
@@ -905,7 +1040,6 @@ Boako.Match = {
                 const hoursPassed = (new Date().getTime() - proposedTime) / (1000 * 60 * 60);
                 const TIME_LIMIT_HOURS = 12;
 
-                // 🌟 [수정 완료] 함수명(forceConfirmPoll) 누락 해결 1
                 if (isMajorityReached && hoursPassed >= TIME_LIMIT_HOURS) {
                     Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id);
                     return;
@@ -987,7 +1121,6 @@ Boako.Match = {
 
             const myId = String(Boako.state.user.id);
             
-            // 💡 [버그 수정] 통신 지연 방지를 위해 DB에서 최신 데이터를 명확히 다시 불러옵니다.
             const { data: poll } = await Boako.db.from('schedule_polls').select('*').eq('poll_id', pollId).single();
             if (!poll) return;
 
@@ -998,13 +1131,11 @@ Boako.Match = {
 
             const totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
 
-            // 🌟 [수정 완료] 함수명(forceConfirmPoll) 누락 해결 2
             if (currentConfirmations.length >= totalExpectedVoters) {
                 await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id);
             } else {
                 await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
                 Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
-                // 💡 즉시 렌더링 호출을 통해 내가 버튼을 누르자마자 '✅ 수락 완료' 상태로 화면을 바꿉니다.
                 await Boako.Match.Chat.loadMessagesAndPolls();
             }
         },
@@ -1034,10 +1165,8 @@ Boako.Match = {
             Boako.Match.Chat.openPollModal();
         },
 
-       // 🌟 [수정됨] 백엔드 함수(RPC) 연동으로 극도로 간결해진 확정 로직
         forceConfirmPoll: async (pollId, confirmedTime, proposerId) => {
             try {
-                // 1. 프론트엔드에서는 복잡한 로직 없이, 백엔드에 만들어둔 함수만 호출!
                 const { error } = await Boako.db.rpc('confirm_match_schedule', {
                     p_poll_id: pollId,
                     p_confirmed_time: confirmedTime,
