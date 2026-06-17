@@ -165,7 +165,6 @@ Boako.Match = {
             
             if (currentSeason) {
                 document.getElementById('match-season-title').innerText = currentSeason.title || `시즌 ${seasonNo} 대항전`;
-                
                 const logoArea = document.getElementById('match-season-logo-area');
                 if (currentSeason.logo_url) {
                     logoArea.innerHTML = `<img src="${currentSeason.logo_url}" class="h-10 object-contain drop-shadow-md">`;
@@ -183,38 +182,49 @@ Boako.Match = {
             if (gamesErr) throw gamesErr;
 
             const isFinalized = allGames.some(g => g.status === 'FINAL');
-            let displayGames = [];
-
-            if (isFinalized) {
-                displayGames = allGames;
-                document.getElementById('status-ban').classList.replace('bg-blue-600', 'bg-slate-700');
-                document.getElementById('status-ban').classList.replace('text-white', 'text-slate-400');
-                document.getElementById('status-entry').classList.replace('text-slate-400', 'bg-blue-600');
-                document.getElementById('status-entry').classList.add('text-white', 'shadow-lg');
-            } else {
-                displayGames = allGames.filter(g => g.status === 'CANDIDATE').slice(0, 10);
-            }
+            let displayGames = isFinalized ? allGames : allGames.filter(g => g.status === 'CANDIDATE').slice(0, 10);
 
             let confirmedEntries = [];
             let gameScores = [];
 
             if (isFinalized) {
-                const { data: entriesData, error: entriesErr } = await Boako.db
+                const { data: entriesData } = await Boako.db
                     .from('grandprix_entries')
                     .select('*, teams(logo_url)') 
                     .eq('season_no', seasonNo)
                     .eq('is_finalized', true);
-                
-                if (entriesErr) console.error("엔트리 로드 에러:", entriesErr);
-                else confirmedEntries = entriesData || [];
+                confirmedEntries = entriesData || [];
 
-                const { data: scoresData, error: scoresErr } = await Boako.db
+                const { data: scoresData } = await Boako.db
                     .from('grandprix_game_scores')
                     .select('*')
                     .eq('season_no', seasonNo);
-                
-                if (scoresErr) console.error("스코어 로드 에러:", scoresErr);
-                else gameScores = scoresData || [];
+                gameScores = scoresData || [];
+            }
+
+            // 🔥 상단 진행바(Status) 3단계 완벽 자동 전환
+            const statusBan = document.getElementById('status-ban');
+            const statusEntry = document.getElementById('status-entry');
+            const statusPlay = document.getElementById('status-play');
+            
+            const activeClass = "px-4 py-2 rounded-xl bg-blue-600 text-white shadow-lg transition-colors";
+            const inactiveClass = "px-4 py-2 rounded-xl text-slate-400 transition-colors";
+
+            if (!isFinalized) {
+                // 1단계: 밴픽 진행 중
+                if(statusBan) statusBan.className = activeClass;
+                if(statusEntry) statusEntry.className = inactiveClass;
+                if(statusPlay) statusPlay.className = inactiveClass;
+            } else if (confirmedEntries.length === 0) {
+                // 2단계: 엔트리 제출 중
+                if(statusBan) statusBan.className = inactiveClass;
+                if(statusEntry) statusEntry.className = activeClass;
+                if(statusPlay) statusPlay.className = inactiveClass;
+            } else {
+                // 3단계: 본선 경기
+                if(statusBan) statusBan.className = inactiveClass;
+                if(statusEntry) statusEntry.className = inactiveClass;
+                if(statusPlay) statusPlay.className = activeClass;
             }
 
             Boako.Match.renderBanTab(displayGames, isFinalized);
