@@ -155,30 +155,43 @@ Boako.Match = {
     // 🌟 3. 데이터 로드
     loadData: async () => {
         try {
-            const { data: currentSeason } = await Boako.db.from('seasons')
-                .select('*')
-                .lte('start_date', new Date().toISOString())
-                .gte('end_date', new Date().toISOString())
-                .maybeSingle();
+            // 🌟 1. 껍데기가 아닌 '실제 데이터가 있는' 시즌 번호만 긁어오기 (grandprix_games 기준)
+            const { data: activeGames } = await Boako.db.from('grandprix_games').select('season_no');
             
-            let seasonNo = currentSeason ? currentSeason.season_no : 1;
-            
-            if (currentSeason) {
-                document.getElementById('match-season-title').innerText = currentSeason.title || `시즌 ${seasonNo} 대항전`;
-                const logoArea = document.getElementById('match-season-logo-area');
-                if (currentSeason.logo_url) {
-                    logoArea.innerHTML = `<img src="${currentSeason.logo_url}" class="h-10 object-contain drop-shadow-md">`;
-                } else {
-                    logoArea.innerHTML = `<span class="text-white/50 text-sm font-bold border border-white/20 px-3 py-1 rounded-lg">시즌 로고 대기 중</span>`;
-                }
+            let availableSeasons = [1]; // 데이터가 아예 없을 때의 최후의 기본값
+            if (activeGames && activeGames.length > 0) {
+                // 중복 제거 후 내림차순 정렬 (가장 최신 시즌이 0번째 배열에 오도록)
+                availableSeasons = [...new Set(activeGames.map(g => g.season_no))].sort((a, b) => b - a);
             }
 
-            const { data: allGames, error: gamesErr } = await Boako.db
-                .from('grandprix_games')
-                .select('*')
-                .eq('season_no', seasonNo)
-                .order('selection_rank', { ascending: true });
+            // 현재 선택된 시즌 (사용자가 드롭다운을 안 건드렸다면 가장 최신 시즌으로 세팅)
+            let seasonNo = Boako.Match.currentSeasonNo || availableSeasons[0];
+            Boako.Match.currentSeasonNo = seasonNo;
+            Boako.Match.availableSeasons = availableSeasons; // 스코어보드 탭에서 재활용
+
+            // 🌟 2. 상단 타이틀/로고 영역 전면 개편 (거대 텍스트 삭제, 로고 중심)
+            const { data: currentSeason } = await Boako.db.from('seasons').select('*').eq('season_no', seasonNo).single();
             
+            const titleEl = document.getElementById('match-season-title');
+            const logoEl = document.getElementById('match-season-logo-area');
+            
+            if (titleEl && logoEl) {
+                titleEl.style.display = 'none'; // 불필요한 중복 텍스트(제 1회 대항전 등) 강제 숨김
+                logoEl.className = "flex flex-col gap-3 mt-2"; // 로고와 날짜를 위아래로 깔끔하게 배치
+                
+                let logoHtml = currentSeason?.logo_url 
+                    ? `<img src="${currentSeason.logo_url}" class="h-16 md:h-20 object-contain drop-shadow-lg" alt="시즌 로고">`
+                    : `<div class="text-white/50 text-sm font-bold border-2 border-dashed border-white/20 px-6 py-4 rounded-2xl w-max">시즌 로고 대기 중</div>`;
+                
+                let dateHtml = `<div class="text-indigo-200 text-xs font-black bg-indigo-900/60 px-3 py-1.5 rounded-lg border border-indigo-500/30 w-max shadow-inner">
+                                   📅 ${currentSeason?.start_date ? currentSeason.start_date.substring(0, 10) : '시작 미정'} ~ ${currentSeason?.end_date ? currentSeason.end_date.substring(0, 10) : '종료 미정'}
+                                </div>`;
+                
+                logoEl.innerHTML = logoHtml + dateHtml;
+            }
+
+            // 3. 해당 시즌의 게임, 엔트리, 스코어 데이터 로드
+            const { data: allGames, error: gamesErr } = await Boako.db.from('grandprix_games').select('*').eq('season_no', seasonNo).order('selection_rank', { ascending: true });
             if (gamesErr) throw gamesErr;
 
             const isFinalized = allGames.some(g => g.status === 'FINAL');
@@ -188,43 +201,33 @@ Boako.Match = {
             let gameScores = [];
 
             if (isFinalized) {
-                const { data: entriesData } = await Boako.db
-                    .from('grandprix_entries')
-                    .select('*, teams(logo_url)') 
-                    .eq('season_no', seasonNo)
-                    .eq('is_finalized', true);
+                const { data: entriesData } = await Boako.db.from('grandprix_entries').select('*, teams(logo_url)').eq('season_no', seasonNo).eq('is_finalized', true);
                 confirmedEntries = entriesData || [];
-
-                const { data: scoresData } = await Boako.db
-                    .from('grandprix_game_scores')
-                    .select('*')
-                    .eq('season_no', seasonNo);
+                const { data: scoresData } = await Boako.db.from('grandprix_game_scores').select('*').eq('season_no', seasonNo);
                 gameScores = scoresData || [];
             }
 
-            // 🔥 상단 진행바(Status) 3단계 완벽 자동 전환
+            // 🌟 4. 진행 상태 바 UI 수정 (어거지 2줄 깨짐 방지: whitespace-nowrap 적용)
             const statusBan = document.getElementById('status-ban');
             const statusEntry = document.getElementById('status-entry');
             const statusPlay = document.getElementById('status-play');
             
-            const activeClass = "px-4 py-2 rounded-xl bg-blue-600 text-white shadow-lg transition-colors";
-            const inactiveClass = "px-4 py-2 rounded-xl text-slate-400 transition-colors";
+            // whitespace-nowrap으로 무조건 한 줄로 뻗게 강제
+            const activeClass = "px-5 py-2.5 rounded-xl bg-blue-600 text-white shadow-lg transition-colors whitespace-nowrap text-sm font-black flex items-center gap-1.5";
+            const inactiveClass = "px-5 py-2.5 rounded-xl text-slate-400 transition-colors whitespace-nowrap text-sm font-bold flex items-center gap-1.5";
 
             if (!isFinalized) {
-                // 1단계: 밴픽 진행 중
-                if(statusBan) statusBan.className = activeClass;
-                if(statusEntry) statusEntry.className = inactiveClass;
-                if(statusPlay) statusPlay.className = inactiveClass;
+                if(statusBan) statusBan.className = activeClass; statusBan.innerHTML = "🚫 밴픽 진행";
+                if(statusEntry) statusEntry.className = inactiveClass; statusEntry.innerHTML = "⚔️ 엔트리 제출";
+                if(statusPlay) statusPlay.className = inactiveClass; statusPlay.innerHTML = "🏆 본선 경기";
             } else if (confirmedEntries.length === 0) {
-                // 2단계: 엔트리 제출 중
-                if(statusBan) statusBan.className = inactiveClass;
-                if(statusEntry) statusEntry.className = activeClass;
-                if(statusPlay) statusPlay.className = inactiveClass;
+                if(statusBan) statusBan.className = inactiveClass; statusBan.innerHTML = "🚫 밴픽 종료";
+                if(statusEntry) statusEntry.className = activeClass; statusEntry.innerHTML = "⚔️ 엔트리 제출";
+                if(statusPlay) statusPlay.className = inactiveClass; statusPlay.innerHTML = "🏆 본선 경기";
             } else {
-                // 3단계: 본선 경기
-                if(statusBan) statusBan.className = inactiveClass;
-                if(statusEntry) statusEntry.className = inactiveClass;
-                if(statusPlay) statusPlay.className = activeClass;
+                if(statusBan) statusBan.className = inactiveClass; statusBan.innerHTML = "🚫 밴픽 종료";
+                if(statusEntry) statusEntry.className = inactiveClass; statusEntry.innerHTML = "⚔️ 엔트리 마감";
+                if(statusPlay) statusPlay.className = activeClass; statusPlay.innerHTML = "🏆 본선 경기";
             }
 
             Boako.Match.renderBanTab(displayGames, isFinalized);
@@ -240,7 +243,12 @@ Boako.Match = {
             `;
         }
     },
-
+// 🌟 여기에 신규 함수 추가!
+    switchSeason: async (seasonNo) => {
+        Boako.Match.currentSeasonNo = Number(seasonNo); // 선택한 시즌 번호 저장
+        document.getElementById('tab-score').innerHTML = `<div class="p-12 text-center text-slate-400 font-bold">데이터를 불러오는 중입니다... ⏳</div>`;
+        await Boako.Match.loadData(); // 데이터 새로고침
+    },
     // 🌟 4. [탭 1] 밴 결과 렌더링
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
@@ -487,17 +495,39 @@ Boako.Match = {
         // 3. 총점 기준 내림차순 정렬
         const rankedTeams = Object.keys(teamData).map(name => ({ teamName: name, ...teamData[name] })).sort((a, b) => b.totalScore - a.totalScore);
 
-        // 4. HTML 조립 (시즌 드롭다운 + 아코디언 테이블)
+        // 🌟 4. 동적으로 추출된 시즌 배열을 바탕으로 option 태그 생성
+        const seasonOptionsHtml = Boako.Match.availableSeasons.map(s => 
+            `<option value="${s}" ${s === Boako.Match.currentSeasonNo ? 'selected' : ''}>🏆 시즌 ${s}</option>`
+        ).join('');
+
+        // HTML 조립 (동적 드롭다운 + 분리된 통계 뱃지)
         let html = `
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 px-2 gap-3">
-                <select class="bg-slate-800 text-white font-black px-4 py-2.5 rounded-xl shadow-lg border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
-                    <option value="1">🏆 시즌 1 대항전</option>
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 px-4 gap-4">
+                
+                <!-- 왼쪽: 자동 생성되는 시즌 드롭다운 -->
+                <div class="relative w-full sm:w-40">
+                    <select onchange="Boako.Match.switchSeason(this.value)" class="w-full bg-slate-900 text-white font-black py-3 rounded-2xl shadow-lg border-none focus:outline-none focus:ring-4 focus:ring-indigo-500/30 cursor-pointer text-center appearance-none" style="padding-left: 20px; padding-right: 20px;">
+                        ${seasonOptionsHtml}
                     </select>
-                <div class="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                    본선 <span class="text-indigo-600 font-black">${survivingGames.length}</span>종목 | 참가 <span class="text-indigo-600 font-black">${rankedTeams.length}</span>팀
+                    <!-- 우측 화살표 아이콘 독립 배치 -->
+                    <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white/40">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"></path></svg>
+                    </div>
+                </div>
+
+                <!-- 오른쪽: 통계 데이터 뱃지 -->
+                <div class="flex gap-2 w-full sm:w-auto justify-center sm:justify-end">
+                    <div class="bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+                        <span class="text-[10px] font-black text-slate-400">종목</span>
+                        <span class="text-indigo-600 font-black text-sm">${survivingGames.length}개</span>
+                    </div>
+                    <div class="bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+                        <span class="text-[10px] font-black text-slate-400">참가</span>
+                        <span class="text-indigo-600 font-black text-sm">${rankedTeams.length}팀</span>
+                    </div>
                 </div>
             </div>
-
+            
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <table class="w-full text-sm text-center border-collapse">
                     <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-black">
