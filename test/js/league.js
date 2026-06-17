@@ -330,7 +330,7 @@ Boako.League.loadBingoBoardData = async function() {
 };
 
 // ====================================================================
-// 🖼️ [마킹 사이즈 극대화] 밴댕이 똥꾸멍 배지 삭제 ➡️ 거대 오버레이 마킹 도입
+// 🖼️ [점령 & 정보 완벽 조화] 팀 로고 오버레이 + 하단 게임명 최상단 고정
 // ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
@@ -346,7 +346,9 @@ Boako.League.renderBingoBoard = function() {
         const isWinner = winCells.includes(idx);
         const isMyTeam = ownerTeam && ownerTeam === myTeamName;
         const diffStatus = difficulties[idx] || "EASY";
+        const gameName = Boako.League.State.boardGames25[idx] || "지정 미정";
         
+        // 🌟 배경색 및 테두리 처리
         let bgClass = "bg-slate-50 border-slate-200/60";
         if (ownerTeam) {
             if (isMyTeam) {
@@ -361,57 +363,67 @@ Boako.League.renderBingoBoard = function() {
             }
         }
 
+        // 🔥 중앙 페널티 테두리
         if (diffStatus === 'HARD_CENTER_PENALTY') {
             bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
         }
 
-        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center p-2 gap-1.5 transition-all text-center relative overflow-hidden group ${bgClass}`;
+        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group ${bgClass}`;
         
+        // 🎲 1. 게임 로고 (배경 레이어 - 투명도 30%)
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         const gameImageHtml = gameLogoUrl 
-            ? `<div class="w-full h-[52px] flex items-center justify-center pointer-events-none z-10">
-                   <img src="${gameLogoUrl}" alt="${Boako.League.State.boardGames25[idx]}" 
-                        class="w-full h-auto max-h-full object-contain opacity-40 transition-opacity"
+            ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-4">
+                   <img src="${gameLogoUrl}" alt="${gameName}" 
+                        class="w-[60%] h-auto max-h-full object-contain opacity-30 transition-opacity"
                         style="filter: drop-shadow(0px 2px 3px rgba(15, 23, 42, 0.28));">
                </div>`
-            : `<div class="w-full h-[52px] flex items-center justify-center opacity-10 pointer-events-none text-2xl bg-slate-100 rounded-lg">🎲</div>`;
+            : `<div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none text-3xl pb-4 z-10">🎲</div>`;
 
-        // 🌟 [거대 점유 오버레이] 로고와 팀명이 칸의 중앙을 쾅! 가리도록 렌더링
+        // 🛡️ 2. 점령 팀 거대 로고 오버레이 (위로 살짝 올려서 하단 텍스트 공간 확보)
         let massiveOverlayHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             massiveOverlayHtml = `
-                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2.5px] transition-all">
-                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-12 h-12 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300">
-                    <span class="mt-1 px-2.5 py-0.5 bg-slate-900/90 text-white text-[10px] font-black rounded-lg shadow-sm backdrop-blur-md">${ownerTeam}</span>
+                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-3">
+                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-10 h-10 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300">
+                    <span class="mt-0.5 px-2 py-0.5 bg-slate-900/90 text-white text-[9px] font-black rounded-md shadow-sm backdrop-blur-md">${ownerTeam}</span>
                 </div>
             `;
         }
 
+        // 🎯 3. 우측 상단 난이도 배지
         let diffBadgeHtml = '';
         if (diffStatus === 'HARD_CENTER_PENALTY') {
-            diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[8px] px-1.5 py-0.5 rounded-md shadow-sm">🔥 CENTER</span>`;
+            diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[7px] px-1.5 py-0.5 rounded shadow-sm">🔥 CENTER</span>`;
         } else {
             const diffColors = {
                 EASY: "bg-emerald-500/90 text-white",
                 NORMAL: "bg-blue-500/90 text-white",
                 HARD: "bg-rose-500/90 text-white"
             };
-            diffBadgeHtml = `<span class="absolute top-1.5 right-1.5 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm scale-90">${diffStatus}</span>`;
+            diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm">${diffStatus}</span>`;
         }
         
-        const crownHtml = isWinner ? `<span class="absolute top-1.5 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-14' : 'right-9'} text-xs text-amber-400 animate-bounce z-30">👑</span>` : '';
+        // 👑 4. 빙고 완성 왕관
+        const crownHtml = isWinner ? `<span class="absolute top-1 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-12' : 'right-8'} text-xs text-amber-400 animate-bounce z-30">👑</span>` : '';
         
-        cell.innerHTML = `
-            ${massiveOverlayHtml}
-            ${diffBadgeHtml}
-            ${gameImageHtml}
-            <div class="w-full z-10">
-                <div class="w-full px-1 bg-white/70 backdrop-blur-[2px] py-1 rounded-lg border border-white/50 shadow-sm flex items-center justify-center min-h-[28px]">
-                    <p class="text-[9px] font-black text-slate-800 tracking-tight leading-tight line-clamp-2 break-all">${Boako.League.State.boardGames25[idx]}</p>
+        // 📝 5. 하단 게임 종목 라벨 (z-30으로 띄워서 점령 오버레이 위로 항상 노출!)
+        const gameLabelHtml = `
+            <div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30">
+                <div class="w-full px-1 bg-white/95 backdrop-blur-md py-0.5 rounded-md border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[20px]">
+                    <span class="text-[8.5px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${gameName}</span>
                 </div>
             </div>
+        `;
+        
+        // HTML 조립
+        cell.innerHTML = `
+            ${gameImageHtml}
+            ${massiveOverlayHtml}
+            ${diffBadgeHtml}
             ${crownHtml}
+            ${gameLabelHtml}
         `;
         
         grid.appendChild(cell);
