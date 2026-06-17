@@ -506,7 +506,7 @@ Boako.Match = {
                 
                 <!-- 왼쪽: 자동 생성되는 시즌 드롭다운 -->
                 <div class="relative w-full sm:w-40">
-                    <select onchange="Boako.Match.switchSeason(this.value)" class="w-full bg-slate-900 text-white font-black py-3 rounded-2xl shadow-lg border-none focus:outline-none focus:ring-4 focus:ring-indigo-500/30 cursor-pointer text-center appearance-none" style="padding-left: 20px; padding-right: 20px;">
+                    <select onchange="Boako.Match.switchSeason(this.value)" class="w-full bg-slate-900 text-white font-black py-3 pl-5 pr-10 rounded-2xl shadow-lg border-none focus:outline-none focus:ring-4 focus:ring-indigo-500/30 cursor-pointer appearance-none">
                         ${seasonOptionsHtml}
                     </select>
                     <!-- 우측 화살표 아이콘 독립 배치 -->
