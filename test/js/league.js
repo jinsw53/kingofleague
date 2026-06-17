@@ -370,8 +370,8 @@ Boako.League.renderBingoBoard = function() {
 
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group ${bgClass}`;
         
-        // 🎲 1. 게임 로고 (🎯 핵심: 흰색 로고 보호색 완벽 방지용 다크 후광 섀도우)
-        const gameLogoOpacity = ownerTeam ? "opacity-30 grayscale-[50%]" : "opacity-100";
+       // 🎲 1. 게임 로고 (🎯 게임 흔적을 더 진하게: 투명도 30% -> 45% / 흑백 필터 살짝 완화)
+        const gameLogoOpacity = ownerTeam ? "opacity-45 grayscale-[40%]" : "opacity-100";
         
         // 미점령 시엔 짙은 그림자 윤곽선 생성, 점령 시엔 살짝 약한 윤곽선으로 흔적 유지
         const shadowFilter = ownerTeam 
@@ -387,13 +387,13 @@ Boako.League.renderBingoBoard = function() {
                </div>`
             : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
 
-        // 🛡️ 2. 점령 팀 '도장' 오버레이
+        // 🛡️ 2. 점령 팀 '도장' 오버레이 (🎯 도장을 더 투명하게: 투명도 60% -> 35%, 떡지는 필터 삭제)
         let massiveOverlayHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             massiveOverlayHtml = `
                 <div class="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none pb-2">
-                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-14 h-14 object-contain drop-shadow-lg opacity-60 transform group-hover:scale-110 transition-transform duration-300 mix-blend-multiply">
+                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-14 h-14 object-contain drop-shadow-md opacity-[0.35] transform group-hover:scale-110 transition-transform duration-300">
                 </div>
             `;
         }
