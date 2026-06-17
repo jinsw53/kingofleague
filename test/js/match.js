@@ -500,22 +500,27 @@ Boako.Match = {
             `<option value="${s}" ${s === Boako.Match.currentSeasonNo ? 'selected' : ''}>🏆 시즌 ${s}</option>`
         ).join('');
 
-        // HTML 조립 (동적 드롭다운 + 분리된 통계 뱃지)
+        // HTML 조립 (고급형 커스텀 드롭다운 + 분리된 통계 뱃지)
         let html = `
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 px-4 gap-4">
                 
-                <!-- 왼쪽: 자동 생성되는 시즌 드롭다운 -->
-                <div class="relative w-full sm:w-40">
-                    <select onchange="Boako.Match.switchSeason(this.value)" class="w-full bg-slate-900 text-white font-black py-3 pl-5 pr-10 rounded-2xl shadow-lg border-none focus:outline-none focus:ring-4 focus:ring-indigo-500/30 cursor-pointer appearance-none">
-                        ${seasonOptionsHtml}
-                    </select>
-                    <!-- 우측 화살표 아이콘 독립 배치 -->
-                    <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white/40">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"></path></svg>
+                <div class="relative w-full sm:w-40 z-30">
+                    <button onclick="Boako.Match.toggleSeasonDropdown()" class="w-full bg-slate-900 text-white font-black py-3 pl-5 pr-4 rounded-2xl shadow-lg focus:outline-none focus:ring-4 focus:ring-indigo-500/30 flex justify-between items-center transition-all">
+                        <span>🏆 시즌 ${Boako.Match.currentSeasonNo}</span>
+                        <svg class="w-4 h-4 text-white/40" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"></path></svg>
+                    </button>
+
+                    <div id="season-dropdown-overlay" onclick="Boako.Match.toggleSeasonDropdown()" class="hidden fixed inset-0 z-40"></div>
+
+                    <div id="season-dropdown-menu" class="hidden absolute top-full left-0 mt-2 w-full bg-slate-800 rounded-2xl shadow-xl border border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                        ${Boako.Match.availableSeasons.map(s => `
+                            <div onclick="Boako.Match.selectSeason(${s})" class="px-5 py-3.5 text-sm font-black cursor-pointer transition-colors ${s === Boako.Match.currentSeasonNo ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">
+                                🏆 시즌 ${s}
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
 
-                <!-- 오른쪽: 통계 데이터 뱃지 -->
                 <div class="flex gap-2 w-full sm:w-auto justify-center sm:justify-end">
                     <div class="bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
                         <span class="text-[10px] font-black text-slate-400">종목</span>
