@@ -330,7 +330,7 @@ Boako.League.loadBingoBoardData = async function() {
 };
 
 // ====================================================================
-// 🖼️ [투시 도장 마킹 시스템 & 흰색 로고 시인성 극대화]
+// 🖼️ [점령 뽕맛 극대화 & 스마트 툴팁] 점령 시 확실하게 가리고, 마우스 오버 시 정보 제공
 // ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
@@ -347,74 +347,77 @@ Boako.League.renderBingoBoard = function() {
         const isMyTeam = ownerTeam && ownerTeam === myTeamName;
         const diffStatus = difficulties[idx] || "EASY";
         const gameName = Boako.League.State.boardGames25[idx] || "지정 미정";
+        const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         
         // 🌟 배경색 및 테두리 처리
         let bgClass = "bg-slate-50 border-slate-200/60";
         if (ownerTeam) {
             if (isMyTeam) {
-                bgClass = "bg-violet-100/50 border-violet-400 bingo-won-pulse border-2 scale-[0.97] shadow-sm";
+                bgClass = "bg-gradient-to-br from-violet-600 to-indigo-600 text-white border-violet-400 bingo-won-pulse border-2 scale-[0.97] shadow-md";
                 if (!isWinner) {
-                    bgClass = "bg-violet-50/50 border-violet-300 scale-[0.97] border";
+                    bgClass = "bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300 text-violet-950 font-black scale-[0.97] shadow-inner border";
                 }
             } else {
                 bgClass = isWinner 
-                    ? "bg-slate-200/80 border-slate-400 scale-[0.97]" 
-                    : "bg-slate-100/80 border-slate-200 scale-[0.97]";
+                    ? "bg-slate-700 text-slate-100 border-slate-500 scale-[0.97] opacity-80" 
+                    : "bg-slate-100 border-slate-200 text-slate-700 font-bold scale-[0.97]";
             }
         }
 
-        // 🔥 중앙 페널티 테두리
         if (diffStatus === 'HARD_CENTER_PENALTY') {
             bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
         }
 
-        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group ${bgClass}`;
+        // 🎯 툴팁 이벤트를 받기 위해 data-handler 추가
+        cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group cursor-pointer ${bgClass}`;
+        cell.setAttribute('data-handler', 'bingo-tooltip');
         
-   // 🎲 1. 게임 로고 (주인공이므로 100% 선명하게 유지)
-        const gameLogoOpacity = "opacity-100";
-        const shadowFilter = "filter: drop-shadow(0px 0px 6px rgba(15, 23, 42, 0.7)) drop-shadow(0px 2px 4px rgba(15, 23, 42, 0.4));";
-
-        const gameLogoUrl = Boako.League.State.boardLogos25[idx];
+        // 🎲 1. 게임 로고 (배경으로 희미하게 깔아둠)
+        const gameLogoOpacity = ownerTeam ? "opacity-20 grayscale transition-all duration-300 group-hover:opacity-10" : "opacity-100 drop-shadow-md";
         const gameImageHtml = gameLogoUrl 
             ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-3">
-                   <img src="${gameLogoUrl}" alt="${gameName}" 
-                        class="w-[65%] h-auto max-h-full object-contain transition-all duration-300 ${gameLogoOpacity}"
-                        style="${shadowFilter}">
+                   <img src="${gameLogoUrl}" alt="${gameName}" class="w-[65%] h-auto max-h-full object-contain ${gameLogoOpacity}">
                </div>`
             : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
 
-        // 🛡️ 2. 점령 팀 '도장' 오버레이 (주객전도 방지: 크기 축소 & 투명도 60%)
+        // 🛡️ 2. 점령 팀 거대 오버레이 (🎯 뽕맛 복구: 크고 아름답게 가려버림!)
         let massiveOverlayHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             massiveOverlayHtml = `
-                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none pb-2">
-                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-11 h-11 object-contain drop-shadow-md opacity-60 transform -rotate-6 group-hover:scale-110 transition-transform duration-300">
+                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-3">
+                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-12 h-12 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300">
+                    <span class="mt-0.5 px-2 py-0.5 bg-slate-900/90 text-white text-[9px] font-black rounded-md shadow-sm backdrop-blur-md">${ownerTeam}</span>
                 </div>
             `;
         }
-        // 🎯 3. 우측 상단 난이도 배지
+
+        // 🎯 3. 배지 및 왕관
         let diffBadgeHtml = '';
         if (diffStatus === 'HARD_CENTER_PENALTY') {
             diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[7px] px-1.5 py-0.5 rounded shadow-sm">🔥 CENTER</span>`;
         } else {
-            const diffColors = {
-                EASY: "bg-emerald-500/90 text-white",
-                NORMAL: "bg-blue-500/90 text-white",
-                HARD: "bg-rose-500/90 text-white"
-            };
+            const diffColors = { EASY: "bg-emerald-500/90 text-white", NORMAL: "bg-blue-500/90 text-white", HARD: "bg-rose-500/90 text-white" };
             diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm">${diffStatus}</span>`;
         }
-        
-        // 👑 4. 빙고 완성 왕관
         const crownHtml = isWinner ? `<span class="absolute top-1 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-12' : 'right-8'} text-xs text-amber-400 animate-bounce z-30">👑</span>` : '';
         
-        // 📝 5. 하단 게임 종목 라벨
+        // 📝 4. 하단 게임 종목 라벨
         const gameLabelHtml = `
             <div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30">
-                <div class="w-full px-1 bg-white/80 backdrop-blur-md py-0.5 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[18px]">
+                <div class="w-full px-1 bg-white/90 backdrop-blur-md py-0.5 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[18px]">
                     <span class="text-[8px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${gameName}</span>
                 </div>
+            </div>
+        `;
+
+        // 💡 5. 절대 안 잘리는 좌표 추적형 최상단 툴팁
+        const tooltipHtml = `
+            <div class="fixed mb-2 w-48 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[9999] pointer-events-none flex flex-col items-center justify-center transition-opacity duration-200"
+                 style="display: none; opacity: 0; transform: translate(-50%, -100%); top: var(--bingo-top, auto); left: var(--bingo-left, auto);">
+                ${gameLogoUrl ? `<img src="${gameLogoUrl}" class="w-20 h-20 object-contain mb-3 drop-shadow-md" alt="Game Logo">` : `<div class="text-4xl mb-2">🎲</div>`}
+                <div class="text-xs font-black text-slate-800 text-center w-full break-keep">${gameName}</div>
+                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"></div>
             </div>
         `;
         
@@ -425,12 +428,34 @@ Boako.League.renderBingoBoard = function() {
             ${diffBadgeHtml}
             ${crownHtml}
             ${gameLabelHtml}
+            ${tooltipHtml}
         `;
         
         grid.appendChild(cell);
     });
 
     Boako.League.updateStats();
+
+    // 🎯 [툴팁 이벤트 매핑] 마우스 움직임에 따라 절대 좌표 갱신 (부모 요소의 overflow-hidden 무시)
+    grid.querySelectorAll('[data-handler="bingo-tooltip"]').forEach(handler => {
+        const tooltip = handler.querySelector('.fixed');
+        if (!tooltip) return;
+
+        handler.addEventListener('mouseenter', () => {
+            tooltip.style.display = 'flex';
+            setTimeout(() => { tooltip.style.opacity = '1'; }, 10);
+        });
+
+        handler.addEventListener('mousemove', (e) => {
+            tooltip.style.setProperty('--bingo-top', `${e.clientY - 15}px`);
+            tooltip.style.setProperty('--bingo-left', `${e.clientX}px`);
+        });
+
+        handler.addEventListener('mouseleave', () => {
+            tooltip.style.opacity = '0';
+            tooltip.style.display = 'none';
+        });
+    });
 };
 
 if (!document.getElementById('bingo-fire-border-style')) {
