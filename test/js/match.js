@@ -111,7 +111,7 @@ Boako.Match = {
                             <span class="text-slate-600">▶</span>
                             <span class="px-4 py-2 rounded-xl text-slate-400 transition-colors" id="status-entry">⚔️ 엔트리 제출</span>
                             <span class="text-slate-600">▶</span>
-                            <span class="px-4 py-2 rounded-xl text-slate-400 transition-colors" id="status-play">🏆 본선 경기</span>
+                            <span class="px-4 py-2 rounded-xl text-slate-400 transition-colors" id="status-play">🏆 대항전 경기</span>
                         </div>
                     </div>
                 </div>
@@ -128,7 +128,7 @@ Boako.Match = {
                     <div class="bg-white p-12 rounded-3xl text-center border border-slate-200 shadow-sm">
                         <span class="text-6xl block mb-4 drop-shadow-md">🏆</span>
                         <h3 class="text-xl font-black text-slate-800">스코어보드 집계 중</h3>
-                        <p class="text-sm text-slate-500 font-bold mt-2">본선 경기가 시작되면 각 팀의 실시간 승점이 기록됩니다.</p>
+                        <p class="text-sm text-slate-500 font-bold mt-2">대항전 경기가 시작되면 각 팀의 실시간 승점이 기록됩니다.</p>
                     </div>
                 </div>
             </div>
@@ -219,15 +219,15 @@ Boako.Match = {
             if (!isFinalized) {
                 if(statusBan) statusBan.className = activeClass; statusBan.innerHTML = "🚫 밴픽 진행";
                 if(statusEntry) statusEntry.className = inactiveClass; statusEntry.innerHTML = "⚔️ 엔트리 제출";
-                if(statusPlay) statusPlay.className = inactiveClass; statusPlay.innerHTML = "🏆 본선 경기";
+                if(statusPlay) statusPlay.className = inactiveClass; statusPlay.innerHTML = "🏆 대항전 경기";
             } else if (confirmedEntries.length === 0) {
                 if(statusBan) statusBan.className = inactiveClass; statusBan.innerHTML = "🚫 밴픽 종료";
                 if(statusEntry) statusEntry.className = activeClass; statusEntry.innerHTML = "⚔️ 엔트리 제출";
-                if(statusPlay) statusPlay.className = inactiveClass; statusPlay.innerHTML = "🏆 본선 경기";
+                if(statusPlay) statusPlay.className = inactiveClass; statusPlay.innerHTML = "🏆 대항전 경기";
             } else {
                 if(statusBan) statusBan.className = inactiveClass; statusBan.innerHTML = "🚫 밴픽 종료";
                 if(statusEntry) statusEntry.className = inactiveClass; statusEntry.innerHTML = "⚔️ 엔트리 마감";
-                if(statusPlay) statusPlay.className = activeClass; statusPlay.innerHTML = "🏆 본선 경기";
+                if(statusPlay) statusPlay.className = activeClass; statusPlay.innerHTML = "🏆 대항전 경기";
             }
 
             Boako.Match.renderBanTab(displayGames, isFinalized);
