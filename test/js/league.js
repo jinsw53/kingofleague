@@ -370,7 +370,7 @@ Boako.League.renderBingoBoard = function() {
 
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group ${bgClass}`;
         
-    // 🎲 1. 게임 로고 (점령당해도 투명도 100% 유지, 보호색 방지 섀도우 풀가동)
+   // 🎲 1. 게임 로고 (주인공이므로 100% 선명하게 유지)
         const gameLogoOpacity = "opacity-100";
         const shadowFilter = "filter: drop-shadow(0px 0px 6px rgba(15, 23, 42, 0.7)) drop-shadow(0px 2px 4px rgba(15, 23, 42, 0.4));";
 
@@ -383,19 +383,13 @@ Boako.League.renderBingoBoard = function() {
                </div>`
             : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
 
-        // 🛡️ 2. 점령 팀 '스티커 도장' 오버레이 (🎯 섞이지 않게 분리!)
+        // 🛡️ 2. 점령 팀 '도장' 오버레이 (주객전도 방지: 크기 축소 & 투명도 60%)
         let massiveOverlayHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             massiveOverlayHtml = `
                 <div class="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none pb-2">
-                    <!-- 약간 비스듬하게 회전시켜 진짜 스티커/도장 느낌 부여 -->
-                    <div class="relative transform -rotate-6 group-hover:scale-110 transition-transform duration-300">
-                        <!-- 🎯 핵심: 팀 로고 뒤에 하얀색 부드러운 후광을 깔아서 밑의 게임 로고와 색이 섞이는 것을 방지 -->
-                        <div class="absolute inset-0 bg-white/60 blur-md rounded-full scale-125"></div>
-                        <!-- 팀 로고는 아주 쨍하게(opacity-95) 얹기 -->
-                        <img src="${teamLogoUrl}" alt="${ownerTeam}" class="relative w-14 h-14 object-contain drop-shadow-xl opacity-95">
-                    </div>
+                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-11 h-11 object-contain drop-shadow-md opacity-60 transform -rotate-6 group-hover:scale-110 transition-transform duration-300">
                 </div>
             `;
         }
