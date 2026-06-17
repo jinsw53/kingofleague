@@ -249,6 +249,23 @@ Boako.Match = {
         document.getElementById('tab-score').innerHTML = `<div class="p-12 text-center text-slate-400 font-bold">데이터를 불러오는 중입니다... ⏳</div>`;
         await Boako.Match.loadData(); // 데이터 새로고침
     },
+    // 🌟 드롭다운 메뉴 열기/닫기
+    toggleSeasonDropdown: () => {
+        const menu = document.getElementById('season-dropdown-menu');
+        const overlay = document.getElementById('season-dropdown-overlay');
+        if(menu && overlay) {
+            menu.classList.toggle('hidden');
+            overlay.classList.toggle('hidden');
+        }
+    },
+
+    // 🌟 드롭다운 목록에서 항목 선택 시
+    selectSeason: (seasonNo) => {
+        Boako.Match.toggleSeasonDropdown(); // 1. 메뉴 닫기
+        if (seasonNo !== Boako.Match.currentSeasonNo) {
+            Boako.Match.switchSeason(seasonNo); // 2. 선택한 시즌으로 갱신
+        }
+    },
     // 🌟 4. [탭 1] 밴 결과 렌더링
     renderBanTab: (games, isFinalized) => {
         const content = document.getElementById('match-ban-content');
