@@ -385,9 +385,9 @@ Boako.League.renderBingoBoard = function() {
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             massiveOverlayHtml = `
-                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-3">
-                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-10 h-10 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300">
-                    <span class="mt-0.5 px-2 py-0.5 bg-slate-900/90 text-white text-[9px] font-black rounded-md shadow-sm backdrop-blur-md">${ownerTeam}</span>
+                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/30 backdrop-blur-[0.5px] transition-all">
+                    <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-12 h-12 object-contain drop-shadow-md opacity-90">
+                    <span class="mt-1 px-1.5 py-0.5 bg-black/50 text-white text-[8px] font-black rounded-sm backdrop-blur-sm shadow-sm">${ownerTeam}</span>
                 </div>
             `;
         }
@@ -411,8 +411,8 @@ Boako.League.renderBingoBoard = function() {
         // 📝 5. 하단 게임 종목 라벨 (z-30으로 띄워서 점령 오버레이 위로 항상 노출!)
         const gameLabelHtml = `
             <div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30">
-                <div class="w-full px-1 bg-white/95 backdrop-blur-md py-0.5 rounded-md border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[20px]">
-                    <span class="text-[8.5px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${gameName}</span>
+                <div class="w-full px-1 bg-white/70 backdrop-blur-md py-0.5 rounded-sm border border-white/50 shadow-sm flex items-center justify-center min-h-[18px]">
+                    <span class="text-[8px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${gameName}</span>
                 </div>
             </div>
         `;
