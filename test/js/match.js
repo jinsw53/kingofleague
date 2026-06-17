@@ -418,14 +418,29 @@ Boako.Match = {
         html += `</div>`;
         content.innerHTML = html;
     },
-
-    // 🌟 6. [탭 3] 스코어보드 렌더링 로직 (완성판)
+// 🌟 [신규 추가] 아코디언(상세 점수) 토글 함수
+    toggleScoreDetail: (teamId) => {
+        const detailRow = document.getElementById(`detail-${teamId}`);
+        const icon = document.getElementById(`icon-${teamId}`);
+        
+        if (detailRow.classList.contains('hidden')) {
+            // 열기
+            detailRow.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+            icon.classList.replace('bg-slate-100', 'bg-indigo-600');
+            icon.classList.replace('text-slate-400', 'text-white');
+        } else {
+            // 닫기
+            detailRow.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
+            icon.classList.replace('bg-indigo-600', 'bg-slate-100');
+            icon.classList.replace('text-white', 'text-slate-400');
+        }
+    },
+   // 🌟 [전면 교체] 탭 3: 스코어보드 렌더링 (아코디언 방식)
     renderScoreTab: (games, isFinalized, entries, scores) => {
         const content = document.getElementById('tab-score');
-        
-        if (!isFinalized) {
-            return; 
-        }
+        if (!isFinalized) return; 
 
         const survivingGames = games.filter(g => g.status === 'FINAL');
         
@@ -438,107 +453,144 @@ Boako.Match = {
             teamData[entry.team_name].gameScores[entry.game_name] = { entered: true, detail: null };
         });
 
-        // 2. DB 스코어 데이터 매핑 (경기 진행 일시, URL 포함)
-        scores.forEach(scoreRow => {
-            const gameName = scoreRow.game_name;
-            const currentScores = scoreRow.scores || {};
-            const originalScores = scoreRow.original_scores || {};
-            const penaltyReasons = scoreRow.penalty_reasons || {};
-            const url = scoreRow.source_url || '#';
-            
-            const dateStr = scoreRow.created_at 
-                ? new Date(scoreRow.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                : '일시 미상';
+        // 2. DB 스코어 데이터 매핑
+        scores.forEach(row => {
+            const gameName = row.game_name;
+            const currentScores = row.scores || {};
+            const originalScores = row.original_scores || {};
+            const penaltyReasons = row.penalty_reasons || {};
+            const url = row.source_url || '#';
+            const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '일시 미상';
 
-            Object.keys(currentScores).forEach(teamName => {
-                if (!teamData[teamName]) return;
-                
-                const score = Number(currentScores[teamName]) || 0;
-                teamData[teamName].totalScore += score;
-                
-                if (teamData[teamName].gameScores[gameName]) {
-                    teamData[teamName].gameScores[gameName].detail = {
-                        score: score,
-                        originalScore: originalScores[teamName],
-                        penaltyReason: penaltyReasons[teamName],
-                        url: url,
-                        date: dateStr
+            Object.keys(currentScores).forEach(team => {
+                if (!teamData[team]) return;
+                const score = Number(currentScores[team]) || 0;
+                teamData[team].totalScore += score;
+                if (teamData[team].gameScores[gameName]) {
+                    teamData[team].gameScores[gameName].detail = {
+                        score: score, originalScore: originalScores[team], penaltyReason: penaltyReasons[team], url: url, date: dateStr
                     };
                 }
             });
         });
 
         // 3. 총점 기준 내림차순 정렬
-        const rankedTeams = Object.keys(teamData).map(teamName => ({
-            teamName: teamName,
-            ...teamData[teamName]
-        })).sort((a, b) => b.totalScore - a.totalScore);
+        const rankedTeams = Object.keys(teamData).map(name => ({ teamName: name, ...teamData[name] })).sort((a, b) => b.totalScore - a.totalScore);
 
-        // 4. HTML 조립
+        // 4. HTML 조립 (시즌 드롭다운 + 아코디언 테이블)
         let html = `
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 px-2 gap-3">
+                <select class="bg-slate-800 text-white font-black px-4 py-2.5 rounded-xl shadow-lg border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                    <option value="1">🏆 시즌 1 대항전</option>
+                    </select>
+                <div class="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+                    본선 <span class="text-indigo-600 font-black">${survivingGames.length}</span>종목 | 참가 <span class="text-indigo-600 font-black">${rankedTeams.length}</span>팀
+                </div>
+            </div>
+
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-sm text-center">
-                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-black">
-                            <tr>
-                                <th class="p-4 w-16 whitespace-nowrap">순위</th>
-                                <th class="p-4 text-left min-w-[120px] whitespace-nowrap">팀명</th>
-                                <th class="p-4 bg-indigo-50/50 text-indigo-700 whitespace-nowrap">🏆 종합 점수</th>
-                                ${survivingGames.map(g => `<th class="p-4 whitespace-nowrap text-[11px] md:text-sm">${g.game_name}</th>`).join('')}
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
+                <table class="w-full text-sm text-center border-collapse">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-black">
+                        <tr>
+                            <th class="py-4 px-2 w-16">순위</th>
+                            <th class="py-4 px-3 text-left">팀명</th>
+                            <th class="py-4 px-2 w-20 text-indigo-700">🏆 종합</th>
+                            <th class="py-4 px-2 w-16 text-slate-400 text-xs">상세</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
         `;
 
         if (rankedTeams.length === 0) {
-            html += `<tr><td colspan="${survivingGames.length + 3}" class="p-8 text-slate-400 font-bold">아직 엔트리 데이터가 없습니다.</td></tr>`;
-        }
-
-        rankedTeams.forEach((team, index) => {
-            let rankBadge = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}위`;
-            let rankClass = index < 3 ? 'text-lg' : 'text-slate-500 font-bold';
-
-            html += `<tr class="hover:bg-slate-50 transition-colors group">
-                        <td class="p-4 ${rankClass}">${rankBadge}</td>
-                        <td class="p-4 text-left font-black text-slate-800">${team.teamName}</td>
-                        <td class="p-4 font-black text-indigo-600 text-lg bg-indigo-50/30 group-hover:bg-indigo-100/50 transition-colors">${team.totalScore}점</td>`;
-
-            survivingGames.forEach(game => {
-                const gameData = team.gameScores[game.game_name];
+            html += `<tr><td colspan="4" class="p-8 text-slate-400 font-bold">아직 엔트리 데이터가 없습니다.</td></tr>`;
+        } else {
+            rankedTeams.forEach((team, index) => {
+                let rankBadge = index === 0 ? '<span class="text-2xl drop-shadow-sm">🥇</span>' : index === 1 ? '<span class="text-2xl drop-shadow-sm">🥈</span>' : index === 2 ? '<span class="text-2xl drop-shadow-sm">🥉</span>' : `<span class="bg-slate-100 text-slate-400 px-2 py-1 rounded-lg text-xs font-black">${index + 1}</span>`;
+                let rowBg = index === 0 ? 'bg-yellow-50/20' : 'hover:bg-slate-50';
                 
-                if (!gameData) {
-                    html += `<td class="p-4 text-slate-300 font-bold">-</td>`;
-                } else if (!gameData.detail) {
-                    html += `<td class="p-4 text-slate-400 font-bold"><span class="bg-slate-100 px-2 py-1 rounded text-xs">0점</span></td>`;
-                } else {
-                    const detail = gameData.detail;
-                    if (detail.penaltyReason) {
-                        const tooltipText = `${detail.penaltyReason} | ⏰ ${detail.date}`;
-                        html += `
-                            <td class="p-4 cell-penalty" data-tooltip="${tooltipText}">
-                                <a href="${detail.url}" target="_blank" class="block w-full h-full">
-                                    <span class="score-original">${detail.originalScore}</span>
-                                    <span class="text-red-500 font-black">${detail.score}점</span>
-                                </a>
-                            </td>`;
+                // 팀명에 공백 등이 있을 경우 ID 선택자에 오류가 없도록 안전한 문자열로 변환
+                const safeId = team.teamName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '') + '-' + index;
+
+                // 👑 4-1. 요약 행 (클릭 시 토글 발동)
+                html += `
+                    <tr class="${rowBg} transition-colors cursor-pointer group" onclick="Boako.Match.toggleScoreDetail('${safeId}')">
+                        <td class="py-4 px-2">${rankBadge}</td>
+                        <td class="py-4 px-3 text-left font-black text-slate-800 text-base group-hover:text-indigo-600 transition-colors">${team.teamName}</td>
+                        <td class="py-4 px-2">
+                            <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-black text-lg border border-indigo-100">${team.totalScore}</span>
+                        </td>
+                        <td class="py-4 px-2 text-slate-400">
+                            <div id="icon-${safeId}" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto transition-all duration-300 font-bold text-xs">
+                                ▼
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                // 📊 4-2. 상세 행 (기본 숨김 모드, Grid Layout으로 예쁘게 렌더링)
+                html += `
+                    <tr id="detail-${safeId}" class="hidden bg-slate-800 shadow-inner">
+                        <td colspan="4" class="p-0 border-t-2 border-indigo-500">
+                            <div class="p-4 md:p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                `;
+
+                survivingGames.forEach(game => {
+                    const gameData = team.gameScores[game.game_name];
+                    
+                    html += `<div class="bg-white rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden group/card hover:-translate-y-1 transition-transform">`;
+                    
+                    // 종목 로고 & 이름
+                    html += `
+                        <div class="flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
+                            <div class="w-8 h-8 shrink-0 bg-slate-50 rounded-lg p-1 border border-slate-100 flex justify-center items-center">
+                                ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="max-w-full max-h-full object-contain">` : `<span>🎲</span>`}
+                            </div>
+                            <span class="text-[11px] font-bold text-slate-600 truncate" title="${game.game_name}">${game.game_name}</span>
+                        </div>
+                    `;
+
+                    // 점수 및 상태 처리
+                    if (!gameData) {
+                        html += `<div class="text-center text-[11px] font-bold text-slate-300 py-1.5">- 미 출 전 -</div>`;
+                    } else if (!gameData.detail) {
+                        html += `<div class="text-center text-[11px] font-black bg-slate-100 text-slate-400 py-1.5 rounded-lg">대기 중 (0점)</div>`;
                     } else {
-                        html += `
-                            <td class="p-4 font-bold text-slate-700 hover:bg-indigo-50 transition-colors rounded-lg cursor-pointer">
-                                <a href="${detail.url}" target="_blank" class="block w-full h-full text-indigo-600 hover:text-indigo-800" title="⏰ 진행: ${detail.date} (클릭 시 기록 확인)">
-                                    ${detail.score > 0 ? detail.score + '점' : '0점'}
+                        const detail = gameData.detail;
+                        if (detail.penaltyReason) {
+                            // 페널티 UI
+                            html += `
+                                <a href="${detail.url}" target="_blank" class="block text-center cell-penalty cursor-pointer" data-tooltip="${detail.penaltyReason} | ${detail.date}">
+                                    <div class="bg-red-50 text-red-600 border border-red-200 rounded-lg py-1 flex items-center justify-center gap-1.5 hover:bg-red-100 transition-colors">
+                                        <span class="score-original !mr-0">${detail.originalScore}</span>
+                                        <span class="font-black text-sm">${detail.score}점</span>
+                                    </div>
                                 </a>
-                            </td>`;
+                            `;
+                        } else {
+                            // 정상 점수 UI (클릭 시 BGA 이동)
+                            const isZero = detail.score === 0;
+                            const scoreClass = isZero ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100";
+                            html += `
+                                <a href="${detail.url}" target="_blank" title="진행: ${detail.date} (클릭 시 BGA 기록 확인)" class="block text-center ${scoreClass} border rounded-lg py-1 font-black text-sm transition-colors">
+                                    ${detail.score}점
+                                </a>
+                            `;
+                        }
                     }
-                }
+                    html += `</div>`;
+                });
+
+                html += `
+                            </div>
+                        </td>
+                    </tr>
+                `;
             });
-
-            html += `</tr>`;
-        });
-
+        }
+        
         html += `       </tbody>
                     </table>
                 </div>
-            </div>
         `;
         content.innerHTML = html;
     },
