@@ -9,9 +9,15 @@ Boako.Archive = {
     gameRankings: [], 
     currentTab: 'records',
     
-    // 🌟 [서버 페이징용 독립형 상태 장부]
+    // 🌟 서버 페이징용 독립형 상태 장부
     currentPage: 1,
     totalCount: 0,
+
+    // 🌟 커스텀 필터 상태 관리용 변수
+    currentSeasonFilter: 'all',
+    currentRoundFilter: 'all',
+    availableSeasons: [],
+    availableRounds: [],
     
     // 🎯 탭별로 완벽하게 최적화된 페이지당 사출 개수 정의
     getLimit: function() {
@@ -35,14 +41,14 @@ Boako.Archive = {
                         </div>
                         <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Team League</h1>
                     </div>
-                    <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1">
-                        <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap">
+                    <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1 overflow-x-auto max-w-full">
+                        <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap shrink-0">
                             <i data-lucide="history" class="w-4 h-4"></i> 기록실
                         </button>
-                        <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
+                        <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
                             <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
                         </button>
-                        <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap">
+                        <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
                             <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
                         </button>
                     </div>
@@ -54,19 +60,9 @@ Boako.Archive = {
                         <p id="archive-page-desc" class="text-slate-400 mt-2 font-medium text-sm">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
                         <p id="archive-page-subdesc" class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )</p>
                     </div>
-                    <div class="flex gap-2">
-                        <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
-                            <i data-lucide="calendar" class="text-indigo-500 w-4 h-4"></i>
-                            <select id="archive-season" onchange="Boako.Archive.filterData()" class="bg-transparent border-none text-xs font-black outline-none cursor-pointer">
-                                <option value="all">전체 시즌</option>
-                            </select>
-                        </div>
-                        <div id="round-filter-wrapper" class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
-                            <i data-lucide="layers" class="text-indigo-500 w-4 h-4"></i>
-                            <select id="archive-round" onchange="Boako.Archive.filterData()" class="bg-transparent border-none text-xs font-black outline-none cursor-pointer">
-                                <option value="all">전체 라운드</option>
-                            </select>
-                        </div>
+                    <div class="flex gap-2 relative z-30">
+                        <div id="season-filter-container" class="relative w-[130px]"></div>
+                        <div id="round-filter-wrapper" class="relative w-[130px]"></div>
                     </div>
                 </div>
 
@@ -113,14 +109,96 @@ Boako.Archive = {
         }
     },
 
+    // 🌟 커스텀 드롭다운 열기/닫기
+    toggleDropdown: function(type) {
+        const menu = document.getElementById(`archive-${type}-menu`);
+        const overlay = document.getElementById(`archive-${type}-overlay`);
+        if (menu && overlay) {
+            menu.classList.toggle('hidden');
+            overlay.classList.toggle('hidden');
+        }
+    },
+
+    // 🌟 드롭다운 항목 선택 처리
+    selectFilter: function(type, val) {
+        this.toggleDropdown(type);
+        if (type === 'season') {
+            this.currentSeasonFilter = val;
+            this.renderSeasonDropdown();
+        } else {
+            this.currentRoundFilter = val;
+            this.renderRoundDropdown();
+        }
+        this.filterData(); // 선택 즉시 데이터 갱신
+    },
+
+    updateSeasonOptions: function(records) {
+        const seasons = [...new Set(records.map(rec => rec.season_no).filter(Boolean))];
+        seasons.sort((a, b) => a - b);
+        this.availableSeasons = seasons;
+        this.renderSeasonDropdown();
+    },
+
+    renderSeasonDropdown: function() {
+        const container = document.getElementById('season-filter-container');
+        if (!container) return;
+        
+        const currentText = this.currentSeasonFilter === 'all' ? '전체 시즌' : `시즌 ${this.currentSeasonFilter}`;
+        
+        container.innerHTML = `
+            <button onclick="Boako.Archive.toggleDropdown('season')" class="w-full bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                <div class="flex items-center gap-2"><i data-lucide="calendar" class="text-indigo-500 w-4 h-4"></i> <span>${currentText}</span></div>
+                <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+            </button>
+            <div id="archive-season-overlay" onclick="Boako.Archive.toggleDropdown('season')" class="hidden fixed inset-0 z-40"></div>
+            <div id="archive-season-menu" class="hidden absolute top-full left-0 mt-2 w-full bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div onclick="Boako.Archive.selectFilter('season', 'all')" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentSeasonFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">전체 시즌</div>
+                ${this.availableSeasons.map(s => `
+                    <div onclick="Boako.Archive.selectFilter('season', ${s})" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentSeasonFilter === s ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">시즌 ${s}</div>
+                `).join('')}
+            </div>
+        `;
+        if(window.lucide) lucide.createIcons();
+    },
+
+    updateRoundOptions: function(records) {
+        const rounds = [...new Set(records.map(rec => rec.round_no).filter(Boolean))];
+        rounds.sort((a, b) => a - b);
+        this.availableRounds = rounds;
+        this.renderRoundDropdown();
+    },
+
+    renderRoundDropdown: function() {
+        const container = document.getElementById('round-filter-wrapper');
+        if (!container) return;
+        
+        const currentText = this.currentRoundFilter === 'all' ? '전체 라운드' : `${this.currentRoundFilter} 라운드`;
+        
+        container.innerHTML = `
+            <button onclick="Boako.Archive.toggleDropdown('round')" class="w-full bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                <div class="flex items-center gap-2"><i data-lucide="layers" class="text-indigo-500 w-4 h-4"></i> <span>${currentText}</span></div>
+                <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+            </button>
+            <div id="archive-round-overlay" onclick="Boako.Archive.toggleDropdown('round')" class="hidden fixed inset-0 z-40"></div>
+            <div id="archive-round-menu" class="hidden absolute top-full left-0 mt-2 w-full bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div onclick="Boako.Archive.selectFilter('round', 'all')" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentRoundFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">전체 라운드</div>
+                ${this.availableRounds.map(r => `
+                    <div onclick="Boako.Archive.selectFilter('round', ${r})" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentRoundFilter === r ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">${r} 라운드</div>
+                `).join('')}
+            </div>
+        `;
+        if(window.lucide) lucide.createIcons();
+    },
+
     // 🌟 [페이징 & 서치 통합 코어 엔진]
     fetchAndRender: async function() {
         const area = document.getElementById('archive-content-area');
         if (area) area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">데이터 요청 중...</div>`;
 
         const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
-        const seasonVal = document.getElementById('archive-season')?.value || 'all';
-        const roundVal = document.getElementById('archive-round')?.value || 'all';
+        // 🌟 커스텀 상태 변수에서 필터값 읽기
+        const seasonVal = this.currentSeasonFilter;
+        const roundVal = this.currentRoundFilter;
         const limit = this.getLimit();
 
         const from = (this.currentPage - 1) * limit;
@@ -195,8 +273,8 @@ Boako.Archive = {
         this.currentTab = tabName;
         this.currentPage = 1;
         
-        const activeClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap';
-        const inactiveClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap';
+        const activeClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap shrink-0';
+        const inactiveClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0';
         
         document.getElementById('tab-records').className = tabName === 'records' ? activeClass : inactiveClass;
         document.getElementById('tab-rankings').className = tabName === 'rankings' ? activeClass : inactiveClass;
@@ -211,12 +289,12 @@ Boako.Archive = {
             titleEl.innerText = '시즌 경기 기록실';
             descEl.innerText = '시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.';
             if (subDescEl) subDescEl.style.display = 'block';
-            if (roundFilter) roundFilter.style.display = 'flex';
+            if (roundFilter) roundFilter.style.display = 'block';
         } else if (tabName === 'rankings') {
             titleEl.innerText = '리그 개인 순위표';
             descEl.innerText = '누적 RP 기준 전체 유저들의 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
-            if (roundFilter) roundFilter.style.display = 'flex';
+            if (roundFilter) roundFilter.style.display = 'block';
         } else if (tabName === 'games') {
             titleEl.innerText = '시즌 대세 게임 & 게임별 순위';
             descEl.innerText = '가장 핫한 보드게임 종목 순위와 게임별 모든 유저의 기록 순위입니다.';
@@ -248,36 +326,6 @@ Boako.Archive = {
         const mi = String(d.getMinutes()).padStart(2, '0');
         return `${mo}.${da} ${mo === 'all' ? '' : ho}:${mi}`;
     },
-
-    updateSeasonOptions: function(records) {
-        const seasonSelect = document.getElementById('archive-season');
-        if (!seasonSelect) return;
-
-        const seasons = [...new Set(records.map(rec => rec.season_no).filter(Boolean))];
-        seasons.sort((a, b) => a - b);
-        const maxSeason = seasons.length > 0 ? seasons[seasons.length - 1] : null;
-
-        let optionsHTML = `<option value="all">전체 시즌</option>`;
-        seasons.forEach(s => {
-            const isSelected = s === maxSeason ? 'selected' : '';
-            optionsHTML += `<option value="${s}" ${isSelected}>시즌 ${s}</option>`;
-        });
-        seasonSelect.innerHTML = optionsHTML;
-    }, 
-
-    updateRoundOptions: function(records) {
-        const roundSelect = document.getElementById('archive-round');
-        if (!roundSelect) return;
-
-        const rounds = [...new Set(records.map(rec => rec.round_no).filter(Boolean))];
-        rounds.sort((a, b) => a - b);
-
-        let optionsHTML = `<option value="all">전체 라운드</option>`;
-        rounds.forEach(r => {
-            optionsHTML += `<option value="${r}">${r} 라운드</option>`;
-        });
-        roundSelect.innerHTML = optionsHTML;
-    }, 
 
     // 5. 기록실 테이블 렌더링
     renderRecords: function() {
