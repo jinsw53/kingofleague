@@ -330,7 +330,8 @@ Boako.League.loadBingoBoardData = async function() {
 };
 
 // ====================================================================
-// 🖼️ [점령 뽕맛 극대화 & 스마트 툴팁] 점령 시 확실하게 가리고, 마우스 오버 시 정보 제공
+// 🖼️ [점령 뽕맛 극대화 & 글로벌 탈옥 툴팁] 
+// 빙고판의 overflow 제약을 뚫고 브라우저 최상단에 정보 제공
 // ====================================================================
 Boako.League.renderBingoBoard = function() {
     const grid = document.getElementById('bingo-grid');
@@ -340,6 +341,19 @@ Boako.League.renderBingoBoard = function() {
     const winCells = Boako.League.calculateWinningCells();
     const myTeamName = Boako.state.team?.info?.team_name;
     const difficulties = Boako.League.State.missionDifficulties || Array(25).fill("EASY");
+
+    // 🌟 [프로모드 핵심] 빙고판의 CSS 종속성을 완벽히 탈옥하는 단일 글로벌 툴팁 생성
+    let globalTooltip = document.getElementById('btl-global-tooltip');
+    if (!globalTooltip) {
+        globalTooltip = document.createElement('div');
+        globalTooltip.id = 'btl-global-tooltip';
+        // z-[99999] 부여 및 포인터 간섭 완벽 차단
+        globalTooltip.className = 'fixed w-48 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[99999] pointer-events-none flex flex-col items-center justify-center transition-opacity duration-200';
+        globalTooltip.style.display = 'none';
+        globalTooltip.style.opacity = '0';
+        globalTooltip.style.transform = 'translate(-50%, -100%)';
+        document.body.appendChild(globalTooltip); // 🚀 body 직속으로 빼내서 잘림 원천 봉쇄!
+    }
     
     Boako.League.State.bingoBoard.forEach((ownerTeam, idx) => {
         const cell = document.createElement('div');
@@ -349,7 +363,7 @@ Boako.League.renderBingoBoard = function() {
         const gameName = Boako.League.State.boardGames25[idx] || "지정 미정";
         const gameLogoUrl = Boako.League.State.boardLogos25[idx];
         
-        // 🌟 배경색 및 테두리 처리
+        // 🌟 배경색 및 테두리 (Stacking Context 유발자들)
         let bgClass = "bg-slate-50 border-slate-200/60";
         if (ownerTeam) {
             if (isMyTeam) {
@@ -368,11 +382,9 @@ Boako.League.renderBingoBoard = function() {
             bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
         }
 
-        // 🎯 툴팁 이벤트를 받기 위해 data-handler 추가
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group cursor-pointer ${bgClass}`;
-        cell.setAttribute('data-handler', 'bingo-tooltip');
         
-        // 🎲 1. 게임 로고 (배경으로 희미하게 깔아둠)
+        // 🎲 1. 게임 로고 (내부 요소 마우스 간섭 방지용 pointer-events-none 추가)
         const gameLogoOpacity = ownerTeam ? "opacity-20 grayscale transition-all duration-300 group-hover:opacity-10" : "opacity-100 drop-shadow-md";
         const gameImageHtml = gameLogoUrl 
             ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-3">
@@ -380,61 +392,80 @@ Boako.League.renderBingoBoard = function() {
                </div>`
             : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
 
-        // 🛡️ 2. 점령 팀 거대 오버레이 (🎯 뽕맛 복구: 크고 아름답게 가려버림!)
+        // 🛡️ 2. 점령 팀 거대 오버레이 (마찬가지로 pointer-events-none 추가)
         let massiveOverlayHtml = '';
         if (ownerTeam) {
             const teamLogoUrl = Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
             massiveOverlayHtml = `
-                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-3">
+                <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-3 pointer-events-none">
                     <img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-12 h-12 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300">
                     <span class="mt-0.5 px-2 py-0.5 bg-slate-900/90 text-white text-[9px] font-black rounded-md shadow-sm backdrop-blur-md">${ownerTeam}</span>
                 </div>
             `;
         }
 
-        // 🎯 3. 배지 및 왕관
+        // 🎯 3. 배지 및 왕관 (pointer-events-none)
         let diffBadgeHtml = '';
         if (diffStatus === 'HARD_CENTER_PENALTY') {
-            diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[7px] px-1.5 py-0.5 rounded shadow-sm">🔥 CENTER</span>`;
+            diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[7px] px-1.5 py-0.5 rounded shadow-sm pointer-events-none">🔥 CENTER</span>`;
         } else {
             const diffColors = { EASY: "bg-emerald-500/90 text-white", NORMAL: "bg-blue-500/90 text-white", HARD: "bg-rose-500/90 text-white" };
-            diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm">${diffStatus}</span>`;
+            diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm pointer-events-none">${diffStatus}</span>`;
         }
-        const crownHtml = isWinner ? `<span class="absolute top-1 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-12' : 'right-8'} text-xs text-amber-400 animate-bounce z-30">👑</span>` : '';
+        const crownHtml = isWinner ? `<span class="absolute top-1 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-12' : 'right-8'} text-xs text-amber-400 animate-bounce z-30 pointer-events-none">👑</span>` : '';
         
-        // 📝 4. 하단 게임 종목 라벨
+        // 📝 4. 하단 게임 종목 라벨 (pointer-events-none)
         const gameLabelHtml = `
-            <div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30">
+            <div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30 pointer-events-none">
                 <div class="w-full px-1 bg-white/90 backdrop-blur-md py-0.5 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[18px]">
                     <span class="text-[8px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${gameName}</span>
                 </div>
             </div>
         `;
 
-        // 💡 5. 절대 안 잘리는 좌표 추적형 최상단 툴팁
-        const tooltipHtml = `
-            <div class="fixed mb-2 w-48 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[9999] pointer-events-none flex flex-col items-center justify-center transition-opacity duration-200"
-                 style="display: none; opacity: 0; transform: translate(-50%, -100%); top: var(--bingo-top, auto); left: var(--bingo-left, auto);">
-                ${gameLogoUrl ? `<img src="${gameLogoUrl}" class="w-20 h-20 object-contain mb-3 drop-shadow-md" alt="Game Logo">` : `<div class="text-4xl mb-2">🎲</div>`}
-                <div class="text-xs font-black text-slate-800 text-center w-full break-keep">${gameName}</div>
-                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"></div>
-            </div>
-        `;
-        
-        // HTML 조립
+        // HTML 조립 (더 이상 칸 내부에 툴팁 HTML을 생성하지 않음!)
         cell.innerHTML = `
             ${gameImageHtml}
             ${massiveOverlayHtml}
             ${diffBadgeHtml}
             ${crownHtml}
             ${gameLabelHtml}
-            ${tooltipHtml}
         `;
+
+        // 🚀 [해결의 핵심] 셀 자체에 마우스 이벤트를 직결하고 글로벌 툴팁 컨트롤
+        cell.addEventListener('mouseenter', () => {
+            // 해당 칸의 정보로 글로벌 툴팁 콘텐츠 갈아끼우기
+            globalTooltip.innerHTML = `
+                ${gameLogoUrl ? `<img src="${gameLogoUrl}" class="w-20 h-20 object-contain mb-3 drop-shadow-md" alt="Game Logo">` : `<div class="text-4xl mb-2">🎲</div>`}
+                <div class="text-xs font-black text-slate-800 text-center w-full break-keep">${gameName}</div>
+                <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"></div>
+            `;
+            globalTooltip.style.display = 'flex';
+            // 리페인팅 후 투명도 적용
+            setTimeout(() => { globalTooltip.style.opacity = '1'; }, 10);
+        });
+
+        cell.addEventListener('mousemove', (e) => {
+            // 마우스 커서 위로 일정 간격을 두고 추적
+            globalTooltip.style.top = `${e.clientY - 15}px`;
+            globalTooltip.style.left = `${e.clientX}px`;
+        });
+
+        cell.addEventListener('mouseleave', () => {
+            globalTooltip.style.opacity = '0';
+            // 페이드아웃 애니메이션 대기 후 display none
+            setTimeout(() => {
+                if (globalTooltip.style.opacity === '0') {
+                    globalTooltip.style.display = 'none';
+                }
+            }, 200);
+        });
         
         grid.appendChild(cell);
     });
 
     Boako.League.updateStats();
+};
 
     // 🎯 [툴팁 이벤트 매핑] 마우스 움직임에 따라 절대 좌표 갱신 (부모 요소의 overflow-hidden 무시)
     grid.querySelectorAll('[data-handler="bingo-tooltip"]').forEach(handler => {
