@@ -148,59 +148,48 @@ Boako.League.switchTab = async function(tabId) {
 // 💡 2. 챌린지 데이터 동기화 (에러 안 나는 완결본)
 Boako.League.initChallengeData = async function() {
     try {
-        if (!Boako.db) throw new Error("Supabase 서버 연결 실패");
+        if (!Boako.db) throw new Error("Supabase 연결 실패");
 
-        // 게임 목록 가져오기 (이미지 별칭 포함)
-        const { data: games, error: gameErr } = await Boako.db.from('games').select('game_name, game_logo_url:image_url');
-        if (gameErr) throw gameErr;
+        // 1. 종목 데이터 (image_url -> game_logo_url 매핑)
+        const { data: games } = await Boako.db.from('games').select('game_name, game_logo_url:image_url');
         Boako.League.State.availableGames = games || [];
 
-        const now = new Date().toISOString(); // 현재 KST 시간 기준
+        const now = new Date().toISOString(); 
 
-        // 1. 현재 진행 중인 시즌 단건 조회 (시작일이 지났고 종료일이 안 지난 것)
+        // 2. 현재 시즌 조회 (시작일이 오늘 이전, 종료일이 오늘 이후)
         const { data: currentSeason } = await Boako.db.from('seasons')
             .select('season_no, title')
             .lte('start_date', now)
             .gte('end_date', now)
             .single();
 
-        // 2. 챌린지 테이블에 기록이 있는 과거 시즌 번호들만 추출
+        // 3. 챌린지 기록이 있는 시즌 번호만 추출 (과거 시즌 필터링)
         const { data: pastChallenges } = await Boako.db.from('challenges').select('season_no');
         const activeSeasonNos = [...new Set((pastChallenges || []).map(c => c.season_no))];
 
-        // 3. 시작일이 미래인 시즌을 '제외한' 모든 시즌 조회 (미래 시즌 차단)
+        // 4. 미래 시즌 차단하여 모든 유효 시즌 조회
         const { data: allValidSeasons } = await Boako.db.from('seasons')
             .select('season_no, title')
             .lte('start_date', now) 
             .order('season_no', { ascending: false });
 
-        // 4. 현재 시즌 무조건 포함 + 과거 시즌은 챌린지 기록이 있는 것만 남기기
-        let filteredSeasons = [];
-        if (allValidSeasons) {
-            filteredSeasons = allValidSeasons.filter(s => 
-                (currentSeason && s.season_no === currentSeason.season_no) || 
-                activeSeasonNos.includes(s.season_no)
-            );
-        }
+        // 5. 현재 시즌 포함 + 기록 있는 과거 시즌만 필터링
+        Boako.League.State.challengeSeasons = (allValidSeasons || []).filter(s => 
+            (currentSeason && s.season_no === currentSeason.season_no) || 
+            activeSeasonNos.includes(s.season_no)
+        );
 
-        // 상태값 업데이트
-        Boako.League.State.challengeSeasons = filteredSeasons;
-        Boako.League.State.currentActiveSeason = currentSeason ? currentSeason.title : "현재 진행 중인 시즌 없음";
-        Boako.League.State.selectedChallengeSeason = currentSeason ? currentSeason.season_no : (filteredSeasons[0]?.season_no || 1);
+        Boako.League.State.selectedChallengeSeason = currentSeason ? currentSeason.season_no : (Boako.League.State.challengeSeasons[0]?.season_no || 1);
 
-        // 해당 시즌 데이터 로드
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         
-        // 화면 렌더링
         const container = document.getElementById('league-view-container');
         if (container) {
             container.innerHTML = Boako.League.getChallengeHTML();
             Boako.League.renderChallenges();
         }
-
-    // 👇 아까 실수로 날아갔던 catch 부분이 여기 있습니다.
     } catch (e) {
-        console.error("도전장 데이터 초기화 실패:", e);
+        console.error("초기화 실패:", e);
         Boako.League.renderErrorUI();
     }
 };
