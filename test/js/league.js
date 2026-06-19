@@ -150,7 +150,7 @@ Boako.League.initChallengeData = async function() {
         if (!Boako.db) throw new Error("Supabase 서버 연결 실패");
 
         // 1. 공식 종목 리스트 및 로고 가져오기
-        const { data: games, error: gameErr } = await Boako.db.from('games').select('game_name, game_logo_url');
+        const { data: games, error: gameErr } = await Boako.db.from('games').select('game_name, image_url as game_logo_url');
         if (gameErr) throw gameErr;
         Boako.League.State.availableGames = games || [];
 
