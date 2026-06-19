@@ -154,21 +154,40 @@ Boako.League.initChallengeData = async function() {
         if (gameErr) throw gameErr;
         Boako.League.State.availableGames = games || [];
 
-        // 2. 전체 시즌 목록 가져오기 (필터링 드롭다운용, 최신순)
-        const { data: allSeasons, error: allSeasonsErr } = await Boako.db.from('seasons').select('season_no, title').order('season_no', { ascending: false });
-        if (allSeasonsErr) throw allSeasonsErr;
-        Boako.League.State.challengeSeasons = allSeasons || [];
+       const now = new Date().toISOString(); // 현재 KST 시간 기준
 
-        // 3. 현재 진행 중인 시즌 번호 찾기 (기본 선택값)
-        const now = new Date().toISOString(); 
-        const { data: currentSeason, error: currentSeasonErr } = await Boako.db.from('seasons').select('season_no').lte('start_date', now).gte('end_date', now).single();
+        // 1. 현재 진행 중인 시즌 단건 조회 (시작일이 지났고 종료일이 안 지난 것)
+        const { data: currentSeason } = await Boako.db.from('seasons')
+            .select('season_no, title')
+            .lte('start_date', now)
+            .gte('end_date', now)
+            .single();
+
+        // 2. 챌린지 테이블에 기록이 있는 과거 시즌 번호들만 추출
+        const { data: pastChallenges } = await Boako.db.from('challenges').select('season_no');
+        const activeSeasonNos = [...new Set((pastChallenges || []).map(c => c.season_no))];
+
+        // 3. 시작일이 미래인 시즌을 '제외한' 모든 시즌 조회
+        const { data: allValidSeasons } = await Boako.db.from('seasons')
+            .select('season_no, title')
+            .lte('start_date', now) // 미래 시즌 원천 차단
+            .order('season_no', { ascending: false });
+
+        // 4. 현재 시즌 무조건 포함 + 과거 시즌은 챌린지 기록이 있는 것만 남기기
+        let filteredSeasons = [];
+        if (allValidSeasons) {
+            filteredSeasons = allValidSeasons.filter(s => 
+                (currentSeason && s.season_no === currentSeason.season_no) || 
+                activeSeasonNos.includes(s.season_no)
+            );
+        }
+
+        // 상태값 업데이트
+        Boako.League.State.challengeSeasons = filteredSeasons;
+        Boako.League.State.currentActiveSeason = currentSeason ? currentSeason.title : "현재 진행 중인 시즌 없음";
         
-        if (currentSeasonErr && currentSeasonErr.code !== 'PGRST116') throw currentSeasonErr;
-
-        if (currentSeason) {
-            Boako.League.State.selectedChallengeSeason = currentSeason.season_no;
-        } else if (Boako.League.State.challengeSeasons.length > 0) {
-            Boako.League.State.selectedChallengeSeason = Boako.League.State.challengeSeasons[0].season_no;
+        // 드롭다운 기본값은 '현재 시즌', 없으면 '가장 최근의 유효 시즌'
+        Boako.League.State.selectedChallengeSeason = currentSeason ? currentSeason.season_no : (filteredSeasons[0]?.season_no || 1);
         }
 
         // 4. 선택된 시즌의 챌린지 목록 가져오기
@@ -251,7 +270,10 @@ Boako.League.selectChallengeOpt = function(gameName, logoUrl) {
 
 Boako.League.getChallengeHTML = function() {
     const p = Boako.League.State.challengeParams;
-    const isTeamLeader = Boako.state?.team?.info?.is_leader === true; 
+    // 현재 로그인한 유저의 닉네임과 팀 멤버 목록의 role을 직접 대조합니다.
+const myName = Boako.state?.user?.full_name; // 접속 유저 닉네임 (경로 확인 필요)
+const myMemberInfo = Boako.state?.team?.members?.find(m => m.player_name === myName);
+const isTeamLeader = myMemberInfo ? (myMemberInfo.role === 'LEADER') : false; 
     
     const gameOptionsHtml = Boako.League.State.availableGames.length > 0 
         ? Boako.League.State.availableGames.map(g => `
