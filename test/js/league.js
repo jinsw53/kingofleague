@@ -144,12 +144,25 @@ Boako.League.initChallengeData = async function() {
             Boako.League.State.currentActiveSeason = "2026 윈터 정규리그";
         } else {
             // 1. 공식 종목 리스트 가져오기
-            const { data: games } = await Boako.db.from('board_games').select('game_name');
+            const { data: games } = await Boako.db.from('games').select('game_name');
             if (games) Boako.League.State.availableGames = games.map(g => g.game_name);
 
-            // 2. 현재 진행 중인 시즌 가져오기
-            const { data: season } = await Boako.db.from('league_seasons').select('season_name').eq('is_active', true).single();
-            if (season) Boako.League.State.currentActiveSeason = season.season_name;
+            // 2. 현재 날짜를 기준으로 진행 중인 시즌 가져오기
+            // '2026-06-19'와 같이 오늘 날짜를 기준으로 start_date <= 오늘 <= end_date 조건 적용
+            const today = new Date().toISOString().split('T')[0]; 
+
+            const { data: season, error } = await Boako.db
+                .from('seasons')
+                .select('season_name')
+                .lte('start_date', today) // 시작일이 오늘보다 작거나 같고
+                .gte('end_date', today)   // 종료일이 오늘보다 크거나 같음
+                .single();
+
+            if (season) {
+                Boako.League.State.currentActiveSeason = season.season_name;
+            } else {
+                Boako.League.State.currentActiveSeason = "현재 진행 중인 시즌이 없습니다.";
+            }
         }
 
         const container = document.getElementById('league-view-container');
