@@ -138,40 +138,61 @@ Boako.League.switchTab = async function(tabId) {
 // ====================================================================
 Boako.League.initChallengeData = async function() {
     try {
+        // DB 객체 자체가 없거나 연결이 불가능한 상태 체크
         if (!Boako.db) {
-            console.warn("Supabase 미연결: 목업 데이터 사용");
-            Boako.League.State.availableGames = ["스플렌더", "아크 노바", "윙스팬", "쿼리도", "카탄의 개척자"];
-            Boako.League.State.currentActiveSeason = "2026 윈터 정규리그";
-        } else {
-            // 1. 공식 종목 리스트 가져오기
-            const { data: games } = await Boako.db.from('games').select('game_name');
-            if (games) Boako.League.State.availableGames = games.map(g => g.game_name);
-
-            // 2. 현재 날짜를 기준으로 진행 중인 시즌 가져오기
-            // '2026-06-19'와 같이 오늘 날짜를 기준으로 start_date <= 오늘 <= end_date 조건 적용
-            const today = new Date().toISOString().split('T')[0]; 
-
-            const { data: season, error } = await Boako.db
-                .from('seasons')
-                .select('season_name')
-                .lte('start_date', today) // 시작일이 오늘보다 작거나 같고
-                .gte('end_date', today)   // 종료일이 오늘보다 크거나 같음
-                .single();
-
-            if (season) {
-                Boako.League.State.currentActiveSeason = season.season_name;
-            } else {
-                Boako.League.State.currentActiveSeason = "현재 진행 중인 시즌이 없습니다.";
-            }
+            throw new Error("Supabase 서버 연결 실패");
         }
 
+        // 1. 공식 종목 리스트 가져오기
+        const { data: games, error: gameErr } = await Boako.db.from('games').select('game_name');
+        if (gameErr) throw gameErr;
+        Boako.League.State.availableGames = games.map(g => g.game_name);
+
+        // 2. 현재 진행 중인 시즌 가져오기
+        const now = new Date().toISOString(); 
+        const { data: season, error: seasonErr } = await Boako.db
+            .from('seasons')
+            .select('title')
+            .lte('start_date', now)
+            .gte('end_date', now)
+            .single();
+        
+        // 데이터가 없으면 비시즌 처리, 에러 발생 시 throw
+        if (seasonErr && seasonErr.code !== 'PGRST116') throw seasonErr; // PGRST116은 데이터 없음 에러
+        
+        Boako.League.State.currentActiveSeason = season ? season.title : "현재 진행 중인 시즌이 없습니다.";
+
+        // 성공 시 화면 렌더링
         const container = document.getElementById('league-view-container');
         if (container && Boako.League.State.currentTab === 'challenge') {
             container.innerHTML = Boako.League.getChallengeHTML();
             Boako.League.renderChallenges();
         }
+
     } catch (err) {
         console.error("도전장 데이터 초기화 실패:", err);
+        
+        // 실패 시 상태값 초기화
+        Boako.League.State.availableGames = [];
+        Boako.League.State.currentActiveSeason = null;
+
+        // UI에 에러 상태 노출
+        const container = document.getElementById('league-view-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-20 text-center">
+                    <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mb-4">
+                        <i data-lucide="alert-triangle" class="w-8 h-8 text-rose-500"></i>
+                    </div>
+                    <h3 class="font-black text-slate-800 text-lg mb-2">서버 연결 오류</h3>
+                    <p class="text-sm text-slate-500 font-bold">현재 서버 연결에 문제가 발생했습니다.<br>잠시 후 다시 시도해 주세요.</p>
+                    <button onclick="Boako.League.initChallengeData()" class="mt-6 bg-slate-800 text-white font-black text-xs px-6 py-3 rounded-xl hover:bg-slate-900 transition-all">
+                        재연결 시도
+                    </button>
+                </div>
+            `;
+            if (window.lucide) window.lucide.createIcons();
+        }
     }
 };
 
