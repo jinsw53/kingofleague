@@ -259,10 +259,9 @@ Boako.League.selectChallengeOpt = function(gameName, logoUrl) {
 
 Boako.League.getChallengeHTML = function() {
     const p = Boako.League.State.challengeParams;
-    // 현재 로그인한 유저의 닉네임과 팀 멤버 목록의 role을 직접 대조합니다.
-const myName = Boako.state?.user?.full_name; // 접속 유저 닉네임 (경로 확인 필요)
-const myMemberInfo = Boako.state?.team?.members?.find(m => m.player_name === myName);
-const isTeamLeader = myMemberInfo ? (myMemberInfo.role === 'LEADER') : false; 
+    
+    // 💡 핵심 권한 판별: Boako.state.team.type이 'LEADER'일 때만 발행 가능
+    const isTeamLeader = (Boako.state.team?.type === 'LEADER');
     
     const gameOptionsHtml = Boako.League.State.availableGames.length > 0 
         ? Boako.League.State.availableGames.map(g => `
@@ -281,6 +280,7 @@ const isTeamLeader = myMemberInfo ? (myMemberInfo.role === 'LEADER') : false;
         </div>
     `).join('');
 
+    // 팀장 권한에 따라 폼(createFormHtml)을 동적으로 생성
     const createFormHtml = isTeamLeader ? `
         <div class="space-y-4 text-xs font-bold text-slate-600 relative">
             <div class="relative z-30">
