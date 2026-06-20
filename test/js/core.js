@@ -12,9 +12,18 @@ window.Boako = {
     config: {
         url: 'https://qrredwrxdnvqwdxzanba.supabase.co',
         key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY'
+    },
+// 💡 [추가] 전역 권한 검증 메서드
+    // 시스템 어디서든 Boako.isMyTeamLeader() 로 호출하여 즉시 확인
+    isMyTeamLeader: function() {
+        if (!this.state.user?.full_name || !this.state.team?.members) {
+            return false;
+        }
+        const myName = this.state.user.full_name;
+        const myInfo = this.state.team.members.find(m => m.player_name === myName);
+        return myInfo?.role === 'LEADER';
     }
 };
-
 // ==============================================================================
 // 👑 [BOAKO MEGA ARCHITECTURE - 미래 확장 기능 호적 선언부]
 // ==============================================================================
