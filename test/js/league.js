@@ -303,13 +303,26 @@ Boako.League.renderSelectedGames = function() {
     const searchInput = document.getElementById('game-search-input');
     if(!container) return;
 
-    container.innerHTML = Boako.League.State.selectedProposedGames.map((g, idx) => `
-        <div class="flex items-center gap-1.5 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-lg shadow-sm">
-            <img src="${g.logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" class="w-5 h-5 rounded object-contain" />
-            <span class="text-[10px] font-black text-violet-800">${g.name}</span>
-            <button type="button" class="text-violet-400 hover:text-red-500 font-black ml-1.5 outline-none" onclick="Boako.League.removeProposedGame(${idx})">✕</button>
+    container.innerHTML = Boako.League.State.selectedProposedGames.map((g, idx) => {
+        const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+        return `
+        <div class="flex items-center justify-between bg-violet-50 border border-violet-200 px-3 py-2 rounded-lg shadow-sm mb-1.5">
+            <div class="flex items-center gap-2">
+                <img src="${safeLogo}" class="w-5 h-5 rounded object-contain" />
+                <span class="text-xs font-black text-violet-800">${g.name}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- 🔥 빠졌던 방식(모드) 선택 드롭다운 복구 -->
+                <select class="bg-white border border-violet-200 rounded text-[10px] p-1 font-bold text-violet-700 outline-none cursor-pointer shadow-sm" onchange="Boako.League.State.selectedProposedGames[${idx}].mode = this.value">
+                    <option value="4v4" ${g.mode==='4v4'?'selected':''}>4v4</option>
+                    <option value="3v3" ${g.mode==='3v3'?'selected':''}>3v3</option>
+                    <option value="2v2" ${g.mode==='2v2'?'selected':''}>2v2</option>
+                    <option value="1v1" ${g.mode==='1v1'?'selected':''}>1v1</option>
+                </select>
+                <button type="button" class="text-violet-400 hover:text-red-500 font-black outline-none px-1" onclick="Boako.League.removeProposedGame(${idx})">✕</button>
+            </div>
         </div>
-    `).join('');
+    `}).join('');
 
     if (Boako.League.State.selectedProposedGames.length >= 3) {
         searchInput.placeholder = "최대 3개 선택 완료";
