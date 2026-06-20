@@ -1,4 +1,4 @@
-/*** 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 DB 완벽 연동)
+/*** 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목 완벽 연동)
  * 관리 책임자: 소장님 MASTER */
 
 Boako.League = Boako.League || {};
@@ -21,25 +21,16 @@ Boako.League.State = {
     currentBingoSeason: 'live',
     bingoSeasonOptions: [],
 
-    // [🌟 챌린지 DB 연동용 상태 추가]
+    // [🌟 챌린지 다중 종목 및 DB 연동용 상태]
     currentActiveSeason: null,
     availableGames: [], 
     challengeSeasons: [],
     selectedChallengeSeason: null,
     challenges: [],
     
-    challengeParams: {
-        game: '결투 종목을 선택하세요',
-        gameLogoUrl: '',
-        schedule: '',
-        message: '',
-        roster: [
-            { name: '', isMercenary: false },
-            { name: '', isMercenary: false },
-            { name: '', isMercenary: false },
-            { name: '', isMercenary: false }
-        ]
-    }
+    // 발행 시 선택된 종목들을 담을 배열 (최대 3개)
+    // 형태: [{name: '종목명', logo: 'url'}, ...]
+    selectedProposedGames: [] 
 };
 
 // 🌟 공용 커스텀 드롭다운 토글 함수
@@ -59,11 +50,9 @@ Boako.League.buildUI = function(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-   container.innerHTML = `
+    container.innerHTML = `
     <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
-        
         <div class="p-6 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50/50">
-            
             <div id="league-header-img-container" class="flex-1 w-full h-20 rounded-2xl overflow-hidden border border-slate-200/60 shadow-inner bg-slate-100 p-1.5 flex items-center justify-center">
                 <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: contain;">
             </div>
@@ -86,7 +75,7 @@ Boako.League.buildUI = function(containerId) {
 
         <div id="league-view-container" class="p-6 sm:p-8"></div>
     </div>
-`;
+    `;
 
     this.switchTab('bingo');
 };
@@ -127,7 +116,6 @@ Boako.League.switchTab = async function(tabId) {
         container.innerHTML = Boako.League.getBingoHTML();
         await Boako.League.loadBingoBoardData(); 
     } else if (tabId === 'challenge') {
-        // 🔥 챌린지 탭 진입 시 DB 동기화
         container.innerHTML = `<div class="text-center py-20 font-black text-slate-400 animate-pulse">데이터 동기화 중...</div>`;
         await Boako.League.initChallengeData();
     } else if (tabId === 'champion') {
@@ -143,40 +131,23 @@ Boako.League.switchTab = async function(tabId) {
 };
 
 // ====================================================================
-// 🔥 탭 2: 챌린지 전용 초기화 및 DB 연동 로직
+// 🔥 탭 2: 챌린지 데이터 연동 및 검색 시스템 (리팩토링 반영)
 // ====================================================================
-// 💡 2. 챌린지 데이터 동기화 (에러 안 나는 완결본)
 Boako.League.initChallengeData = async function() {
     try {
         if (!Boako.db) throw new Error("Supabase 연결 실패");
 
-        // 1. 종목 데이터 (image_url -> game_logo_url 매핑)
         const { data: games } = await Boako.db.from('games').select('game_name, game_logo_url:image_url');
         Boako.League.State.availableGames = games || [];
 
         const now = new Date().toISOString(); 
-
-        // 2. 현재 시즌 조회 (시작일이 오늘 이전, 종료일이 오늘 이후)
-        const { data: currentSeason } = await Boako.db.from('seasons')
-            .select('season_no, title')
-            .lte('start_date', now)
-            .gte('end_date', now)
-            .single();
-
-        // 3. 챌린지 기록이 있는 시즌 번호만 추출 (과거 시즌 필터링)
+        const { data: currentSeason } = await Boako.db.from('seasons').select('season_no, title').lte('start_date', now).gte('end_date', now).single();
         const { data: pastChallenges } = await Boako.db.from('challenges').select('season_no');
         const activeSeasonNos = [...new Set((pastChallenges || []).map(c => c.season_no))];
+        const { data: allValidSeasons } = await Boako.db.from('seasons').select('season_no, title').lte('start_date', now).order('season_no', { ascending: false });
 
-        // 4. 미래 시즌 차단하여 모든 유효 시즌 조회
-        const { data: allValidSeasons } = await Boako.db.from('seasons')
-            .select('season_no, title')
-            .lte('start_date', now) 
-            .order('season_no', { ascending: false });
-
-        // 5. 현재 시즌 포함 + 기록 있는 과거 시즌만 필터링
         Boako.League.State.challengeSeasons = (allValidSeasons || []).filter(s => 
-            (currentSeason && s.season_no === currentSeason.season_no) || 
-            activeSeasonNos.includes(s.season_no)
+            (currentSeason && s.season_no === currentSeason.season_no) || activeSeasonNos.includes(s.season_no)
         );
 
         Boako.League.State.selectedChallengeSeason = currentSeason ? currentSeason.season_no : (Boako.League.State.challengeSeasons[0]?.season_no || 1);
@@ -187,6 +158,7 @@ Boako.League.initChallengeData = async function() {
         if (container) {
             container.innerHTML = Boako.League.getChallengeHTML();
             Boako.League.renderChallenges();
+            Boako.League.initGameSearch(); // HTML 렌더링 직후 검색 UI 활성화
         }
     } catch (e) {
         console.error("초기화 실패:", e);
@@ -224,6 +196,7 @@ Boako.League.changeChallengeSeason = async function(seasonNo) {
     if (container) {
         container.innerHTML = Boako.League.getChallengeHTML();
         Boako.League.renderChallenges();
+        Boako.League.initGameSearch(); // 재렌더링 시 검색 기능 다시 활성화
     }
 };
 
@@ -236,43 +209,105 @@ Boako.League.renderErrorUI = function() {
                 <i data-lucide="alert-triangle" class="w-8 h-8 text-rose-500"></i>
             </div>
             <h3 class="font-black text-slate-800 text-lg mb-2">서버 연결 오류</h3>
-            <p class="text-sm text-slate-500 font-bold">현재 서버 연결에 문제가 발생하여 데이터를 불러올 수 없습니다.<br>잠시 후 다시 시도해 주세요.</p>
-            <button onclick="Boako.League.initChallengeData()" class="mt-6 bg-slate-800 text-white font-black text-xs px-6 py-3 rounded-xl hover:bg-slate-900 transition-all shadow-md hover:-translate-y-0.5">
-                재연결 시도
-            </button>
+            <button onclick="Boako.League.initChallengeData()" class="mt-6 bg-slate-800 text-white font-black text-xs px-6 py-3 rounded-xl hover:bg-slate-900 transition-all shadow-md">재연결 시도</button>
         </div>
     `;
     if (window.lucide) window.lucide.createIcons();
 };
 
-Boako.League.selectChallengeOpt = function(gameName, logoUrl) {
-    Boako.League.State.challengeParams.game = gameName;
-    Boako.League.State.challengeParams.gameLogoUrl = logoUrl;
-    const labelElem = document.getElementById('challenge-game-label');
-    if (labelElem) {
-        labelElem.innerText = gameName;
-        labelElem.classList.remove('text-slate-400');
-        labelElem.classList.add('text-slate-800');
-    }
-    Boako.League.toggleDropdown('challenge-game');
+// ====================================================================
+// 💡 [신규] 종목 검색 및 다중 선택 상태 관리
+// ====================================================================
+Boako.League.initGameSearch = function() {
+    const searchInput = document.getElementById('game-search-input');
+    const autocompleteList = document.getElementById('game-autocomplete-list');
+    if (!searchInput || !autocompleteList) return;
+
+    Boako.League.State.selectedProposedGames = []; // 초기화
+
+    // 검색어 입력 시 드롭다운 표출
+    searchInput.addEventListener('input', (e) => {
+        const keyword = e.target.value.trim().toLowerCase();
+        if (!keyword || Boako.League.State.selectedProposedGames.length >= 3) {
+            autocompleteList.classList.add('hidden');
+            return;
+        }
+
+        const matchedGames = Boako.League.State.availableGames
+            .filter(g => g.game_name.toLowerCase().includes(keyword))
+            .slice(0, 10);
+
+        if (matchedGames.length > 0) {
+            autocompleteList.innerHTML = matchedGames.map(g => `
+                <li class="p-3 hover:bg-slate-50 cursor-pointer flex items-center gap-3 border-b border-slate-100 last:border-0"
+                    onclick="Boako.League.addProposedGame('${g.game_name.replace(/'/g, "\\'")}', '${g.game_logo_url || ''}')">
+                    <img src="${g.game_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" class="w-6 h-6 object-contain rounded drop-shadow-sm" />
+                    <span class="font-bold text-slate-700 text-xs">${g.game_name}</span>
+                </li>
+            `).join('');
+            autocompleteList.classList.remove('hidden');
+        } else {
+            autocompleteList.innerHTML = `<li class="p-3 text-slate-400 text-xs font-bold text-center">검색 결과가 없습니다.</li>`;
+            autocompleteList.classList.remove('hidden');
+        }
+    });
+
+    // 외부 클릭 시 리스트 숨김
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !autocompleteList.contains(e.target)) {
+            autocompleteList.classList.add('hidden');
+        }
+    });
 };
 
-Boako.League.getChallengeHTML = function() {
-    const p = Boako.League.State.challengeParams;
+Boako.League.addProposedGame = function(name, logo) {
+    if (Boako.League.State.selectedProposedGames.length >= 3) return;
+    if (Boako.League.State.selectedProposedGames.find(g => g.name === name)) {
+        alert("이미 추가된 종목입니다."); return;
+    }
     
-    // 💡 핵심 권한 판별: Boako.state.team.type이 'LEADER'일 때만 발행 가능
+    Boako.League.State.selectedProposedGames.push({ name, logo });
+    Boako.League.renderSelectedGames();
+
+    const searchInput = document.getElementById('game-search-input');
+    const autocompleteList = document.getElementById('game-autocomplete-list');
+    searchInput.value = '';
+    autocompleteList.classList.add('hidden');
+};
+
+Boako.League.removeProposedGame = function(index) {
+    Boako.League.State.selectedProposedGames.splice(index, 1);
+    Boako.League.renderSelectedGames();
+};
+
+Boako.League.renderSelectedGames = function() {
+    const container = document.getElementById('selected-games-container');
+    const searchInput = document.getElementById('game-search-input');
+    if(!container) return;
+
+    container.innerHTML = Boako.League.State.selectedProposedGames.map((g, idx) => `
+        <div class="flex items-center gap-1.5 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-lg shadow-sm">
+            <img src="${g.logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" class="w-5 h-5 rounded object-contain" />
+            <span class="text-[10px] font-black text-violet-800">${g.name}</span>
+            <button type="button" class="text-violet-400 hover:text-red-500 font-black ml-1.5 outline-none" onclick="Boako.League.removeProposedGame(${idx})">✕</button>
+        </div>
+    `).join('');
+
+    if (Boako.League.State.selectedProposedGames.length >= 3) {
+        searchInput.placeholder = "최대 3개 선택 완료";
+        searchInput.disabled = true;
+    } else {
+        searchInput.placeholder = "종목을 검색하세요...";
+        searchInput.disabled = false;
+    }
+};
+
+// ====================================================================
+// 💡 HTML UI 렌더링 (로스터 걷어내고 다중 종목 폼 적용)
+// ====================================================================
+Boako.League.getChallengeHTML = function() {
     const isTeamLeader = (Boako.state.team?.type === 'LEADER');
     
-    const gameOptionsHtml = Boako.League.State.availableGames.length > 0 
-        ? Boako.League.State.availableGames.map(g => `
-            <div onclick="Boako.League.selectChallengeOpt('${g.game_name}', '${g.game_logo_url || ''}')" 
-                 class="group px-4 py-3 cursor-pointer text-slate-600 font-extrabold text-xs transition-all duration-200 hover:bg-gradient-to-r hover:from-violet-50 hover:to-indigo-50 hover:text-violet-700 border-b border-slate-100/50 last:border-0 flex items-center gap-3">
-                <img src="${g.game_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" class="w-6 h-6 object-contain rounded drop-shadow-sm grayscale group-hover:grayscale-0 transition-all" alt="logo">
-                <span class="relative z-10">${g.game_name}</span>
-            </div>
-          `).join('')
-        : `<div class="px-4 py-4 text-slate-400 text-xs font-bold text-center">등록된 종목이 없습니다.</div>`;
-
     const seasonFilterOptionsHtml = Boako.League.State.challengeSeasons.map(s => `
         <div onclick="Boako.League.changeChallengeSeason(${s.season_no})" class="group px-4 py-3 cursor-pointer text-slate-600 font-extrabold text-xs transition-all duration-200 hover:bg-violet-50 hover:text-violet-700 flex items-center gap-2">
             <div class="w-1.5 h-1.5 rounded-full ${Boako.League.State.selectedChallengeSeason === s.season_no ? 'bg-violet-500' : 'bg-transparent'}"></div>
@@ -280,41 +315,31 @@ Boako.League.getChallengeHTML = function() {
         </div>
     `).join('');
 
-    // 팀장 권한에 따라 폼(createFormHtml)을 동적으로 생성
     const createFormHtml = isTeamLeader ? `
         <div class="space-y-4 text-xs font-bold text-slate-600 relative">
             <div class="relative z-30">
-                <label class="block mb-1.5 text-slate-700">종목 보드게임</label>
-                <button onclick="Boako.League.toggleDropdown('challenge-game')" class="w-full bg-white px-4 py-3.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between text-xs font-black hover:border-violet-400 hover:shadow-md transition-all duration-200 group">
-                    <span id="challenge-game-label" class="${p.game === '결투 종목을 선택하세요' ? 'text-slate-400' : 'text-slate-800'} transition-colors">${p.game}</span>
-                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-hover:text-violet-500 transition-colors"></i>
-                </button>
-                <div id="challenge-game-overlay" onclick="Boako.League.toggleDropdown('challenge-game')" class="hidden fixed inset-0 z-40 bg-transparent"></div>
-                <div id="challenge-game-menu" class="hidden absolute top-full left-0 mt-2 w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_15px_40px_-10px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden z-50 transform transition-all">
-                    <div class="max-h-60 overflow-y-auto custom-scrollbar p-1">${gameOptionsHtml}</div>
+                <label class="block mb-1.5 text-slate-700">결투 가능 종목 <span class="text-[10px] text-violet-500 font-black">(1~3개 선택)</span></label>
+                <div id="selected-games-container" class="flex flex-wrap gap-2 mb-2"></div>
+                <div class="relative">
+                    <input type="text" id="game-search-input" placeholder="종목을 검색하세요..." class="w-full bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-200 outline-none focus:border-violet-500 transition-all font-bold text-slate-700" autocomplete="off" />
+                    <ul id="game-autocomplete-list" class="absolute z-50 w-full bg-white border border-slate-200 rounded-xl max-h-48 overflow-y-auto hidden shadow-xl mt-1 custom-scrollbar"></ul>
                 </div>
             </div>
 
-            <div class="relative z-20">
-                <label class="block mb-1.5 text-slate-700">결투 일정 (KST)</label>
-                <input type="datetime-local" id="challenge-schedule" class="w-full bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-200 font-black text-slate-700 outline-none focus:border-violet-500 hover:border-violet-300 transition-colors">
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-sm relative z-10">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <label class="block text-violet-700 font-black">출전 로스터 (4인)</label>
-                    <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md">용병 허용</span>
+            <div class="grid grid-cols-2 gap-3 relative z-20">
+                <div>
+                    <label class="block mb-1.5 text-slate-700">결투 일정 (KST)</label>
+                    <input type="datetime-local" id="challenge-schedule" class="w-full bg-white px-3 py-2.5 rounded-xl shadow-sm border border-slate-200 font-black text-slate-700 outline-none focus:border-violet-500 hover:border-violet-300 transition-colors text-[10px]">
                 </div>
-                ${[1, 2, 3, 4].map(num => `
-                    <div class="flex items-center gap-2.5 group">
-                        <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-400 font-black flex items-center justify-center text-[10px] group-hover:bg-violet-100 group-hover:text-violet-600 transition-colors">${num}</span>
-                        <input type="text" id="roster-${num}-name" placeholder="출전자 닉네임" class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 focus:bg-white transition-all">
-                        <label class="flex items-center gap-1.5 cursor-pointer shrink-0 bg-slate-50 hover:bg-slate-100 px-2.5 py-2 rounded-lg border border-slate-200 transition-colors">
-                            <input type="checkbox" id="roster-${num}-mercenary" class="w-3.5 h-3.5 text-violet-600 rounded border-slate-300 focus:ring-violet-500 cursor-pointer">
-                            <span class="text-[10px] font-bold text-slate-500">용병</span>
-                        </label>
-                    </div>
-                `).join('')}
+                <div>
+                    <label class="block mb-1.5 text-slate-700">참전 방식</label>
+                    <select id="challenge-game-mode" class="w-full bg-white px-3 py-2.5 rounded-xl shadow-sm border border-slate-200 font-black text-slate-700 outline-none focus:border-violet-500 hover:border-violet-300 transition-colors cursor-pointer text-xs">
+                        <option value="4v4">4 vs 4 (풀 로스터)</option>
+                        <option value="3v3">3 vs 3</option>
+                        <option value="2v2">2 vs 2 (태그)</option>
+                        <option value="1v1">1 vs 1 (대장전)</option>
+                    </select>
+                </div>
             </div>
 
             <div class="relative z-0">
@@ -384,26 +409,38 @@ Boako.League.renderChallenges = function() {
             cardStyle = 'bg-white border-violet-100 shadow-sm hover:shadow-md hover:border-violet-300';
         }
 
-        const card = document.createElement('div');
-        card.className = `p-4 rounded-2xl border ${cardStyle} transition-all duration-300 relative flex gap-4`;
-        const logoUrl = p.game_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
         let scheduleText = '일정 미정';
         if (p.schedule) {
             const dateObj = new Date(p.schedule);
             scheduleText = `${dateObj.getMonth()+1}/${dateObj.getDate()} ${dateObj.getHours().toString().padStart(2,'0')}:${dateObj.getMinutes().toString().padStart(2,'0')}`;
         }
 
-        let mercCount = 0; let regularCount = 0;
-        for(let i=1; i<=4; i++) {
-            if (p[`attacker_${i}`]) {
-                if(p[`is_attacker_${i}_mercenary`]) mercCount++; else regularCount++;
-            }
+        // 🌟 멀티 종목 아이콘 노출 로직
+        let gameVisualHtml = '';
+        let gameTitleText = '';
+
+        if (p.status === 'PENDING' && p.proposed_games && Array.isArray(p.proposed_games)) {
+            // 제안된 종목 1~3개 병렬 표기
+            const logosHtml = p.proposed_games.map(g => `
+                <img src="${g.logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png'}" 
+                     class="w-7 h-7 object-contain drop-shadow-sm z-10" alt="${g.name}" title="${g.name}">
+            `).join('');
+            gameVisualHtml = `<div class="flex items-center justify-center gap-1 flex-wrap w-full p-1">${logosHtml}</div>`;
+            gameTitleText = '종목 선택 대기중';
+        } else {
+            // 매칭 확정 후엔 단일 종목 표기
+            const logoUrl = p.game_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge.png';
+            gameVisualHtml = `<img src="${logoUrl}" class="w-12 h-12 object-contain drop-shadow-md z-10" alt="${p.game_name}">`;
+            gameTitleText = p.game_name || '미정';
         }
 
+        const card = document.createElement('div');
+        card.className = `p-4 rounded-2xl border ${cardStyle} transition-all duration-300 relative flex gap-4`;
+        
         card.innerHTML = `
-            <div class="w-20 h-24 bg-white rounded-xl border border-slate-200 shadow-inner flex flex-col items-center justify-center shrink-0 overflow-hidden relative">
-                <img src="${logoUrl}" class="w-14 h-14 object-contain drop-shadow-md z-10" alt="${p.game_name}">
-                <div class="absolute bottom-0 w-full bg-slate-800 text-white text-center text-[8px] font-black py-1 tracking-wider uppercase truncate px-1">${p.game_name}</div>
+            <div class="w-24 h-24 bg-white rounded-xl border border-slate-200 shadow-inner flex flex-col items-center justify-center shrink-0 overflow-hidden relative">
+                ${gameVisualHtml}
+                <div class="absolute bottom-0 w-full bg-slate-800 text-white text-center text-[8px] font-black py-1 tracking-wider uppercase truncate px-1">${gameTitleText}</div>
             </div>
             <div class="flex-1 flex flex-col min-w-0">
                 <div class="flex items-start justify-between mb-2">
@@ -421,13 +458,12 @@ Boako.League.renderChallenges = function() {
                 <p class="text-xs font-bold text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100/80 italic line-clamp-2 leading-relaxed shadow-sm">"${p.message || '도발 문구가 없습니다.'}"</p>
                 <div class="flex items-center justify-between mt-auto pt-3">
                     <div class="flex gap-1.5">
-                        <span class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-extrabold border border-slate-200">정규 ${regularCount}인</span>
-                        ${mercCount > 0 ? `<span class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-extrabold border border-indigo-200">용병 ${mercCount}인</span>` : ''}
+                        <span class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-extrabold border border-indigo-200">${p.game_mode || 'TBD'} 모드</span>
+                        ${p.status === 'PENDING' ? `<span class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-extrabold border border-slate-200">로스터 미정</span>` : ''}
                     </div>
                     ${p.status === 'PENDING' 
                         ? `<div class="flex gap-1.5 relative z-20">
-                               <button onclick="Boako.League.acceptChallenge(${p.id}, false)" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-black text-[10px] px-2.5 py-1.5 rounded-lg shadow-sm">1배율 참전</button>
-                               <button onclick="Boako.League.acceptChallenge(${p.id}, true)" class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 text-white font-black text-[10px] px-2.5 py-1.5 rounded-lg shadow-[0_3px_8px_-2px_rgba(239,68,68,0.4)] hover:-translate-y-0.5 transition-all">🔥 더블</button>
+                               <button onclick="Boako.League.acceptChallenge(${p.id}, false)" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-black text-[10px] px-2.5 py-1.5 rounded-lg shadow-sm">참전 (종목선택)</button>
                            </div>` 
                         : (p.status === 'ACCEPTED' ? `<span class="text-[10px] font-black text-emerald-600">경기 대기중</span>` : `<span class="text-[10px] font-black text-slate-500">결과 집계 완료</span>`)
                     }
@@ -440,25 +476,15 @@ Boako.League.renderChallenges = function() {
 };
 
 Boako.League.registerChallenge = async function() {
-    const p = Boako.League.State.challengeParams;
-    const game = p.game;
+    const games = Boako.League.State.selectedProposedGames;
     const scheduleStr = document.getElementById('challenge-schedule').value;
+    const gameMode = document.getElementById('challenge-game-mode').value;
     const message = document.getElementById('challenge-msg').value || "이 판을 접수할 배짱 있는 팀을 찾습니다.";
     
-    if (game === '결투 종목을 선택하세요') { alert("종목을 먼저 선택해주세요."); return; }
-
-    const rosterData = {}; let totalCount = 0;
-    for(let i=1; i<=4; i++) {
-        const isMerc = document.getElementById(`roster-${i}-mercenary`)?.checked || false;
-        const name = document.getElementById(`roster-${i}-name`)?.value.trim();
-        if(name) {
-            rosterData[`attacker_${i}`] = name;
-            rosterData[`is_attacker_${i}_mercenary`] = isMerc;
-            totalCount++;
-        }
+    if (games.length === 0) { 
+        alert("최소 1개의 결투 종목을 선택해야 합니다."); 
+        return; 
     }
-
-    if (totalCount === 0) { alert("최소 1명 이상의 출전자를 입력해주세요."); return; }
 
     try {
         const payload = {
@@ -466,13 +492,14 @@ Boako.League.registerChallenge = async function() {
             attacker_team_id: Boako.state?.team?.info?.id, 
             attacker_team_name: Boako.state?.team?.info?.team_name || "테스트 팀",
             attacker_team_logo_url: Boako.state?.team?.info?.logo_url,
-            game_name: game,
-            game_logo_url: p.gameLogoUrl,
-            game_mode: `${totalCount}v${totalCount}`,
+            proposed_games: games, // 🌟 배열 통째로 삽입
+            game_name: null,       // 참전 시 덮어쓸 용도
+            game_logo_url: null,
+            game_mode: gameMode,
             schedule: scheduleStr ? new Date(scheduleStr).toISOString() : null,
             message: message,
-            status: 'PENDING',
-            ...rosterData
+            status: 'PENDING'
+            // attacker_1, is_attacker_1_mercenary 등 로스터 정보는 배제
         };
 
         if (Boako.db) {
@@ -482,8 +509,10 @@ Boako.League.registerChallenge = async function() {
 
         alert("도전장이 발행되었습니다!");
         document.getElementById('challenge-msg').value = '';
+        Boako.League.State.selectedProposedGames = []; // 폼 초기화
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         Boako.League.renderChallenges();
+        Boako.League.initGameSearch(); 
     } catch (err) {
         console.error("도전장 발행 에러:", err);
         alert("발행 중 오류가 발생했습니다.");
@@ -491,10 +520,8 @@ Boako.League.registerChallenge = async function() {
 };
 
 Boako.League.acceptChallenge = function(id, isDouble) {
-    const confirmMsg = isDouble ? "🔥 토큰 1개를 소모하여 '더블' 배율로 참전하시겠습니까?" : "토큰 소모 없이 일반 배율로 참전하시겠습니까?";
-    if(confirm(confirmMsg)) {
-        alert("방어팀 로스터 제출 및 참전 처리 로직 연동 대기중");
-    }
+    // 상대방이 참전 버튼을 눌렀을 때, proposed_games 목록 중 하나를 고르는 팝업 로직 호출 예정
+    alert("3개 종목 중 선택 및 로스터 제출 팝업 구현 예정입니다.");
 };
 
 // ====================================================================
