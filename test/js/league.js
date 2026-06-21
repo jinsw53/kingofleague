@@ -278,19 +278,23 @@ Boako.League.initGameSearch = function() {
     });
 };
 
+// ====================================================================
+// 💡 종목 추가 (mode: '4v4' 기본값 주입)
+// ====================================================================
 Boako.League.addProposedGame = function(name, logo) {
     if (Boako.League.State.selectedProposedGames.length >= 3) return;
     if (Boako.League.State.selectedProposedGames.find(g => g.name === name)) {
         alert("이미 추가된 종목입니다."); return;
     }
     
-    Boako.League.State.selectedProposedGames.push({ name, logo });
+    // 🔥 여기에 mode: '4v4' 가 반드시 들어가야 방식 선택이 가능합니다.
+    Boako.League.State.selectedProposedGames.push({ name: name, logo: logo, mode: '4v4' });
     Boako.League.renderSelectedGames();
 
     const searchInput = document.getElementById('game-search-input');
     const autocompleteList = document.getElementById('game-autocomplete-list');
-    searchInput.value = '';
-    autocompleteList.classList.add('hidden');
+    if (searchInput) searchInput.value = '';
+    if (autocompleteList) autocompleteList.classList.add('hidden');
 };
 
 Boako.League.removeProposedGame = function(index) {
@@ -298,6 +302,9 @@ Boako.League.removeProposedGame = function(index) {
     Boako.League.renderSelectedGames();
 };
 
+// ====================================================================
+// 💡 선택된 종목 렌더링 (방식 선택 셀렉트 박스 포함)
+// ====================================================================
 Boako.League.renderSelectedGames = function() {
     const container = document.getElementById('selected-games-container');
     const searchInput = document.getElementById('game-search-input');
@@ -306,30 +313,34 @@ Boako.League.renderSelectedGames = function() {
     container.innerHTML = Boako.League.State.selectedProposedGames.map((g, idx) => {
         const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
         return `
-        <div class="flex items-center justify-between bg-violet-50 border border-violet-200 px-3 py-2 rounded-lg shadow-sm mb-1.5">
-            <div class="flex items-center gap-2">
-                <img src="${safeLogo}" class="w-5 h-5 rounded object-contain" />
-                <span class="text-xs font-black text-violet-800">${g.name}</span>
+        <div class="flex items-center justify-between bg-violet-50 border border-violet-200 px-3 py-2.5 rounded-xl shadow-sm mb-2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 bg-white border border-violet-100 rounded-md flex items-center justify-center p-0.5">
+                    <img src="${safeLogo}" class="max-w-full max-h-full object-contain drop-shadow-sm" />
+                </div>
+                <span class="text-xs font-black text-violet-900">${g.name}</span>
             </div>
             <div class="flex items-center gap-2">
-                <!-- 🔥 빠졌던 방식(모드) 선택 드롭다운 복구 -->
-                <select class="bg-white border border-violet-200 rounded text-[10px] p-1 font-bold text-violet-700 outline-none cursor-pointer shadow-sm" onchange="Boako.League.State.selectedProposedGames[${idx}].mode = this.value">
-                    <option value="4v4" ${g.mode==='4v4'?'selected':''}>4v4</option>
-                    <option value="3v3" ${g.mode==='3v3'?'selected':''}>3v3</option>
-                    <option value="2v2" ${g.mode==='2v2'?'selected':''}>2v2</option>
-                    <option value="1v1" ${g.mode==='1v1'?'selected':''}>1v1</option>
+                <!-- 🔥 종목별 방식 선택 드롭다운 UI 부활 -->
+                <select class="bg-white border border-violet-200 rounded-lg text-[10px] p-1.5 font-bold text-violet-700 outline-none cursor-pointer shadow-sm focus:border-violet-400" onchange="Boako.League.State.selectedProposedGames[${idx}].mode = this.value">
+                    <option value="4v4" ${g.mode==='4v4'?'selected':''}>4vs4</option>
+                    <option value="3v3" ${g.mode==='3v3'?'selected':''}>3vs3</option>
+                    <option value="2v2" ${g.mode==='2v2'?'selected':''}>2vs2</option>
+                    <option value="1v1" ${g.mode==='1v1'?'selected':''}>1vs1</option>
                 </select>
                 <button type="button" class="text-violet-400 hover:text-red-500 font-black outline-none px-1" onclick="Boako.League.removeProposedGame(${idx})">✕</button>
             </div>
         </div>
     `}).join('');
 
-    if (Boako.League.State.selectedProposedGames.length >= 3) {
-        searchInput.placeholder = "최대 3개 선택 완료";
-        searchInput.disabled = true;
-    } else {
-        searchInput.placeholder = "종목을 검색하세요...";
-        searchInput.disabled = false;
+    if (searchInput) {
+        if (Boako.League.State.selectedProposedGames.length >= 3) {
+            searchInput.placeholder = "최대 3개 선택 완료";
+            searchInput.disabled = true;
+        } else {
+            searchInput.placeholder = "종목을 검색하세요...";
+            searchInput.disabled = false;
+        }
     }
 };
 
