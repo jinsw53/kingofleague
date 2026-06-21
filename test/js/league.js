@@ -133,7 +133,7 @@ Boako.League.switchTab = async function(tabId) {
 };
 
 // ====================================================================
-// 💡 3. 챌린지 초기화 및 리스트 렌더링
+// 💡 3. 챌린지 초기화 및 실시간(Realtime) 구독 활성화
 // ====================================================================
 Boako.League.initChallengeData = async function() {
     try {
@@ -154,6 +154,7 @@ Boako.League.initChallengeData = async function() {
 
         Boako.League.State.selectedChallengeSeason = currentSeason ? currentSeason.season_no : (Boako.League.State.challengeSeasons[0]?.season_no || 1);
 
+        // 1. 최초 데이터 로드
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         
         const container = document.getElementById('league-view-container');
@@ -161,6 +162,25 @@ Boako.League.initChallengeData = async function() {
             container.innerHTML = Boako.League.getChallengeHTML();
             Boako.League.renderChallenges();
         }
+
+        // 🚨 [실시간 리얼타임 부품 꽂기] 
+        // 기존 채널이 있다면 꼬이지 않게 먼저 해제
+        if (Boako.League.State.realtimeChannel) {
+            Boako.db.removeChannel(Boako.League.State.realtimeChannel);
+        }
+
+        // challenges 테이블의 변경사항을 실시간 구독(Subscribe)
+        Boako.League.State.realtimeChannel = Boako.db
+            .channel('public:challenges')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, async (payload) => {
+                console.log('🔥 챌린지 광장 실시간 변동 감지:', payload);
+                
+                // 데이터베이스에 변동이 생기면 현재 선택된 시즌의 데이터를 다시 긁어와서 화면만 갱신
+                await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
+                Boako.League.renderChallenges();
+            })
+            .subscribe();
+
     } catch (e) {
         console.error("초기화 실패:", e);
         Boako.League.renderErrorUI();
