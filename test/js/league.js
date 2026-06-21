@@ -447,32 +447,42 @@ Boako.League.renderSelectedGames = function() {
     container.innerHTML = Boako.League.State.selectedProposedGames.map((g, idx) => {
         const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
         return `
-        <div class="flex items-center justify-between bg-violet-50 border border-violet-200 px-3 py-2.5 rounded-xl shadow-sm mb-2">
+        <div class="flex items-center justify-between bg-white border border-violet-100 px-3 py-2 rounded-xl shadow-sm mb-2 transition-all hover:border-violet-300 group">
             <div class="flex items-center gap-2.5">
-                <div class="w-6 h-6 bg-white border border-violet-100 rounded-md flex items-center justify-center p-0.5">
+                <div class="w-7 h-7 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-center p-1 shadow-inner">
                     <img src="${safeLogo}" class="max-w-full max-h-full object-contain drop-shadow-sm" />
                 </div>
-                <span class="text-xs font-black text-violet-900">${g.name}</span>
+                <span class="text-xs font-black text-slate-800">${g.name}</span>
             </div>
             <div class="flex items-center gap-2">
-                <select class="bg-white border border-violet-200 rounded-lg text-[10px] p-1.5 font-bold text-violet-700 outline-none cursor-pointer shadow-sm focus:border-violet-400" onchange="Boako.League.State.selectedProposedGames[${idx}].mode = this.value">
-                    <option value="4v4" ${g.mode==='4v4'?'selected':''}>4v4</option>
-                    <option value="3v3" ${g.mode==='3v3'?'selected':''}>3v3</option>
-                    <option value="2v2" ${g.mode==='2v2'?'selected':''}>2v2</option>
-                    <option value="1v1" ${g.mode==='1v1'?'selected':''}>1v1</option>
-                </select>
-                <button type="button" class="text-violet-400 hover:text-red-500 font-black outline-none px-1" onclick="Boako.League.removeProposedGame(${idx})">✕</button>
+                <div class="relative">
+                    <select class="appearance-none bg-violet-50 border border-violet-200 hover:border-violet-400 hover:bg-white rounded-lg text-[10px] pl-2.5 pr-6 py-1.5 font-black text-violet-700 outline-none cursor-pointer shadow-sm focus:ring-2 focus:ring-violet-200 transition-all" onchange="Boako.League.State.selectedProposedGames[${idx}].mode = this.value">
+                        <option value="4v4" ${g.mode==='4v4'?'selected':''}>4vs4</option>
+                        <option value="3v3" ${g.mode==='3v3'?'selected':''}>3vs3</option>
+                        <option value="2v2" ${g.mode==='2v2'?'selected':''}>2vs2</option>
+                        <option value="1v1" ${g.mode==='1v1'?'selected':''}>1vs1</option>
+                    </select>
+                    <i data-lucide="chevron-down" class="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-500 pointer-events-none transition-transform group-hover:translate-y(-40%)"></i>
+                </div>
+                <button type="button" class="w-6 h-6 flex items-center justify-center rounded-md bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors" onclick="Boako.League.removeProposedGame(${idx})">
+                    <i data-lucide="x" class="w-3 h-3 font-black"></i>
+                </button>
             </div>
         </div>
     `}).join('');
+
+    // 아이콘 재렌더링
+    if (window.lucide) window.lucide.createIcons();
 
     if (searchInput) {
         if (Boako.League.State.selectedProposedGames.length >= 3) {
             searchInput.placeholder = "최대 3개 선택 완료";
             searchInput.disabled = true;
+            searchInput.classList.add('bg-slate-100', 'cursor-not-allowed', 'opacity-60');
         } else {
             searchInput.placeholder = "종목을 검색하세요...";
             searchInput.disabled = false;
+            searchInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'opacity-60');
         }
     }
 };
