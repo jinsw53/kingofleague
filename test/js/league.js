@@ -320,7 +320,7 @@ Boako.League.renderChallenges = function() {
         let actionHtml = '';
         if (isPending) {
             if (isMyTeamChallenge) {
-                // 내 팀의 글일 때, 토큰 회수 버튼 표시
+                // 내 팀이 올린 대기 중인 글일 때
                 if (p.is_attacker_token_used) {
                     actionHtml = `
                         <div class="flex flex-col gap-2 w-full">
@@ -332,7 +332,22 @@ Boako.League.renderChallenges = function() {
                     actionHtml = `<div class="w-full bg-slate-100 text-slate-400 font-black text-xs px-3 py-2 rounded-lg shadow-inner border border-slate-200 flex items-center justify-center gap-1.5 cursor-not-allowed"><i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> 내 팀 모집글</div>`;
                 }
             } else {
+                // 남의 글이면 참전 가능
                 actionHtml = `<button onclick="Boako.League.showAcceptPopup(${p.id})" class="w-full bg-slate-900 hover:bg-violet-600 group-hover:bg-violet-600 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i data-lucide="eye" class="w-4 h-4"></i> 정보 확인 및 참전</button>`;
+            }
+        } else {
+            // 🚨 매칭 확정(CONFIRMED) 상태일 때
+            if (isMyTeamChallenge && p.is_attacker_token_used && p.is_defender_token_used) {
+                // 내 글이고, 나도 토큰을 걸었는데 상대도 토큰을 걸었을 때 (더블 배팅 상황)
+                actionHtml = `
+                    <div class="flex flex-col gap-1.5 w-full text-center">
+                        <div class="w-full"><i data-lucide="flame" class="w-5 h-5 text-rose-500 mx-auto animate-pulse"></i><span class="text-[10px] font-black text-rose-600 block mt-1">상대 더블 배팅!</span></div>
+                        <button onclick="Boako.League.withdrawAttackerToken(${p.id})" class="w-full bg-rose-50 hover:bg-rose-500 text-rose-500 hover:text-white font-black text-[10px] px-2 py-2 rounded-lg transition-colors border border-rose-200 mt-1">앗, 쫄? (배팅 철회)</button>
+                    </div>
+                `;
+            } else {
+                // 그 외의 일반적인 확정 상태
+                actionHtml = `<div class="text-center w-full py-2"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mx-auto mb-1 opacity-80"></i><span class="text-[10px] font-black text-slate-400 block">매칭 완료</span></div>`;
             }
         }
 
