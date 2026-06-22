@@ -263,7 +263,9 @@ Boako.League.getChallengeHTML = function() {
                     </div>
                 </div>
             </div>
-            <div id="challenge-list" class="overflow-y-auto pr-2 custom-scrollbar flex-1 pb-4 grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+            
+            <!-- 🔥 문제 해결: grid, xl:grid-cols-2 속성을 싹 날리고 flex-col 로 넓게 폈습니다! -->
+            <div id="challenge-list" class="overflow-y-auto pr-2 custom-scrollbar flex-1 pb-4 flex flex-col gap-4"></div>
         </div>
         <div id="challenge-modal-root"></div>
         <div id="challenge-popup-root"></div>
