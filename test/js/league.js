@@ -276,110 +276,81 @@ Boako.League.renderChallenges = function() {
     const container = document.getElementById('challenge-list');
     if (!container) return; container.innerHTML = '';
 
-    // 날짜 및 시간 포맷 헬퍼 함수
     const formatTime = (iso) => {
         if(!iso) return ''; const d = new Date(iso);
         const isZeroTime = d.getHours() === 0 && d.getMinutes() === 0;
-        if (isZeroTime) {
-            return `${d.getMonth()+1}/${d.getDate()} (시간 상관없음)`;
-        }
+        if (isZeroTime) return `${d.getMonth()+1}/${d.getDate()} (시간 상관없음)`;
         return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
     };
 
+    // 🚨 현재 접속한 내 팀의 ID 가져오기
+    const myTeamId = Boako.state?.team?.info?.id;
+
     Boako.League.State.challenges.forEach(p => {
         const isPending = p.status === 'PENDING';
+        // 🚨 이 도전장이 우리 팀이 쓴 글인지 확인
+        const isMyTeamChallenge = (p.attacker_team_id === myTeamId);
         
-        // 💡 1. 제안된 종목 리스트를 카드 내부에서 뱃지 형태로 확실하게 노출
         let gamesHtml = '';
         if (p.proposed_games && Array.isArray(p.proposed_games)) {
             gamesHtml = p.proposed_games.map(g => {
                 const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-                return `
-                    <div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm">
-                        <img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" />
-                        <div class="flex flex-col">
-                            <span class="text-[11px] font-black text-slate-800 leading-tight">${g.name}</span>
-                            <span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${g.mode || '4v4'}</span>
-                        </div>
-                    </div>
-                `;
+                return `<div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm"><img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" /><div class="flex flex-col"><span class="text-[11px] font-black text-slate-800 leading-tight">${g.name}</span><span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${g.mode || '4v4'}</span></div></div>`;
             }).join('');
         }
 
-        // 💡 2. "N개 후보 제안됨" 대신, 실제 후보 날짜 배열을 칩 형태로 전부 명확히 리스팅
         let schedulesHtml = '';
         if (p.confirmed_schedule) {
             schedulesHtml = `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2.5 py-1 rounded-md font-black flex items-center gap-1">📅 확정 일시: ${formatTime(p.confirmed_schedule)}</span>`;
         } else if (p.schedule && Array.isArray(p.schedule) && p.schedule.length > 0) {
-            schedulesHtml = p.schedule.map(iso => `
-                <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] px-2 py-1 rounded-md font-bold tracking-tight">⏱️ ${formatTime(iso)}</span>
-            `).join('');
+            schedulesHtml = p.schedule.map(iso => `<span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] px-2 py-1 rounded-md font-bold tracking-tight">⏱️ ${formatTime(iso)}</span>`).join('');
         } else {
             schedulesHtml = `<span class="text-slate-400 text-[10px] font-bold">제안된 일정 없음</span>`;
         }
 
-        // 왼쪽 메인 비주얼 데코레이션
         let leftVisualHtml = '';
         if (isPending) {
-            leftVisualHtml = `
-                <div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0">
-                    <i data-lucide="swords" class="w-7 h-7 mb-1 animate-pulse"></i>
-                    <span class="text-[9px] font-black tracking-widest uppercase opacity-80">OPEN</span>
-                </div>
-            `;
+            leftVisualHtml = `<div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0"><i data-lucide="swords" class="w-7 h-7 mb-1 animate-pulse"></i><span class="text-[9px] font-black tracking-widest uppercase opacity-80">OPEN</span></div>`;
         } else {
             const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-            leftVisualHtml = `
-                <div class="w-20 h-20 bg-slate-100 border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-inner">
-                    <img src="${safeGameLogo}" class="max-w-full max-h-full object-contain drop-shadow-sm" />
-                    <div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${p.game_mode || '4v4'}</div>
-                </div>
-            `;
+            leftVisualHtml = `<div class="w-20 h-20 bg-slate-100 border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-inner"><img src="${safeGameLogo}" class="max-w-full max-h-full object-contain drop-shadow-sm" /><div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${p.game_mode || '4v4'}</div></div>`;
+        }
+
+        // 🚨 우측 액션 버튼 로직 분기
+        let actionHtml = '';
+        if (isPending) {
+            if (isMyTeamChallenge) {
+                // 내 팀이 올린 글이면 '참전하기' 숨기고 안내 뱃지 노출
+                actionHtml = `<div class="w-full bg-slate-100 text-slate-400 font-black text-xs px-4 py-3.5 rounded-xl shadow-inner border border-slate-200 flex items-center justify-center gap-1.5 cursor-not-allowed"><i data-lucide="shield-alert" class="w-4 h-4"></i> 내 팀의 모집글</div>`;
+            } else {
+                // 다른 팀 글이면 정상적으로 '참전하기' 노출
+                actionHtml = `<button onclick="Boako.League.showAcceptPopup(${p.id})" class="w-full bg-slate-900 hover:bg-violet-600 group-hover:bg-violet-600 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i data-lucide="eye" class="w-4 h-4"></i> 정보 확인 및 참전</button>`;
+            }
+        } else {
+            actionHtml = `<div class="text-center w-full py-2"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mx-auto mb-1 opacity-80"></i><span class="text-[10px] font-black text-slate-400 block">매칭 완료</span></div>`;
         }
 
         const card = document.createElement('div');
-        // 1줄에 1개씩 꽉 차는 프리미엄 레이아웃 구조 개편
         card.className = `p-5 rounded-3xl border ${isPending ? 'bg-white border-slate-200/80 hover:border-violet-400 hover:shadow-md' : 'bg-slate-50 border-slate-200 opacity-75'} transition-all shadow-sm flex flex-col md:flex-row gap-5 md:items-center relative group`;
         
         card.innerHTML = `
             ${leftVisualHtml}
-            
             <div class="flex-1 flex flex-col min-w-0 gap-3">
-                
                 <div>
                     <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">${isPending ? '🎯 대항 제안 종목 후보' : '⚔️ 확정 경기 종목'}</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        ${isPending ? gamesHtml : `
-                            <div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm">
-                                <span class="text-xs font-black">${p.game_name}</span>
-                            </div>
-                        `}
-                    </div>
+                    <div class="flex flex-wrap gap-1.5">${isPending ? gamesHtml : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><span class="text-xs font-black">${p.game_name}</span></div>`}</div>
                 </div>
-                
                 <div>
                     <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">${isPending ? '🕒 조율 가능한 후보 일정 목록' : '📅 확정 대결 일시'}</label>
-                    <div class="flex flex-wrap gap-1">
-                        ${schedulesHtml}
-                    </div>
+                    <div class="flex flex-wrap gap-1">${schedulesHtml}</div>
                 </div>
-                
                 <div class="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100/80">
-                    ${!isPending ? `
-                        <div class="text-xs font-black text-slate-800 flex items-center gap-1">
-                            <span class="text-violet-600">${p.attacker_team_name}</span>
-                            <span class="text-rose-500 text-[10px] italic mx-0.5">VS</span>
-                            <span class="text-slate-800">${p.defender_team_name}</span>
-                        </div>
-                    ` : ''}
+                    ${!isPending ? `<div class="text-xs font-black text-slate-800 flex items-center gap-1"><span class="text-violet-600">${p.attacker_team_name}</span><span class="text-rose-500 text-[10px] italic mx-0.5">VS</span><span class="text-slate-800">${p.defender_team_name}</span></div>` : ''}
                     <p class="text-xs font-bold text-slate-600 italic">"${p.message}"</p>
                 </div>
             </div>
-            
             <div class="flex items-center justify-end md:flex-col md:justify-center shrink-0 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5 min-w-[150px]">
-                ${isPending 
-                    ? `<button onclick="Boako.League.showAcceptPopup(${p.id})" class="w-full bg-slate-900 hover:bg-violet-600 group-hover:bg-violet-600 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i data-lucide="eye" class="w-4 h-4"></i> 정보 확인 및 참전</button>` 
-                    : `<div class="text-center w-full py-2"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mx-auto mb-1 opacity-80"></i><span class="text-[10px] font-black text-slate-400 block">매칭 완료</span></div>`}
+                ${actionHtml}
             </div>
         `;
         container.appendChild(card);
