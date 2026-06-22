@@ -316,18 +316,24 @@ Boako.League.renderChallenges = function() {
             leftVisualHtml = `<div class="w-20 h-20 bg-slate-100 border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-inner"><img src="${safeGameLogo}" class="max-w-full max-h-full object-contain drop-shadow-sm" /><div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${p.game_mode || '4v4'}</div></div>`;
         }
 
-        // 🚨 우측 액션 버튼 로직 분기
+       // 🚨 우측 액션 버튼 로직 분기
         let actionHtml = '';
         if (isPending) {
             if (isMyTeamChallenge) {
-                // 내 팀이 올린 글이면 '참전하기' 숨기고 안내 뱃지 노출
-                actionHtml = `<div class="w-full bg-slate-100 text-slate-400 font-black text-xs px-4 py-3.5 rounded-xl shadow-inner border border-slate-200 flex items-center justify-center gap-1.5 cursor-not-allowed"><i data-lucide="shield-alert" class="w-4 h-4"></i> 내 팀의 모집글</div>`;
+                // 내 팀의 글일 때, 토큰 회수 버튼 표시
+                if (p.is_attacker_token_used) {
+                    actionHtml = `
+                        <div class="flex flex-col gap-2 w-full">
+                            <div class="w-full bg-slate-100 text-slate-400 font-black text-xs px-3 py-2 rounded-lg shadow-inner border border-slate-200 flex items-center justify-center gap-1.5 cursor-not-allowed"><i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> 내 팀 모집글</div>
+                            <button onclick="Boako.League.withdrawAttackerToken(${p.id})" class="w-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white font-black text-[10px] px-3 py-2 rounded-lg transition-colors border border-rose-200">배팅 철회 (토큰 회수)</button>
+                        </div>
+                    `;
+                } else {
+                    actionHtml = `<div class="w-full bg-slate-100 text-slate-400 font-black text-xs px-3 py-2 rounded-lg shadow-inner border border-slate-200 flex items-center justify-center gap-1.5 cursor-not-allowed"><i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> 내 팀 모집글</div>`;
+                }
             } else {
-                // 다른 팀 글이면 정상적으로 '참전하기' 노출
                 actionHtml = `<button onclick="Boako.League.showAcceptPopup(${p.id})" class="w-full bg-slate-900 hover:bg-violet-600 group-hover:bg-violet-600 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i data-lucide="eye" class="w-4 h-4"></i> 정보 확인 및 참전</button>`;
             }
-        } else {
-            actionHtml = `<div class="text-center w-full py-2"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mx-auto mb-1 opacity-80"></i><span class="text-[10px] font-black text-slate-400 block">매칭 완료</span></div>`;
         }
 
         const card = document.createElement('div');
@@ -816,7 +822,32 @@ Boako.League.confirmAcceptChallenge = async function(challengeId) {
         document.getElementById('challenge-popup-root').innerHTML = ''; 
     } catch (err) { alert("처리 중 오류가 발생했습니다: " + err.message); console.error(err); }
 };
+// ====================================================================
+// 💡 공격팀 배팅 철회 (토큰 회수)
+// ====================================================================
+Boako.League.withdrawAttackerToken = async function(challengeId) {
+    if (!confirm("정말 배팅을 철회하시겠습니까? 소모된 토큰 1개를 돌려받지만, 비겁하다는 소리를 들을 수 있습니다.")) return;
 
+    try {
+        if (!Boako.db) throw new Error("DB 연결 오류");
+        
+        const { error } = await Boako.db.rpc('withdraw_attacker_token', {
+            p_challenge_id: challengeId
+        });
+
+        if (error) throw error;
+
+        alert("배팅 철회가 완료되었습니다. 토큰 1개가 환불되었습니다.");
+        
+        // 데이터 재조회 및 화면 갱신
+        await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
+        Boako.League.renderChallenges();
+        
+    } catch (err) {
+        alert("철회 실패: " + err.message);
+        console.error(err);
+    }
+};
 // ====================================================================
 // 🎲 6. BTL 영토 빙고전
 // ====================================================================
