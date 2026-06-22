@@ -274,53 +274,110 @@ Boako.League.renderChallenges = function() {
     const container = document.getElementById('challenge-list');
     if (!container) return; container.innerHTML = '';
 
+    // 날짜 및 시간 포맷 헬퍼 함수
     const formatTime = (iso) => {
         if(!iso) return ''; const d = new Date(iso);
+        const isZeroTime = d.getHours() === 0 && d.getMinutes() === 0;
+        if (isZeroTime) {
+            return `${d.getMonth()+1}/${d.getDate()} (시간 상관없음)`;
+        }
         return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
     };
 
     Boako.League.State.challenges.forEach(p => {
         const isPending = p.status === 'PENDING';
         
-        let scheduleText = '일정 미정';
-        if (p.confirmed_schedule) { 
-            scheduleText = `<span class="text-emerald-600 font-black">${formatTime(p.confirmed_schedule)} 확정</span>`; 
-        } else if (p.schedule && Array.isArray(p.schedule) && p.schedule.length > 0) {
-            scheduleText = `<span class="text-indigo-500 font-black">${p.schedule.length}개</span> 후보 제안됨`;
+        // 💡 1. 제안된 종목 리스트를 카드 내부에서 뱃지 형태로 확실하게 노출
+        let gamesHtml = '';
+        if (p.proposed_games && Array.isArray(p.proposed_games)) {
+            gamesHtml = p.proposed_games.map(g => {
+                const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+                return `
+                    <div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm">
+                        <img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" />
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-black text-slate-800 leading-tight">${g.name}</span>
+                            <span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${g.mode || '4v4'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
-        let teamNameDisplay = isPending ? `<span class="text-xs font-black text-slate-400 italic flex items-center gap-1"><i data-lucide="shield-question" class="w-3.5 h-3.5"></i> 익명 팀 모집 중</span>` : `<span class="text-xs font-black text-slate-800">${p.attacker_team_name}</span>`;
-        
-        let gameVisualHtml = '';
-        if (isPending && p.proposed_games) {
-            const logos = p.proposed_games.map(g => {
-                const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-                return `<div class="relative"><img src="${safeLogo}" class="w-7 h-7 object-contain drop-shadow-sm bg-white rounded border border-slate-100 p-0.5"><span class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[7px] font-black px-1 rounded shadow-md z-20">${g.mode || '4v4'}</span></div>`;
-            }).join('');
-            gameVisualHtml = `<div class="flex items-center justify-center gap-1.5 flex-wrap w-full p-1">${logos}</div><div class="absolute bottom-0 w-full bg-slate-700 text-white text-center text-[8px] font-black py-1">종목 선택 가능</div>`;
+        // 💡 2. "N개 후보 제안됨" 대신, 실제 후보 날짜 배열을 칩 형태로 전부 명확히 리스팅
+        let schedulesHtml = '';
+        if (p.confirmed_schedule) {
+            schedulesHtml = `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2.5 py-1 rounded-md font-black flex items-center gap-1">📅 확정 일시: ${formatTime(p.confirmed_schedule)}</span>`;
+        } else if (p.schedule && Array.isArray(p.schedule) && p.schedule.length > 0) {
+            schedulesHtml = p.schedule.map(iso => `
+                <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] px-2 py-1 rounded-md font-bold tracking-tight">⏱️ ${formatTime(iso)}</span>
+            `).join('');
         } else {
-            const safeLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-            gameVisualHtml = `<img src="${safeLogo}" class="w-12 h-12 object-contain drop-shadow-md z-10"><div class="absolute bottom-0 w-full bg-slate-800 text-white text-center text-[8px] font-black py-1 truncate px-1">${p.game_name}</div>`;
+            schedulesHtml = `<span class="text-slate-400 text-[10px] font-bold">제안된 일정 없음</span>`;
+        }
+
+        // 왼쪽 메인 비주얼 데코레이션
+        let leftVisualHtml = '';
+        if (isPending) {
+            leftVisualHtml = `
+                <div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0">
+                    <i data-lucide="swords" class="w-7 h-7 mb-1 animate-pulse"></i>
+                    <span class="text-[9px] font-black tracking-widest uppercase opacity-80">OPEN</span>
+                </div>
+            `;
+        } else {
+            const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+            leftVisualHtml = `
+                <div class="w-20 h-20 bg-slate-100 border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-inner">
+                    <img src="${safeGameLogo}" class="max-w-full max-h-full object-contain drop-shadow-sm" />
+                    <div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${p.game_mode || '4v4'}</div>
+                </div>
+            `;
         }
 
         const card = document.createElement('div');
-        card.className = `p-4 rounded-2xl border ${isPending ? 'bg-white border-violet-100 hover:border-violet-300' : 'bg-slate-50 border-slate-200'} transition-all shadow-sm flex gap-4`;
+        // 1줄에 1개씩 꽉 차는 프리미엄 레이아웃 구조 개편
+        card.className = `p-5 rounded-3xl border ${isPending ? 'bg-white border-slate-200/80 hover:border-violet-400 hover:shadow-md' : 'bg-slate-50 border-slate-200 opacity-75'} transition-all shadow-sm flex flex-col md:flex-row gap-5 md:items-center relative group`;
+        
         card.innerHTML = `
-            <div class="w-24 h-24 bg-white rounded-xl border border-slate-200 shadow-inner flex flex-col items-center justify-center shrink-0 overflow-hidden relative">${gameVisualHtml}</div>
-            <div class="flex-1 flex flex-col min-w-0">
-                <div class="flex items-start justify-between mb-2">
-                    <div class="truncate">
-                        <div class="flex items-center gap-2 mb-1">
-                            ${isPending ? `<span class="bg-orange-100 text-orange-600 border border-orange-200 text-[10px] px-2 py-0.5 rounded font-black flex items-center gap-1 animate-pulse">대기 중</span>` : `<span class="bg-slate-700 text-white text-[10px] px-2 py-0.5 rounded font-black">종료됨</span>`}
-                            <span class="text-[9px] text-slate-500 font-bold bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">${scheduleText}</span>
-                        </div>
-                        <div class="mt-1.5">${teamNameDisplay} ${!isPending ? `<span class="text-[10px] text-rose-500 font-bold mx-1">VS</span><span class="text-xs font-black text-slate-800">${p.defender_team_name}</span>` : ''}</div>
+            ${leftVisualHtml}
+            
+            <div class="flex-1 flex flex-col min-w-0 gap-3">
+                
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">${isPending ? '🎯 대항 제안 종목 후보' : '⚔️ 확정 경기 종목'}</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${isPending ? gamesHtml : `
+                            <div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm">
+                                <span class="text-xs font-black">${p.game_name}</span>
+                            </div>
+                        `}
                     </div>
                 </div>
-                <p class="text-xs font-bold text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100/80 italic line-clamp-2 shadow-sm">"${p.message}"</p>
-                <div class="flex items-center justify-end mt-auto pt-3">
-                    ${isPending ? `<button onclick="Boako.League.showAcceptPopup(${p.id})" class="bg-violet-600 hover:bg-violet-700 text-white font-black text-[10px] px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1"><i data-lucide="eye" class="w-3 h-3"></i> 정보 확인 및 참전</button>` : `<span class="text-[10px] font-black text-slate-400">성사 완료</span>`}
+                
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">${isPending ? '🕒 조율 가능한 후보 일정 목록' : '📅 확정 대결 일시'}</label>
+                    <div class="flex flex-wrap gap-1">
+                        ${schedulesHtml}
+                    </div>
                 </div>
+                
+                <div class="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100/80">
+                    ${!isPending ? `
+                        <div class="text-xs font-black text-slate-800 flex items-center gap-1">
+                            <span class="text-violet-600">${p.attacker_team_name}</span>
+                            <span class="text-rose-500 text-[10px] italic mx-0.5">VS</span>
+                            <span class="text-slate-800">${p.defender_team_name}</span>
+                        </div>
+                    ` : ''}
+                    <p class="text-xs font-bold text-slate-600 italic">"${p.message}"</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-end md:flex-col md:justify-center shrink-0 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5 min-w-[150px]">
+                ${isPending 
+                    ? `<button onclick="Boako.League.showAcceptPopup(${p.id})" class="w-full bg-slate-900 hover:bg-violet-600 group-hover:bg-violet-600 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><i data-lucide="eye" class="w-4 h-4"></i> 정보 확인 및 참전</button>` 
+                    : `<div class="text-center w-full py-2"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mx-auto mb-1 opacity-80"></i><span class="text-[10px] font-black text-slate-400 block">매칭 완료</span></div>`}
             </div>
         `;
         container.appendChild(card);
