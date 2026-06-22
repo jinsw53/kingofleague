@@ -379,18 +379,31 @@ Boako.League.renderChallenges = function() {
                 break;
         }
 
-        // 왼쪽 비주얼 영역 데코레이션
+       // 🚨 수정된 로직: PENDING(대기 중)일 때만 '후보'를 보여주고, 그 이후 단계부터는 '확정된 단건'만 노출
+        const isPendingState = currentStatus === 'PENDING';
+
+        // 1. 왼쪽 비주얼 영역 (협상 중일 때는 강렬한 더블 배팅 이펙트 + 확정 게임 로고 노출)
         let leftVisualHtml = '';
-        if (currentStatus === 'PENDING' || currentStatus === 'NEGOTIATING') {
-            leftVisualHtml = `<div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0"><i data-lucide="swords" class="w-7 h-7 mb-1 ${currentStatus === 'NEGOTIATING' ? 'animate-bounce' : 'animate-pulse'}"></i><span class="text-[9px] font-black tracking-widest uppercase opacity-80">${currentStatus === 'PENDING' ? 'OPEN' : 'BET'}</span></div>`;
+        if (isPendingState) {
+            leftVisualHtml = `<div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0"><i data-lucide="swords" class="w-7 h-7 mb-1 animate-pulse"></i><span class="text-[9px] font-black tracking-widest uppercase opacity-80">OPEN</span></div>`;
+        } else if (currentStatus === 'NEGOTIATING') {
+            const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+            leftVisualHtml = `
+                <div class="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 border border-amber-400 rounded-2xl flex flex-col items-center justify-center p-1.5 shrink-0 relative overflow-hidden shadow-lg shadow-amber-500/30">
+                    <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    <img src="${safeGameLogo}" class="max-w-full max-h-full object-contain relative z-10 drop-shadow-md bg-white rounded-xl p-1" />
+                    <div class="absolute bottom-0 inset-x-0 bg-amber-900 text-white text-[8px] font-black py-0.5 text-center truncate z-20">더블 배팅!</div>
+                </div>
+            `;
         } else {
             const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
             leftVisualHtml = `<div class="w-20 h-20 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-sm"><img src="${safeGameLogo}" class="max-w-full max-h-full object-contain" /><div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${p.game_mode || '4v4'}</div></div>`;
         }
 
         const card = document.createElement('div');
-        card.className = `p-5 rounded-3xl border ${currentStatus === 'CANCELED' ? 'bg-slate-100/50 border-slate-200 opacity-50' : 'bg-white border-slate-200'} transition-all shadow-sm flex flex-col md:flex-row gap-5 md:items-center relative group`;
+        card.className = `p-5 rounded-3xl border ${currentStatus === 'CANCELED' ? 'bg-slate-100/50 border-slate-200 opacity-50' : currentStatus === 'NEGOTIATING' ? 'bg-amber-50/30 border-amber-300' : 'bg-white border-slate-200'} transition-all shadow-sm flex flex-col md:flex-row gap-5 md:items-center relative group`;
         
+        // 2. 카드 내부 구조
         card.innerHTML = `
             ${leftVisualHtml}
             <div class="flex-1 flex flex-col min-w-0 gap-3">
@@ -401,14 +414,29 @@ Boako.League.renderChallenges = function() {
                         ${p.is_defender_token_used ? `<span class="bg-orange-50 text-orange-600 border border-orange-200 text-[9px] font-black px-1.5 py-0.5 rounded">방어팀 🪙</span>` : ''}
                     </div>
                 </div>
+                
+                <!-- 🎯 종목 영역: 대기 중일 땐 리스트, 그 외엔 확정 종목 -->
                 <div>
-                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${currentStatus === 'PENDING' || currentStatus === 'NEGOTIATING' ? '🎯 대항 제안 종목 후보' : '⚔️ 확정 경기 종목'}</label>
-                    <div class="flex flex-wrap gap-1.5">${currentStatus === 'PENDING' || currentStatus === 'NEGOTIATING' ? gamesHtml : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1 rounded-xl shadow-sm"><span class="text-xs font-black">${p.game_name}</span></div>`}</div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${isPendingState ? '🎯 대항 제안 종목 후보' : '⚔️ 확정 경기 종목'}</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${isPendingState 
+                            ? gamesHtml 
+                            : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><img src="${(p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" class="w-4 h-4 object-contain rounded bg-white p-0.5" /><span class="text-xs font-black">${p.game_name}</span><span class="text-[9px] font-black text-slate-400 border-l border-slate-600 pl-2 ml-1">${p.game_mode || '4v4'}</span></div>`
+                        }
+                    </div>
                 </div>
+                
+                <!-- 🕒 일정 영역: 대기 중일 땐 후보 배열, 그 외엔 확정 일정 -->
                 <div>
-                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${currentStatus === 'PENDING' || currentStatus === 'NEGOTIATING' ? '🕒 조율 가능한 후보 일정 목록' : '📅 확정 대결 일시'}</label>
-                    <div class="flex flex-wrap gap-1">${schedulesHtml}</div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${isPendingState ? '🕒 조율 가능한 후보 일정 목록' : '📅 확정 대결 일시'}</label>
+                    <div class="flex flex-wrap gap-1">
+                        ${isPendingState 
+                            ? schedulesHtml 
+                            : `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] px-3 py-1.5 rounded-lg font-black flex items-center gap-1 shadow-sm">📅 ${formatTime(p.confirmed_schedule)}</span>`
+                        }
+                    </div>
                 </div>
+                
                 <div class="flex flex-col gap-1 pt-1.5 border-t border-slate-100">
                     ${p.defender_team_name ? `<div class="text-xs font-black text-slate-800 flex items-center gap-1"><span class="text-violet-600">${p.attacker_team_name}</span><span class="text-rose-500 text-[10px] italic mx-0.5">VS</span><span class="text-slate-800">${p.defender_team_name}</span></div>` : `<div class="text-xs font-black text-slate-400"><span class="text-slate-600">${p.attacker_team_name}</span> 팀의 전면 도발</div>`}
                     <p class="text-xs font-bold text-slate-500 italic">"${p.message}"</p>
