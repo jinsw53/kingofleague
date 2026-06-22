@@ -721,6 +721,7 @@ Boako.League.registerChallenge = async function() {
 // ====================================================================
 // 💡 5. 참전 수락 팝업 로직
 // ====================================================================
+// 1. 팝업 UI 업데이트
 Boako.League.showAcceptPopup = function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
@@ -729,12 +730,10 @@ Boako.League.showAcceptPopup = function(challengeId) {
     
     let schedulesOptions = '<option value="">선택 불가 (일정 없음)</option>';
     if (p.schedule && p.schedule.length > 0) {
-        schedulesOptions = p.schedule.map((d, i) => {
+        schedulesOptions = p.schedule.map((d) => {
             const dt = new Date(d);
             const isZeroTime = dt.getHours() === 0 && dt.getMinutes() === 0;
-            const display = isZeroTime 
-                ? `${dt.getMonth()+1}월 ${dt.getDate()}일 (시간 상관없음)` 
-                : `${dt.getMonth()+1}월 ${dt.getDate()}일 ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+            const display = isZeroTime ? `${dt.getMonth()+1}월 ${dt.getDate()}일 (시간 상관없음)` : `${dt.getMonth()+1}월 ${dt.getDate()}일 ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
             return `<option value="${d}">${display}</option>`;
         }).join('');
     }
@@ -746,25 +745,32 @@ Boako.League.showAcceptPopup = function(challengeId) {
             <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200" onclick="event.stopPropagation()">
                 <div class="bg-gradient-to-br from-violet-600 to-indigo-700 p-6 text-center relative">
                     <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="absolute top-4 right-4 text-white/60 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-                    <span class="bg-white/20 text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-white/30 backdrop-blur-md mb-4 inline-block">발행 팀 정보 공개</span>
-                    <div class="w-20 h-20 mx-auto bg-white rounded-2xl shadow-lg p-1.5 mb-3 border-2 border-white/50 transform rotate-3"><img src="${safeTeamLogo}" class="w-full h-full object-cover rounded-xl" /></div>
+                    <div class="w-20 h-20 mx-auto bg-white rounded-2xl shadow-lg p-1.5 mb-3 border-2 border-white/50"><img src="${safeTeamLogo}" class="w-full h-full object-cover rounded-xl" /></div>
                     <h3 class="text-xl font-black text-white">${p.attacker_team_name}</h3>
                 </div>
                 
                 <div class="p-6 space-y-5">
                     <div>
                         <label class="block text-xs font-black text-slate-700 mb-1.5">🎯 맞붙을 종목 선택</label>
-                        <select id="popup-selected-game" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 cursor-pointer shadow-inner">
-                            ${gamesOptions}
-                        </select>
+                        <select id="popup-selected-game" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 cursor-pointer shadow-inner">${gamesOptions}</select>
                     </div>
                     <div>
                         <label class="block text-xs font-black text-slate-700 mb-1.5">🕒 최종 확정 일정 선택</label>
-                        <p class="text-[10px] text-slate-500 mb-2 font-bold">상대 팀이 제안한 후보 일정 중 하나를 선택하세요.</p>
-                        <select id="popup-confirmed-schedule" class="w-full bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2.5 text-xs font-black text-indigo-800 outline-none focus:border-indigo-500 cursor-pointer shadow-inner">
-                            ${schedulesOptions}
-                        </select>
+                        <select id="popup-confirmed-schedule" class="w-full bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2.5 text-xs font-black text-indigo-800 outline-none focus:border-indigo-500 cursor-pointer shadow-inner">${schedulesOptions}</select>
                     </div>
+                    
+                    <!-- 🚨 묻고 더블로 가! 토글 영역 -->
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                        <div>
+                            <span class="block text-xs font-black text-amber-800">🔥 묻고 더블로 가!</span>
+                            <span class="block text-[10px] font-bold text-amber-600 mt-0.5">우리 팀도 토큰을 걸어 판돈을 키웁니다.</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="popup-use-token" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 shadow-inner"></div>
+                        </label>
+                    </div>
+
                     <button onclick="Boako.League.confirmAcceptChallenge(${p.id})" class="w-full bg-slate-900 hover:bg-black text-white font-black text-sm py-3.5 rounded-xl shadow-lg transition-all">
                         ⚔️ 조건 확정 및 참전하기
                     </button>
@@ -772,18 +778,18 @@ Boako.League.showAcceptPopup = function(challengeId) {
             </div>
         </div>
     `;
-    
     document.getElementById('challenge-popup-root').innerHTML = popupHtml;
     if (window.lucide) window.lucide.createIcons();
 };
 
+// 2. 수락 로직에 토큰 변수 추가
 Boako.League.confirmAcceptChallenge = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     const selectedGameIndex = document.getElementById('popup-selected-game').value;
     const confirmedTime = document.getElementById('popup-confirmed-schedule').value;
+    const useToken = document.getElementById('popup-use-token').checked; // 🚨 토큰 사용 여부
     
     if (!confirmedTime) return alert("최종 확정 일정을 입력해 주세요.");
-    
     const selectedGame = p.proposed_games[selectedGameIndex];
 
     try {
@@ -794,19 +800,21 @@ Boako.League.confirmAcceptChallenge = async function(challengeId) {
             p_game_name: selectedGame.name,
             p_game_logo_url: selectedGame.logo,
             p_game_mode: selectedGame.mode || '4v4',
-            p_confirmed_schedule: new Date(confirmedTime).toISOString()
+            p_confirmed_schedule: new Date(confirmedTime).toISOString(),
+            p_use_token: useToken // RPC로 전달
         };
 
         if (Boako.db) {
             const { error } = await Boako.db.rpc('accept_challenge', payload);
-            if (error) throw error;
+            if (error) {
+                if(error.message.includes("토큰이 부족")) return alert("보유한 챌린지 토큰이 부족하여 더블 배팅을 할 수 없습니다.");
+                throw error;
+            }
         }
 
-        alert("매칭이 성사되었습니다! 뜨거운 승부를 기대합니다.");
+        alert("매칭이 성사되었습니다!");
         document.getElementById('challenge-popup-root').innerHTML = ''; 
-        await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
-        Boako.League.renderChallenges();
-    } catch (err) { alert("처리 중 오류가 발생했습니다."); console.error(err); }
+    } catch (err) { alert("처리 중 오류가 발생했습니다: " + err.message); console.error(err); }
 };
 
 // ====================================================================
