@@ -2,6 +2,31 @@
  * [MATCH] 대항전 메인 대시보드 관리
  */
 Boako.Match = {
+    // 🌟 [신규] 스코어보드 리얼타임 채널 보관용
+    scoreChannel: null,
+
+    // 🌟 [신규] 실시간 스코어 감지기
+    setupRealtimeScore: (seasonNo) => {
+        // 기존 구독이 있다면 먼저 해제 (중복 통신 방지)
+        if (Boako.Match.scoreChannel) {
+            Boako.db.removeChannel(Boako.Match.scoreChannel);
+        }
+
+        // 해당 시즌의 grandprix_game_scores 테이블의 모든 변화(INSERT, UPDATE)를 감시
+        Boako.Match.scoreChannel = Boako.db.channel(`match-score-season-${seasonNo}`)
+            .on('postgres_changes', {
+                event: '*', 
+                schema: 'public',
+                table: 'grandprix_game_scores',
+                filter: `season_no=eq.${seasonNo}`
+            }, (payload) => {
+                console.log("🌟 [실시간 감지] 스코어 데이터 변경:", payload);
+                Boako.Util.toast("🏆 스코어보드가 실시간으로 업데이트되었습니다!", 3000);
+                Boako.Match.loadData();
+            })
+            .subscribe();
+    },
+
     // 🌟 1. 스타일 및 확대용 포탈 자동 주입
     injectStylesAndPortal: () => {
         if (document.getElementById('boako-match-styles')) return;
@@ -184,7 +209,7 @@ Boako.Match = {
                     : `<div class="text-white/50 text-sm font-bold border-2 border-dashed border-white/20 px-6 py-4 rounded-2xl w-max">시즌 로고 대기 중</div>`;
                 
                 let dateHtml = `<div class="text-indigo-200 text-xs font-black bg-indigo-900/60 px-3 py-1.5 rounded-lg border border-indigo-500/30 w-max shadow-inner">
-                                   📅 ${currentSeason?.start_date ? currentSeason.start_date.substring(0, 10) : '시작 미정'} ~ ${currentSeason?.end_date ? currentSeason.end_date.substring(0, 10) : '종료 미정'}
+                                    📅 ${currentSeason?.start_date ? currentSeason.start_date.substring(0, 10) : '시작 미정'} ~ ${currentSeason?.end_date ? currentSeason.end_date.substring(0, 10) : '종료 미정'}
                                 </div>`;
                 
                 logoEl.innerHTML = logoHtml + dateHtml;
@@ -234,6 +259,9 @@ Boako.Match = {
             Boako.Match.renderEntryTab(displayGames, isFinalized, confirmedEntries);
             Boako.Match.renderScoreTab(displayGames, isFinalized, confirmedEntries, gameScores);
 
+            // 🌟 [추가됨] 렌더링이 끝나면 해당 시즌의 스코어보드 감지기 작동!
+            Boako.Match.setupRealtimeScore(seasonNo);
+
         } catch (err) {
             console.error("대항전 데이터 로드 에러:", err);
             document.getElementById('match-ban-content').innerHTML = `
@@ -243,7 +271,7 @@ Boako.Match = {
             `;
         }
     },
-// 🌟 여기에 신규 함수 추가!
+    // 🌟 여기에 신규 함수 추가!
     switchSeason: async (seasonNo) => {
         Boako.Match.currentSeasonNo = Number(seasonNo); // 선택한 시즌 번호 저장
         document.getElementById('tab-score').innerHTML = `<div class="p-12 text-center text-slate-400 font-bold">데이터를 불러오는 중입니다... ⏳</div>`;
@@ -453,7 +481,7 @@ Boako.Match = {
         html += `</div>`;
         content.innerHTML = html;
     },
-// 🌟 [신규 추가] 아코디언(상세 점수) 토글 함수
+    // 🌟 [신규 추가] 아코디언(상세 점수) 토글 함수
     toggleScoreDetail: (teamId) => {
         const detailRow = document.getElementById(`detail-${teamId}`);
         const icon = document.getElementById(`icon-${teamId}`);
@@ -488,12 +516,21 @@ Boako.Match = {
             teamData[entry.team_name].gameScores[entry.game_name] = { entered: true, detail: null };
         });
 
+        // 🌟 [핵심 변경] DB에서 넘어온 JSON 데이터 안전 파싱 함수
+        const safeParseJSON = (data) => {
+            if (!data) return {};
+            if (typeof data === 'string') {
+                try { return JSON.parse(data); } catch(e) { return {}; }
+            }
+            return data;
+        };
+
         // 2. DB 스코어 데이터 매핑
         scores.forEach(row => {
             const gameName = row.game_name;
-            const currentScores = row.scores || {};
-            const originalScores = row.original_scores || {};
-            const penaltyReasons = row.penalty_reasons || {};
+            const currentScores = safeParseJSON(row.scores);
+            const originalScores = safeParseJSON(row.original_scores);
+            const penaltyReasons = safeParseJSON(row.penalty_reasons);
             const url = row.source_url || '#';
             const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '일시 미상';
 
