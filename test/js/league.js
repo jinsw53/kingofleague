@@ -1,5 +1,6 @@
 /*** 
  * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
+ * 🛠️ 2026 최신화 패치: 용병 필터링 최적화(player_name 기반), '1vs1' UI 포매팅 일괄 적용, 모달 렌더링 안정성 강화
  * 관리 책임자: 소장님 MASTER 
  */
 
@@ -32,7 +33,13 @@ Boako.League.State = {
     
     // 모달 작성 시 상태 관리
     selectedProposedGames: [], // [{name: '종목명', logo: 'url', mode: '4v4'}, ...]
-    selectedSchedules: []      // ['2026-06-21 20:00', ...]
+    selectedSchedules: [],     // ['2026-06-21 20:00', ...]
+    
+    // 로스터 상태 관리
+    currentRosterSlots: [null, null, null, null], 
+    rosterTeamMembers: [],
+    rosterMercenaries: [],
+    isMercenaryTab: false
 };
 
 // 🌟 공용 커스텀 드롭다운 토글 함수
@@ -43,6 +50,11 @@ Boako.League.toggleDropdown = function(id) {
         menu.classList.toggle('hidden');
         overlay.classList.toggle('hidden');
     }
+};
+
+// 🌟 공용 포매팅 함수 (1v1 -> 1vs1 변환)
+Boako.League.formatMode = function(modeStr) {
+    return (modeStr || '4v4').replace('v', 'vs');
 };
 
 // ====================================================================
@@ -154,7 +166,8 @@ Boako.League.initChallengeData = async function() {
 
         Boako.League.State.selectedChallengeSeason = currentSeason ? currentSeason.season_no : (Boako.League.State.challengeSeasons[0]?.season_no || 1);
 
-        // 1. 최초 데이터 로드
+        // 최초 데이터 로드 (초기화)
+        Boako.League.State.challenges = [];
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         
         const container = document.getElementById('league-view-container');
@@ -164,18 +177,14 @@ Boako.League.initChallengeData = async function() {
         }
 
         // 🚨 [실시간 리얼타임 부품 꽂기] 
-        // 기존 채널이 있다면 꼬이지 않게 먼저 해제
         if (Boako.League.State.realtimeChannel) {
             Boako.db.removeChannel(Boako.League.State.realtimeChannel);
         }
 
-        // challenges 테이블의 변경사항을 실시간 구독(Subscribe)
         Boako.League.State.realtimeChannel = Boako.db
             .channel('public:challenges')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, async (payload) => {
                 console.log('🔥 챌린지 광장 실시간 변동 감지:', payload);
-                
-                // 데이터베이스에 변동이 생기면 현재 선택된 시즌의 데이터를 다시 긁어와서 화면만 갱신
                 await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
                 Boako.League.renderChallenges();
             })
@@ -264,7 +273,6 @@ Boako.League.getChallengeHTML = function() {
                 </div>
             </div>
             
-            <!-- 🔥 문제 해결: grid, xl:grid-cols-2 속성을 싹 날리고 flex-col 로 넓게 폈습니다! -->
             <div id="challenge-list" class="overflow-y-auto pr-2 custom-scrollbar flex-1 pb-4 flex flex-col gap-4"></div>
         </div>
         <div id="challenge-modal-root"></div>
@@ -283,21 +291,18 @@ Boako.League.renderChallenges = function() {
         return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
     };
 
-    // 현재 접속한 내 유저 정보 및 팀 정보
     const myTeamId = Boako.state?.team?.info?.id;
-    const isLeader = Boako.state?.user?.role === 'LEADER'; // 팀장 여부
 
     Boako.League.State.challenges.forEach(p => {
         const currentStatus = p.status;
         const isMyAttack = (p.attacker_team_id === myTeamId);
         const isMyDefend = (p.defender_team_id === myTeamId);
         
-        // 공통 종목 및 일정 칩 렌더링 로직
         let gamesHtml = '';
         if (p.proposed_games && Array.isArray(p.proposed_games)) {
             gamesHtml = p.proposed_games.map(g => {
                 const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-                return `<div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm"><img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" /><div class="flex flex-col"><span class="text-[11px] font-black text-slate-800 leading-tight">${g.name}</span><span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${g.mode || '4v4'}</span></div></div>`;
+                return `<div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm"><img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" /><div class="flex flex-col"><span class="text-[11px] font-black text-slate-800 leading-tight">${g.name}</span><span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${Boako.League.formatMode(g.mode)}</span></div></div>`;
             }).join('');
         }
 
@@ -308,12 +313,11 @@ Boako.League.renderChallenges = function() {
             schedulesHtml = p.schedule.map(iso => `<span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] px-2 py-1 rounded-md font-bold tracking-tight">⏱️ ${formatTime(iso)}</span>`).join('');
         }
 
-        // 🚨 [핵심] 6단계 상태 및 권한별 우측 액션 영역 분기 제어
         let actionHtml = '';
         let statusBadgeHtml = '';
 
         switch (currentStatus) {
-            case 'PENDING': // 1단계: 도발 및 대기
+            case 'PENDING': 
                 statusBadgeHtml = `<span class="bg-orange-100 text-orange-600 border border-orange-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1 animate-pulse">⚔️ 대기 중</span>`;
                 if (isMyAttack) {
                     actionHtml = `
@@ -327,10 +331,9 @@ Boako.League.renderChallenges = function() {
                 }
                 break;
 
-            case 'NEGOTIATING': // 2단계: 판돈 협상 중 (더블 배팅 발생)
+            case 'NEGOTIATING': 
                 statusBadgeHtml = `<span class="bg-amber-100 text-amber-700 border border-amber-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1"><i data-lucide="zap" class="w-3 h-3 text-amber-500 animate-bounce"></i> 판돈 협상 중</span>`;
                 if (isMyAttack) {
-                    // 공격팀 팀장에게 결정권 부여
                     actionHtml = `
                         <div class="flex flex-col gap-1.5 w-full">
                             <div class="text-[10px] text-amber-600 font-black text-center animate-pulse">상대 더블 베팅 시전!</div>
@@ -345,7 +348,7 @@ Boako.League.renderChallenges = function() {
                 }
                 break;
 
-            case 'ROSTER_WAITING': // 3단계: 엔트리 등록 대기
+            case 'ROSTER_WAITING': 
                 statusBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">📋 로스터 구성 중</span>`;
                 if (isMyAttack || isMyDefend) {
                     actionHtml = `<button onclick="Boako.League.showRosterModal(${p.id})" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"><i data-lucide="users" class="w-4 h-4"></i> 엔트리/용병 등록</button>`;
@@ -354,12 +357,12 @@ Boako.League.renderChallenges = function() {
                 }
                 break;
 
-            case 'UPCOMING': // 4단계: 결전 임박
+            case 'UPCOMING': 
                 statusBadgeHtml = `<span class="bg-purple-100 text-purple-700 border border-purple-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1"><i data-lucide="swords" class="w-3 h-3 text-purple-500"></i> 결전 임박</span>`;
                 actionHtml = `<button onclick="Boako.League.viewMatchLineup(${p.id})" class="w-full bg-white hover:bg-slate-50 text-slate-800 font-black text-xs px-4 py-3.5 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center justify-center gap-1.5"><i data-lucide="scroll-text" class="w-4 h-4"></i> 라인업/전적 확인</button>`;
                 break;
 
-            case 'RESULT_PENDING': // 5단계: 결과 입력 대기
+            case 'RESULT_PENDING': 
                 statusBadgeHtml = `<span class="bg-rose-100 text-rose-700 border border-rose-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1 animate-pulse">⏱️ 결과 대기 중</span>`;
                 if (isMyAttack || isMyDefend) {
                     actionHtml = `<button onclick="Boako.League.showResultInputModal(${p.id})" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"><i data-lucide="trophy" class="w-4 h-4"></i> 경기 승패 스코어 입력</button>`;
@@ -368,7 +371,7 @@ Boako.League.renderChallenges = function() {
                 }
                 break;
 
-            case 'COMPLETED': // 6단계: 정산 및 종료
+            case 'COMPLETED': 
                 statusBadgeHtml = `<span class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">🏆 종료 완료</span>`;
                 actionHtml = `<div class="text-center w-full py-2"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mx-auto mb-1 opacity-80"></i><span class="text-[10px] font-black text-slate-400 block">포인트 정산 완료</span></div>`;
                 break;
@@ -379,10 +382,8 @@ Boako.League.renderChallenges = function() {
                 break;
         }
 
-       // 🚨 수정된 로직: PENDING(대기 중)일 때만 '후보'를 보여주고, 그 이후 단계부터는 '확정된 단건'만 노출
         const isPendingState = currentStatus === 'PENDING';
 
-        // 1. 왼쪽 비주얼 영역 (협상 중일 때는 강렬한 더블 배팅 이펙트 + 확정 게임 로고 노출)
         let leftVisualHtml = '';
         if (isPendingState) {
             leftVisualHtml = `<div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0"><i data-lucide="swords" class="w-7 h-7 mb-1 animate-pulse"></i><span class="text-[9px] font-black tracking-widest uppercase opacity-80">OPEN</span></div>`;
@@ -397,13 +398,12 @@ Boako.League.renderChallenges = function() {
             `;
         } else {
             const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-            leftVisualHtml = `<div class="w-20 h-20 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-sm"><img src="${safeGameLogo}" class="max-w-full max-h-full object-contain" /><div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${p.game_mode || '4v4'}</div></div>`;
+            leftVisualHtml = `<div class="w-20 h-20 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-sm"><img src="${safeGameLogo}" class="max-w-full max-h-full object-contain" /><div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${Boako.League.formatMode(p.game_mode)}</div></div>`;
         }
 
         const card = document.createElement('div');
         card.className = `p-5 rounded-3xl border ${currentStatus === 'CANCELED' ? 'bg-slate-100/50 border-slate-200 opacity-50' : currentStatus === 'NEGOTIATING' ? 'bg-amber-50/30 border-amber-300' : 'bg-white border-slate-200'} transition-all shadow-sm flex flex-col md:flex-row gap-5 md:items-center relative group`;
         
-        // 2. 카드 내부 구조
         card.innerHTML = `
             ${leftVisualHtml}
             <div class="flex-1 flex flex-col min-w-0 gap-3">
@@ -415,18 +415,16 @@ Boako.League.renderChallenges = function() {
                     </div>
                 </div>
                 
-                <!-- 🎯 종목 영역: 대기 중일 땐 리스트, 그 외엔 확정 종목 -->
                 <div>
                     <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${isPendingState ? '🎯 대항 제안 종목 후보' : '⚔️ 확정 경기 종목'}</label>
                     <div class="flex flex-wrap gap-1.5">
                         ${isPendingState 
                             ? gamesHtml 
-                            : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><img src="${(p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" class="w-4 h-4 object-contain rounded bg-white p-0.5" /><span class="text-xs font-black">${p.game_name}</span><span class="text-[9px] font-black text-slate-400 border-l border-slate-600 pl-2 ml-1">${p.game_mode || '4v4'}</span></div>`
+                            : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><img src="${(p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" class="w-4 h-4 object-contain rounded bg-white p-0.5" /><span class="text-xs font-black">${p.game_name}</span><span class="text-[9px] font-black text-slate-400 border-l border-slate-600 pl-2 ml-1">${Boako.League.formatMode(p.game_mode)}</span></div>`
                         }
                     </div>
                 </div>
                 
-                <!-- 🕒 일정 영역: 대기 중일 땐 후보 배열, 그 외엔 확정 일정 -->
                 <div>
                     <label class="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">${isPendingState ? '🕒 조율 가능한 후보 일정 목록' : '📅 확정 대결 일시'}</label>
                     <div class="flex flex-wrap gap-1">
@@ -448,10 +446,14 @@ Boako.League.renderChallenges = function() {
         `;
         container.appendChild(card);
     });
-    if (window.lucide) window.lucide.createIcons();
+    
+    // 모달 DOM 렌더링 이후 안전하게 아이콘 그리기
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 };
 
-// 🚨 프론트엔드 연결 브릿지 함수 추가
+// ====================================================================
+// 💡 공격팀 배팅 철회 (토큰 회수) 및 협상 결정
+// ====================================================================
 Boako.League.resolveNegotiation = async function(challengeId, decision) {
     const msg = decision === 'CALL' ? "더블 배팅을 수락하고 매칭을 확정하시겠습니까?" : "배팅을 철회하시겠습니까? 소모된 토큰이 환불되며 매칭이 취소됩니다.";
     if (!confirm(msg)) return;
@@ -472,6 +474,23 @@ Boako.League.resolveNegotiation = async function(challengeId, decision) {
     }
 };
 
+Boako.League.withdrawAttackerToken = async function(challengeId) {
+    if (!confirm("정말 배팅을 철회하시겠습니까? 소모된 토큰 1개를 돌려받지만, 비겁하다는 소리를 들을 수 있습니다.")) return;
+
+    try {
+        if (!Boako.db) throw new Error("DB 연결 오류");
+        const { error } = await Boako.db.rpc('withdraw_attacker_token', { p_challenge_id: challengeId });
+        if (error) throw error;
+
+        alert("배팅 철회가 완료되었습니다. 토큰 1개가 환불되었습니다.");
+        await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
+        Boako.League.renderChallenges();
+    } catch (err) {
+        alert("철회 실패: " + err.message);
+    }
+};
+
+
 // ====================================================================
 // 💡 4. 도전장 모달 (종목 검색, 드롭다운, 달력, 제출 통합)
 // ====================================================================
@@ -482,7 +501,6 @@ Boako.League.showCreateChallengeModal = function() {
         return;
     }
 
-    // 초기화
     Boako.League.State.selectedProposedGames = [];
     Boako.League.State.selectedSchedules = [];
 
@@ -533,7 +551,7 @@ Boako.League.showCreateChallengeModal = function() {
     `;
     
     document.getElementById('challenge-modal-root').innerHTML = modalHtml;
-    if (window.lucide) window.lucide.createIcons();
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
     Boako.League.initGameSearch();
 };
 
@@ -635,8 +653,7 @@ Boako.League.renderSelectedGames = function() {
         </div>
     `}).join('');
 
-    // 아이콘 재렌더링
-    if (window.lucide) window.lucide.createIcons();
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 
     if (searchInput) {
         if (Boako.League.State.selectedProposedGames.length >= 3) {
@@ -835,12 +852,12 @@ Boako.League.registerChallenge = async function() {
 // ====================================================================
 // 💡 5. 참전 수락 팝업 로직
 // ====================================================================
-// 1. 팝업 UI 업데이트
 Boako.League.showAcceptPopup = function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
     
-    const gamesOptions = (p.proposed_games || []).map((g, i) => `<option value="${i}">${g.name} (${g.mode || '4v4'})</option>`).join('');
+    // 포매팅 적용
+    const gamesOptions = (p.proposed_games || []).map((g, i) => `<option value="${i}">${g.name} (${Boako.League.formatMode(g.mode)})</option>`).join('');
     
     let schedulesOptions = '<option value="">선택 불가 (일정 없음)</option>';
     if (p.schedule && p.schedule.length > 0) {
@@ -873,7 +890,6 @@ Boako.League.showAcceptPopup = function(challengeId) {
                         <select id="popup-confirmed-schedule" class="w-full bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2.5 text-xs font-black text-indigo-800 outline-none focus:border-indigo-500 cursor-pointer shadow-inner">${schedulesOptions}</select>
                     </div>
                     
-                    <!-- 🚨 묻고 더블로 가! 토글 영역 -->
                     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
                         <div>
                             <span class="block text-xs font-black text-amber-800">🔥 묻고 더블로 가!</span>
@@ -893,15 +909,14 @@ Boako.League.showAcceptPopup = function(challengeId) {
         </div>
     `;
     document.getElementById('challenge-popup-root').innerHTML = popupHtml;
-    if (window.lucide) window.lucide.createIcons();
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 };
 
-// 2. 수락 로직에 토큰 변수 추가
 Boako.League.confirmAcceptChallenge = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     const selectedGameIndex = document.getElementById('popup-selected-game').value;
     const confirmedTime = document.getElementById('popup-confirmed-schedule').value;
-    const useToken = document.getElementById('popup-use-token').checked; // 🚨 토큰 사용 여부
+    const useToken = document.getElementById('popup-use-token').checked; 
     
     if (!confirmedTime) return alert("최종 확정 일정을 입력해 주세요.");
     const selectedGame = p.proposed_games[selectedGameIndex];
@@ -915,7 +930,7 @@ Boako.League.confirmAcceptChallenge = async function(challengeId) {
             p_game_logo_url: selectedGame.logo,
             p_game_mode: selectedGame.mode || '4v4',
             p_confirmed_schedule: new Date(confirmedTime).toISOString(),
-            p_use_token: useToken // RPC로 전달
+            p_use_token: useToken
         };
 
         if (Boako.db) {
@@ -930,40 +945,10 @@ Boako.League.confirmAcceptChallenge = async function(challengeId) {
         document.getElementById('challenge-popup-root').innerHTML = ''; 
     } catch (err) { alert("처리 중 오류가 발생했습니다: " + err.message); console.error(err); }
 };
-// ====================================================================
-// 💡 공격팀 배팅 철회 (토큰 회수)
-// ====================================================================
-Boako.League.withdrawAttackerToken = async function(challengeId) {
-    if (!confirm("정말 배팅을 철회하시겠습니까? 소모된 토큰 1개를 돌려받지만, 비겁하다는 소리를 들을 수 있습니다.")) return;
 
-    try {
-        if (!Boako.db) throw new Error("DB 연결 오류");
-        
-        const { error } = await Boako.db.rpc('withdraw_attacker_token', {
-            p_challenge_id: challengeId
-        });
-
-        if (error) throw error;
-
-        alert("배팅 철회가 완료되었습니다. 토큰 1개가 환불되었습니다.");
-        
-        // 데이터 재조회 및 화면 갱신
-        await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
-        Boako.League.renderChallenges();
-        
-    } catch (err) {
-        alert("철회 실패: " + err.message);
-        console.error(err);
-    }
-};
 // ====================================================================
 // 💡 5.5. 결전 로스터(엔트리) 구성 및 지능형 오더 제출 모달
 // ====================================================================
-
-Boako.League.State.currentRosterSlots = [null, null, null, null]; 
-Boako.League.State.rosterTeamMembers = [];
-Boako.League.State.rosterMercenaries = [];
-Boako.League.State.isMercenaryTab = false;
 
 Boako.League.showRosterModal = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
@@ -976,9 +961,9 @@ Boako.League.showRosterModal = async function(challengeId) {
     Boako.League.State.currentRosterSlots = [null, null, null, null];
     Boako.League.State.isMercenaryTab = false;
 
-    // 🚨 1. 데이터 로드 (DB 에러 수정본)
+    // 🚨 [데이터 바인딩 수정 완료] player_name과 is_active를 사용한 DB 매핑
     try {
-        // 1. [우리 팀원] team_members에서 현재 우리 팀 소속인 player_name들 확보
+        // 1. [우리 팀원] team_members에서 현재 활성화된 우리 팀 소속 이름 확보
         const { data: myTeamRel, error: tmErr } = await Boako.db
             .from('team_members')
             .select('player_name')
@@ -988,14 +973,14 @@ Boako.League.showRosterModal = async function(challengeId) {
         if (tmErr) throw tmErr;
         const myTeamPlayerNames = (myTeamRel || []).map(row => row.player_name);
 
-        // 2. [용병] team_members에 등록되지 않은(혹은 active가 아닌) 모든 사람 찾기
-        const { data: allTeamRel, error: allTmErr } = await Boako.db
+        // 2. [모든 소속원] team_members에 등록되어 활동 중인 모든 유저명 확보
+        const { data: allActiveMembers, error: allErr } = await Boako.db
             .from('team_members')
             .select('player_name')
             .eq('is_active', true);
 
-        if (allTmErr) throw allTmErr;
-        const allAssignedPlayerNames = (allTeamRel || []).map(row => row.player_name);
+        if (allErr) throw allErr;
+        const assignedPlayerNames = (allActiveMembers || []).map(row => row.player_name);
 
         // 3. 프로필 전체 조회 후 매핑
         const { data: allProfiles, error: pErr } = await Boako.db
@@ -1004,15 +989,14 @@ Boako.League.showRosterModal = async function(challengeId) {
             
         if (pErr) throw pErr;
 
-        // 팀원 매핑
         Boako.League.State.rosterTeamMembers = allProfiles
-            .filter(p => myTeamPlayerNames.includes(p.full_name))
-            .map(p => ({ id: p.id, nickname: p.full_name }));
+            .filter(profile => myTeamPlayerNames.includes(profile.full_name))
+            .map(profile => ({ id: profile.id, nickname: profile.full_name }));
 
-        // 용병 매핑 (team_members에 이름이 없는 사람)
+        // 용병: 현재 어떤 활성 팀에도 소속되지 않은 프로필
         Boako.League.State.rosterMercenaries = allProfiles
-            .filter(p => !allAssignedPlayerNames.includes(p.full_name))
-            .map(p => ({ id: p.id, nickname: p.full_name }));
+            .filter(profile => !assignedPlayerNames.includes(profile.full_name))
+            .map(profile => ({ id: profile.id, nickname: profile.full_name }));
 
     } catch (err) {
         console.error("로스터 데이터 바인딩 실패:", err);
@@ -1021,9 +1005,8 @@ Boako.League.showRosterModal = async function(challengeId) {
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
     
-    // 🚨 2. 화면 표기용 변수 확정 (1v1 -> 1vs1)
     const gameMode = p.game_mode || '4v4'; 
-    const displayGameMode = gameMode.replace('v', 'vs'); 
+    const displayGameMode = Boako.League.formatMode(gameMode); // 1v1 -> 1vs1
 
     const modalHtml = `
         <div id="roster-modal-backdrop" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="Boako.League.closeRosterModal()">
@@ -1079,13 +1062,12 @@ Boako.League.showRosterModal = async function(challengeId) {
     `;
     
     document.getElementById('challenge-popup-root').innerHTML = modalHtml;
-    if (window.lucide) window.lucide.createIcons();
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
     
     Boako.League.renderRosterList();
     Boako.League.renderRosterSlots(gameMode);
 };
 
-// 탭 전환
 Boako.League.switchRosterTab = function(isMerc) {
     Boako.League.State.isMercenaryTab = isMerc;
     document.getElementById('btn-tab-team').className = `flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isMerc ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`;
@@ -1093,7 +1075,6 @@ Boako.League.switchRosterTab = function(isMerc) {
     Boako.League.renderRosterList();
 };
 
-// 선수 목록 렌더링
 Boako.League.renderRosterList = function() {
     const container = document.getElementById('roster-list-container');
     const isMerc = Boako.League.State.isMercenaryTab;
@@ -1105,7 +1086,6 @@ Boako.League.renderRosterList = function() {
     }
 
     container.innerHTML = list.map(m => {
-        // 이미 선택된 인원인지 확인
         const isSelected = Boako.League.State.currentRosterSlots.some(slot => slot && slot.id === m.id);
         const btnClass = isSelected 
             ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50" 
@@ -1123,12 +1103,9 @@ Boako.League.renderRosterList = function() {
     }).join('');
 };
 
-// 빈 슬롯에 선수 추가
 Boako.League.addPlayerToSlot = function(id, nickname, isMerc) {
-    // 이미 있는 유저면 무시
     if (Boako.League.State.currentRosterSlots.some(s => s && s.id === id)) return;
 
-    // 첫 번째 빈 슬롯 찾기
     const emptyIndex = Boako.League.State.currentRosterSlots.findIndex(s => s === null);
     if (emptyIndex === -1) {
         Boako.Util.toast("4개의 슬롯이 모두 가득 찼습니다.");
@@ -1137,32 +1114,28 @@ Boako.League.addPlayerToSlot = function(id, nickname, isMerc) {
 
     Boako.League.State.currentRosterSlots[emptyIndex] = { id, nickname, isMerc };
     
-    // 현재 열려있는 팝업의 게임 모드를 찾아 프리뷰 업데이트
     const modeBadge = document.querySelector('#challenge-popup-root span.bg-indigo-600');
-    const gameMode = modeBadge ? modeBadge.innerText.trim() : '4v4';
+    const gameMode = modeBadge ? modeBadge.innerText.replace('vs', 'v').trim() : '4v4';
 
-    Boako.League.renderRosterList(); // 왼쪽 명단 비활성화 처리
+    Boako.League.renderRosterList(); 
     Boako.League.renderRosterSlots(gameMode);
 };
 
-// 슬롯에서 선수 제거
 Boako.League.removePlayerFromSlot = function(index) {
     Boako.League.State.currentRosterSlots[index] = null;
     
     const modeBadge = document.querySelector('#challenge-popup-root span.bg-indigo-600');
-    const gameMode = modeBadge ? modeBadge.innerText.trim() : '4v4';
+    const gameMode = modeBadge ? modeBadge.innerText.replace('vs', 'v').trim() : '4v4';
 
     Boako.League.renderRosterList();
     Boako.League.renderRosterSlots(gameMode);
 };
 
-// 상단 1~4번 슬롯 렌더링 및 하단 DB 기준 프리뷰 렌더링
 Boako.League.renderRosterSlots = function(gameMode) {
     const slotsContainer = document.getElementById('roster-slots-container');
     const previewContainer = document.getElementById('roster-preview-container');
     if (!slotsContainer || !previewContainer) return;
 
-    // 1. 슬롯 렌더링
     slotsContainer.innerHTML = Boako.League.State.currentRosterSlots.map((slot, idx) => {
         if (slot) {
             return `
@@ -1182,13 +1155,12 @@ Boako.League.renderRosterSlots = function(gameMode) {
             `;
         }
     }).join('');
-    if (window.lucide) window.lucide.createIcons();
+    
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 
-    // 2. 소장님 DB 로직(GENERATED ALWAYS AS)과 100% 동일한 프리뷰 연산 매핑
     const slots = Boako.League.State.currentRosterSlots.map(s => s ? s.nickname : '미지정');
     const mercStatus = Boako.League.State.currentRosterSlots.map(s => s ? s.isMerc : false);
     
-    // DB의 entry_1, entry_2, entry_3, entry_4 매핑
     let entries = { 1: [], 2: [], 3: [], 4: [] };
 
     switch (gameMode) {
@@ -1208,7 +1180,6 @@ Boako.League.renderRosterSlots = function(gameMode) {
             entries[1] = []; entries[2] = []; entries[3] = []; entries[4] = [];
     }
 
-    // 프리뷰 렌더링
     previewContainer.innerHTML = [1, 2, 3, 4].map(matchNum => {
         const teamIndexes = entries[matchNum];
         if (teamIndexes.length === 0) return '';
@@ -1233,7 +1204,6 @@ Boako.League.closeRosterModal = function() {
     document.getElementById('challenge-popup-root').innerHTML = '';
 };
 
-// 최종 제출
 Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
     const slots = Boako.League.State.currentRosterSlots;
     
@@ -1246,7 +1216,6 @@ Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
     try {
         if (!Boako.db) throw new Error("DB 연결 오류");
         
-        // 🚨 소장님의 RPC 함수 (아래 인자값은 백엔드 함수에 맞게 연결되어 있습니다)
         const payload = {
             p_challenge_id: challengeId,
             p_team_id: Boako.state?.team?.info?.id,
@@ -1269,6 +1238,7 @@ Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
         console.error(err);
     }
 };
+
 // ====================================================================
 // 🎲 6. BTL 영토 빙고전
 // ====================================================================
@@ -1333,7 +1303,7 @@ Boako.League.renderBingoSeasonDropdown = function() {
             </div>
         </div>
     `;
-    if(window.lucide) lucide.createIcons();
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 };
 
 Boako.League.loadBingoBoardData = async function() {
