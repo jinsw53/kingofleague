@@ -957,6 +957,289 @@ Boako.League.withdrawAttackerToken = async function(challengeId) {
     }
 };
 // ====================================================================
+// 💡 5.5. 결전 로스터(엔트리) 구성 및 지능형 오더 제출 모달
+// ====================================================================
+
+Boako.League.State.currentRosterSlots = [null, null, null, null]; // 1~4번 슬롯 상태
+Boako.League.State.rosterTeamMembers = [];
+Boako.League.State.rosterMercenaries = [];
+Boako.League.State.isMercenaryTab = false;
+
+Boako.League.showRosterModal = async function(challengeId) {
+    const p = Boako.League.State.challenges.find(c => c.id === challengeId);
+    if (!p) return;
+
+    const myTeamId = Boako.state?.team?.info?.id;
+    if (!myTeamId) return alert("소속된 팀 정보가 없습니다.");
+
+    // 상태 초기화
+    Boako.League.State.currentRosterSlots = [null, null, null, null];
+    Boako.League.State.isMercenaryTab = false;
+
+    // 1. 데이터 로드 (팀원 & 용병)
+    try {
+        // 내 팀원
+        const { data: teamData } = await Boako.db.from('profiles').select('id, nickname').eq('team_id', myTeamId);
+        Boako.League.State.rosterTeamMembers = teamData || [];
+
+        // 용병 (team_id가 없는 유저)
+        const { data: mercData } = await Boako.db.from('profiles').select('id, nickname').is('team_id', null);
+        Boako.League.State.rosterMercenaries = mercData || [];
+    } catch (err) {
+        return alert("로스터 데이터를 불러오지 못했습니다.");
+    }
+
+    const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+    const gameMode = p.game_mode || '4v4';
+
+    const modalHtml = `
+        <div id="roster-modal-backdrop" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="Boako.League.closeRosterModal()">
+            <div class="bg-slate-50 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:flex-row max-h-[90vh]" onclick="event.stopPropagation()">
+                
+                <div class="w-full md:w-5/12 bg-white flex flex-col border-r border-slate-200">
+                    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                        <h3 class="font-black text-slate-800 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5 text-indigo-600"></i> 선수 명단</h3>
+                        <button onclick="Boako.League.closeRosterModal()" class="md:hidden text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    
+                    <div class="flex p-3 gap-2 bg-slate-50/50">
+                        <button id="btn-tab-team" onclick="Boako.League.switchRosterTab(false)" class="flex-1 py-2 text-xs font-black rounded-lg transition-all bg-indigo-600 text-white shadow-sm">소속 팀원</button>
+                        <button id="btn-tab-merc" onclick="Boako.League.switchRosterTab(true)" class="flex-1 py-2 text-xs font-black rounded-lg transition-all bg-white text-slate-500 border border-slate-200 hover:bg-slate-100">자유 용병</button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2" id="roster-list-container">
+                        </div>
+                </div>
+
+                <div class="w-full md:w-7/12 flex flex-col">
+                    <div class="p-5 bg-gradient-to-r from-indigo-900 to-slate-900 text-white flex justify-between items-start">
+                        <div>
+                            <div class="text-[10px] font-black text-indigo-300 mb-1 tracking-widest uppercase">Challenge Order</div>
+                            <div class="font-black text-lg flex items-center gap-2">
+                                <img src="${safeGameLogo}" class="w-6 h-6 object-contain bg-white rounded p-0.5">
+                                ${p.game_name} <span class="bg-indigo-600 border border-indigo-400 px-2 py-0.5 text-xs rounded-md ml-1">${gameMode}</span>
+                            </div>
+                        </div>
+                        <button onclick="Boako.League.closeRosterModal()" class="hidden md:block text-white/50 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+                    </div>
+
+                    <div class="p-5 flex-1 overflow-y-auto custom-scrollbar">
+                        <div class="mb-5">
+                            <label class="block text-xs font-black text-slate-700 mb-2">1. 출전 슬롯 (순서대로 채우세요)</label>
+                            <div class="grid grid-cols-4 gap-2" id="roster-slots-container">
+                                </div>
+                            <p class="text-[10px] text-slate-400 mt-2 font-bold text-center">선수를 클릭하여 슬롯에서 제거할 수 있습니다.</p>
+                        </div>
+
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 shadow-inner">
+                            <label class="block text-xs font-black text-indigo-900 mb-3 flex items-center gap-1.5"><i data-lucide="eye" class="w-4 h-4"></i> 2. 실시간 조 편성 프리뷰 (DB 연동 기준)</label>
+                            <div class="space-y-2" id="roster-preview-container">
+                                </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 bg-white border-t border-slate-200">
+                        <button onclick="Boako.League.submitFinalRoster(${challengeId}, '${gameMode}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm py-4 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                            <i data-lucide="send" class="w-4 h-4"></i> 최종 로스터 확정 및 제출
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('challenge-popup-root').innerHTML = modalHtml;
+    if (window.lucide) window.lucide.createIcons();
+    
+    Boako.League.renderRosterList();
+    Boako.League.renderRosterSlots(gameMode);
+};
+
+// 탭 전환
+Boako.League.switchRosterTab = function(isMerc) {
+    Boako.League.State.isMercenaryTab = isMerc;
+    document.getElementById('btn-tab-team').className = `flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isMerc ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`;
+    document.getElementById('btn-tab-merc').className = `flex-1 py-2 text-xs font-black rounded-lg transition-all ${isMerc ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`;
+    Boako.League.renderRosterList();
+};
+
+// 선수 목록 렌더링
+Boako.League.renderRosterList = function() {
+    const container = document.getElementById('roster-list-container');
+    const isMerc = Boako.League.State.isMercenaryTab;
+    const list = isMerc ? Boako.League.State.rosterMercenaries : Boako.League.State.rosterTeamMembers;
+
+    if (list.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs font-bold text-slate-400 py-10">조회된 인원이 없습니다.</div>`;
+        return;
+    }
+
+    container.innerHTML = list.map(m => {
+        // 이미 선택된 인원인지 확인
+        const isSelected = Boako.League.State.currentRosterSlots.some(slot => slot && slot.id === m.id);
+        const btnClass = isSelected 
+            ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50" 
+            : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-sm cursor-pointer";
+
+        return `
+            <div onclick="Boako.League.addPlayerToSlot('${m.id}', '${m.nickname}', ${isMerc})" class="p-3 border rounded-xl flex justify-between items-center transition-all ${btnClass}">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black ${isMerc ? 'text-amber-600' : 'text-indigo-600'}">${m.nickname.substring(0,2)}</div>
+                    <span class="font-black text-xs">${m.nickname}</span>
+                </div>
+                ${isMerc ? '<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black">용병</span>' : ''}
+            </div>
+        `;
+    }).join('');
+};
+
+// 빈 슬롯에 선수 추가
+Boako.League.addPlayerToSlot = function(id, nickname, isMerc) {
+    // 이미 있는 유저면 무시
+    if (Boako.League.State.currentRosterSlots.some(s => s && s.id === id)) return;
+
+    // 첫 번째 빈 슬롯 찾기
+    const emptyIndex = Boako.League.State.currentRosterSlots.findIndex(s => s === null);
+    if (emptyIndex === -1) {
+        Boako.Util.toast("4개의 슬롯이 모두 가득 찼습니다.");
+        return;
+    }
+
+    Boako.League.State.currentRosterSlots[emptyIndex] = { id, nickname, isMerc };
+    
+    // 현재 열려있는 팝업의 게임 모드를 찾아 프리뷰 업데이트
+    const modeBadge = document.querySelector('#challenge-popup-root span.bg-indigo-600');
+    const gameMode = modeBadge ? modeBadge.innerText.trim() : '4v4';
+
+    Boako.League.renderRosterList(); // 왼쪽 명단 비활성화 처리
+    Boako.League.renderRosterSlots(gameMode);
+};
+
+// 슬롯에서 선수 제거
+Boako.League.removePlayerFromSlot = function(index) {
+    Boako.League.State.currentRosterSlots[index] = null;
+    
+    const modeBadge = document.querySelector('#challenge-popup-root span.bg-indigo-600');
+    const gameMode = modeBadge ? modeBadge.innerText.trim() : '4v4';
+
+    Boako.League.renderRosterList();
+    Boako.League.renderRosterSlots(gameMode);
+};
+
+// 상단 1~4번 슬롯 렌더링 및 하단 DB 기준 프리뷰 렌더링
+Boako.League.renderRosterSlots = function(gameMode) {
+    const slotsContainer = document.getElementById('roster-slots-container');
+    const previewContainer = document.getElementById('roster-preview-container');
+    if (!slotsContainer || !previewContainer) return;
+
+    // 1. 슬롯 렌더링
+    slotsContainer.innerHTML = Boako.League.State.currentRosterSlots.map((slot, idx) => {
+        if (slot) {
+            return `
+                <div onclick="Boako.League.removePlayerFromSlot(${idx})" class="aspect-square bg-indigo-600 rounded-xl border-2 border-indigo-400 flex flex-col items-center justify-center cursor-pointer shadow-md transform hover:scale-105 transition-all group relative">
+                    <span class="absolute top-1 left-1.5 text-[9px] font-black text-indigo-300">P${idx+1}</span>
+                    <div class="font-black text-white text-xs truncate w-full text-center px-1">${slot.nickname}</div>
+                    ${slot.isMerc ? '<span class="absolute -top-2 -right-2 text-base drop-shadow-md">💎</span>' : ''}
+                    <div class="absolute inset-0 bg-rose-500/90 text-white opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center font-black text-xs transition-opacity">제거</div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="aspect-square bg-white border border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-300">
+                    <span class="text-[9px] font-black mb-1">P${idx+1}</span>
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                </div>
+            `;
+        }
+    }).join('');
+    if (window.lucide) window.lucide.createIcons();
+
+    // 2. 소장님 DB 로직(GENERATED ALWAYS AS)과 100% 동일한 프리뷰 연산 매핑
+    const slots = Boako.League.State.currentRosterSlots.map(s => s ? s.nickname : '미지정');
+    const mercStatus = Boako.League.State.currentRosterSlots.map(s => s ? s.isMerc : false);
+    
+    // DB의 entry_1, entry_2, entry_3, entry_4 매핑
+    let entries = { 1: [], 2: [], 3: [], 4: [] };
+
+    switch (gameMode) {
+        case '1v1':
+            entries[1] = [0]; entries[2] = [1]; entries[3] = [2]; entries[4] = [3];
+            break;
+        case '2v2':
+            entries[1] = [0, 1]; entries[2] = [2, 3]; entries[3] = [1, 2]; entries[4] = [0, 3];
+            break;
+        case '3v3':
+            entries[1] = [0, 1, 2]; entries[2] = [0, 1, 3]; entries[3] = [0, 2, 3]; entries[4] = [1, 2, 3];
+            break;
+        case '4v4':
+            entries[1] = [0, 1, 2, 3]; entries[2] = [0, 1, 2, 3]; entries[3] = [0, 1, 2, 3]; entries[4] = [0, 1, 2, 3];
+            break;
+        default:
+            entries[1] = []; entries[2] = []; entries[3] = []; entries[4] = [];
+    }
+
+    // 프리뷰 렌더링
+    previewContainer.innerHTML = [1, 2, 3, 4].map(matchNum => {
+        const teamIndexes = entries[matchNum];
+        if (teamIndexes.length === 0) return '';
+        
+        const namesHtml = teamIndexes.map(idx => {
+            const isMerc = mercStatus[idx];
+            const name = slots[idx];
+            const color = name === '미지정' ? 'text-slate-400' : 'text-indigo-900';
+            return `<span class="bg-white border border-indigo-100 shadow-sm px-2 py-1 rounded-md font-black text-xs ${color}">${name} ${isMerc ? '💎' : ''}</span>`;
+        }).join('<span class="text-indigo-300 font-bold text-[10px] mx-1">+</span>');
+
+        return `
+            <div class="flex items-center gap-3 bg-white/60 p-2 rounded-xl border border-indigo-50">
+                <div class="w-10 h-7 bg-indigo-100 rounded-lg text-indigo-700 font-black text-[10px] flex items-center justify-center shrink-0">매치 ${matchNum}</div>
+                <div class="flex flex-wrap items-center gap-1">${namesHtml}</div>
+            </div>
+        `;
+    }).join('');
+};
+
+Boako.League.closeRosterModal = function() {
+    document.getElementById('challenge-popup-root').innerHTML = '';
+};
+
+// 최종 제출
+Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
+    const slots = Boako.League.State.currentRosterSlots;
+    
+    if (slots.includes(null)) {
+        return Boako.Util.toast("4명의 선수를 모두 슬롯에 배치해주세요.");
+    }
+
+    if (!confirm("이 조합과 순서로 로스터를 확정하시겠습니까? (제출 후 수정 불가)")) return;
+
+    try {
+        if (!Boako.db) throw new Error("DB 연결 오류");
+        
+        // 🚨 소장님의 RPC 함수 (아래 인자값은 백엔드 함수에 맞게 연결되어 있습니다)
+        const payload = {
+            p_challenge_id: challengeId,
+            p_team_id: Boako.state?.team?.info?.id,
+            p_p1: slots[0].nickname, p_m1: slots[0].isMerc,
+            p_p2: slots[1].nickname, p_m2: slots[1].isMerc,
+            p_p3: slots[2].nickname, p_m3: slots[2].isMerc,
+            p_p4: slots[3].nickname, p_m4: slots[3].isMerc
+        };
+
+        const { error } = await Boako.db.rpc('submit_challenge_roster', payload);
+        if (error) throw error;
+
+        Boako.Util.toast("🎯 로스터 제출이 완료되었습니다!");
+        Boako.League.closeRosterModal();
+        await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
+        Boako.League.renderChallenges();
+        
+    } catch (err) {
+        alert("로스터 제출 실패: " + err.message);
+        console.error(err);
+    }
+};
+// ====================================================================
 // 🎲 6. BTL 영토 빙고전
 // ====================================================================
 Boako.League.getBingoHTML = function() {
