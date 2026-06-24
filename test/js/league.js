@@ -977,18 +977,22 @@ Boako.League.showRosterModal = async function(challengeId) {
         if (allErr) throw allErr;
         const assignedPlayerNames = (allActiveMembers || []).map(row => row.player_name);
 
-        const { data: allProfiles, error: pErr } = await Boako.db
-            .from('profiles')
-            .select('id, full_name');
-        if (pErr) throw pErr;
+        // 3. 프로필 전체 조회 부분
+const { data: allProfiles, error: pErr } = await Boako.db
+    .from('profiles')
+    .select('id, full_name, profile_url'); // 🌟 profile_url 가져오기
+    
+if (pErr) throw pErr;
 
-        Boako.League.State.rosterTeamMembers = allProfiles
-            .filter(profile => myTeamPlayerNames.includes(profile.full_name))
-            .map(profile => ({ id: profile.id, nickname: profile.full_name }));
+// 팀원 매핑 시 avatar 데이터 포함
+Boako.League.State.rosterTeamMembers = allProfiles
+    .filter(p => myTeamPlayerNames.includes(p.full_name))
+    .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
 
-        Boako.League.State.rosterMercenaries = allProfiles
-            .filter(profile => !assignedPlayerNames.includes(profile.full_name))
-            .map(profile => ({ id: profile.id, nickname: profile.full_name }));
+// 용병 매핑
+Boako.League.State.rosterMercenaries = allProfiles
+    .filter(p => !assignedPlayerNames.includes(p.full_name))
+    .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
 
     } catch (err) {
         console.error("로스터 데이터 바인딩 실패:", err);
