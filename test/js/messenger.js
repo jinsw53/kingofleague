@@ -11,10 +11,16 @@ Boako.Messenger = {
     realtimeChannels: [], 
 
     // 🌟 [추가] 대항전 다수결 투표 브릿지 (달력 모달 호출기)
-    openMatchPoll: async (roomId) => {
+   openMatchPoll: async (roomId) => {
         const room = Boako.Messenger.chatRooms[roomId];
         if (!room || !room.isMatchChannel) return;
         
+        // 🚨 [핵심 추가] 이미 일정이 확정된 방이면 모달 오픈 자체를 강제 차단
+        if (room.isConfirmed) {
+            Boako.Util.toast("이미 일정이 최종 확정되어 투표를 진행할 수 없습니다.");
+            return;
+        }
+
         Boako.Match.Chat.currentSeason = room.seasonNo;
         Boako.Match.Chat.currentGame = room.gameName;
         Boako.Match.Chat.currentEntryCount = room.entryCount || 2;
