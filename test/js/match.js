@@ -941,7 +941,21 @@ Boako.Match = {
         selectedTimesState: [], 
         currentFixedTime: '20:00', 
 
-        openPollModal: () => {
+        openPollModal: async () => {
+            const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
+
+            // 🚨 [핵심 방어 1] 달력 열기 전에 DB 찔러서 이미 확정된 상태인지 팩트 체크
+            const { data: confirmed } = await Boako.db.from('schedule_polls')
+                .select('poll_id')
+                .eq('target_id', roomId)
+                .eq('status', 'CONFIRMED')
+                .limit(1);
+
+            if (confirmed && confirmed.length > 0) {
+                Boako.Util.toast("🚨 이미 일정이 최종 확정되어 달력을 열 수 없습니다.");
+                return;
+            }
+
             const existing = document.getElementById('poll-calendar-modal');
             if (existing) existing.remove();
 
@@ -1090,14 +1104,21 @@ Boako.Match = {
             const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
             const myId = String(Boako.state.user.id);
 
+            // 🚨 [핵심 방어 2] OPEN/PROPOSED만 긁어오지 않고, 일단 전부 다 긁어옴
             const { data: existingPolls } = await Boako.db.from('schedule_polls')
                 .select('*')
                 .eq('target_id', roomId)
-                .in('status', ['OPEN', 'PROPOSED'])
-                .order('created_at', { ascending: false })
-                .limit(1);
+                .order('created_at', { ascending: false });
 
-            const existingPoll = existingPolls && existingPolls.length > 0 ? existingPolls[0] : null;
+            // 만약 이미 확정된(CONFIRMED) 투표가 단 1개라도 있다면 인서트/업데이트 전면 차단
+            if (existingPolls && existingPolls.some(p => p.status === 'CONFIRMED')) {
+                Boako.Util.toast("🚨 이미 일정이 최종 확정되어 제출이 취소되었습니다.");
+                document.getElementById('poll-calendar-modal').remove();
+                return;
+            }
+
+            // 확정된 게 없다면 진행 중인(OPEN/PROPOSED) 투표를 찾음
+            const existingPoll = existingPolls && existingPolls.find(p => p.status === 'OPEN' || p.status === 'PROPOSED');
 
             if (!existingPoll) {
                 const initialVotes = {};
