@@ -1087,19 +1087,16 @@ Boako.League.switchRosterTab = function(isMerc) {
 Boako.League.renderRosterList = function() {
     const container = document.getElementById('roster-list-container');
     const searchInput = document.getElementById('roster-search-input');
-    
-    // 🚨 검색어 가져오기
     const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const isMerc = Boako.League.State.isMercenaryTab;
     let list = isMerc ? Boako.League.State.rosterMercenaries : Boako.League.State.rosterTeamMembers;
 
-    // 🚨 검색어가 있으면 필터링 적용
     if (keyword) {
         list = list.filter(m => m.nickname.toLowerCase().includes(keyword));
     }
 
     if (list.length === 0) {
-        container.innerHTML = `<div class="text-center text-xs font-bold text-slate-400 py-10">${keyword ? '검색된 인원이 없습니다.' : '조회된 인원이 없습니다.'}</div>`;
+        container.innerHTML = `<div class="text-center text-xs font-bold text-slate-400 py-10">조회된 인원이 없습니다.</div>`;
         return;
     }
 
@@ -1109,10 +1106,15 @@ Boako.League.renderRosterList = function() {
             ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50" 
             : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-sm cursor-pointer";
 
+        // 🌟 프사가 있으면 이미지, 없으면 닉네임 두 글자 (기본 이미지 주소는 프로젝트 환경에 맞게 변경 가능)
+        const avatarHtml = m.avatar 
+            ? `<img src="${m.avatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner">`
+            : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black ${isMerc ? 'text-amber-600' : 'text-indigo-600'}">${m.nickname.substring(0,2)}</div>`;
+
         return `
             <div onclick="Boako.League.addPlayerToSlot('${m.id}', '${m.nickname.replace(/'/g, "\\'")}', ${isMerc})" class="p-3 border rounded-xl flex justify-between items-center transition-all ${btnClass}">
                 <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black ${isMerc ? 'text-amber-600' : 'text-indigo-600'}">${m.nickname.substring(0,2)}</div>
+                    ${avatarHtml}
                     <span class="font-black text-xs">${m.nickname}</span>
                 </div>
                 ${isMerc ? '<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black">용병</span>' : ''}
