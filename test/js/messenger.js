@@ -141,7 +141,31 @@ Boako.Messenger = {
             return Boako.Messenger.chatRooms;
         }
     },
-
+// 🌟 [추가] 대항전 다수결 투표 브릿지 (달력 모달 호출기)
+    openMatchPoll: async (roomId) => {
+        const room = Boako.Messenger.chatRooms[roomId];
+        if (!room || !room.isMatchChannel) return;
+        
+        // 기존 Match.js의 투표 시스템에 현재 방의 컨텍스트(시즌, 종목) 강제 주입
+        Boako.Match.Chat.currentSeason = room.seasonNo;
+        Boako.Match.Chat.currentGame = room.gameName;
+        
+        try {
+            // 과반수 계산에 필요한 엔트리 총 인원수를 실시간으로 긁어옴
+            const { count } = await Boako.db.from('grandprix_entries')
+                .select('*', { count: 'exact', head: true })
+                .eq('season_no', room.seasonNo)
+                .eq('game_name', room.gameName)
+                .eq('is_finalized', true);
+                
+            Boako.Match.Chat.currentEntryCount = count || 0;
+            
+            // 기존에 잘 만들어두신 달력 투표 모달 격발!
+            Boako.Match.Chat.openPollModal();
+        } catch (e) {
+            console.error("인원 파악 에러:", e);
+        }
+    },
     sendDirect: async (receiverId, content, receiverName, actionType = 'DEFAULT', metadata = {}, matchId = null) => {
         try {
             const payload = {
@@ -318,7 +342,14 @@ Boako.Messenger = {
             if (room.isMatchChannel) {
                 bannerHtml = `
                     <div class="bg-indigo-900 border-b border-indigo-800 p-3 px-5 flex items-center justify-between shadow-sm z-10">
-                        <div class="font-black text-white text-sm flex items-center gap-2"><span class="animate-pulse">📣</span> [대항전] ${room.gameName} 소통 채널</div>
+                        <div class="font-black text-white text-sm flex items-center gap-2">
+                            <span class="animate-pulse">📣</span> [대항전] ${room.gameName} 소통 채널
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="Boako.Messenger.openMatchPoll('${roomId}')" class="text-xs bg-white text-indigo-900 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 shadow-sm transition-colors">
+                                📅 일정 투표/조율
+                            </button>
+                        </div>
                     </div>`;
             } else if (room.isMatch) {
                 bannerHtml = `
