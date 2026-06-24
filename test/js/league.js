@@ -960,7 +960,7 @@ Boako.League.withdrawAttackerToken = async function(challengeId) {
 // 💡 5.5. 결전 로스터(엔트리) 구성 및 지능형 오더 제출 모달
 // ====================================================================
 
-Boako.League.State.currentRosterSlots = [null, null, null, null]; // 1~4번 슬롯 상태
+Boako.League.State.currentRosterSlots = [null, null, null, null]; 
 Boako.League.State.rosterTeamMembers = [];
 Boako.League.State.rosterMercenaries = [];
 Boako.League.State.isMercenaryTab = false;
@@ -976,68 +976,54 @@ Boako.League.showRosterModal = async function(challengeId) {
     Boako.League.State.currentRosterSlots = [null, null, null, null];
     Boako.League.State.isMercenaryTab = false;
 
-    // 1. 데이터 로드 (팀원 & 용병)
-  // 🚨 [수정됨] team_members 테이블과 profiles(full_name) 분리 연동 로직
+    // 🚨 1. 데이터 로드 (DB 에러 수정본)
     try {
-        // 1. [우리 팀원] team_members에서 우리 팀 소속 인원들의 ID를 먼저 확보
-        // (주의: 컬럼명이 user_id가 아니라 profile_id나 member_id라면 그에 맞게 수정해주세요)
+        // 1. [우리 팀원] team_members에서 현재 우리 팀 소속인 player_name들 확보
         const { data: myTeamRel, error: tmErr } = await Boako.db
             .from('team_members')
-            .select('user_id') 
-            .eq('team_id', myTeamId);
+            .select('player_name')
+            .eq('team_id', myTeamId)
+            .eq('is_active', true);
 
-        if (tmErr) {
-            console.error("🚨 team_members 조회 실패:", tmErr.message);
-            throw tmErr;
-        }
+        if (tmErr) throw tmErr;
+        const myTeamPlayerNames = (myTeamRel || []).map(row => row.player_name);
 
-        const myTeamUserIds = (myTeamRel || []).map(row => row.user_id);
-
-        if (myTeamUserIds.length > 0) {
-            const { data: teamProfiles, error: tpErr } = await Boako.db
-                .from('profiles')
-                .select('id, full_name')
-                .in('id', myTeamUserIds);
-                
-            if (tpErr) throw tpErr;
-            Boako.League.State.rosterTeamMembers = (teamProfiles || []).map(u => ({ id: u.id, nickname: u.full_name || '이름없음' }));
-        } else {
-            Boako.League.State.rosterTeamMembers = [];
-        }
-
-        // 2. [자유 용병] team_members 테이블에 등록된 '모든' 유저 ID 확보
+        // 2. [용병] team_members에 등록되지 않은(혹은 active가 아닌) 모든 사람 찾기
         const { data: allTeamRel, error: allTmErr } = await Boako.db
             .from('team_members')
-            .select('user_id');
-            
-        if (allTmErr) {
-            console.error("🚨 전체 팀 멤버 조회 실패:", allTmErr.message);
-            throw allTmErr;
-        }
+            .select('player_name')
+            .eq('is_active', true);
 
-        const allAssignedUserIds = (allTeamRel || []).map(row => row.user_id);
+        if (allTmErr) throw allTmErr;
+        const allAssignedPlayerNames = (allTeamRel || []).map(row => row.player_name);
 
-        // 3. 프로필 전체 조회 후, 위 배열에 없는 사람만 순수 용병으로 필터링
+        // 3. 프로필 전체 조회 후 매핑
         const { data: allProfiles, error: pErr } = await Boako.db
             .from('profiles')
             .select('id, full_name');
             
         if (pErr) throw pErr;
 
-        // JS 단에서 안전하게 필터링 (team_members에 없는 사람만 남김)
-        const pureMercenaries = (allProfiles || []).filter(p => !allAssignedUserIds.includes(p.id));
-        
-        Boako.League.State.rosterMercenaries = pureMercenaries.map(u => ({ id: u.id, nickname: u.full_name || '이름없음' }));
+        // 팀원 매핑
+        Boako.League.State.rosterTeamMembers = allProfiles
+            .filter(p => myTeamPlayerNames.includes(p.full_name))
+            .map(p => ({ id: p.id, nickname: p.full_name }));
+
+        // 용병 매핑 (team_members에 이름이 없는 사람)
+        Boako.League.State.rosterMercenaries = allProfiles
+            .filter(p => !allAssignedPlayerNames.includes(p.full_name))
+            .map(p => ({ id: p.id, nickname: p.full_name }));
 
     } catch (err) {
-        console.error("로스터 초기 데이터 바인딩 최종 실패:", err);
-        return alert(`데이터 로드 실패: ${err.message}\n자세한 에러는 콘솔을 확인하십시오.`);
+        console.error("로스터 데이터 바인딩 실패:", err);
+        return alert(`DB 조회 실패: ${err.message}`);
     }
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
     
-    const gameMode = p.game_mode || '4v4'; // 이건 DB 연산용 (수정 X)
-    const displayGameMode = gameMode.replace('v', 'vs'); // 🌟 화면 표기용 (1v1 -> 1vs1)
+    // 🚨 2. 화면 표기용 변수 확정 (1v1 -> 1vs1)
+    const gameMode = p.game_mode || '4v4'; 
+    const displayGameMode = gameMode.replace('v', 'vs'); 
 
     const modalHtml = `
         <div id="roster-modal-backdrop" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="Boako.League.closeRosterModal()">
@@ -1054,8 +1040,7 @@ Boako.League.showRosterModal = async function(challengeId) {
                         <button id="btn-tab-merc" onclick="Boako.League.switchRosterTab(true)" class="flex-1 py-2 text-xs font-black rounded-lg transition-all bg-white text-slate-500 border border-slate-200 hover:bg-slate-100">자유 용병</button>
                     </div>
                     
-                    <div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2" id="roster-list-container">
-                        </div>
+                    <div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2" id="roster-list-container"></div>
                 </div>
 
                 <div class="w-full md:w-7/12 flex flex-col">
@@ -1073,15 +1058,13 @@ Boako.League.showRosterModal = async function(challengeId) {
                     <div class="p-5 flex-1 overflow-y-auto custom-scrollbar">
                         <div class="mb-5">
                             <label class="block text-xs font-black text-slate-700 mb-2">1. 출전 슬롯 (순서대로 채우세요)</label>
-                            <div class="grid grid-cols-4 gap-2" id="roster-slots-container">
-                                </div>
+                            <div class="grid grid-cols-4 gap-2" id="roster-slots-container"></div>
                             <p class="text-[10px] text-slate-400 mt-2 font-bold text-center">선수를 클릭하여 슬롯에서 제거할 수 있습니다.</p>
                         </div>
 
                         <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 shadow-inner">
                             <label class="block text-xs font-black text-indigo-900 mb-3 flex items-center gap-1.5"><i data-lucide="eye" class="w-4 h-4"></i> 2. 실시간 조 편성 프리뷰 (DB 연동 기준)</label>
-                            <div class="space-y-2" id="roster-preview-container">
-                                </div>
+                            <div class="space-y-2" id="roster-preview-container"></div>
                         </div>
                     </div>
 
