@@ -68,23 +68,22 @@ Boako.Messenger = {
                             isMatchChannel: true, 
                             seasonNo: entry.season_no,
                             gameName: entry.game_name,
-                            entryCount: gameInfo ? gameInfo.entry_count : 2, // 과반수 계산용 총원
+                            entryCount: gameInfo ? gameInfo.entry_count : 2,
                             dbRoomId: dbRoomId,
                             title: `[${entry.game_name}] 소통 채널`,
                             badge: `<span class="bg-indigo-100 text-indigo-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">대항전</span>`,
                             lastMessage: '채널이 개설되었습니다. 자유롭게 소통하세요.',
                             lastTime: new Date(0).toISOString(), 
                             unread: 0,
+                            isConfirmed: false, // 🌟 [추가됨] 기본값은 미확정
                             messages: []
                         };
                     });
 
-                    // 🌟 대항전 채팅 내역 긁어오기
                     const { data: matchMsgs } = await Boako.db.from('grandprix_match_chats')
                         .select('*, profiles(full_name)')
                         .in('room_id', validRoomIds);
 
-                    // 🌟 [추가됨] 대항전 투표 내역 긁어오기
                     const { data: matchPolls } = await Boako.db.from('schedule_polls')
                         .select('*')
                         .in('target_id', validRoomIds);
@@ -95,14 +94,20 @@ Boako.Messenger = {
                         const activePolls = matchPolls.filter(p => p.status === 'OPEN' || p.status === 'PROPOSED');
                         const activePollIds = activePolls.map(p => p.poll_id);
                         matchPolls.forEach(p => {
-                            // 종료된 투표 말고 활성 투표나 최종 확정된 투표만 필터링
+                            const uiRoomId = `match_channel_${p.target_id}`;
+                            const room = Boako.Messenger.chatRooms[uiRoomId];
+                            
+                            // 🌟 [핵심 변경] 일정이 확정된 기록이 있다면, 해당 방 전체에 '확정 딱지'를 붙임!
+                            if (p.status === 'CONFIRMED' && room) {
+                                room.isConfirmed = true;
+                            }
+
                             if (p.status === 'CONFIRMED' || activePollIds.includes(p.poll_id)) {
                                 combined.push({ ...p, type: 'POLL', room_id: p.target_id, created_at: p.created_at });
                             }
                         });
                     }
 
-                    // 역순(최신순) 정렬 (나중에 unshift로 화면에 뿌릴 때 과거->최신 순서가 되도록 조율)
                     combined.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
                     combined.forEach(item => {
@@ -370,13 +375,16 @@ Boako.Messenger = {
 
             let bannerHtml = '';
             if (room.isMatchChannel) {
+                // 🌟 [핵심 변경] 확정된 방이면 파란 투표 버튼을 없애고 초록색 '완료' 뱃지로 렌더링
+                const actionBtn = room.isConfirmed 
+                    ? `<div class="text-xs bg-emerald-800/80 text-emerald-100 px-3 py-1.5 rounded-lg font-black border border-emerald-700 shadow-inner cursor-not-allowed">✅ 일정 확정 완료</div>`
+                    : `<button onclick="Boako.Messenger.openMatchPoll('${roomId}')" class="text-xs bg-white text-indigo-900 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 shadow-sm transition-colors">📅 일정 투표/조율</button>`;
+                    
                 bannerHtml = `
                     <div class="bg-indigo-900 border-b border-indigo-800 p-3 px-5 flex items-center justify-between shadow-sm z-10">
                         <div class="font-black text-white text-sm flex items-center gap-2"><span class="animate-pulse">📣</span> [대항전] ${room.gameName} 채널</div>
                         <div class="flex gap-2">
-                            <button onclick="Boako.Messenger.openMatchPoll('${roomId}')" class="text-xs bg-white text-indigo-900 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 shadow-sm transition-colors">
-                                📅 일정 투표/조율
-                            </button>
+                            ${actionBtn}
                         </div>
                     </div>`;
             } else if (room.isMatch) {
@@ -402,7 +410,6 @@ Boako.Messenger = {
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                 const senderName = room.isMatchChannel ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override;
 
-                // 🌟 [핵심] 대항전 투표(POLL) UI 렌더링
                 if (msg.type === 'POLL') {
                     const poll = msg;
                     const votersCount = Object.keys(poll.votes || {}).length;
@@ -441,7 +448,6 @@ Boako.Messenger = {
                     }
                     messagesHtml += `<div class="flex justify-center my-2 w-full self-center"><div class="bg-gradient-to-b from-indigo-50 to-white border-2 border-indigo-200/60 rounded-2xl p-4 w-72 shadow-md">${cardInnerHtml}</div></div>`;
                 } 
-                // 일반 DM 특수 액션 카드 렌더링
                 else if (msg.action_type === 'SCHEDULE_PROPOSE') {
                     const proposedTime = msg.metadata?.proposed_time ? new Date(msg.metadata.proposed_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '미정';
                     const status = msg.action_status || 'PENDING';
@@ -476,9 +482,7 @@ Boako.Messenger = {
                     else if (status === 'ACCEPTED') btnHtml = `<div class="mt-3 text-xs text-blue-600 text-center bg-blue-50 py-1.5 rounded-lg">✅ 승인됨</div>`;
                     else btnHtml = `<div class="mt-3 text-xs text-red-500 text-center bg-red-50 py-1.5 rounded-lg">❌ 거절됨</div>`;
                     messagesHtml += `<div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${senderName}</div>` : ''}<div class="flex items-end gap-2">${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}<div class="bg-white border border-blue-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800"><div class="font-black text-blue-600 text-xs mb-2">${isJoin ? '🛡️ 입단 지원' : '💌 스카웃 제안'}</div><div class="text-sm font-bold bg-slate-50 p-2.5 rounded-lg text-center border">[${pData.team_name}] 합류</div>${btnHtml}</div>${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}</div></div>`;
-                } 
-                // 일반 텍스트 대화 렌더링
-                else {
+                } else {
                     if (isMe) {
                         messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%]"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-indigo-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${msg.content.replace(/\n/g, '<br>')}</div></div>`;
                     } else {
