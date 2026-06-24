@@ -977,20 +977,67 @@ Boako.League.showRosterModal = async function(challengeId) {
     Boako.League.State.isMercenaryTab = false;
 
     // 1. 데이터 로드 (팀원 & 용병)
+  // 🚨 [수정됨] team_members 테이블과 profiles(full_name) 분리 연동 로직
     try {
-        // 내 팀원
-        const { data: teamData } = await Boako.db.from('profiles').select('id, nickname').eq('team_id', myTeamId);
-        Boako.League.State.rosterTeamMembers = teamData || [];
+        // 1. [우리 팀원] team_members에서 우리 팀 소속 인원들의 ID를 먼저 확보
+        // (주의: 컬럼명이 user_id가 아니라 profile_id나 member_id라면 그에 맞게 수정해주세요)
+        const { data: myTeamRel, error: tmErr } = await Boako.db
+            .from('team_members')
+            .select('user_id') 
+            .eq('team_id', myTeamId);
 
-        // 용병 (team_id가 없는 유저)
-        const { data: mercData } = await Boako.db.from('profiles').select('id, nickname').is('team_id', null);
-        Boako.League.State.rosterMercenaries = mercData || [];
+        if (tmErr) {
+            console.error("🚨 team_members 조회 실패:", tmErr.message);
+            throw tmErr;
+        }
+
+        const myTeamUserIds = (myTeamRel || []).map(row => row.user_id);
+
+        if (myTeamUserIds.length > 0) {
+            const { data: teamProfiles, error: tpErr } = await Boako.db
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', myTeamUserIds);
+                
+            if (tpErr) throw tpErr;
+            Boako.League.State.rosterTeamMembers = (teamProfiles || []).map(u => ({ id: u.id, nickname: u.full_name || '이름없음' }));
+        } else {
+            Boako.League.State.rosterTeamMembers = [];
+        }
+
+        // 2. [자유 용병] team_members 테이블에 등록된 '모든' 유저 ID 확보
+        const { data: allTeamRel, error: allTmErr } = await Boako.db
+            .from('team_members')
+            .select('user_id');
+            
+        if (allTmErr) {
+            console.error("🚨 전체 팀 멤버 조회 실패:", allTmErr.message);
+            throw allTmErr;
+        }
+
+        const allAssignedUserIds = (allTeamRel || []).map(row => row.user_id);
+
+        // 3. 프로필 전체 조회 후, 위 배열에 없는 사람만 순수 용병으로 필터링
+        const { data: allProfiles, error: pErr } = await Boako.db
+            .from('profiles')
+            .select('id, full_name');
+            
+        if (pErr) throw pErr;
+
+        // JS 단에서 안전하게 필터링 (team_members에 없는 사람만 남김)
+        const pureMercenaries = (allProfiles || []).filter(p => !allAssignedUserIds.includes(p.id));
+        
+        Boako.League.State.rosterMercenaries = pureMercenaries.map(u => ({ id: u.id, nickname: u.full_name || '이름없음' }));
+
     } catch (err) {
-        return alert("로스터 데이터를 불러오지 못했습니다.");
+        console.error("로스터 초기 데이터 바인딩 최종 실패:", err);
+        return alert(`데이터 로드 실패: ${err.message}\n자세한 에러는 콘솔을 확인하십시오.`);
     }
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-    const gameMode = p.game_mode || '4v4';
+    
+    const gameMode = p.game_mode || '4v4'; // 이건 DB 연산용 (수정 X)
+    const displayGameMode = gameMode.replace('v', 'vs'); // 🌟 화면 표기용 (1v1 -> 1vs1)
 
     const modalHtml = `
         <div id="roster-modal-backdrop" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="Boako.League.closeRosterModal()">
@@ -1017,7 +1064,7 @@ Boako.League.showRosterModal = async function(challengeId) {
                             <div class="text-[10px] font-black text-indigo-300 mb-1 tracking-widest uppercase">Challenge Order</div>
                             <div class="font-black text-lg flex items-center gap-2">
                                 <img src="${safeGameLogo}" class="w-6 h-6 object-contain bg-white rounded p-0.5">
-                                ${p.game_name} <span class="bg-indigo-600 border border-indigo-400 px-2 py-0.5 text-xs rounded-md ml-1">${gameMode}</span>
+                                ${p.game_name} <span class="bg-indigo-600 border border-indigo-400 px-2 py-0.5 text-xs rounded-md ml-1">${displayGameMode}</span>
                             </div>
                         </div>
                         <button onclick="Boako.League.closeRosterModal()" class="hidden md:block text-white/50 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
