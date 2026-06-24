@@ -950,6 +950,7 @@ Boako.League.confirmAcceptChallenge = async function(challengeId) {
 // 💡 5.5. 결전 로스터(엔트리) 구성 및 지능형 오더 제출 모달
 // ====================================================================
 
+// 1. 모달 렌더링 함수 (검색바 HTML 추가)
 Boako.League.showRosterModal = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
@@ -957,43 +958,34 @@ Boako.League.showRosterModal = async function(challengeId) {
     const myTeamId = Boako.state?.team?.info?.id;
     if (!myTeamId) return alert("소속된 팀 정보가 없습니다.");
 
-    // 상태 초기화
     Boako.League.State.currentRosterSlots = [null, null, null, null];
     Boako.League.State.isMercenaryTab = false;
 
-    // 🚨 [데이터 바인딩 수정 완료] player_name과 is_active를 사용한 DB 매핑
     try {
-        // 1. [우리 팀원] team_members에서 현재 활성화된 우리 팀 소속 이름 확보
         const { data: myTeamRel, error: tmErr } = await Boako.db
             .from('team_members')
             .select('player_name')
             .eq('team_id', myTeamId)
             .eq('is_active', true);
-
         if (tmErr) throw tmErr;
         const myTeamPlayerNames = (myTeamRel || []).map(row => row.player_name);
 
-        // 2. [모든 소속원] team_members에 등록되어 활동 중인 모든 유저명 확보
         const { data: allActiveMembers, error: allErr } = await Boako.db
             .from('team_members')
             .select('player_name')
             .eq('is_active', true);
-
         if (allErr) throw allErr;
         const assignedPlayerNames = (allActiveMembers || []).map(row => row.player_name);
 
-        // 3. 프로필 전체 조회 후 매핑
         const { data: allProfiles, error: pErr } = await Boako.db
             .from('profiles')
             .select('id, full_name');
-            
         if (pErr) throw pErr;
 
         Boako.League.State.rosterTeamMembers = allProfiles
             .filter(profile => myTeamPlayerNames.includes(profile.full_name))
             .map(profile => ({ id: profile.id, nickname: profile.full_name }));
 
-        // 용병: 현재 어떤 활성 팀에도 소속되지 않은 프로필
         Boako.League.State.rosterMercenaries = allProfiles
             .filter(profile => !assignedPlayerNames.includes(profile.full_name))
             .map(profile => ({ id: profile.id, nickname: profile.full_name }));
@@ -1004,9 +996,8 @@ Boako.League.showRosterModal = async function(challengeId) {
     }
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-    
     const gameMode = p.game_mode || '4v4'; 
-    const displayGameMode = Boako.League.formatMode(gameMode); // 1v1 -> 1vs1
+    const displayGameMode = Boako.League.formatMode(gameMode);
 
     const modalHtml = `
         <div id="roster-modal-backdrop" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="Boako.League.closeRosterModal()">
@@ -1021,6 +1012,13 @@ Boako.League.showRosterModal = async function(challengeId) {
                     <div class="flex p-3 gap-2 bg-slate-50/50">
                         <button id="btn-tab-team" onclick="Boako.League.switchRosterTab(false)" class="flex-1 py-2 text-xs font-black rounded-lg transition-all bg-indigo-600 text-white shadow-sm">소속 팀원</button>
                         <button id="btn-tab-merc" onclick="Boako.League.switchRosterTab(true)" class="flex-1 py-2 text-xs font-black rounded-lg transition-all bg-white text-slate-500 border border-slate-200 hover:bg-slate-100">자유 용병</button>
+                    </div>
+
+                    <div class="px-3 pb-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
+                        <div class="relative">
+                            <input type="text" id="roster-search-input" oninput="Boako.League.renderRosterList()" placeholder="닉네임으로 검색..." class="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-inner transition-all">
+                            <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                        </div>
                     </div>
                     
                     <div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2" id="roster-list-container"></div>
@@ -1068,20 +1066,36 @@ Boako.League.showRosterModal = async function(challengeId) {
     Boako.League.renderRosterSlots(gameMode);
 };
 
+// 2. 탭 전환 함수 (전환 시 검색바 초기화 추가)
 Boako.League.switchRosterTab = function(isMerc) {
     Boako.League.State.isMercenaryTab = isMerc;
     document.getElementById('btn-tab-team').className = `flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isMerc ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`;
     document.getElementById('btn-tab-merc').className = `flex-1 py-2 text-xs font-black rounded-lg transition-all ${isMerc ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`;
+    
+    // 🚨 탭 전환 시 검색어 비우기
+    const searchInput = document.getElementById('roster-search-input');
+    if (searchInput) searchInput.value = '';
+    
     Boako.League.renderRosterList();
 };
 
+// 3. 리스트 렌더링 함수 (입력값에 따른 실시간 필터링 추가)
 Boako.League.renderRosterList = function() {
     const container = document.getElementById('roster-list-container');
+    const searchInput = document.getElementById('roster-search-input');
+    
+    // 🚨 검색어 가져오기
+    const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const isMerc = Boako.League.State.isMercenaryTab;
-    const list = isMerc ? Boako.League.State.rosterMercenaries : Boako.League.State.rosterTeamMembers;
+    let list = isMerc ? Boako.League.State.rosterMercenaries : Boako.League.State.rosterTeamMembers;
+
+    // 🚨 검색어가 있으면 필터링 적용
+    if (keyword) {
+        list = list.filter(m => m.nickname.toLowerCase().includes(keyword));
+    }
 
     if (list.length === 0) {
-        container.innerHTML = `<div class="text-center text-xs font-bold text-slate-400 py-10">조회된 인원이 없습니다.</div>`;
+        container.innerHTML = `<div class="text-center text-xs font-bold text-slate-400 py-10">${keyword ? '검색된 인원이 없습니다.' : '조회된 인원이 없습니다.'}</div>`;
         return;
     }
 
@@ -1092,7 +1106,7 @@ Boako.League.renderRosterList = function() {
             : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-sm cursor-pointer";
 
         return `
-            <div onclick="Boako.League.addPlayerToSlot('${m.id}', '${m.nickname}', ${isMerc})" class="p-3 border rounded-xl flex justify-between items-center transition-all ${btnClass}">
+            <div onclick="Boako.League.addPlayerToSlot('${m.id}', '${m.nickname.replace(/'/g, "\\'")}', ${isMerc})" class="p-3 border rounded-xl flex justify-between items-center transition-all ${btnClass}">
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black ${isMerc ? 'text-amber-600' : 'text-indigo-600'}">${m.nickname.substring(0,2)}</div>
                     <span class="font-black text-xs">${m.nickname}</span>
