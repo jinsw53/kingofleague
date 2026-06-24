@@ -844,59 +844,74 @@ Boako.Match = {
         },
 
         loadMessagesAndPolls: async () => {
-            const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
-            try {
-                const { data: chats } = await Boako.db.from('grandprix_match_chats')
-                    .select('*, profiles(full_name)')
-                    .eq('room_id', roomId)
-                    .order('created_at', { ascending: false }).limit(40);
+        const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
+        const container = document.getElementById('match-chat-messages');
 
-                const { data: polls } = await Boako.db.from('schedule_polls')
-                    .select('*')
-                    .eq('target_id', roomId)
-                    .order('created_at', { ascending: true });
+        // 🚨 [핵심 안전장치] 구버전 모달창(#match-chat-messages)이 화면에 없다면?
+        if (!container) {
+            // 현재 우측 패널(통합 메신저)에 해당 대항전 채널이 열려있는지 확인
+            if (Boako.Messenger && Boako.Messenger.currentRoomId === `match_channel_${roomId}`) {
+                // 새로운 메신저에게 "투표 데이터 바뀌었으니 갱신해라" 하고 위임 처리
+                await Boako.Messenger.loadChatRooms(); // 최신 DB 다시 파싱
+                Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId); // 화면 리렌더링
+            }
+            return; // 💥 여기서 함수를 종료시켜서 null.innerHTML 에러를 원천 차단합니다!
+        }
 
-                const container = document.getElementById('match-chat-messages');
-                container.innerHTML = '';
+        // 🟢 아래는 구버전 모달창이 켜져 있을 때만 정상 작동하는 기존 로직입니다.
+        try {
+            const { data: chats } = await Boako.db.from('grandprix_match_chats')
+                .select('*, profiles(full_name)')
+                .eq('room_id', roomId)
+                .order('created_at', { ascending: false }).limit(40);
 
-                const bannerHtml = `
-                    <div class="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 rounded-xl p-3 flex items-start gap-2 shadow-sm shrink-0 mb-2">
-                        <span class="text-xl drop-shadow-sm">📢</span>
-                        <div>
-                            <h4 class="text-indigo-800 font-black text-xs mb-0.5">상시 안내</h4>
-                            <p class="text-[10px] text-slate-500 font-bold leading-tight break-keep">달력 탭을 열어 편한 시간을 클릭하세요. 시스템이 최적의 교집합 시간을 찾아 자동으로 조율을 진행합니다.</p>
-                        </div>
+            const { data: polls } = await Boako.db.from('schedule_polls')
+                .select('*')
+                .eq('target_id', roomId)
+                .order('created_at', { ascending: true });
+
+            container.innerHTML = '';
+
+            const bannerHtml = `
+                <div class="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 rounded-xl p-3 flex items-start gap-2 shadow-sm shrink-0 mb-2">
+                    <span class="text-xl drop-shadow-sm">📢</span>
+                    <div>
+                        <h4 class="text-indigo-800 font-black text-xs mb-0.5">상시 안내</h4>
+                        <p class="text-[10px] text-slate-500 font-bold leading-tight break-keep">달력 탭을 열어 편한 시간을 클릭하세요. 시스템이 최적의 교집합 시간을 찾아 자동으로 조율을 진행합니다.</p>
                     </div>
-                `;
-                container.insertAdjacentHTML('beforeend', bannerHtml);
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', bannerHtml);
 
-                let totalTimeline = [];
-                if (chats) chats.forEach(c => totalTimeline.push({ type: 'CHAT', time: new Date(c.created_at), data: c }));
+            let totalTimeline = [];
+            if (chats) chats.forEach(c => totalTimeline.push({ type: 'CHAT', time: new Date(c.created_at), data: c }));
 
-                if (polls) {
-                    const activePolls = polls.filter(p => p.status === 'OPEN' || p.status === 'PROPOSED');
-                    const latestActiveId = activePolls.length > 0 ? activePolls[activePolls.length - 1].poll_id : null;
+            if (polls) {
+                const activePolls = polls.filter(p => p.status === 'OPEN' || p.status === 'PROPOSED');
+                const latestActiveId = activePolls.length > 0 ? activePolls[activePolls.length - 1].poll_id : null;
 
-                    polls.forEach(p => {
-                        if (p.status === 'CONFIRMED' || p.poll_id === latestActiveId) {
-                            totalTimeline.push({ type: 'POLL', time: new Date(p.created_at), data: p });
-                        }
-                    });
-                }
+                polls.forEach(p => {
+                    if (p.status === 'CONFIRMED' || p.poll_id === latestActiveId) {
+                        totalTimeline.push({ type: 'POLL', time: new Date(p.created_at), data: p });
+                    }
+                });
+            }
 
-                totalTimeline.sort((a, b) => a.time - b.time);
+            totalTimeline.sort((a, b) => a.time - b.time);
 
-                if (totalTimeline.length > 0) {
-                    totalTimeline.forEach(item => {
-                        if (item.type === 'CHAT') Boako.Match.Chat.renderMessage(item.data);
-                        else Boako.Match.Chat.renderPollCard(item.data);
-                    });
-                    Boako.Match.Chat.scrollToBottom();
-                } else {
-                    container.insertAdjacentHTML('beforeend', `<div class="text-center text-slate-400 text-xs font-bold py-8">아직 대화 기록이 없습니다. 일정을 제안해 보세요!</div>`);
-                }
-            } catch (err) { console.error("데이터 로드 실패:", err); }
-        },
+            if (totalTimeline.length > 0) {
+                totalTimeline.forEach(item => {
+                    if (item.type === 'CHAT') Boako.Match.Chat.renderMessage(item.data);
+                    else Boako.Match.Chat.renderPollCard(item.data);
+                });
+                Boako.Match.Chat.scrollToBottom();
+            } else {
+                container.insertAdjacentHTML('beforeend', `<div class="text-center text-slate-400 text-xs font-bold py-8">아직 대화 기록이 없습니다. 일정을 제안해 보세요!</div>`);
+            }
+        } catch (err) { 
+            console.error("데이터 로드 실패:", err); 
+        }
+    },
 
         send: async () => {
             const input = document.getElementById('match-chat-input');
