@@ -501,12 +501,12 @@ Boako.League.renderChallenges = function() {
             case 'ROSTER_WAITING': 
                 statusBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">📋 로스터 구성 중</span>`;
                 if (isMyAttack || isMyDefend) {
-                    // 🚨 내 팀이 이미 로스터를 제출했는지 상태값 조회
-                    const isSubmitted = isMyAttack ? p.is_attacker_roster_submitted : p.is_defender_roster_submitted;
+                    // 🚨 핵심 수정: 실제 DB에 들어가는 1번 엔트리(p1) 데이터 유무로 제출 완료 여부 완벽 감지
+                    const isSubmitted = isMyAttack ? !!p.attacker_p1 : !!p.defender_p1;
                     
                     if (isSubmitted) {
                         actionHtml = `
-                            <button disabled class="w-full bg-slate-100 border border-slate-200 text-slate-400 font-black text-xs px-4 py-3.5 rounded-xl cursor-not-allowed flex items-center justify-center gap-1.5">
+                            <button disabled class="w-full bg-slate-100 border border-slate-200 text-slate-400 font-black text-xs px-4 py-3.5 rounded-xl cursor-not-allowed flex items-center justify-center gap-1.5 shadow-inner">
                                 <i data-lucide="check-circle" class="w-4 h-4 text-slate-400"></i> 제출 완료
                             </button>
                         `;
