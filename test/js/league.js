@@ -297,15 +297,139 @@ Boako.League.getChallengeHTML = function() {
     `;
 };
 
-// 🚨 라인업 확인 팝업 (누락 방지 추가)
+// ====================================================================
+// ⚔️ [라인업/현황 확인 뷰어] 양 팀의 스탠딩 엔트리 및 매치 승패 뷰어 모달
+// ====================================================================
 Boako.League.viewMatchLineup = function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
-    
-    console.log("라인업 로드:", p);
-    alert(`[${p.game_name}] 결전 임박!\n양 팀의 로스터가 모두 확정되었습니다. (상세 라인업 UI는 뷰어 개발 후 연동됩니다.)`);
-};
 
+    const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+    
+    // 개별 엔트리 매치별 승패 판단을 위한 헬퍼 연산 함수
+    const getMatchWinner = (matchNum) => {
+        if (p[`match${matchNum}_winner`] === 'ATTACKER') return 'ATTACKER';
+        if (p[`match${matchNum}_winner`] === 'DEFENDER') return 'DEFENDER';
+        if (p.status === 'COMPLETED' || p.status === 'RESULT_PENDING') {
+            if (p[`attacker_score${matchNum}`] > p[`defender_score${matchNum}`]) return 'ATTACKER';
+            if (p[`attacker_score${matchNum}`] < p[`defender_score${matchNum}`]) return 'DEFENDER';
+        }
+        return null;
+    };
+
+    // 엔트리 슬롯 컴포넌트 사출 로직 (승패 흐름에 따른 등화 점등 구현)
+    const buildEntrySlotHtml = (playerName, isMerc, matchNum, isAttackerSide) => {
+        if (!playerName) {
+            return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
+        }
+
+        const winner = getMatchWinner(matchNum);
+        let statusLightClass = 'bg-slate-300 shadow-none';
+        let statusText = '대기';
+        let textStyle = 'text-slate-500';
+        let bgStyle = 'bg-white border-slate-200';
+
+        if (winner) {
+            const side = isAttackerSide ? 'ATTACKER' : 'DEFENDER';
+            if (winner === side) {
+                statusLightClass = 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse';
+                statusText = '승리';
+                textStyle = 'text-emerald-600 font-black';
+                bgStyle = 'bg-emerald-50/40 border-emerald-200/80';
+            } else {
+                statusLightClass = 'bg-slate-300 opacity-60';
+                statusText = '패배';
+                textStyle = 'text-slate-400 font-medium';
+                bgStyle = 'bg-slate-50/60 border-slate-200 opacity-80';
+            }
+        }
+
+        return `
+            <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all ${bgStyle}">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center font-black text-[11px] text-slate-600 shrink-0 border border-slate-200">
+                        ${playerName.substring(0, 2)}
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                        <span class="text-xs font-black text-slate-800 truncate leading-tight">${playerName} ${isMerc ? '💎' : ''}</span>
+                        <span class="text-[8px] font-bold text-slate-400 mt-0.5">ENTRY 0${matchNum}</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100">
+                    <span class="w-1.5 h-1.5 rounded-full ${statusLightClass}"></span>
+                    <span class="text-[10px] font-black ${textStyle}">${statusText}</span>
+                </div>
+            </div>
+        `;
+    };
+
+    const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_p${i}`], p[`attacker_m${i}`], i, true)).join('');
+    const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_p${i}`], p[`defender_m${i}`], i, false)).join('');
+
+    const modalHtml = `
+        <div id="lineup-viewer-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="document.getElementById('challenge-popup-root').innerHTML=''">
+            <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+                
+                <div class="bg-gradient-to-r from-slate-900 to-indigo-950 p-5 flex items-center justify-between shrink-0 border-b border-slate-800">
+                    <h3 class="font-black text-white text-sm flex items-center gap-2"><i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> 실시간 결전 엔트리 정보</h3>
+                    <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="text-white/60 hover:text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+
+                <div class="p-6 overflow-y-auto custom-scrollbar flex-1 relative bg-slate-50/50---">
+                    
+                    <div class="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none z-0">
+                        <img src="${safeGameLogo}" class="w-80 h-80 object-contain">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-7 gap-4 items-center relative z-10">
+                        
+                        <div class="md:col-span-3 space-y-3">
+                            <div class="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                                <img src="${p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
+                                <span class="text-[9px] bg-violet-100 text-violet-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Challenger</span>
+                                <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.attacker_team_name}</h4>
+                            </div>
+                            <div class="space-y-2">
+                                ${attackerEntriesHtml}
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-1 flex flex-col items-center justify-center gap-4 py-4">
+                            <div class="bg-slate-800 text-white font-black text-xs px-2.5 py-1 rounded-full border-4 border-white shadow-md select-none">VS</div>
+                            <div class="flex flex-col items-center text-center">
+                                <img src="${safeGameLogo}" class="w-8.5 h-8.5 object-contain bg-white rounded-xl p-1 shadow-sm border border-slate-200 mb-1">
+                                <span class="text-[10px] font-black text-slate-700 truncate max-w-[80px] block leading-tight">${p.game_name}</span>
+                                <span class="bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 text-[8px] font-black text-indigo-700 rounded mt-1">${Boako.League.formatMode(p.game_mode)}</span>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-3 space-y-3">
+                            <div class="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                                <img src="${p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
+                                <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Defender</span>
+                                <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.defender_team_name || '대기 중'}</h4>
+                            </div>
+                            <div class="space-y-2">
+                                ${defenderEntriesHtml}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-slate-100 bg-white shrink-0 flex justify-end">
+                    <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="bg-slate-900 hover:bg-black text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-[0.98]">
+                        확인 완료
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    `;
+
+    document.getElementById('challenge-popup-root').innerHTML = modalHtml;
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
+};
 Boako.League.renderChallenges = function() {
     const container = document.getElementById('challenge-list');
     if (!container) return; container.innerHTML = '';
@@ -377,7 +501,18 @@ Boako.League.renderChallenges = function() {
             case 'ROSTER_WAITING': 
                 statusBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">📋 로스터 구성 중</span>`;
                 if (isMyAttack || isMyDefend) {
-                    actionHtml = `<button onclick="Boako.League.showRosterModal(${p.id})" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"><i data-lucide="users" class="w-4 h-4"></i> 엔트리/용병 등록</button>`;
+                    // 🚨 내 팀이 이미 로스터를 제출했는지 상태값 조회
+                    const isSubmitted = isMyAttack ? p.is_attacker_roster_submitted : p.is_defender_roster_submitted;
+                    
+                    if (isSubmitted) {
+                        actionHtml = `
+                            <button disabled class="w-full bg-slate-100 border border-slate-200 text-slate-400 font-black text-xs px-4 py-3.5 rounded-xl cursor-not-allowed flex items-center justify-center gap-1.5">
+                                <i data-lucide="check-circle" class="w-4 h-4 text-slate-400"></i> 제출 완료
+                            </button>
+                        `;
+                    } else {
+                        actionHtml = `<button onclick="Boako.League.showRosterModal(${p.id})" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"><i data-lucide="users" class="w-4 h-4"></i> 엔트리/용병 등록</button>`;
+                    }
                 } else {
                     actionHtml = `<div class="text-center w-full"><span class="text-[11px] font-black text-slate-400 block">양 팀 로스터 제출 대기</span></div>`;
                 }
