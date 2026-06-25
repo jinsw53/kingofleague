@@ -363,8 +363,14 @@ Boako.League.viewMatchLineup = function(challengeId) {
         `;
     };
 
-    const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_p${i}`], p[`attacker_m${i}`], i, true)).join('');
-    const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_p${i}`], p[`defender_m${i}`], i, false)).join('');
+    // 🚨 실제 DB 스키마 컬럼명(attacker_1, is_attacker_1_mercenary 등)으로 매핑 수정
+    const attackerEntriesHtml = [1, 2, 3, 4].map(i => 
+        buildEntrySlotHtml(p[`attacker_${i}`], p[`is_attacker_${i}_mercenary`], i, true)
+    ).join('');
+    
+    const defenderEntriesHtml = [1, 2, 3, 4].map(i => 
+        buildEntrySlotHtml(p[`defender_${i}`], p[`is_defender_${i}_mercenary`], i, false)
+    ).join('');
 
     const modalHtml = `
         <div id="lineup-viewer-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="document.getElementById('challenge-popup-root').innerHTML=''">
@@ -501,13 +507,14 @@ Boako.League.renderChallenges = function() {
             case 'ROSTER_WAITING': 
                 statusBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">📋 로스터 구성 중</span>`;
                 if (isMyAttack || isMyDefend) {
-                    // 🚨 핵심 수정: 실제 DB에 들어가는 1번 엔트리(p1) 데이터 유무로 제출 완료 여부 완벽 감지
-                    const isSubmitted = isMyAttack ? !!p.attacker_p1 : !!p.defender_p1;
+                    
+                    // 🚨 실제 DB 스키마 컬럼명(attacker_1, defender_1)으로 수정
+                    const isSubmitted = isMyAttack ? !!p.attacker_1 : !!p.defender_1;
                     
                     if (isSubmitted) {
                         actionHtml = `
                             <button disabled class="w-full bg-slate-100 border border-slate-200 text-slate-400 font-black text-xs px-4 py-3.5 rounded-xl cursor-not-allowed flex items-center justify-center gap-1.5 shadow-inner">
-                                <i data-lucide="check-circle" class="w-4 h-4 text-slate-400"></i> 제출 완료
+                                <i data-lucide="check-circle" class="w-4 h-4 text-slate-400"></i> 엔트리 제출 완료
                             </button>
                         `;
                     } else {
