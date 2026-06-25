@@ -1,6 +1,5 @@
-/*** 
- * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
- * 🛠️ 2026 최신화 패치: 용병 필터링 최적화(player_name 기반), '1vs1' UI 포매팅 일괄 적용, 모달 렌더링 안정성 강화
+/*** * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
+ * 🛠️ 2026 최신화 패치: 용병 프사 보안 에러 픽스, 라인업 함수 누락 해결, 프로필&챌린지 실시간 다중 감지(Realtime) 적용
  * 관리 책임자: 소장님 MASTER 
  */
 
@@ -145,7 +144,7 @@ Boako.League.switchTab = async function(tabId) {
 };
 
 // ====================================================================
-// 💡 3. 챌린지 초기화 및 실시간(Realtime) 구독 활성화
+// 💡 3. 챌린지 초기화 및 실시간(Realtime) 다중 구독 활성화
 // ====================================================================
 Boako.League.initChallengeData = async function() {
     try {
@@ -176,17 +175,35 @@ Boako.League.initChallengeData = async function() {
             Boako.League.renderChallenges();
         }
 
-        // 🚨 [실시간 리얼타임 부품 꽂기] 
+        // 🚨 [실시간 리얼타임 부품 꽂기 - 챌린지 & 프로필 통합 채널] 
         if (Boako.League.State.realtimeChannel) {
             Boako.db.removeChannel(Boako.League.State.realtimeChannel);
         }
 
         Boako.League.State.realtimeChannel = Boako.db
-            .channel('public:challenges')
+            .channel('league-multi-realtime')
+            // ⚔️ 1. 챌린지 테이블 감지
             .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, async (payload) => {
-                console.log('🔥 챌린지 광장 실시간 변동 감지:', payload);
+                console.log('🔥 챌린지 변동 감지:', payload);
                 await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
                 Boako.League.renderChallenges();
+                
+                const currentModal = document.getElementById('roster-modal-backdrop');
+                if (currentModal && payload.new.status === 'UPCOMING') {
+                    Boako.League.closeRosterModal();
+                    if(Boako.Util && Boako.Util.toast) Boako.Util.toast("상대 팀의 로스터 제출로 결전이 확정되었습니다!");
+                }
+            })
+            // 👤 2. 프로필 테이블 감지 (새 용병 합류, 프사 변경 등)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async (payload) => {
+                console.log('👤 프로필 변동 감지:', payload);
+                const currentModal = document.getElementById('roster-modal-backdrop');
+                if (currentModal) {
+                    const challengeNameElem = document.querySelector('#challenge-popup-root .text-lg');
+                    if (challengeNameElem) {
+                        if(Boako.Util && Boako.Util.toast) Boako.Util.toast("유저 정보(용병/프사 등)가 실시간 갱신되었습니다. 창을 다시 열면 반영됩니다.");
+                    }
+                }
             })
             .subscribe();
 
@@ -278,6 +295,15 @@ Boako.League.getChallengeHTML = function() {
         <div id="challenge-modal-root"></div>
         <div id="challenge-popup-root"></div>
     `;
+};
+
+// 🚨 라인업 확인 팝업 (누락 방지 추가)
+Boako.League.viewMatchLineup = function(challengeId) {
+    const p = Boako.League.State.challenges.find(c => c.id === challengeId);
+    if (!p) return;
+    
+    console.log("라인업 로드:", p);
+    alert(`[${p.game_name}] 결전 임박!\n양 팀의 로스터가 모두 확정되었습니다. (상세 라인업 UI는 뷰어 개발 후 연동됩니다.)`);
 };
 
 Boako.League.renderChallenges = function() {
@@ -978,21 +1004,21 @@ Boako.League.showRosterModal = async function(challengeId) {
         const assignedPlayerNames = (allActiveMembers || []).map(row => row.player_name);
 
         // 3. 프로필 전체 조회 부분
-const { data: allProfiles, error: pErr } = await Boako.db
-    .from('profiles')
-    .select('id, full_name, profile_url'); // 🌟 profile_url 가져오기
-    
-if (pErr) throw pErr;
+        const { data: allProfiles, error: pErr } = await Boako.db
+            .from('profiles')
+            .select('id, full_name, profile_url'); // 🌟 profile_url 가져오기
+            
+        if (pErr) throw pErr;
 
-// 팀원 매핑 시 avatar 데이터 포함
-Boako.League.State.rosterTeamMembers = allProfiles
-    .filter(p => myTeamPlayerNames.includes(p.full_name))
-    .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
+        // 팀원 매핑 시 avatar 데이터 포함
+        Boako.League.State.rosterTeamMembers = allProfiles
+            .filter(p => myTeamPlayerNames.includes(p.full_name))
+            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
 
-// 용병 매핑
-Boako.League.State.rosterMercenaries = allProfiles
-    .filter(p => !assignedPlayerNames.includes(p.full_name))
-    .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
+        // 용병 매핑
+        Boako.League.State.rosterMercenaries = allProfiles
+            .filter(p => !assignedPlayerNames.includes(p.full_name))
+            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
 
     } catch (err) {
         console.error("로스터 데이터 바인딩 실패:", err);
@@ -1096,7 +1122,7 @@ Boako.League.renderRosterList = function() {
     }
 
     if (list.length === 0) {
-        container.innerHTML = `<div class="text-center text-xs font-bold text-slate-400 py-10">조회된 인원이 없습니다.</div>`;
+        container.innerHTML = `<div class="text-center text-xs font-bold text-slate-400 py-10">${keyword ? '검색된 인원이 없습니다.' : '조회된 인원이 없습니다.'}</div>`;
         return;
     }
 
@@ -1106,9 +1132,11 @@ Boako.League.renderRosterList = function() {
             ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50" 
             : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-sm cursor-pointer";
 
-        // 🌟 프사가 있으면 이미지, 없으면 닉네임 두 글자 (기본 이미지 주소는 프로젝트 환경에 맞게 변경 가능)
-        const avatarHtml = m.avatar 
-            ? `<img src="${m.avatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner">`
+        // 🚨 HTTP -> HTTPS 변환 로직 추가
+        const secureAvatar = m.avatar ? m.avatar.replace(/^http:\/\//i, 'https://') : null;
+
+        const avatarHtml = secureAvatar 
+            ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
             : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black ${isMerc ? 'text-amber-600' : 'text-indigo-600'}">${m.nickname.substring(0,2)}</div>`;
 
         return `
@@ -1128,7 +1156,8 @@ Boako.League.addPlayerToSlot = function(id, nickname, isMerc) {
 
     const emptyIndex = Boako.League.State.currentRosterSlots.findIndex(s => s === null);
     if (emptyIndex === -1) {
-        Boako.Util.toast("4개의 슬롯이 모두 가득 찼습니다.");
+        if(Boako.Util && Boako.Util.toast) Boako.Util.toast("4개의 슬롯이 모두 가득 찼습니다.");
+        else alert("4개의 슬롯이 모두 가득 찼습니다.");
         return;
     }
 
@@ -1228,7 +1257,8 @@ Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
     const slots = Boako.League.State.currentRosterSlots;
     
     if (slots.includes(null)) {
-        return Boako.Util.toast("4명의 선수를 모두 슬롯에 배치해주세요.");
+        if(Boako.Util && Boako.Util.toast) return Boako.Util.toast("4명의 선수를 모두 슬롯에 배치해주세요.");
+        else return alert("4명의 선수를 모두 슬롯에 배치해주세요.");
     }
 
     if (!confirm("이 조합과 순서로 로스터를 확정하시겠습니까? (제출 후 수정 불가)")) return;
@@ -1248,7 +1278,9 @@ Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
         const { error } = await Boako.db.rpc('submit_challenge_roster', payload);
         if (error) throw error;
 
-        Boako.Util.toast("🎯 로스터 제출이 완료되었습니다!");
+        if(Boako.Util && Boako.Util.toast) Boako.Util.toast("🎯 로스터 제출이 완료되었습니다!");
+        else alert("🎯 로스터 제출이 완료되었습니다!");
+        
         Boako.League.closeRosterModal();
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         Boako.League.renderChallenges();
