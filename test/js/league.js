@@ -300,9 +300,24 @@ Boako.League.getChallengeHTML = function() {
 // ====================================================================
 // ⚔️ [라인업/현황 확인 뷰어] 양 팀의 스탠딩 엔트리 및 매치 승패 뷰어 모달
 // ====================================================================
-Boako.League.viewMatchLineup = function(challengeId) {
+Boako.League.viewMatchLineup = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
+
+    // 🚨 1. 프사 조회를 위한 프로필 데이터 호출
+    let profiles = [];
+    try {
+        if (Boako.db) {
+            const { data } = await Boako.db.from('profiles').select('full_name, profile_url');
+            profiles = data || [];
+        }
+    } catch (e) { console.error("프로필 조회 실패", e); }
+
+    // 🚨 2. 프사 URL 매핑 및 HTTP -> HTTPS 강제 변환 (보안 경고 방지)
+    const getSecureAvatar = (name) => {
+        const url = profiles.find(pr => pr.full_name === name)?.profile_url;
+        return url ? url.replace(/^http:\/\//i, 'https://') : null;
+    };
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
     
@@ -317,11 +332,17 @@ Boako.League.viewMatchLineup = function(challengeId) {
         return null;
     };
 
-    // 엔트리 슬롯 컴포넌트 사출 로직 (승패 흐름에 따른 등화 점등 구현)
+    // 엔트리 슬롯 컴포넌트 사출 로직 (프사 적용 및 승패 인디케이터)
     const buildEntrySlotHtml = (playerName, isMerc, matchNum, isAttackerSide) => {
         if (!playerName) {
             return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
         }
+
+        // 🚨 3. 변환된 안전한 아바타 삽입
+        const secureAvatar = getSecureAvatar(playerName);
+        const avatarHtml = secureAvatar 
+            ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
+            : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-300">${playerName.substring(0, 2)}</div>`;
 
         const winner = getMatchWinner(matchNum);
         let statusLightClass = 'bg-slate-300 shadow-none';
@@ -345,11 +366,9 @@ Boako.League.viewMatchLineup = function(challengeId) {
         }
 
         return `
-            <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all ${bgStyle}">
+            <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${bgStyle}">
                 <div class="flex items-center gap-2 min-w-0">
-                    <div class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center font-black text-[11px] text-slate-600 shrink-0 border border-slate-200">
-                        ${playerName.substring(0, 2)}
-                    </div>
+                    ${avatarHtml}
                     <div class="flex flex-col min-w-0">
                         <span class="text-xs font-black text-slate-800 truncate leading-tight">${playerName} ${isMerc ? '💎' : ''}</span>
                         <span class="text-[8px] font-bold text-slate-400 mt-0.5">ENTRY 0${matchNum}</span>
@@ -363,34 +382,27 @@ Boako.League.viewMatchLineup = function(challengeId) {
         `;
     };
 
-    // 🚨 실제 DB 스키마 컬럼명(attacker_1, is_attacker_1_mercenary 등)으로 매핑 수정
-    const attackerEntriesHtml = [1, 2, 3, 4].map(i => 
-        buildEntrySlotHtml(p[`attacker_${i}`], p[`is_attacker_${i}_mercenary`], i, true)
-    ).join('');
-    
-    const defenderEntriesHtml = [1, 2, 3, 4].map(i => 
-        buildEntrySlotHtml(p[`defender_${i}`], p[`is_defender_${i}_mercenary`], i, false)
-    ).join('');
+    const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_${i}`], p[`is_attacker_${i}_mercenary`], i, true)).join('');
+    const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_${i}`], p[`is_defender_${i}_mercenary`], i, false)).join('');
 
     const modalHtml = `
         <div id="lineup-viewer-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="document.getElementById('challenge-popup-root').innerHTML=''">
-            <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+            <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] relative" onclick="event.stopPropagation()">
                 
-                <div class="bg-gradient-to-r from-slate-900 to-indigo-950 p-5 flex items-center justify-between shrink-0 border-b border-slate-800">
+                <div class="absolute top-0 inset-x-0 h-56 z-0 pointer-events-none opacity-[0.06] flex items-start justify-center pt-8 overflow-hidden">
+                    <img src="${safeGameLogo}" class="w-64 h-64 object-contain scale-150">
+                </div>
+                
+                <div class="bg-slate-900/95 backdrop-blur-sm p-5 flex items-center justify-between shrink-0 border-b border-slate-800 relative z-20">
                     <h3 class="font-black text-white text-sm flex items-center gap-2"><i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> 실시간 결전 엔트리 정보</h3>
                     <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="text-white/60 hover:text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
                 </div>
 
-                <div class="p-6 overflow-y-auto custom-scrollbar flex-1 relative bg-slate-50/50---">
-                    
-                    <div class="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none z-0">
-                        <img src="${safeGameLogo}" class="w-80 h-80 object-contain">
-                    </div>
-
+                <div class="p-6 overflow-y-auto custom-scrollbar flex-1 relative bg-transparent">
                     <div class="grid grid-cols-1 md:grid-cols-7 gap-4 items-center relative z-10">
                         
                         <div class="md:col-span-3 space-y-3">
-                            <div class="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                            <div class="bg-white/80 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                                 <img src="${p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-violet-100 text-violet-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Challenger</span>
                                 <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.attacker_team_name}</h4>
@@ -403,14 +415,14 @@ Boako.League.viewMatchLineup = function(challengeId) {
                         <div class="md:col-span-1 flex flex-col items-center justify-center gap-4 py-4">
                             <div class="bg-slate-800 text-white font-black text-xs px-2.5 py-1 rounded-full border-4 border-white shadow-md select-none">VS</div>
                             <div class="flex flex-col items-center text-center">
-                                <img src="${safeGameLogo}" class="w-8.5 h-8.5 object-contain bg-white rounded-xl p-1 shadow-sm border border-slate-200 mb-1">
-                                <span class="text-[10px] font-black text-slate-700 truncate max-w-[80px] block leading-tight">${p.game_name}</span>
+                                <img src="${safeGameLogo}" class="w-8 h-8 object-contain bg-white/80 rounded-xl p-1 shadow-sm border border-slate-200 mb-1 relative z-10 backdrop-blur-sm">
+                                <span class="text-[10px] font-black text-slate-700 truncate max-w-[80px] block leading-tight bg-white/80 px-1 rounded">${p.game_name}</span>
                                 <span class="bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 text-[8px] font-black text-indigo-700 rounded mt-1">${Boako.League.formatMode(p.game_mode)}</span>
                             </div>
                         </div>
 
                         <div class="md:col-span-3 space-y-3">
-                            <div class="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                            <div class="bg-white/80 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                                 <img src="${p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Defender</span>
                                 <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.defender_team_name || '대기 중'}</h4>
@@ -423,7 +435,7 @@ Boako.League.viewMatchLineup = function(challengeId) {
                     </div>
                 </div>
 
-                <div class="p-4 border-t border-slate-100 bg-white shrink-0 flex justify-end">
+                <div class="p-4 border-t border-slate-100 bg-white shrink-0 flex justify-end relative z-20">
                     <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="bg-slate-900 hover:bg-black text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-[0.98]">
                         확인 완료
                     </button>
@@ -436,6 +448,7 @@ Boako.League.viewMatchLineup = function(challengeId) {
     document.getElementById('challenge-popup-root').innerHTML = modalHtml;
     setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 };
+
 Boako.League.renderChallenges = function() {
     const container = document.getElementById('challenge-list');
     if (!container) return; container.innerHTML = '';
