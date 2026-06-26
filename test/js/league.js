@@ -304,7 +304,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
 
-    // 🚨 1. 프사 조회를 위한 프로필 데이터 호출
+    // 🚨 프사 조회를 위한 프로필 데이터 호출
     let profiles = [];
     try {
         if (Boako.db) {
@@ -313,7 +313,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     } catch (e) { console.error("프로필 조회 실패", e); }
 
-    // 🚨 2. 프사 URL 매핑 및 HTTP -> HTTPS 강제 변환 (보안 경고 방지)
+    // 🚨 프사 URL 매핑 및 HTTP -> HTTPS 강제 변환
     const getSecureAvatar = (name) => {
         const url = profiles.find(pr => pr.full_name === name)?.profile_url;
         return url ? url.replace(/^http:\/\//i, 'https://') : null;
@@ -338,7 +338,6 @@ Boako.League.viewMatchLineup = async function(challengeId) {
             return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
         }
 
-        // 🚨 3. 변환된 안전한 아바타 삽입
         const secureAvatar = getSecureAvatar(playerName);
         const avatarHtml = secureAvatar 
             ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
@@ -389,8 +388,8 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         <div id="lineup-viewer-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="document.getElementById('challenge-popup-root').innerHTML=''">
             <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] relative" onclick="event.stopPropagation()">
                 
-                <div class="absolute top-0 inset-x-0 h-56 z-0 pointer-events-none opacity-[0.06] flex items-start justify-center pt-8 overflow-hidden">
-                    <img src="${safeGameLogo}" class="w-64 h-64 object-contain scale-150">
+                <div class="absolute inset-0 z-0 opacity-15 pointer-events-none flex items-center justify-center select-none overflow-hidden">
+                    <img src="${safeGameLogo}" class="w-80 h-80 object-contain">
                 </div>
                 
                 <div class="bg-slate-900/95 backdrop-blur-sm p-5 flex items-center justify-between shrink-0 border-b border-slate-800 relative z-20">
@@ -402,7 +401,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                     <div class="grid grid-cols-1 md:grid-cols-7 gap-4 items-center relative z-10">
                         
                         <div class="md:col-span-3 space-y-3">
-                            <div class="bg-white/80 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                            <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                                 <img src="${p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-violet-100 text-violet-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Challenger</span>
                                 <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.attacker_team_name}</h4>
@@ -412,17 +411,17 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                             </div>
                         </div>
 
-                        <div class="md:col-span-1 flex flex-col items-center justify-center gap-4 py-4">
-                            <div class="bg-slate-800 text-white font-black text-xs px-2.5 py-1 rounded-full border-4 border-white shadow-md select-none">VS</div>
-                            <div class="flex flex-col items-center text-center">
-                                <img src="${safeGameLogo}" class="w-8 h-8 object-contain bg-white/80 rounded-xl p-1 shadow-sm border border-slate-200 mb-1 relative z-10 backdrop-blur-sm">
-                                <span class="text-[10px] font-black text-slate-700 truncate max-w-[80px] block leading-tight bg-white/80 px-1 rounded">${p.game_name}</span>
-                                <span class="bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 text-[8px] font-black text-indigo-700 rounded mt-1">${Boako.League.formatMode(p.game_mode)}</span>
+                        <div class="md:col-span-1 flex flex-col items-center justify-center gap-5 py-4 relative z-10">
+                            <div class="bg-slate-800 text-white font-black text-sm px-3.5 py-1.5 rounded-full border-4 border-white shadow-md select-none tracking-widest">VS</div>
+                            <div class="flex flex-col items-center text-center mt-1">
+                                <img src="${safeGameLogo}" class="w-12 h-12 object-contain bg-white/95 rounded-2xl p-1.5 shadow-md border border-slate-200 mb-1.5 backdrop-blur-sm">
+                                <span class="text-xs font-black text-slate-800 truncate max-w-[90px] block leading-tight bg-white/90 px-1.5 py-0.5 rounded shadow-sm">${p.game_name}</span>
+                                <span class="bg-indigo-600 border border-indigo-400 px-2.5 py-0.5 text-[10px] font-black text-white rounded mt-1.5 shadow-sm">${Boako.League.formatMode(p.game_mode)}</span>
                             </div>
                         </div>
 
                         <div class="md:col-span-3 space-y-3">
-                            <div class="bg-white/80 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                            <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                                 <img src="${p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Defender</span>
                                 <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.defender_team_name || '대기 중'}</h4>
