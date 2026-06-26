@@ -1160,19 +1160,35 @@ Boako.League.showRosterModal = async function(challengeId) {
         // 3. 프로필 전체 조회 부분
         const { data: allProfiles, error: pErr } = await Boako.db
             .from('profiles')
-            .select('id, full_name, profile_url'); // 🌟 profile_url 가져오기
+            .select('id, full_name, profile_url'); 
             
         if (pErr) throw pErr;
+
+        // 🚨 [추가] 상대팀이 이미 데려간 명단 추출 (양다리 방지용)
+        const isMyAttack = (p.attacker_team_id === myTeamId);
+        const opposingRosterNames = [];
+        if (isMyAttack) {
+            if (p.defender_1) opposingRosterNames.push(p.defender_1);
+            if (p.defender_2) opposingRosterNames.push(p.defender_2);
+            if (p.defender_3) opposingRosterNames.push(p.defender_3);
+            if (p.defender_4) opposingRosterNames.push(p.defender_4);
+        } else {
+            if (p.attacker_1) opposingRosterNames.push(p.attacker_1);
+            if (p.attacker_2) opposingRosterNames.push(p.attacker_2);
+            if (p.attacker_3) opposingRosterNames.push(p.attacker_3);
+            if (p.attacker_4) opposingRosterNames.push(p.attacker_4);
+        }
 
         // 팀원 매핑 시 avatar 데이터 포함
         Boako.League.State.rosterTeamMembers = allProfiles
             .filter(p => myTeamPlayerNames.includes(p.full_name))
-            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
+            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); 
 
-        // 용병 매핑
+        // 용병 매핑 (🚨 상대팀 명단 필터링 추가)
         Boako.League.State.rosterMercenaries = allProfiles
             .filter(p => !assignedPlayerNames.includes(p.full_name))
-            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); // 🌟 avatar에 profile_url 할당
+            .filter(p => !opposingRosterNames.includes(p.full_name)) // 🌟 여기서 양다리 완벽 차단
+            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url }));
 
     } catch (err) {
         console.error("로스터 데이터 바인딩 실패:", err);
