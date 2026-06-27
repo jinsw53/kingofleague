@@ -321,13 +321,17 @@ Boako.League.viewMatchLineup = async function(challengeId) {
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
     
-    // 개별 엔트리 매치별 승패 판단을 위한 헬퍼 연산 함수
+    // 🚨 [수정됨] 존재하지 않는 컬럼 대신 JSONB match_results 데이터를 파싱하여 승패 판단
     const getMatchWinner = (matchNum) => {
-        if (p[`match${matchNum}_winner`] === 'ATTACKER') return 'ATTACKER';
-        if (p[`match${matchNum}_winner`] === 'DEFENDER') return 'DEFENDER';
-        if (p.status === 'COMPLETED' || p.status === 'RESULT_PENDING') {
-            if (p[`attacker_score${matchNum}`] > p[`defender_score${matchNum}`]) return 'ATTACKER';
-            if (p[`attacker_score${matchNum}`] < p[`defender_score${matchNum}`]) return 'DEFENDER';
+        let resultsObj = p.match_results;
+        // 문자열로 들어왔을 경우 방어 처리
+        if (typeof resultsObj === 'string') {
+            try { resultsObj = JSON.parse(resultsObj); } catch(e) { resultsObj = {}; }
+        }
+        
+        // JSON 객체 내부에 해당 매치의 winner_side가 기록되어 있는지 확인
+        if (resultsObj && resultsObj.matches && resultsObj.matches[matchNum]) {
+            return resultsObj.matches[matchNum].winner_side; // 'ATTACKER' 또는 'DEFENDER'
         }
         return null;
     };
@@ -519,8 +523,6 @@ Boako.League.renderChallenges = function() {
             case 'ROSTER_WAITING': 
                 statusBadgeHtml = `<span class="bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">📋 로스터 구성 중</span>`;
                 if (isMyAttack || isMyDefend) {
-                    
-                    // 🚨 실제 DB 스키마 컬럼명(attacker_1, defender_1)으로 수정
                     const isSubmitted = isMyAttack ? !!p.attacker_1 : !!p.defender_1;
                     
                     if (isSubmitted) {
@@ -537,8 +539,14 @@ Boako.League.renderChallenges = function() {
                 }
                 break;
 
+            // 🚨 [수정됨] IN_PROGRESS 상태 병합 및 처리
             case 'UPCOMING': 
-                statusBadgeHtml = `<span class="bg-purple-100 text-purple-700 border border-purple-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1"><i data-lucide="swords" class="w-3 h-3 text-purple-500"></i> 결전 임박</span>`;
+            case 'IN_PROGRESS': 
+                if (currentStatus === 'IN_PROGRESS') {
+                    statusBadgeHtml = `<span class="bg-blue-100 text-blue-700 border border-blue-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1 animate-pulse"><i data-lucide="play" class="w-3 h-3 text-blue-500"></i> 결전 진행 중</span>`;
+                } else {
+                    statusBadgeHtml = `<span class="bg-purple-100 text-purple-700 border border-purple-200 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1"><i data-lucide="swords" class="w-3 h-3 text-purple-500"></i> 결전 임박</span>`;
+                }
                 actionHtml = `<button onclick="Boako.League.viewMatchLineup(${p.id})" class="w-full bg-white hover:bg-slate-50 text-slate-800 font-black text-xs px-4 py-3.5 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center justify-center gap-1.5"><i data-lucide="scroll-text" class="w-4 h-4"></i> 라인업/전적 확인</button>`;
                 break;
 
@@ -553,7 +561,8 @@ Boako.League.renderChallenges = function() {
 
             case 'COMPLETED': 
                 statusBadgeHtml = `<span class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">🏆 종료 완료</span>`;
-                actionHtml = `<div class="text-center w-full py-2"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mx-auto mb-1 opacity-80"></i><span class="text-[10px] font-black text-slate-400 block">포인트 정산 완료</span></div>`;
+                // 🚨 [수정됨] 완료된 상태에서도 전적을 볼 수 있도록 라인업 버튼 렌더링
+                actionHtml = `<button onclick="Boako.League.viewMatchLineup(${p.id})" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black text-xs px-4 py-3.5 rounded-xl shadow-sm border border-emerald-200 transition-all flex items-center justify-center gap-1.5"><i data-lucide="trophy" class="w-4 h-4"></i> 최종 전적 결과 보기</button>`;
                 break;
 
             case 'CANCELED':
