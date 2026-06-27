@@ -298,7 +298,7 @@ Boako.League.getChallengeHTML = function() {
 };
 
 // ====================================================================
-// ⚔️ [라인업/현황 확인 뷰어] 양 팀의 스탠딩 엔트리 및 매치 승패 뷰어 모달
+// ⚔️ [라인업/현황 확인 뷰어] 승자연전(릴레이) 기반 엔트리 생존/승패 뷰어 모달
 // ====================================================================
 Boako.League.viewMatchLineup = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
@@ -321,22 +321,74 @@ Boako.League.viewMatchLineup = async function(challengeId) {
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
     
-    // 🚨 [수정됨] 존재하지 않는 컬럼 대신 JSONB match_results 데이터를 파싱하여 승패 판단
-    const getMatchWinner = (matchNum) => {
-        let resultsObj = p.match_results;
-        // 문자열로 들어왔을 경우 방어 처리
-        if (typeof resultsObj === 'string') {
-            try { resultsObj = JSON.parse(resultsObj); } catch(e) { resultsObj = {}; }
-        }
-        
-        // JSON 객체 내부에 해당 매치의 winner_side가 기록되어 있는지 확인
-        if (resultsObj && resultsObj.matches && resultsObj.matches[matchNum]) {
-            return resultsObj.matches[matchNum].winner_side; // 'ATTACKER' 또는 'DEFENDER'
-        }
-        return null;
+    // 💡 [승자연전(릴레이) 로직] JSONB 데이터를 분석하여 각 엔트리의 '생존 상태'를 도출
+    let resultsObj = p.match_results;
+    if (typeof resultsObj === 'string') {
+        try { resultsObj = JSON.parse(resultsObj); } catch(e) { resultsObj = null; }
+    }
+    
+    const summary = resultsObj?.summary || {
+        attacker: { wins: 0, streak: 0 },
+        defender: { wins: 0, streak: 0 }
     };
 
-    // 엔트리 슬롯 컴포넌트 사출 로직 (프사 적용 및 승패 인디케이터)
+    // 상대방의 승리 수 = 아군의 탈락(사망) 수
+    const atk_deaths = summary.defender.wins || 0;
+    const def_deaths = summary.attacker.wins || 0;
+    const atk_streak = summary.attacker.streak || 0;
+    const def_streak = summary.defender.streak || 0;
+
+    const getSlotStatus = (matchNum, isAttackerSide) => {
+        const deaths = isAttackerSide ? atk_deaths : def_deaths;
+        const streak = isAttackerSide ? atk_streak : def_streak;
+        const isCompleted = p.status === 'COMPLETED';
+
+        if (matchNum <= deaths) {
+            // [상태 1] 이미 출전해서 패배함 (탈락)
+            return {
+                text: '탈락',
+                lightClass: 'bg-slate-300 opacity-60',
+                textClass: 'text-slate-400 font-medium',
+                bgClass: 'bg-slate-50/60 border-slate-200 opacity-80'
+            };
+        } else if (matchNum === deaths + 1) {
+            // [상태 2] 현재 출전 중이거나 마지막까지 살아남은 엔트리
+            if (isCompleted) {
+                return {
+                    text: streak > 0 ? `생존 (${streak}승)` : '최종 생존',
+                    lightClass: 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse',
+                    textClass: 'text-emerald-600 font-black',
+                    bgClass: 'bg-emerald-50/40 border-emerald-200/80'
+                };
+            } else {
+                return {
+                    text: streak > 0 ? `${streak}연승 중` : '출전/대기',
+                    lightClass: streak > 0 ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24] animate-pulse' : 'bg-blue-400 shadow-[0_0_8px_#60a5fa]',
+                    textClass: streak > 0 ? 'text-amber-600 font-black' : 'text-blue-600 font-bold',
+                    bgClass: streak > 0 ? 'bg-amber-50/40 border-amber-200' : 'bg-blue-50/40 border-blue-200'
+                };
+            }
+        } else {
+            // [상태 3] 아직 순서가 오지 않음
+            if (isCompleted) {
+                return {
+                    text: '미출전',
+                    lightClass: 'bg-slate-200',
+                    textClass: 'text-slate-400 font-medium',
+                    bgClass: 'bg-slate-50/30 border-slate-100 opacity-60'
+                };
+            } else {
+                return {
+                    text: '대기 중',
+                    lightClass: 'bg-slate-300',
+                    textClass: 'text-slate-500 font-medium',
+                    bgClass: 'bg-white border-slate-200'
+                };
+            }
+        }
+    };
+
+    // 엔트리 슬롯 컴포넌트 사출 로직 (프사 적용 및 상태 인디케이터)
     const buildEntrySlotHtml = (playerName, isMerc, matchNum, isAttackerSide) => {
         if (!playerName) {
             return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
@@ -347,29 +399,10 @@ Boako.League.viewMatchLineup = async function(challengeId) {
             ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
             : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-300">${playerName.substring(0, 2)}</div>`;
 
-        const winner = getMatchWinner(matchNum);
-        let statusLightClass = 'bg-slate-300 shadow-none';
-        let statusText = '대기';
-        let textStyle = 'text-slate-500';
-        let bgStyle = 'bg-white border-slate-200';
-
-        if (winner) {
-            const side = isAttackerSide ? 'ATTACKER' : 'DEFENDER';
-            if (winner === side) {
-                statusLightClass = 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse';
-                statusText = '승리';
-                textStyle = 'text-emerald-600 font-black';
-                bgStyle = 'bg-emerald-50/40 border-emerald-200/80';
-            } else {
-                statusLightClass = 'bg-slate-300 opacity-60';
-                statusText = '패배';
-                textStyle = 'text-slate-400 font-medium';
-                bgStyle = 'bg-slate-50/60 border-slate-200 opacity-80';
-            }
-        }
+        const status = getSlotStatus(matchNum, isAttackerSide);
 
         return `
-            <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${bgStyle}">
+            <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${status.bgClass}">
                 <div class="flex items-center gap-2 min-w-0">
                     ${avatarHtml}
                     <div class="flex flex-col min-w-0">
@@ -378,8 +411,8 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100">
-                    <span class="w-1.5 h-1.5 rounded-full ${statusLightClass}"></span>
-                    <span class="text-[10px] font-black ${textStyle}">${statusText}</span>
+                    <span class="w-1.5 h-1.5 rounded-full ${status.lightClass}"></span>
+                    <span class="text-[10px] font-black ${status.textClass}">${status.text}</span>
                 </div>
             </div>
         `;
@@ -397,7 +430,10 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                 </div>
                 
                 <div class="bg-slate-900/95 backdrop-blur-sm p-5 flex items-center justify-between shrink-0 border-b border-slate-800 relative z-20">
-                    <h3 class="font-black text-white text-sm flex items-center gap-2"><i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> 실시간 결전 엔트리 정보</h3>
+                    <h3 class="font-black text-white text-sm flex items-center gap-2">
+                        <i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> 실시간 결전 엔트리 정보 
+                        <span class="bg-indigo-900 text-indigo-300 text-[9px] px-1.5 py-0.5 rounded border border-indigo-700 ml-2 tracking-wider">승자연전 릴레이</span>
+                    </h3>
                     <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="text-white/60 hover:text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
                 </div>
 
