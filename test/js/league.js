@@ -398,7 +398,13 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     };
 
-   // 4. 엔트리 슬롯 HTML 사출 (줄바꿈 완벽 대응 버전)
+   // 💡 [추가] 경기 모드별 최적의 높이를 계산하여 좌우 슬롯 비대칭을 원천 차단
+    let minHeightClass = 'min-h-[60px]'; // 1v1 기본 높이
+    if (p.game_mode === '2v2') minHeightClass = 'min-h-[88px]';
+    else if (p.game_mode === '3v3') minHeightClass = 'min-h-[116px]';
+    else if (p.game_mode === '4v4') minHeightClass = 'min-h-[144px]';
+
+    // 4. 엔트리 슬롯 HTML 사출 (시인성 극대화 + 좌우 대칭 보장 버전)
     const buildEntrySlotHtml = (entryData, isMerc, matchNum, isAttackerSide) => {
         let players = [];
         if (Array.isArray(entryData)) {
@@ -407,11 +413,12 @@ Boako.League.viewMatchLineup = async function(challengeId) {
             try { players = JSON.parse(entryData); } catch(e) { players = [entryData]; }
         }
 
+        // 미등록 슬롯도 맞은편 슬롯과 높이를 맞추기 위해 minHeightClass 주입
         if (!players || players.length === 0 || !players[0]) {
-            return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
+            return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold ${minHeightClass}">엔트리 미등록</div>`;
         }
 
-        // 인원이 많아져도 아바타 영역이 찌그러지지 않도록 shrink-0 처리
+        // 프사 뭉쳐 보여주는 이쁜 구조는 그대로 유지
         const avatarsHtml = `<div class="flex items-center pl-2 shrink-0 pr-1">` + players.map((name, idx) => {
             const secureAvatar = getSecureAvatar(name);
             return secureAvatar 
@@ -419,25 +426,35 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                 : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border-2 border-white shadow-sm -ml-2 relative" style="z-index: ${10 + idx};">${name.substring(0, 2)}</div>`;
         }).join('') + `</div>`;
 
-        const namesText = players.join(', ');
+        // 💡 콤마(,)를 찢어발기고 닉네임을 독자적인 블록으로 분리하여 세로 줄바꿈 정렬
+        const namesHtml = players.map(name => `
+            <div class="text-xs font-black text-slate-800 leading-tight break-all tracking-tight">
+                ${name}
+            </div>
+        `).join('');
         
         const statsObj = isAttackerSide ? atkStats[matchNum] : defStats[matchNum];
         const status = getUIStatus(statsObj);
 
         return `
-            <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${status.bgClass}">
-                <div class="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+            <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${status.bgClass} ${minHeightClass}">
+                <div class="flex items-center gap-3 min-w-0 flex-1 mr-2">
                     ${avatarsHtml}
-                    <div class="flex flex-col min-w-0 flex-1 justify-center">
-                        <span class="text-xs font-black text-slate-800 leading-normal w-full whitespace-normal break-words" title="${namesText}">
-                            ${namesText} ${isMerc ? '💎' : ''}
-                        </span>
-                        <span class="text-[8px] font-bold text-slate-400 mt-0.5">ENTRY 0${matchNum}</span>
+                    <div class="flex flex-col min-w-0 flex-1 justify-center gap-1.5">
+                        <div class="space-y-1">
+                            ${namesHtml}
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[8px] font-bold text-slate-400">ENTRY 0${matchNum}</span>
+                            ${isMerc ? '<span class="text-[9px] leading-none select-none">💎</span>' : ''}
+                        </div>
                     </div>
                 </div>
-                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100/50 self-stretch">
-                    <span class="w-1.5 h-1.5 rounded-full ${status.lightClass} shrink-0"></span>
-                    <span class="text-[10px] font-black ${status.textClass} break-keep text-right">${status.text}</span>
+                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100/50 self-stretch justify-center min-w-[70px]">
+                    <div class="flex flex-col items-center justify-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full ${status.lightClass} shrink-0"></span>
+                        <span class="text-[10px] font-black ${status.textClass} break-keep text-center leading-tight">${status.text}</span>
+                    </div>
                 </div>
             </div>
         `;
