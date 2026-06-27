@@ -398,9 +398,8 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     };
 
-    // 4. 엔트리 슬롯 HTML 사출 (다인전 배열 완벽 지원)
+   // 4. 엔트리 슬롯 HTML 사출 (줄바꿈 완벽 대응 버전)
     const buildEntrySlotHtml = (entryData, isMerc, matchNum, isAttackerSide) => {
-        // 데이터가 배열인지 확인 (과거 1v1 스트링 데이터까지 호환)
         let players = [];
         if (Array.isArray(entryData)) {
             players = entryData;
@@ -412,15 +411,14 @@ Boako.League.viewMatchLineup = async function(challengeId) {
             return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
         }
 
-        // 다인전 대응: 아바타를 살짝 겹치게(overlap) 출력
-        const avatarsHtml = `<div class="flex items-center pl-2">` + players.map(name => {
+        // 인원이 많아져도 아바타 영역이 찌그러지지 않도록 shrink-0 처리
+        const avatarsHtml = `<div class="flex items-center pl-2 shrink-0 pr-1">` + players.map((name, idx) => {
             const secureAvatar = getSecureAvatar(name);
             return secureAvatar 
-                ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm -ml-2 relative z-10" referrerpolicy="no-referrer">`
-                : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border-2 border-white shadow-sm -ml-2 relative z-10">${name.substring(0, 2)}</div>`;
+                ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm -ml-2 relative" style="z-index: ${10 + idx};" referrerpolicy="no-referrer">`
+                : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border-2 border-white shadow-sm -ml-2 relative" style="z-index: ${10 + idx};">${name.substring(0, 2)}</div>`;
         }).join('') + `</div>`;
 
-        // 이름은 쉼표로 연결
         const namesText = players.join(', ');
         
         const statsObj = isAttackerSide ? atkStats[matchNum] : defStats[matchNum];
@@ -428,14 +426,16 @@ Boako.League.viewMatchLineup = async function(challengeId) {
 
         return `
             <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${status.bgClass}">
-                <div class="flex items-center gap-2 min-w-0">
+                <div class="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
                     ${avatarsHtml}
-                    <div class="flex flex-col min-w-0">
-                        <span class="text-xs font-black text-slate-800 truncate leading-tight w-24 sm:w-32" title="${namesText}">${namesText} ${isMerc ? '💎' : ''}</span>
+                    <div class="flex flex-col min-w-0 flex-1 justify-center">
+                        <span class="text-xs font-black text-slate-800 leading-normal w-full whitespace-normal break-words" title="${namesText}">
+                            ${namesText} ${isMerc ? '💎' : ''}
+                        </span>
                         <span class="text-[8px] font-bold text-slate-400 mt-0.5">ENTRY 0${matchNum}</span>
                     </div>
                 </div>
-                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100/50">
+                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100/50 self-stretch">
                     <span class="w-1.5 h-1.5 rounded-full ${status.lightClass} shrink-0"></span>
                     <span class="text-[10px] font-black ${status.textClass} break-keep text-right">${status.text}</span>
                 </div>
