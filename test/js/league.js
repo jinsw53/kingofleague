@@ -398,13 +398,11 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     };
 
-  // 💡 경기 모드별 최적의 높이를 계산하여 좌우 슬롯 대칭 유지 (여백 보정)
-    let minHeightClass = 'min-h-[64px]'; // 1v1 기본 높이
+    let minHeightClass = 'min-h-[64px]'; 
     if (p.game_mode === '2v2') minHeightClass = 'min-h-[96px]';
     else if (p.game_mode === '3v3') minHeightClass = 'min-h-[136px]';
     else if (p.game_mode === '4v4') minHeightClass = 'min-h-[176px]';
 
-    // 4. 엔트리 슬롯 HTML 사출 ([프사 + 닉네임] 직렬 결합 버전)
     const buildEntrySlotHtml = (entryData, isMerc, matchNum, isAttackerSide) => {
         let players = [];
         if (Array.isArray(entryData)) {
@@ -417,7 +415,6 @@ Boako.League.viewMatchLineup = async function(challengeId) {
             return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold ${minHeightClass}">엔트리 미등록</div>`;
         }
 
-        // 💡 [핵심 수정] 각 닉네임 왼쪽에 프사를 개별적으로 결합하여 세로 배열화
         const playersListHtml = players.map(name => {
             const secureAvatar = getSecureAvatar(name);
             const avatarHtml = secureAvatar 
@@ -438,18 +435,15 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         return `
             <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${status.bgClass} ${minHeightClass}">
                 <div class="flex items-center gap-3 min-w-0 flex-1 mr-1">
-                    
                     <div class="flex flex-col items-center justify-center shrink-0 border-r border-slate-100 pr-2 min-w-[42px]">
                         <span class="text-[8px] font-bold text-slate-400">ENTRY</span>
                         <span class="text-xs font-black text-slate-500 leading-none mt-0.5">0${matchNum}</span>
                         ${isMerc ? '<span class="text-[10px] mt-1 select-none leading-none">💎</span>' : ''}
                     </div>
-
                     <div class="flex flex-col min-w-0 flex-1 justify-center gap-2">
                         ${playersListHtml}
                     </div>
                 </div>
-
                 <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100/50 self-stretch justify-center min-w-[72px]">
                     <div class="flex flex-col items-center justify-center gap-1">
                         <span class="w-1.5 h-1.5 rounded-full ${status.lightClass} shrink-0"></span>
@@ -460,28 +454,20 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         `;
     };
 
-    // 🚨 호출 부분 수정: attacker_ -> attacker_entry_ 로 변경
     const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_entry_${i}`], p[`is_attacker_${i}_mercenary`], i, true)).join('');
     const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_entry_${i}`], p[`is_defender_${i}_mercenary`], i, false)).join('');
 
-    // 💡 5. 🏆 리얼 인크 스탬프 시각화 로직 (색상 동적 변경 및 위치 조정)
     let atkStyle = ''; let defStyle = ''; let atkStamp = ''; let defStamp = '';
     
     if (isCompleted) {
         const isAtkWinner = (p.final_winner_team_id === p.attacker_team_id);
         const maxStreak = p.final_max_streak || 0;
         
-        // 연승에 따른 잉크 컬러 로직
-        let stampColorClass = 'border-emerald-500/80 text-emerald-600/90'; // 1연승 (초록)
-        if (maxStreak >= 4) {
-            stampColorClass = 'border-rose-600/80 text-rose-600/90'; // 올킬 4연승 (빨강)
-        } else if (maxStreak === 3) {
-            stampColorClass = 'border-orange-500/80 text-orange-600/90'; // 3연승 (주황)
-        } else if (maxStreak === 2) {
-            stampColorClass = 'border-amber-400/90 text-amber-500/90'; // 2연승 (노랑/황금)
-        }
+        let stampColorClass = 'border-emerald-500/80 text-emerald-600/90'; 
+        if (maxStreak >= 4) stampColorClass = 'border-rose-600/80 text-rose-600/90'; 
+        else if (maxStreak === 3) stampColorClass = 'border-orange-500/80 text-orange-600/90'; 
+        else if (maxStreak === 2) stampColorClass = 'border-amber-400/90 text-amber-500/90'; 
 
-        // 위치 조정: top-[75px] (로고 아래쪽), -right-2 sm:-right-4 (바깥쪽으로 뺌)
         const stampHtml = `
             <div class="absolute top-[75px] -right-2 sm:-right-4 rotate-[-14deg] border-[5px] ${stampColorClass} font-black text-2xl sm:text-3xl px-4 py-1 rounded-2xl z-[50] pointer-events-none select-none mix-blend-multiply animate-in zoom-in duration-300 tracking-wider font-mono shadow-sm">
                 MAX ${maxStreak}연승
@@ -497,7 +483,16 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     }
 
-    // 6. 최종 모달 렌더링
+    // 💡 [추가] 모달 하단 버튼 바로 위에 올라갈 스탬프 컴포넌트
+    const pointStampHtml = (isCompleted && p.earned_points != null) ? `
+        <div class="flex justify-center items-center pb-5 relative select-none pointer-events-none z-30">
+            <div class="border-4 border-dashed border-amber-500/80 text-amber-600 font-black text-lg tracking-widest px-6 py-2.5 rounded-2xl transform -rotate-3 mix-blend-multiply bg-amber-50 shadow-sm flex items-center gap-2 animate-in zoom-in duration-300 delay-150">
+                <span class="text-xl drop-shadow-sm">💰</span>
+                <span>+ ${p.earned_points.toLocaleString()} PT 정산완료</span>
+            </div>
+        </div>
+    ` : '';
+
     const modalHtml = `
         <div id="lineup-viewer-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="document.getElementById('challenge-popup-root').innerHTML=''">
             <div class="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] relative" onclick="event.stopPropagation()">
@@ -516,7 +511,6 @@ Boako.League.viewMatchLineup = async function(challengeId) {
 
                 <div class="p-6 overflow-y-auto custom-scrollbar flex-1 relative bg-transparent">
                     <div class="grid grid-cols-1 md:grid-cols-7 gap-6 items-start relative z-10">
-                        
                         <div class="md:col-span-3 space-y-4 relative transition-all duration-500" style="${atkStyle}">
                             ${atkStamp}
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
@@ -549,9 +543,10 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                                 ${defenderEntriesHtml}
                             </div>
                         </div>
-
                     </div>
                 </div>
+
+                ${pointStampHtml}
 
                 <div class="p-4 border-t border-slate-100 bg-white shrink-0 flex justify-end relative z-20">
                     <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="bg-slate-900 hover:bg-black text-white font-black text-xs px-6 py-3 rounded-xl shadow-md transition-all active:scale-[0.98]">
@@ -654,7 +649,6 @@ Boako.League.renderChallenges = function() {
                 }
                 break;
 
-            // 🚨 [수정됨] IN_PROGRESS 상태 병합 및 처리
             case 'UPCOMING': 
             case 'IN_PROGRESS': 
                 if (currentStatus === 'IN_PROGRESS') {
@@ -676,7 +670,12 @@ Boako.League.renderChallenges = function() {
 
             case 'COMPLETED': 
                 statusBadgeHtml = `<span class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">🏆 종료 완료</span>`;
-                // 🚨 [수정됨] 완료된 상태에서도 전적을 볼 수 있도록 라인업 버튼 렌더링
+                
+                // 💡 [추가] 점수가 정산된 경우 카드에 점수 뱃지를 나란히 배치
+                if (p.earned_points != null) {
+                    statusBadgeHtml += `<span class="bg-amber-100 text-amber-700 border border-amber-300 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1 shadow-sm">💰 +${p.earned_points.toLocaleString()} Pt 정산</span>`;
+                }
+
                 actionHtml = `<button onclick="Boako.League.viewMatchLineup(${p.id})" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black text-xs px-4 py-3.5 rounded-xl shadow-sm border border-emerald-200 transition-all flex items-center justify-center gap-1.5"><i data-lucide="trophy" class="w-4 h-4"></i> 최종 전적 결과 보기</button>`;
                 break;
 
@@ -751,7 +750,6 @@ Boako.League.renderChallenges = function() {
         container.appendChild(card);
     });
     
-    // 모달 DOM 렌더링 이후 안전하게 아이콘 그리기
     setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 };
 
