@@ -298,13 +298,12 @@ Boako.League.getChallengeHTML = function() {
 };
 
 // ====================================================================
-// ⚔️ [라인업/현황 확인 뷰어] 승자연전(KOF) 완벽 대응 및 리얼 스탬프 효과 모달
+// ⚔️ [라인업/현황 확인 뷰어] 승자연전(KOF) 완벽 대응 및 리얼 스탬프(컬러 동적 변경)
 // ====================================================================
 Boako.League.viewMatchLineup = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
 
-    // 1. 프로필(프사) 데이터 안전하게 호출
     let profiles = [];
     try {
         if (Boako.db) {
@@ -321,7 +320,6 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
     const isCompleted = (p.status === 'COMPLETED');
     
-    // 2. [개인 전적 시뮬레이터] 매치 데이터 파싱 및 안전망
     let matches = {};
     try {
         let resultsObj = p.match_results;
@@ -370,7 +368,6 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     applyCurrentState(atkStats, currentAtkIdx);
     applyCurrentState(defStats, currentDefIdx);
 
-    // 3. UI 텍스트 및 컬러 매핑
     const getUIStatus = (statsObj) => {
         if (statsObj.state === 'DEFEATED') {
             return {
@@ -401,7 +398,6 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     };
 
-    // 4. 엔트리 슬롯 HTML 사출
     const buildEntrySlotHtml = (playerName, isMerc, matchNum, isAttackerSide) => {
         if (!playerName) return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
         const secureAvatar = getSecureAvatar(playerName);
@@ -431,16 +427,26 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_${i}`], p[`is_attacker_${i}_mercenary`], i, true)).join('');
     const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_${i}`], p[`is_defender_${i}_mercenary`], i, false)).join('');
 
-    // 5. 🏆 리얼 인크 스탬프 시각화 로직 (배경 제거 및 곱하기 혼합 모드 적용)
+    // 💡 5. 🏆 리얼 인크 스탬프 시각화 로직 (색상 동적 변경 및 위치 조정)
     let atkStyle = ''; let defStyle = ''; let atkStamp = ''; let defStamp = '';
     
     if (isCompleted) {
         const isAtkWinner = (p.final_winner_team_id === p.attacker_team_id);
         const maxStreak = p.final_max_streak || 0;
         
-        // bg-white/shadow 제거, mix-blend-multiply 추가, 테두리를 굵게 하여 스탬프 느낌 강조
+        // 연승에 따른 잉크 컬러 로직
+        let stampColorClass = 'border-emerald-500/80 text-emerald-600/90'; // 1연승 (초록)
+        if (maxStreak >= 4) {
+            stampColorClass = 'border-rose-600/80 text-rose-600/90'; // 올킬 4연승 (빨강)
+        } else if (maxStreak === 3) {
+            stampColorClass = 'border-orange-500/80 text-orange-600/90'; // 3연승 (주황)
+        } else if (maxStreak === 2) {
+            stampColorClass = 'border-amber-400/90 text-amber-500/90'; // 2연승 (노랑/황금)
+        }
+
+        // 위치 조정: top-[75px] (로고 아래쪽), -right-2 sm:-right-4 (바깥쪽으로 뺌)
         const stampHtml = `
-            <div class="absolute top-6 right-4 sm:right-2 rotate-[-14deg] border-[5px] border-amber-500/80 text-amber-500/90 font-black text-2xl sm:text-3xl px-4 py-1 rounded-2xl z-[50] pointer-events-none select-none mix-blend-multiply animate-in zoom-in duration-300 tracking-wider font-mono">
+            <div class="absolute top-[75px] -right-2 sm:-right-4 rotate-[-14deg] border-[5px] ${stampColorClass} font-black text-2xl sm:text-3xl px-4 py-1 rounded-2xl z-[50] pointer-events-none select-none mix-blend-multiply animate-in zoom-in duration-300 tracking-wider font-mono shadow-sm">
                 MAX ${maxStreak}연승
             </div>
         `;
