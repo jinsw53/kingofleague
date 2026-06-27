@@ -298,7 +298,7 @@ Boako.League.getChallengeHTML = function() {
 };
 
 // ====================================================================
-// ⚔️ [라인업/현황 확인 뷰어] 승자연전(KOF) 완벽 대응 및 결과 시각화 모달
+// ⚔️ [라인업/현황 확인 뷰어] 승자연전(KOF) 완벽 대응 및 리얼 스탬프 효과 모달
 // ====================================================================
 Boako.League.viewMatchLineup = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
@@ -321,7 +321,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
     const isCompleted = (p.status === 'COMPLETED');
     
-    // 2. [개인 전적 시뮬레이터] 과거 버그(배열 저장)까지 방어하는 견고한 파싱
+    // 2. [개인 전적 시뮬레이터] 매치 데이터 파싱 및 안전망
     let matches = {};
     try {
         let resultsObj = p.match_results;
@@ -336,14 +336,12 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     } catch(e) { console.warn("매치 데이터 파싱 오류", e); }
 
-    // 슬롯 초기화
     const atkStats = { 1: { wins: 0, state: 'WAITING' }, 2: { wins: 0, state: 'WAITING' }, 3: { wins: 0, state: 'WAITING' }, 4: { wins: 0, state: 'WAITING' } };
     const defStats = { 1: { wins: 0, state: 'WAITING' }, 2: { wins: 0, state: 'WAITING' }, 3: { wins: 0, state: 'WAITING' }, 4: { wins: 0, state: 'WAITING' } };
 
     let currentAtkIdx = 1;
     let currentDefIdx = 1;
 
-    // 경기 기록을 순차적으로 재생하여 각 선수의 정확한 생존/탈락/승수 계산
     const matchKeys = Object.keys(matches).map(Number).sort((a, b) => a - b);
     for (const mIdx of matchKeys) {
         const match = matches[mIdx];
@@ -361,11 +359,9 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     }
 
-    // 시뮬레이션 종료 후 나머지 인원들의 상태 확정
     const applyCurrentState = (stats, currentIdx) => {
         for (let i = 1; i <= 4; i++) {
             if (stats[i].state === 'DEFEATED') continue;
-            
             if (i < currentIdx) stats[i].state = 'DEFEATED'; 
             else if (i === currentIdx) stats[i].state = isCompleted ? 'SURVIVED' : 'PLAYING';
             else stats[i].state = isCompleted ? 'UNPLAYED' : 'WAITING';
@@ -405,7 +401,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     };
 
-    // 4. 슬롯 사출기
+    // 4. 엔트리 슬롯 HTML 사출
     const buildEntrySlotHtml = (playerName, isMerc, matchNum, isAttackerSide) => {
         if (!playerName) return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
         const secureAvatar = getSecureAvatar(playerName);
@@ -435,24 +431,26 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_${i}`], p[`is_attacker_${i}_mercenary`], i, true)).join('');
     const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_${i}`], p[`is_defender_${i}_mercenary`], i, false)).join('');
 
-    // 5. 🏆 승리/패배 시각화 로직 (스탬프 & 흑백 필터)
+    // 5. 🏆 리얼 인크 스탬프 시각화 로직 (배경 제거 및 곱하기 혼합 모드 적용)
     let atkStyle = ''; let defStyle = ''; let atkStamp = ''; let defStamp = '';
     
     if (isCompleted) {
         const isAtkWinner = (p.final_winner_team_id === p.attacker_team_id);
         const maxStreak = p.final_max_streak || 0;
+        
+        // bg-white/shadow 제거, mix-blend-multiply 추가, 테두리를 굵게 하여 스탬프 느낌 강조
         const stampHtml = `
-            <div class="absolute top-4 right-2 sm:-right-4 rotate-[-12deg] border-4 border-amber-400 text-amber-500 font-black text-xl sm:text-2xl px-3 py-1 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm z-[50] pointer-events-none animate-in zoom-in duration-300">
+            <div class="absolute top-6 right-4 sm:right-2 rotate-[-14deg] border-[5px] border-amber-500/80 text-amber-500/90 font-black text-2xl sm:text-3xl px-4 py-1 rounded-2xl z-[50] pointer-events-none select-none mix-blend-multiply animate-in zoom-in duration-300 tracking-wider font-mono">
                 MAX ${maxStreak}연승
             </div>
         `;
         
         if (isAtkWinner) {
             atkStamp = stampHtml;
-            defStyle = 'filter: grayscale(1) opacity(0.65); pointer-events: none;';
+            defStyle = 'filter: grayscale(1) opacity(0.5); pointer-events: none;';
         } else {
             defStamp = stampHtml;
-            atkStyle = 'filter: grayscale(1) opacity(0.65); pointer-events: none;';
+            atkStyle = 'filter: grayscale(1) opacity(0.5); pointer-events: none;';
         }
     }
 
