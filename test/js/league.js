@@ -671,12 +671,24 @@ Boako.League.renderChallenges = function() {
             case 'COMPLETED': 
                 statusBadgeHtml = `<span class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1">🏆 종료 완료</span>`;
                 
-                // 💡 [추가] 점수가 정산된 경우 카드에 점수 뱃지를 나란히 배치
+                // 💡 [수정] 점수 스탬프를 카드 우측 버튼 구역 위에 배치하도록 변경
+                let rightStampHtml = '';
                 if (p.earned_points != null) {
-                    statusBadgeHtml += `<span class="bg-amber-100 text-amber-700 border border-amber-300 text-[10px] px-2 py-1 rounded-md font-black flex items-center gap-1 shadow-sm">💰 +${p.earned_points.toLocaleString()} Pt 정산</span>`;
+                    rightStampHtml = `
+                        <div class="mb-3 border-2 border-dashed border-amber-500/80 text-amber-600 font-black text-xs px-3 py-2 rounded-xl transform rotate-[-4deg] mix-blend-multiply bg-amber-50 shadow-sm flex items-center justify-center gap-1.5 w-full text-center">
+                            <span class="text-[14px]">💰</span> +${p.earned_points.toLocaleString()} PT
+                        </div>
+                    `;
                 }
 
-                actionHtml = `<button onclick="Boako.League.viewMatchLineup(${p.id})" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black text-xs px-4 py-3.5 rounded-xl shadow-sm border border-emerald-200 transition-all flex items-center justify-center gap-1.5"><i data-lucide="trophy" class="w-4 h-4"></i> 최종 전적 결과 보기</button>`;
+                actionHtml = `
+                    <div class="flex flex-col w-full items-center">
+                        ${rightStampHtml}
+                        <button onclick="Boako.League.viewMatchLineup(${p.id})" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black text-xs px-4 py-3.5 rounded-xl shadow-sm border border-emerald-200 transition-all flex items-center justify-center gap-1.5">
+                            <i data-lucide="trophy" class="w-4 h-4"></i> 최종 전적 결과 보기
+                        </button>
+                    </div>
+                `;
                 break;
 
             case 'CANCELED':
