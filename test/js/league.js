@@ -298,13 +298,13 @@ Boako.League.getChallengeHTML = function() {
 };
 
 // ====================================================================
-// ⚔️ [라인업/현황 확인 뷰어] 승자연전(릴레이) 기반 엔트리 개인 전적 추적 뷰어
+// ⚔️ [라인업/현황 확인 뷰어] 승자연전(KOF) 완벽 대응 및 결과 시각화 모달
 // ====================================================================
 Boako.League.viewMatchLineup = async function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
 
-    // 🚨 프사 조회를 위한 프로필 데이터 호출
+    // 1. 프로필(프사) 데이터 안전하게 호출
     let profiles = [];
     try {
         if (Boako.db) {
@@ -319,63 +319,62 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     };
 
     const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-    
-    // 💡 [개인 전적 시뮬레이터] match_results의 매치별 승패를 순차적으로 읽어 엔트리 상태를 재구성
-    let matches = {};
     const isCompleted = (p.status === 'COMPLETED');
     
+    // 2. [개인 전적 시뮬레이터] 과거 버그(배열 저장)까지 방어하는 견고한 파싱
+    let matches = {};
     try {
         let resultsObj = p.match_results;
         if (typeof resultsObj === 'string') resultsObj = JSON.parse(resultsObj);
-        matches = resultsObj?.matches || {};
-    } catch(e) {
-        console.warn("JSON 파싱 오류", e);
-    }
+        
+        if (resultsObj && resultsObj.matches) {
+            if (Array.isArray(resultsObj.matches)) {
+                resultsObj.matches.forEach(m => { if (m && m.match_idx) matches[m.match_idx] = m; });
+            } else {
+                matches = resultsObj.matches;
+            }
+        }
+    } catch(e) { console.warn("매치 데이터 파싱 오류", e); }
 
-    // 각 슬롯별 상태 저장소 초기화 (1~4번 슬롯)
+    // 슬롯 초기화
     const atkStats = { 1: { wins: 0, state: 'WAITING' }, 2: { wins: 0, state: 'WAITING' }, 3: { wins: 0, state: 'WAITING' }, 4: { wins: 0, state: 'WAITING' } };
     const defStats = { 1: { wins: 0, state: 'WAITING' }, 2: { wins: 0, state: 'WAITING' }, 3: { wins: 0, state: 'WAITING' }, 4: { wins: 0, state: 'WAITING' } };
 
     let currentAtkIdx = 1;
     let currentDefIdx = 1;
 
-    // 매치 인덱스를 순서대로 정렬하여 시뮬레이션
+    // 경기 기록을 순차적으로 재생하여 각 선수의 정확한 생존/탈락/승수 계산
     const matchKeys = Object.keys(matches).map(Number).sort((a, b) => a - b);
-    
     for (const mIdx of matchKeys) {
         const match = matches[mIdx];
         if (currentAtkIdx > 4 || currentDefIdx > 4) break; 
         
-        if (match.winner_side === 'ATTACKER') {
+        const winnerSide = String(match.winner_side).toUpperCase();
+        if (winnerSide === 'ATTACKER') {
             atkStats[currentAtkIdx].wins += 1;
             defStats[currentDefIdx].state = 'DEFEATED';
-            currentDefIdx += 1; // 방어팀 다음 타자 등판
-        } else if (match.winner_side === 'DEFENDER') {
+            currentDefIdx += 1;
+        } else if (winnerSide === 'DEFENDER') {
             defStats[currentDefIdx].wins += 1;
             atkStats[currentAtkIdx].state = 'DEFEATED';
-            currentAtkIdx += 1; // 공격팀 다음 타자 등판
+            currentAtkIdx += 1;
         }
     }
 
-    // 시뮬레이션 종료 후, 현재 인덱스를 기준으로 나머지 엔트리들의 상태 확정
+    // 시뮬레이션 종료 후 나머지 인원들의 상태 확정
     const applyCurrentState = (stats, currentIdx) => {
         for (let i = 1; i <= 4; i++) {
             if (stats[i].state === 'DEFEATED') continue;
             
-            if (i < currentIdx) {
-                stats[i].state = 'DEFEATED'; // 로직상 안전장치
-            } else if (i === currentIdx) {
-                stats[i].state = isCompleted ? 'SURVIVED' : 'PLAYING';
-            } else {
-                stats[i].state = isCompleted ? 'UNPLAYED' : 'WAITING';
-            }
+            if (i < currentIdx) stats[i].state = 'DEFEATED'; 
+            else if (i === currentIdx) stats[i].state = isCompleted ? 'SURVIVED' : 'PLAYING';
+            else stats[i].state = isCompleted ? 'UNPLAYED' : 'WAITING';
         }
     };
-
     applyCurrentState(atkStats, currentAtkIdx);
     applyCurrentState(defStats, currentDefIdx);
 
-    // UI 스타일 매핑 함수
+    // 3. UI 텍스트 및 컬러 매핑
     const getUIStatus = (statsObj) => {
         if (statsObj.state === 'DEFEATED') {
             return {
@@ -385,47 +384,34 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                 bgClass: 'bg-slate-50/60 border-slate-200 opacity-80'
             };
         } else if (statsObj.state === 'PLAYING') {
+            let playingText = statsObj.wins > 1 ? `🔥 ${statsObj.wins}연승 중` : (statsObj.wins === 1 ? '🔥 1승 생존' : '🔥 출전 중');
             return {
-                text: statsObj.wins > 0 ? `${statsObj.wins}연승 중` : '출전/대기',
+                text: playingText,
                 lightClass: statsObj.wins > 0 ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24] animate-pulse' : 'bg-blue-400 shadow-[0_0_8px_#60a5fa]',
                 textClass: statsObj.wins > 0 ? 'text-amber-600 font-black' : 'text-blue-600 font-bold',
                 bgClass: statsObj.wins > 0 ? 'bg-amber-50/40 border-amber-200' : 'bg-blue-50/40 border-blue-200'
             };
         } else if (statsObj.state === 'SURVIVED') {
             return {
-                text: statsObj.wins > 0 ? `최종 생존 (${statsObj.wins}승)` : '최종 생존',
+                text: statsObj.wins >= 4 ? `👑 올킬 (${statsObj.wins}승)` : `👑 최종 생존 (${statsObj.wins}승)`,
                 lightClass: 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse',
                 textClass: 'text-emerald-600 font-black',
-                bgClass: 'bg-emerald-50/40 border-emerald-200/80'
+                bgClass: 'bg-emerald-50/40 border-emerald-200/80 shadow-sm'
             };
         } else if (statsObj.state === 'UNPLAYED') {
-            return {
-                text: '미출전',
-                lightClass: 'bg-slate-200',
-                textClass: 'text-slate-400 font-medium',
-                bgClass: 'bg-slate-50/30 border-slate-100 opacity-60'
-            };
-        } else { // WAITING
-            return {
-                text: '순서 대기',
-                lightClass: 'bg-slate-300',
-                textClass: 'text-slate-500 font-medium',
-                bgClass: 'bg-white border-slate-200'
-            };
+            return { text: '미출전', lightClass: 'bg-slate-200', textClass: 'text-slate-400 font-medium', bgClass: 'bg-slate-50/30 border-slate-100 opacity-60' };
+        } else { 
+            return { text: '순서 대기', lightClass: 'bg-slate-300', textClass: 'text-slate-500 font-medium', bgClass: 'bg-white border-slate-200' };
         }
     };
 
-    // 엔트리 슬롯 HTML 사출
+    // 4. 슬롯 사출기
     const buildEntrySlotHtml = (playerName, isMerc, matchNum, isAttackerSide) => {
-        if (!playerName) {
-            return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
-        }
-
+        if (!playerName) return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
         const secureAvatar = getSecureAvatar(playerName);
         const avatarHtml = secureAvatar 
             ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
             : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-300">${playerName.substring(0, 2)}</div>`;
-
         const statsObj = isAttackerSide ? atkStats[matchNum] : defStats[matchNum];
         const status = getUIStatus(statsObj);
 
@@ -438,9 +424,9 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                         <span class="text-[8px] font-bold text-slate-400 mt-0.5">ENTRY 0${matchNum}</span>
                     </div>
                 </div>
-                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100">
-                    <span class="w-1.5 h-1.5 rounded-full ${status.lightClass}"></span>
-                    <span class="text-[10px] font-black ${status.textClass}">${status.text}</span>
+                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-100/50">
+                    <span class="w-1.5 h-1.5 rounded-full ${status.lightClass} shrink-0"></span>
+                    <span class="text-[10px] font-black ${status.textClass} break-keep text-right">${status.text}</span>
                 </div>
             </div>
         `;
@@ -449,37 +435,60 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_${i}`], p[`is_attacker_${i}_mercenary`], i, true)).join('');
     const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_${i}`], p[`is_defender_${i}_mercenary`], i, false)).join('');
 
+    // 5. 🏆 승리/패배 시각화 로직 (스탬프 & 흑백 필터)
+    let atkStyle = ''; let defStyle = ''; let atkStamp = ''; let defStamp = '';
+    
+    if (isCompleted) {
+        const isAtkWinner = (p.final_winner_team_id === p.attacker_team_id);
+        const maxStreak = p.final_max_streak || 0;
+        const stampHtml = `
+            <div class="absolute top-4 right-2 sm:-right-4 rotate-[-12deg] border-4 border-amber-400 text-amber-500 font-black text-xl sm:text-2xl px-3 py-1 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm z-[50] pointer-events-none animate-in zoom-in duration-300">
+                MAX ${maxStreak}연승
+            </div>
+        `;
+        
+        if (isAtkWinner) {
+            atkStamp = stampHtml;
+            defStyle = 'filter: grayscale(1) opacity(0.65); pointer-events: none;';
+        } else {
+            defStamp = stampHtml;
+            atkStyle = 'filter: grayscale(1) opacity(0.65); pointer-events: none;';
+        }
+    }
+
+    // 6. 최종 모달 렌더링
     const modalHtml = `
         <div id="lineup-viewer-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="document.getElementById('challenge-popup-root').innerHTML=''">
-            <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] relative" onclick="event.stopPropagation()">
+            <div class="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] relative" onclick="event.stopPropagation()">
                 
-                <div class="absolute inset-0 z-0 opacity-15 pointer-events-none flex items-center justify-center select-none overflow-hidden">
-                    <img src="${safeGameLogo}" class="w-80 h-80 object-contain">
+                <div class="absolute inset-0 z-0 opacity-10 pointer-events-none flex items-center justify-center select-none overflow-hidden">
+                    <img src="${safeGameLogo}" class="w-96 h-96 object-contain">
                 </div>
                 
                 <div class="bg-slate-900/95 backdrop-blur-sm p-5 flex items-center justify-between shrink-0 border-b border-slate-800 relative z-20">
                     <h3 class="font-black text-white text-sm flex items-center gap-2">
-                        <i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> 실시간 결전 엔트리 정보 
+                        <i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> ${isCompleted ? '최종 전적 결과 보드' : '실시간 결전 현황 보드'}
                         <span class="bg-indigo-900 text-indigo-300 text-[9px] px-1.5 py-0.5 rounded border border-indigo-700 ml-2 tracking-wider">승자연전 릴레이</span>
                     </h3>
                     <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="text-white/60 hover:text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
                 </div>
 
                 <div class="p-6 overflow-y-auto custom-scrollbar flex-1 relative bg-transparent">
-                    <div class="grid grid-cols-1 md:grid-cols-7 gap-4 items-center relative z-10">
+                    <div class="grid grid-cols-1 md:grid-cols-7 gap-6 items-start relative z-10">
                         
-                        <div class="md:col-span-3 space-y-3">
+                        <div class="md:col-span-3 space-y-4 relative transition-all duration-500" style="${atkStyle}">
+                            ${atkStamp}
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
-                                <img src="${p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
+                                <img src="${p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-violet-100 text-violet-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Challenger</span>
-                                <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.attacker_team_name}</h4>
+                                <h4 class="font-black text-slate-800 text-sm truncate w-full">${p.attacker_team_name}</h4>
                             </div>
-                            <div class="space-y-2">
+                            <div class="space-y-2.5">
                                 ${attackerEntriesHtml}
                             </div>
                         </div>
 
-                        <div class="md:col-span-1 flex flex-col items-center justify-center gap-5 py-4 relative z-10">
+                        <div class="md:col-span-1 flex flex-col items-center justify-center gap-5 py-4 relative z-10 self-center">
                             <div class="bg-slate-800 text-white font-black text-sm px-3.5 py-1.5 rounded-full border-4 border-white shadow-md select-none tracking-widest">VS</div>
                             <div class="flex flex-col items-center text-center mt-1">
                                 <img src="${safeGameLogo}" class="w-12 h-12 object-contain bg-white/95 rounded-2xl p-1.5 shadow-md border border-slate-200 mb-1.5 backdrop-blur-sm">
@@ -488,13 +497,14 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                             </div>
                         </div>
 
-                        <div class="md:col-span-3 space-y-3">
+                        <div class="md:col-span-3 space-y-4 relative transition-all duration-500" style="${defStyle}">
+                            ${defStamp}
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
-                                <img src="${p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
+                                <img src="${p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Defender</span>
-                                <h4 class="font-black text-slate-800 text-xs truncate w-full">${p.defender_team_name || '대기 중'}</h4>
+                                <h4 class="font-black text-slate-800 text-sm truncate w-full">${p.defender_team_name || '대기 중'}</h4>
                             </div>
-                            <div class="space-y-2">
+                            <div class="space-y-2.5">
                                 ${defenderEntriesHtml}
                             </div>
                         </div>
@@ -503,7 +513,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                 </div>
 
                 <div class="p-4 border-t border-slate-100 bg-white shrink-0 flex justify-end relative z-20">
-                    <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="bg-slate-900 hover:bg-black text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-[0.98]">
+                    <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="bg-slate-900 hover:bg-black text-white font-black text-xs px-6 py-3 rounded-xl shadow-md transition-all active:scale-[0.98]">
                         확인 완료
                     </button>
                 </div>
