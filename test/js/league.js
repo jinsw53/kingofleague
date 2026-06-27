@@ -398,21 +398,40 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         }
     };
 
-    const buildEntrySlotHtml = (playerName, isMerc, matchNum, isAttackerSide) => {
-        if (!playerName) return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
-        const secureAvatar = getSecureAvatar(playerName);
-        const avatarHtml = secureAvatar 
-            ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
-            : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-300">${playerName.substring(0, 2)}</div>`;
+    // 4. 엔트리 슬롯 HTML 사출 (다인전 배열 완벽 지원)
+    const buildEntrySlotHtml = (entryData, isMerc, matchNum, isAttackerSide) => {
+        // 데이터가 배열인지 확인 (과거 1v1 스트링 데이터까지 호환)
+        let players = [];
+        if (Array.isArray(entryData)) {
+            players = entryData;
+        } else if (typeof entryData === 'string') {
+            try { players = JSON.parse(entryData); } catch(e) { players = [entryData]; }
+        }
+
+        if (!players || players.length === 0 || !players[0]) {
+            return `<div class="p-3 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-slate-300 text-[10px] font-bold">엔트리 미등록</div>`;
+        }
+
+        // 다인전 대응: 아바타를 살짝 겹치게(overlap) 출력
+        const avatarsHtml = `<div class="flex items-center pl-2">` + players.map(name => {
+            const secureAvatar = getSecureAvatar(name);
+            return secureAvatar 
+                ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm -ml-2 relative z-10" referrerpolicy="no-referrer">`
+                : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 border-2 border-white shadow-sm -ml-2 relative z-10">${name.substring(0, 2)}</div>`;
+        }).join('') + `</div>`;
+
+        // 이름은 쉼표로 연결
+        const namesText = players.join(', ');
+        
         const statsObj = isAttackerSide ? atkStats[matchNum] : defStats[matchNum];
         const status = getUIStatus(statsObj);
 
         return `
             <div class="flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all relative z-10 ${status.bgClass}">
                 <div class="flex items-center gap-2 min-w-0">
-                    ${avatarHtml}
+                    ${avatarsHtml}
                     <div class="flex flex-col min-w-0">
-                        <span class="text-xs font-black text-slate-800 truncate leading-tight">${playerName} ${isMerc ? '💎' : ''}</span>
+                        <span class="text-xs font-black text-slate-800 truncate leading-tight w-24 sm:w-32" title="${namesText}">${namesText} ${isMerc ? '💎' : ''}</span>
                         <span class="text-[8px] font-bold text-slate-400 mt-0.5">ENTRY 0${matchNum}</span>
                     </div>
                 </div>
@@ -424,8 +443,9 @@ Boako.League.viewMatchLineup = async function(challengeId) {
         `;
     };
 
-    const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_${i}`], p[`is_attacker_${i}_mercenary`], i, true)).join('');
-    const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_${i}`], p[`is_defender_${i}_mercenary`], i, false)).join('');
+    // 🚨 호출 부분 수정: attacker_ -> attacker_entry_ 로 변경
+    const attackerEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`attacker_entry_${i}`], p[`is_attacker_${i}_mercenary`], i, true)).join('');
+    const defenderEntriesHtml = [1, 2, 3, 4].map(i => buildEntrySlotHtml(p[`defender_entry_${i}`], p[`is_defender_${i}_mercenary`], i, false)).join('');
 
     // 💡 5. 🏆 리얼 인크 스탬프 시각화 로직 (색상 동적 변경 및 위치 조정)
     let atkStyle = ''; let defStyle = ''; let atkStamp = ''; let defStamp = '';
