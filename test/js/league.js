@@ -487,8 +487,8 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const pointStampHtml = (isCompleted && p.earned_points != null) ? `
         <div class="flex justify-center items-center pb-5 relative select-none pointer-events-none z-30">
             <div class="border-4 border-dashed border-amber-500/80 text-amber-600 font-black text-lg tracking-widest px-6 py-2.5 rounded-2xl transform -rotate-3 mix-blend-multiply bg-amber-50 shadow-sm flex items-center gap-2 animate-in zoom-in duration-300 delay-150">
-                <span class="text-xl drop-shadow-sm">💰</span>
-                <span>+ ${p.earned_points.toLocaleString()} PT 정산완료</span>
+                <span class="text-xl drop-shadow-sm">🏆</span>
+                <span>+ ${p.earned_points.toLocaleString()} LP 정산완료</span>
             </div>
         </div>
     ` : '';
@@ -676,7 +676,7 @@ Boako.League.renderChallenges = function() {
                 if (p.earned_points != null) {
                     rightStampHtml = `
                         <div class="mb-3 border-2 border-dashed border-amber-500/80 text-amber-600 font-black text-xs px-3 py-2 rounded-xl transform rotate-[-4deg] mix-blend-multiply bg-amber-50 shadow-sm flex items-center justify-center gap-1.5 w-full text-center">
-                            <span class="text-[14px]">💰</span> +${p.earned_points.toLocaleString()} PT
+                            <span class="text-[14px]">🏆</span> +${p.earned_points.toLocaleString()} LP
                         </div>
                     `;
                 }
