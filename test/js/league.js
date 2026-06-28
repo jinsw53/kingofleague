@@ -1,5 +1,5 @@
 /*** * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
- * 🛠️ 2026 최신화 패치: 용병 프사 보안 에러 픽스, 라인업 함수 누락 해결, 프로필&챌린지 실시간 다중 감지(Realtime) 적용
+ * 🛠️ 2026 최신화 패치: 용병 프사 보안 에러 픽스, 라인업 함수 누락 해결, 프로필&챌린지 실시간 다중 감지(Realtime) 적용, UI 용어 변경(도전/응전/Opponent)
  * 관리 책임자: 소장님 MASTER 
  */
 
@@ -536,7 +536,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                             ${defStamp}
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                                 <img src="${p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
-                                <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Defender</span>
+                                <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Opponent</span>
                                 <h4 class="font-black text-slate-800 text-sm truncate w-full">${p.defender_team_name || '대기 중'}</h4>
                             </div>
                             <div class="space-y-2.5">
@@ -624,7 +624,7 @@ Boako.League.renderChallenges = function() {
                         </div>
                     `;
                 } else if (isMyDefend) {
-                    actionHtml = `<div class="text-center w-full"><span class="text-[11px] font-black text-amber-600 block">공격팀의 승인 대기 중</span><span class="text-[9px] font-bold text-slate-400 block mt-0.5">우리 팀이 더블을 불렀습니다</span></div>`;
+                    actionHtml = `<div class="text-center w-full"><span class="text-[11px] font-black text-amber-600 block">도전팀의 승인 대기 중</span><span class="text-[9px] font-bold text-slate-400 block mt-0.5">우리 팀이 더블을 불렀습니다</span></div>`;
                 } else {
                     actionHtml = `<div class="text-center w-full"><span class="text-[11px] font-black text-slate-400 block">더블 협상 진행 중</span></div>`;
                 }
@@ -725,8 +725,8 @@ Boako.League.renderChallenges = function() {
                 <div class="flex items-center gap-2">
                     ${statusBadgeHtml}
                     <div class="flex items-center gap-1">
-                        ${p.is_attacker_token_used ? `<span class="bg-amber-50 text-amber-600 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded">공격팀 🪙</span>` : ''}
-                        ${p.is_defender_token_used ? `<span class="bg-orange-50 text-orange-600 border border-orange-200 text-[9px] font-black px-1.5 py-0.5 rounded">방어팀 🪙</span>` : ''}
+                        ${p.is_attacker_token_used ? `<span class="bg-amber-50 text-amber-600 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded">도전팀 🪙</span>` : ''}
+                        ${p.is_defender_token_used ? `<span class="bg-orange-50 text-orange-600 border border-orange-200 text-[9px] font-black px-1.5 py-0.5 rounded">응전팀 🪙</span>` : ''}
                     </div>
                 </div>
                 
