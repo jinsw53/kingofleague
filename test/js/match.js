@@ -34,7 +34,7 @@ Boako.Match = {
         style.id = 'boako-match-styles';
         style.innerHTML = `
             .tournament-thumbnail {
-                width: 50px; height: 50px; object-fit: cover;
+                max-height: 40px; width: auto; object-fit: contain;
                 border-radius: 8px; cursor: zoom-in;
                 border: 2px solid #e2e8f0;
                 transition: border-color 0.2s;
