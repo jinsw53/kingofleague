@@ -749,9 +749,13 @@ Boako.Team = {
         try {
             const teamName = Boako.state.team.info.team_name;
 
-            const { data: gameList } = await Boako.db.from('games').select('game_name, image_url');
+const { data: gameList } = await Boako.db.from('games').select('game_name, image_url');
             const gameLogoMap = {};
             (gameList || []).forEach(g => { gameLogoMap[g.game_name] = g.image_url; });
+
+            const { data: gameScores } = await Boako.db.from('grandprix_game_scores').select('game_name, scores, source_url');
+            const gameScoreMap = {};
+            (gameScores || []).forEach(gs => { gameScoreMap[gs.game_name] = gs; });
 
             const { data: schedules } = await Boako.db
                 .from('match_schedules')
@@ -786,18 +790,31 @@ Boako.Team = {
                 const opponent = (s.participants || []).find(p => p.team_name !== teamName);
                 const opponentHtml = opponent ? `<div class="text-xs text-slate-400 font-bold">vs ${opponent.team_name}</div>` : '';
 
-                const clickable = s.status !== 'COMPLETED';
-                const cardClass = clickable
-                    ? 'bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer'
-                    : 'bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3 opacity-70';
+const isCompleted = s.status === 'COMPLETED';
+                const scoreInfo = gameScoreMap[s.game_name];
+                const lpEarned = isCompleted && scoreInfo ? (scoreInfo.scores?.[teamName] ?? null) : null;
+                const tournamentUrl = isCompleted && scoreInfo ? scoreInfo.source_url : null;
+
+                const cardClass = isCompleted
+                    ? 'bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer'
+                    : 'bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer';
+
+                const onclickAttr = isCompleted && tournamentUrl
+                    ? `onclick="window.open('${tournamentUrl}', '_blank')"`
+                    : `onclick="Boako.Team.openMatchRoom('${s.reference_id}')"`;
+
+                const lpBadge = isCompleted && lpEarned !== null
+                    ? `<div class="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">🏆 ${lpEarned} LP</div>`
+                    : '';
 
                 return `
-                    <div class="${cardClass}" ${clickable ? `onclick="Boako.Team.openMatchRoom('${s.reference_id}')"` : ''}>
+                    <div class="${cardClass}" ${onclickAttr}>
                         ${logoHtml}
                         <div class="flex-1 min-w-0">
                             <div class="font-black text-slate-800 text-sm truncate">${s.game_name}</div>
                             ${opponentHtml}
                             <div class="text-xs text-slate-500 font-bold mt-0.5">📅 ${dt}</div>
+                            ${lpBadge}
                         </div>
                         <span class="text-xs font-black px-2.5 py-1 rounded-lg flex-shrink-0 ${st.cls}">${st.label}</span>
                     </div>`;
