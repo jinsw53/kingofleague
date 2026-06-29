@@ -278,10 +278,9 @@ Boako.League.getChallengeHTML = function() {
                         <i data-lucide="plus-circle" class="w-4 h-4"></i> 도전장 발행하기
                     </button>
                 </div>
-                <button onclick="Boako.League.showChallengeRuleModal()" class="bg-white border border-slate-200 text-slate-600 font-black text-xs px-3 py-2.5 rounded-xl shadow-sm hover:border-violet-400 transition-colors flex items-center gap-1.5">
-    📖 규칙
-</button>
-<div class="relative w-36 z-30">
+               
+<div class="flex items-center gap-2">
+                    <div class="relative w-36 z-30">
                     <button onclick="Boako.League.toggleDropdown('challenge-season-filter')" class="w-full bg-white px-3 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between text-xs font-black text-violet-700 hover:border-violet-400 transition-colors">
                         <span>시즌 ${Boako.League.State.selectedChallengeSeason || '-'}</span>
                         <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
@@ -290,6 +289,10 @@ Boako.League.getChallengeHTML = function() {
                     <div id="challenge-season-filter-menu" class="hidden absolute top-full right-0 mt-1 w-full bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-slate-200 overflow-hidden z-50">
                         <div class="max-h-48 overflow-y-auto custom-scrollbar p-1">${seasonFilterOptionsHtml || '<div class="p-3 text-xs text-slate-400 text-center">시즌 없음</div>'}</div>
                     </div>
+                </div>
+                    <button onclick="Boako.League.showChallengeRuleModal()" class="bg-white border border-slate-200 text-slate-600 font-black text-xs px-3 py-2.5 rounded-xl shadow-sm hover:border-violet-400 transition-colors flex items-center gap-1.5">
+                        📖 규칙
+                    </button>
                 </div>
             </div>
             
