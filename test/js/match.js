@@ -616,7 +616,7 @@ Boako.Match = {
                         <td class="py-4 px-2">${rankBadge}</td>
                         <td class="py-4 px-3 text-left font-black text-slate-800 text-base group-hover:text-indigo-600 transition-colors">${team.teamName}</td>
                         <td class="py-4 px-2">
-                            <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-black text-lg border border-indigo-100">🏆 ${team.totalScore} LP</span>
+                            <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-black text-sm border border-indigo-100 whitespace-nowrap">🏆 ${team.totalScore} LP</span>
 
                         </td>
                         <td class="py-4 px-2 text-slate-400">
