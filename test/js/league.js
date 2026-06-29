@@ -1626,7 +1626,7 @@ Boako.League.getBingoHTML = function() {
                     <div class="bg-white/80 border border-slate-200 p-2.5 rounded-xl flex items-center gap-1.5"><span class="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-md font-black">HARD</span><span>팀원 50% 이상</span></div>
                     <div class="bg-amber-500/10 border border-amber-400/30 p-2.5 rounded-xl flex items-center gap-1.5 animate-pulse"><span class="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] px-1.5 py-0.5 rounded-md font-black">🔥 CENTER</span><span class="text-amber-800 font-black">중앙 페널티: 전원</span></div>
                 </div>
-                <p class="text-[10px] text-slate-400 font-medium pt-1">🎯 기본 규칙: 차지한 칸마다 리그 승점 <span class="text-indigo-600 font-bold">1 점</span>을 획득하며, 빙고줄 완성 시 스코어보드 보너스가 연산됩니다.</p>
+                <p class="text-[10px] text-slate-400 font-medium pt-1">🎯 기본 규칙: 차지한 칸마다 🏆 LP <span class="text-indigo-600 font-bold">1점</span>을 획득하며, 빙고줄 완성 시 스코어보드 보너스가 연산됩니다.</p>
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm"><div class="grid grid-cols-5 gap-2" id="bingo-grid"></div></div>
@@ -1757,7 +1757,7 @@ Boako.League.updateStats = function() {
         if (!badgesHtml) badgesHtml = `<span class="text-slate-400 font-medium text-[10px] italic">현재 빙고 조합 연산 중...</span>`;
         html += `
             <div class="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-sm space-y-3 transition-all hover:border-slate-300">
-                <div class="flex justify-between items-center"><span class="font-black text-slate-800 text-xs flex items-center gap-1.5"><img src="${teamLogoUrl}" class="w-4 h-4 object-contain rounded-full shadow-sm bg-slate-50 border border-slate-100"> ${teamName}</span><div class="text-right"><span class="text-[10px] text-slate-400 font-bold">총점</span> <span class="text-indigo-600 font-black text-sm ml-0.5">${totalScore} XP</span></div></div>
+                <div class="flex justify-between items-center"><span class="font-black text-slate-800 text-xs flex items-center gap-1.5"><img src="${teamLogoUrl}" class="w-4 h-4 object-contain rounded-full shadow-sm bg-slate-50 border border-slate-100"> ${teamName}</span><div class="text-right"><span class="text-[10px] text-slate-400 font-bold">총점</span> <span class="text-indigo-600 font-black text-sm ml-0.5">🏆 LP <span🏆 ${totalScore} LP class="text-indigo-600 font-bold">1점</span>을 획득하며</span></div></div>
                 <div class="grid grid-cols-2 gap-2 text-center bg-slate-50 p-2 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><div>점유 영토 <span class="text-slate-800 font-black">${basicSlots}칸</span></div><div class="border-l border-slate-200">완성 라인 <span class="text-amber-500 font-black">${totalLines}줄</span></div></div>
                 <div class="flex flex-wrap gap-1 pt-1 border-t border-dashed border-slate-100">${badgesHtml}</div>
             </div>
