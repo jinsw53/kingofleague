@@ -784,7 +784,7 @@ const { data: gameList } = await Boako.db.from('games').select('game_name, image
                 const st = statusMap[s.status] || { label: s.status, cls: 'bg-slate-100 text-slate-500' };
                 const logoUrl = gameLogoMap[s.game_name];
                 const logoHtml = logoUrl
-                    ? `<img src="${logoUrl}" class="w-10 h-10 rounded-xl object-cover border border-slate-100 shadow-sm flex-shrink-0">`
+                    ? `<img src="${logoUrl}" class="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-100 shadow-sm flex-shrink-0 p-1">`
                     : `<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">🎲</div>`;
 
                 const opponent = (s.participants || []).find(p => p.team_name !== teamName);
