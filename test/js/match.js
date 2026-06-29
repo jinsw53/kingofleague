@@ -1228,7 +1228,8 @@ Boako.Match = {
                 const TIME_LIMIT_HOURS = 12;
 
                 if (isMajorityReached && hoursPassed >= TIME_LIMIT_HOURS) {
-                    Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id);
+                    const _seasonNo = parseInt(poll.target_id?.split('_')[0]) || Boako.Match.Chat.currentSeason;
+                    Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id, poll.game_name, _seasonNo);
                     return;
                 }
 
@@ -1319,7 +1320,8 @@ Boako.Match = {
             const totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
 
             if (currentConfirmations.length >= totalExpectedVoters) {
-                await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id);
+                const _seasonNo = parseInt(poll.target_id?.split('_')[0]) || Boako.Match.Chat.currentSeason;
+                await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id, poll.game_name, _seasonNo);
             } else {
                 await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
                 Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
@@ -1352,14 +1354,14 @@ Boako.Match = {
             Boako.Match.Chat.openPollModal();
         },
 
-        forceConfirmPoll: async (pollId, confirmedTime, proposerId) => {
+        forceConfirmPoll: async (pollId, confirmedTime, proposerId, gameName, seasonNo) => {
             try {
                 const { error } = await Boako.db.rpc('confirm_match_schedule', {
                     p_poll_id: pollId,
                     p_confirmed_time: confirmedTime,
                     p_proposer_id: proposerId,
-                    p_season_no: Boako.Match.Chat.currentSeason,
-                    p_game_name: Boako.Match.Chat.currentGame
+                    p_season_no: seasonNo || Boako.Match.Chat.currentSeason,
+                    p_game_name: gameName || Boako.Match.Chat.currentGame
                 });
 
                 if (error) throw error;
