@@ -1874,7 +1874,7 @@ Boako.League.showChallengeRuleModal = async function() {
                         <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col items-center justify-center relative min-h-[100px] shadow-inner">
                             <div id="rule-calc-result" class="text-3xl font-black text-white">🏆 1,600 LP</div>
                             <div id="rule-calc-formula" class="text-[10px] font-bold text-slate-500 mt-1.5 tracking-wide">연승 보상 800LP × 더블 베팅 (2배)</div>
-                            <div id="rule-stamp-overlay" class="absolute top-2 right-4 pointer-events-none">
+                            <div id="rule-stamp-overlay" class="absolute bottom-2 right-4 pointer-events-none">
                                 <div class="border-[3px] border-solid border-emerald-500 text-emerald-500 font-black text-sm px-3 py-1 rounded-xl tracking-widest bg-slate-950/80 rotate-[-8deg]">
     정산 완료
 </div>
