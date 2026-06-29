@@ -42,6 +42,9 @@ Boako.View = {
         if (tabId === 'chat' && Boako.Team && Boako.Team.Chat) {
             setTimeout(() => { Boako.Team.Chat.scrollToBottom(); }, 50);
         }
+        if (tabId === 'challenge' && Boako.Team && Boako.Team.loadChallengeTab) {
+            setTimeout(() => { Boako.Team.loadChallengeTab(); }, 50);
+        }
     },
 
     render: async (pageId) => {
@@ -237,8 +240,8 @@ switch(seasonStatus.current_phase) {
                             <div class="flex gap-2">
                                 <button id="btn-tab-info" class="team-tab-btn bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all" onclick="Boako.View.switchTeamTab('info')">🛡️ 팀 본부</button>
                                 <button id="btn-tab-chat" class="team-tab-btn bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.View.switchTeamTab('chat')">💬 작전 회의실</button>
-                                <button id="btn-tab-record" class="team-tab-btn bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.View.switchTeamTab('record')">⚔️ 기록 및 일정</button>
-                            </div>
+<button id="btn-tab-record" class="team-tab-btn bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.View.switchTeamTab('record')">⚔️ 대항전 기록 및 일정</button>
+                                <button id="btn-tab-challenge" class="team-tab-btn bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.View.switchTeamTab('challenge')">🔥 챌린지</button>                            </div>
                         </div>
 
                         <div class="card-body" style="padding-top: 0;">
@@ -301,6 +304,12 @@ switch(seasonStatus.current_phase) {
 
                             <div id="tab-record" class="team-tab-content hidden animate-in fade-in duration-300 pt-4">
                                 ${recordTabHtml}
+                            </div>
+
+                            <div id="tab-challenge" class="team-tab-content hidden animate-in fade-in duration-300 pt-4">
+                                <div id="team-challenge-container" class="min-h-[200px]"></div>
+                                <div id="challenge-modal-root"></div>
+                                <div id="challenge-popup-root"></div>
                             </div>
 
                         </div>
