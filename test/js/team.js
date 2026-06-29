@@ -733,16 +733,30 @@ Boako.Team = {
         }
     },
 
- loadMatchSchedule: async function() {
+ openMatchRoom: async function(roomId) {
+        await Boako.View.render('messenger');
+        setTimeout(() => {
+            if (Boako.Messenger && Boako.Messenger.View) {
+                Boako.Messenger.View.openRoom(roomId);
+            }
+        }, 800);
+    },
+
+    loadMatchSchedule: async function() {
         const container = document.getElementById('team-match-schedule-container');
         if (!container) return;
 
         try {
             const teamName = Boako.state.team.info.team_name;
+
+            const { data: gameList } = await Boako.db.from('games').select('game_name, image_url');
+            const gameLogoMap = {};
+            (gameList || []).forEach(g => { gameLogoMap[g.game_name] = g.image_url; });
+
             const { data: schedules } = await Boako.db
                 .from('match_schedules')
                 .select('*')
-                .contains('participants', JSON.stringify([{ team_name: teamName }]))
+                .contains('participants', [{ team_name: teamName }])
                 .eq('match_type', 'GRANDPRIX')
                 .order('scheduled_time', { ascending: true });
 
@@ -755,25 +769,41 @@ Boako.Team = {
                 return;
             }
 
+            const statusMap = {
+                UPCOMING: { label: '예정', cls: 'bg-blue-100 text-blue-700' },
+                IN_PROGRESS: { label: '진행 중', cls: 'bg-amber-100 text-amber-700 animate-pulse' },
+                COMPLETED: { label: '완료', cls: 'bg-emerald-100 text-emerald-700' }
+            };
+
             const html = schedules.map(s => {
                 const dt = new Date(s.scheduled_time).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                const statusMap = { UPCOMING: { label: '예정', cls: 'bg-blue-100 text-blue-700' }, IN_PROGRESS: { label: '진행 중', cls: 'bg-amber-100 text-amber-700 animate-pulse' }, COMPLETED: { label: '완료', cls: 'bg-emerald-100 text-emerald-700' } };
                 const st = statusMap[s.status] || { label: s.status, cls: 'bg-slate-100 text-slate-500' };
+                const logoUrl = gameLogoMap[s.game_name];
+                const logoHtml = logoUrl
+                    ? `<img src="${logoUrl}" class="w-10 h-10 rounded-xl object-cover border border-slate-100 shadow-sm flex-shrink-0">`
+                    : `<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">🎲</div>`;
+
+                const opponent = (s.participants || []).find(p => p.team_name !== teamName);
+                const opponentHtml = opponent ? `<div class="text-xs text-slate-400 font-bold">vs ${opponent.team_name}</div>` : '';
+
+                const clickable = s.status !== 'COMPLETED';
+                const cardClass = clickable
+                    ? 'bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer'
+                    : 'bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3 opacity-70';
 
                 return `
-                    <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-blue-300 transition-colors">
-                        <div class="flex items-center gap-3">
-                            <span class="text-2xl">🏆</span>
-                            <div>
-                                <div class="font-black text-slate-800">${s.game_name}</div>
-                                <div class="text-xs text-slate-500 font-bold mt-0.5">📅 ${dt}</div>
-                            </div>
+                    <div class="${cardClass}" ${clickable ? `onclick="Boako.Team.openMatchRoom('${s.reference_id}')"` : ''}>
+                        ${logoHtml}
+                        <div class="flex-1 min-w-0">
+                            <div class="font-black text-slate-800 text-sm truncate">${s.game_name}</div>
+                            ${opponentHtml}
+                            <div class="text-xs text-slate-500 font-bold mt-0.5">📅 ${dt}</div>
                         </div>
-                        <span class="text-xs font-black px-3 py-1.5 rounded-lg ${st.cls}">${st.label}</span>
+                        <span class="text-xs font-black px-2.5 py-1 rounded-lg flex-shrink-0 ${st.cls}">${st.label}</span>
                     </div>`;
             }).join('');
 
-            container.innerHTML = `<div class="flex flex-col gap-3">${html}</div>`;
+            container.innerHTML = `<div class="flex flex-col gap-2">${html}</div>`;
 
         } catch (e) {
             console.error('대항전 일정 로드 실패:', e);
