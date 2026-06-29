@@ -1863,7 +1863,7 @@ Boako.League.showChallengeRuleModal = async function() {
 
                     <div class="space-y-4 pt-4 border-t border-slate-800">
                         <div class="flex items-center justify-between">
-                            <label class="block text-xs font-black text-amber-400 uppercase tracking-widest">💰 승점 정산 시뮬레이터</label>
+                            <label class="block text-xs font-black text-amber-400 uppercase tracking-widest">🏆 LP 정산 시뮬레이터</label>
                             <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
                                 <span class="text-[10px] font-black text-slate-300">묻고 더블로 가! (x2배)</span>
                                 <input type="checkbox" id="rule-double-toggle" onchange="Boako.League.calcRuleSimulator()" checked
@@ -1871,7 +1871,7 @@ Boako.League.showChallengeRuleModal = async function() {
                             </div>
                         </div>
                         
-                        <p class="text-slate-400 text-[11px] font-bold">최종 승리 시, 기록한 최대 연승에 따라 포인트가 차등 지급됩니다.</p>
+                        <p class="text-slate-400 text-[11px] font-bold">최종 승리 시, 기록한 최대 연승에 따라 🏆 LP가 차등 지급됩니다.</p>
                         
                         <div class="grid grid-cols-4 gap-2">
                             <button onclick="Boako.League.setRuleStreak(1)" id="rule-btn-s1" class="rule-streak-btn bg-slate-800 border border-slate-700 text-slate-400 font-black text-xs py-2.5 rounded-xl transition-all">1승</button>
