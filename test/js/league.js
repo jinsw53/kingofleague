@@ -1772,9 +1772,15 @@ Boako.League.updateStats = function() {
     statContainer.innerHTML = html;
 };
 Boako.League.showChallengeRuleModal = async function() {
-    const { data: rulesData } = await Boako.db.from('point_rules').select('win_streak, points').order('win_streak');
-    Boako.League._rulePoints = {};
-    (rulesData || []).forEach(r => { Boako.League._rulePoints[r.win_streak] = r.points; });
+    try {
+        const { data: rulesData, error } = await Boako.db.from('point_rules').select('win_streak, points').order('win_streak');
+        if (error) throw error;
+        Boako.League._rulePoints = {};
+        (rulesData || []).forEach(r => { Boako.League._rulePoints[Number(r.win_streak)] = r.points; });
+    } catch(e) {
+        alert('승점 규칙 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+        return;
+    }
     const TOKEN_IMG = `<img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-4 h-4 inline-block align-middle mx-0.5">`;
     const modalHtml = `
         <div id="challenge-rule-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onclick="Boako.League.closeChallengeRuleModal()">
