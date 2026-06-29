@@ -728,7 +728,7 @@ default:
         }
 
         const card = document.createElement('div');
-        card.className = `p-5 rounded-3xl border ${currentStatus === 'CANCELED' ? 'bg-slate-100/50 border-slate-200 opacity-50' : currentStatus === 'NEGOTIATING' ? 'bg-amber-50/30 border-amber-300' : 'bg-white border-slate-200'} transition-all shadow-sm flex flex-col md:flex-row gap-5 md:items-center relative group`;
+        card.className = `p-5 rounded-3xl border ${currentStatus.startsWith('CANCELED') ? 'bg-slate-100/50 border-slate-200 opacity-50' : currentStatus === 'NEGOTIATING' ? 'bg-amber-50/30 border-amber-300' : 'bg-white border-slate-200'} transition-all shadow-sm flex flex-col md:flex-row gap-5 md:items-center relative group`;
         
         card.innerHTML = `
             ${leftVisualHtml}
