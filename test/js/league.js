@@ -1794,8 +1794,8 @@ Boako.League.showChallengeRuleModal = async function() {
                         
                         <div class="relative border-l-2 border-slate-800 pl-4 space-y-4 ml-2">
                             
-                            <div class="relative">
-                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-indigo-600 rounded-full border-4 border-slate-900"></div>
+                            <div id="rule-step-1" class="rule-step-card relative">
+    <div class="absolute -left-[25px] top-1 w-4 h-4 bg-indigo-600 rounded-full border-4 border-slate-900"></div>
                                 <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="bg-indigo-900 text-indigo-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 1</span>
@@ -1808,8 +1808,8 @@ Boako.League.showChallengeRuleModal = async function() {
                                 </div>
                             </div>
 
-                            <div class="relative">
-                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-amber-600 rounded-full border-4 border-slate-900"></div>
+                            <div id="rule-step-2" class="rule-step-card relative">
+    <div class="absolute -left-[25px] top-1 w-4 h-4 bg-amber-600 rounded-full border-4 border-slate-900"></div>
                                 <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="bg-amber-900 text-amber-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 2</span>
@@ -1822,8 +1822,8 @@ Boako.League.showChallengeRuleModal = async function() {
                                 </div>
                             </div>
 
-                            <div class="relative">
-                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-emerald-600 rounded-full border-4 border-slate-900"></div>
+                            <div id="rule-step-3" class="rule-step-card relative">
+    <div class="absolute -left-[25px] top-1 w-4 h-4 bg-emerald-600 rounded-full border-4 border-slate-900"></div>
                                 <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="bg-emerald-900 text-emerald-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 3</span>
@@ -1837,8 +1837,8 @@ Boako.League.showChallengeRuleModal = async function() {
                                 </div>
                             </div>
 
-                            <div class="relative">
-                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-rose-600 rounded-full border-4 border-slate-900"></div>
+                            <div id="rule-step-4" class="rule-step-card relative">
+    <div class="absolute -left-[25px] top-1 w-4 h-4 bg-rose-600 rounded-full border-4 border-slate-900"></div>
                                 <div class="bg-rose-900/20 border border-rose-700 rounded-xl p-3">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="bg-rose-900 text-rose-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 4</span>
@@ -1886,6 +1886,16 @@ Boako.League.showChallengeRuleModal = async function() {
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    if (!document.getElementById('rule-step-card-style')) {
+        const style = document.createElement('style');
+        style.id = 'rule-step-card-style';
+        style.innerHTML = `.rule-step-card { opacity: 0; transform: translateX(-10px); transition: all 0.5s ease; } .rule-step-card.show { opacity: 1; transform: translateX(0); }`;
+        document.head.appendChild(style);
+    }
+    setTimeout(() => document.getElementById('rule-step-1')?.classList.add('show'), 200);
+    setTimeout(() => document.getElementById('rule-step-2')?.classList.add('show'), 800);
+    setTimeout(() => document.getElementById('rule-step-3')?.classList.add('show'), 1400);
+    setTimeout(() => document.getElementById('rule-step-4')?.classList.add('show'), 2000);
     Boako.League._ruleStreak = 4;
     Boako.League.calcRuleSimulator();
 };
