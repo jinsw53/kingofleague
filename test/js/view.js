@@ -222,13 +222,19 @@ switch(seasonStatus.current_phase) {
 case 4: // 대항전 본게임 진행 중 (60일~)
         recordTabHtml = `
             <div class="flex flex-col gap-4">
-                <div class="flex flex-col items-center justify-center text-slate-600 py-10 gap-4 border border-blue-200 rounded-xl bg-blue-50 shadow-sm">
-                    <span class="text-4xl">🏆</span>
-                    <h3 class="text-xl font-black text-blue-700">${seasonStatus.title} 대항전 본게임 진행 중</h3>
-                    <p class="font-bold text-blue-500">일정 조율 및 경기 진행 현황을 확인하세요. (${seasonStatus.day_count}일차)</p>
-                    <div class="flex gap-3">
-                        <button onclick="Boako.View.render('match')" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-black hover:bg-blue-700 transition-colors shadow-sm">📊 대항전 현황 보기</button>
-                        <button onclick="Boako.View.render('messenger')" class="bg-white border border-blue-300 text-blue-600 px-6 py-2.5 rounded-xl font-black hover:bg-blue-50 transition-colors shadow-sm">📅 일정 조율 채널</button>
+                <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                    <div class="flex items-center gap-3">
+                        ${seasonStatus.logo_url
+                            ? `<img src="${seasonStatus.logo_url}" class="h-10 w-auto object-contain">`
+                            : `<span class="text-2xl">🏆</span>`}
+                        <div>
+                            <div class="font-black text-slate-800 text-sm">${seasonStatus.title}</div>
+                            <div class="text-xs text-blue-600 font-bold">${seasonStatus.day_count}일차 · 본게임 진행 중</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="Boako.View.render('match')" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-blue-700 transition-colors shadow-sm">📊 대항전 현황</button>
+                        <button onclick="Boako.View.render('messenger')" class="bg-white border border-blue-200 text-blue-600 px-4 py-2 rounded-lg text-xs font-black hover:bg-blue-50 transition-colors shadow-sm">📅 일정 조율</button>
                     </div>
                 </div>
                 <div id="team-match-schedule-container">
