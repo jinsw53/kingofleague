@@ -1768,7 +1768,17 @@ Boako.League.updateStats = function() {
     });
     statContainer.innerHTML = html;
 };
-Boako.League.showChallengeRuleModal = function() {
+Boako.League.showChallengeRuleModal = async function() {
+    try {
+        const { data } = await Boako.db.from('point_rules').select('win_streak, points').order('win_streak');
+        if (data && data.length > 0) {
+            Boako.League._rulePoints = {};
+            data.forEach(r => { Boako.League._rulePoints[r.win_streak] = r.points; });
+        }
+    } catch(e) { 
+        alert('승점 규칙 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+        return;
+    }
     const TOKEN_IMG = `<img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-4 h-4 inline-block align-middle mx-0.5">`;
     const modalHtml = `
         <div id="challenge-rule-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onclick="Boako.League.closeChallengeRuleModal()">
@@ -1897,7 +1907,8 @@ Boako.League.setRuleStreak = function(num) {
 };
 
 Boako.League.calcRuleSimulator = function() {
-    const rules = { 1: 100, 2: 200, 3: 400, 4: 800 };
+    const rules = Boako.League._rulePoints;
+    if (!rules) { console.error('point_rules 미로드'); return; }
     const streak = Boako.League._ruleStreak || 1;
     const isDouble = document.getElementById('rule-double-toggle')?.checked;
     const base = rules[streak];
