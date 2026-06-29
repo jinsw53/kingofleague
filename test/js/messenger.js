@@ -433,7 +433,8 @@ Boako.Messenger = {
                         
                         if (isMajorityReached && hoursPassed >= 12) {
                             cardInnerHtml = `<div class="font-black text-amber-700 text-xs text-center p-3">⏳ 확정 처리 진행 중...</div>`;
-                            setTimeout(() => Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id), 100);
+                            const _seasonNo = parseInt(poll.target_id?.split('_')[0]);
+                            setTimeout(() => Boako.Match.Chat.forceConfirmPoll(poll.poll_id, poll.proposed_time, poll.proposer_id, poll.game_name, _seasonNo), 100);
                         } else {
                             let statusHtml = isMajorityReached ? 
                                 `<div class="bg-amber-50 border border-amber-200 text-amber-700 p-2.5 rounded-xl text-[11px] font-black mb-3">🔥 과반수 수락 완료! (${confirmedCount}/${room.entryCount}명)<br><span class="font-bold text-amber-600 mt-0.5 block">남은 인원 무관 12시간 뒤 자동 확정</span></div>` : 
