@@ -1841,7 +1841,7 @@ Boako.League.showChallengeRuleModal = async function() {
                                     <p class="text-slate-400 text-xs font-bold leading-relaxed">
                                         양 팀이 <span class="text-emerald-400">4명의 출전 선수(P1~P4)</span> 명단을 순서대로 제출합니다.<br>
                                         <span class="text-emerald-400">진행 방식</span>에 따라 <span class="text-emerald-400">엔트리가 자동</span>으로 지정됩니다.<br>
-                                        승리한 엔트리가 계속해서 다음 상대 엔트리와 맞붙는 <span class="text-emerald-400">승자연전(KOF) 룰</span>로 경기가 진행됩니다.
+                                        승리한 엔트리가 계속해서 다음 상대 엔트리와 맞붙는 <span class="text-emerald-400">승자연전 룰</span>로 경기가 진행됩니다.
                                     </p>
                                 </div>
                             </div>
