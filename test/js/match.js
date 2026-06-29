@@ -616,7 +616,8 @@ Boako.Match = {
                         <td class="py-4 px-2">${rankBadge}</td>
                         <td class="py-4 px-3 text-left font-black text-slate-800 text-base group-hover:text-indigo-600 transition-colors">${team.teamName}</td>
                         <td class="py-4 px-2">
-                            <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-black text-lg border border-indigo-100">${team.totalScore}</span>
+                            <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-black text-lg border border-indigo-100">🏆 ${team.totalScore} LP</span>
+
                         </td>
                         <td class="py-4 px-2 text-slate-400">
                             <div id="icon-${safeId}" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto transition-all duration-300 font-bold text-xs">
@@ -652,7 +653,7 @@ Boako.Match = {
                     if (!gameData) {
                         html += `<div class="text-center text-[11px] font-bold text-slate-300 py-1.5">- 미 출 전 -</div>`;
                     } else if (!gameData.detail) {
-                        html += `<div class="text-center text-[11px] font-black bg-slate-100 text-slate-400 py-1.5 rounded-lg">대기 중 (0점)</div>`;
+                        html += `<div class="text-center text-[11px] font-black bg-slate-100 text-slate-400 py-1.5 rounded-lg">대기 중 (🏆 0 LP)</div>`;
                     } else {
                         const detail = gameData.detail;
                         if (detail.penaltyReason) {
@@ -661,7 +662,7 @@ Boako.Match = {
                                 <a href="${detail.url}" target="_blank" class="block text-center cell-penalty cursor-pointer" data-tooltip="${detail.penaltyReason} | ${detail.date}">
                                     <div class="bg-red-50 text-red-600 border border-red-200 rounded-lg py-1 flex items-center justify-center gap-1.5 hover:bg-red-100 transition-colors">
                                         <span class="score-original !mr-0">${detail.originalScore}</span>
-                                        <span class="font-black text-sm">${detail.score}점</span>
+                                        <span class="font-black text-sm">🏆 ${detail.score} LP</span>
                                     </div>
                                 </a>
                             `;
@@ -671,7 +672,7 @@ Boako.Match = {
                             const scoreClass = isZero ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100";
                             html += `
                                 <a href="${detail.url}" target="_blank" title="진행: ${detail.date} (클릭 시 BGA 기록 확인)" class="block text-center ${scoreClass} border rounded-lg py-1 font-black text-sm transition-colors">
-                                    ${detail.score}점
+                                    🏆 ${detail.score} LP
                                 </a>
                             `;
                         }
