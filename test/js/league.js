@@ -725,8 +725,8 @@ Boako.League.renderChallenges = function() {
                 <div class="flex items-center gap-2">
                     ${statusBadgeHtml}
                     <div class="flex items-center gap-1">
-                        ${p.is_attacker_token_used ? `<span class="bg-amber-50 text-amber-600 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded">도전팀 🪙</span>` : ''}
-                        ${p.is_defender_token_used ? `<span class="bg-orange-50 text-orange-600 border border-orange-200 text-[9px] font-black px-1.5 py-0.5 rounded">응전팀 🪙</span>` : ''}
+                        ${p.is_attacker_token_used ? `<span class="bg-amber-50 text-amber-600 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded">도전팀 <img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-3 h-3 inline-block"></span>` : ''}
+                        ${p.is_defender_token_used ? `<span class="bg-orange-50 text-orange-600 border border-orange-200 text-[9px] font-black px-1.5 py-0.5 rounded">응전팀 <img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-3 h-3 inline-block"></span>` : ''}
                     </div>
                 </div>
                 
