@@ -733,6 +733,43 @@ Boako.Team = {
         }
     },
 
+    loadChallengeTab: async function() {
+        const container = document.getElementById('team-challenge-container');
+        if (!container) return;
+
+        container.innerHTML = `<div class="text-center py-10 font-black text-slate-400 animate-pulse">챌린지 데이터 로드 중...</div>`;
+
+        try {
+            if (!Boako.League || !Boako.League.renderChallenges) {
+                await Boako.Util.loadScript('js/league.js');
+            }
+
+            const teamId = Boako.state.team.info.id;
+
+            const { data: challenges, error } = await Boako.db
+                .from('challenges')
+                .select('*')
+                .or(`attacker_team_id.eq.${teamId},defender_team_id.eq.${teamId}`)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const { data: games } = await Boako.db.from('games').select('game_name, game_logo_url:image_url');
+            Boako.League.State.availableGames = games || [];
+            Boako.League.State.challenges = challenges || [];
+
+            container.innerHTML = `<div id="challenge-list" class="flex flex-col gap-4 pb-4"></div>`;
+
+            Boako.League.renderChallenges();
+
+            if (window.lucide) window.lucide.createIcons();
+
+        } catch (e) {
+            console.error('챌린지 탭 로드 실패:', e);
+            container.innerHTML = `<div class="text-center py-10 text-red-400 font-bold">오류: ${e.message}</div>`;
+        }
+    },
+
     Chat: {
         channel: null,
         showNotification: () => {
