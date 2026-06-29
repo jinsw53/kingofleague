@@ -1796,7 +1796,7 @@ Boako.League.showChallengeRuleModal = async function() {
                     <button onclick="Boako.League.closeChallengeRuleModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-black transition-colors">✕</button>
                 </div>
 
-                <div class="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+                <div class="px-6 pt-6 pb-2 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                     
                     <div class="space-y-3">
                         <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest border-b border-slate-800 pb-2">📋 결투 진행 프로세스</label>
