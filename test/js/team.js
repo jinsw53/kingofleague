@@ -733,6 +733,54 @@ Boako.Team = {
         }
     },
 
+ loadMatchSchedule: async function() {
+        const container = document.getElementById('team-match-schedule-container');
+        if (!container) return;
+
+        try {
+            const teamName = Boako.state.team.info.team_name;
+            const { data: schedules } = await Boako.db
+                .from('match_schedules')
+                .select('*')
+                .contains('participants', JSON.stringify([{ team_name: teamName }]))
+                .eq('match_type', 'GRANDPRIX')
+                .order('scheduled_time', { ascending: true });
+
+            if (!schedules || schedules.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                        아직 확정된 대항전 경기 일정이 없습니다.<br>
+                        <span class="text-xs mt-1 block">소통 채널에서 일정 조율을 진행해주세요.</span>
+                    </div>`;
+                return;
+            }
+
+            const html = schedules.map(s => {
+                const dt = new Date(s.scheduled_time).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const statusMap = { UPCOMING: { label: '예정', cls: 'bg-blue-100 text-blue-700' }, IN_PROGRESS: { label: '진행 중', cls: 'bg-amber-100 text-amber-700 animate-pulse' }, COMPLETED: { label: '완료', cls: 'bg-emerald-100 text-emerald-700' } };
+                const st = statusMap[s.status] || { label: s.status, cls: 'bg-slate-100 text-slate-500' };
+
+                return `
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-blue-300 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🏆</span>
+                            <div>
+                                <div class="font-black text-slate-800">${s.game_name}</div>
+                                <div class="text-xs text-slate-500 font-bold mt-0.5">📅 ${dt}</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-black px-3 py-1.5 rounded-lg ${st.cls}">${st.label}</span>
+                    </div>`;
+            }).join('');
+
+            container.innerHTML = `<div class="flex flex-col gap-3">${html}</div>`;
+
+        } catch (e) {
+            console.error('대항전 일정 로드 실패:', e);
+            container.innerHTML = `<div class="text-center py-6 text-red-400 font-bold">일정 로드 실패: ${e.message}</div>`;
+        }
+    },
+
     loadChallengeTab: async function() {
         const container = document.getElementById('team-challenge-container');
         if (!container) return;
