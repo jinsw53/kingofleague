@@ -1317,10 +1317,19 @@ Boako.Match = {
                 currentConfirmations.push(myId);
             }
 
-            const totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
+// 💡 DB에서 실제 entry_count 조회 (전역 변수 의존 제거)
+            const _seasonNo = parseInt(poll.target_id?.split('_')[0]) || Boako.Match.Chat.currentSeason;
+            let totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
+            try {
+                const { data: gameInfo } = await Boako.db.from('grandprix_games')
+                    .select('entry_count')
+                    .eq('game_name', poll.game_name)
+                    .eq('season_no', _seasonNo)
+                    .single();
+                if (gameInfo?.entry_count) totalExpectedVoters = gameInfo.entry_count;
+            } catch(e) { /* fallback to currentEntryCount */ }
 
             if (currentConfirmations.length >= totalExpectedVoters) {
-                const _seasonNo = parseInt(poll.target_id?.split('_')[0]) || Boako.Match.Chat.currentSeason;
                 await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id, poll.game_name, _seasonNo);
             } else {
                 await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
@@ -1335,6 +1344,11 @@ Boako.Match = {
             const myId = String(Boako.state.user.id);
             const { data: poll } = await Boako.db.from('schedule_polls').select('*').eq('poll_id', pollId).single();
             if (!poll) return;
+
+            // 💡 메신저에서 호출 시에도 currentGame/currentSeason 보장
+            const _seasonNo = parseInt(poll.target_id?.split('_')[0]);
+            if (poll.game_name) Boako.Match.Chat.currentGame = poll.game_name;
+            if (_seasonNo) Boako.Match.Chat.currentSeason = _seasonNo;
 
             let currentConfirmations = (poll.confirmations || []).filter(id => String(id) !== myId);
             let currentVotes = poll.votes || {};
