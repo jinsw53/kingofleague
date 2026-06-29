@@ -219,7 +219,24 @@ switch(seasonStatus.current_phase) {
                 <button onclick="Boako.Team.openEntryForm()" class="mt-2 bg-emerald-600 text-white px-8 py-3 rounded-xl font-black shadow-md hover:bg-emerald-700 transition-colors hover:-translate-y-1">엔트리 작전판 열기</button>
             </div>`;
         break;
-    default: // 비시즌 (60일~)
+case 4: // 대항전 본게임 진행 중 (60일~)
+        recordTabHtml = `
+            <div class="flex flex-col gap-4">
+                <div class="flex flex-col items-center justify-center text-slate-600 py-10 gap-4 border border-blue-200 rounded-xl bg-blue-50 shadow-sm">
+                    <span class="text-4xl">🏆</span>
+                    <h3 class="text-xl font-black text-blue-700">${seasonStatus.title} 대항전 본게임 진행 중</h3>
+                    <p class="font-bold text-blue-500">일정 조율 및 경기 진행 현황을 확인하세요. (${seasonStatus.day_count}일차)</p>
+                    <div class="flex gap-3">
+                        <button onclick="Boako.View.render('match')" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-black hover:bg-blue-700 transition-colors shadow-sm">📊 대항전 현황 보기</button>
+                        <button onclick="Boako.View.render('messenger')" class="bg-white border border-blue-300 text-blue-600 px-6 py-2.5 rounded-xl font-black hover:bg-blue-50 transition-colors shadow-sm">📅 일정 조율 채널</button>
+                    </div>
+                </div>
+                <div id="team-match-schedule-container">
+                    <div class="text-center py-6 text-slate-400 font-bold animate-pulse">일정 데이터 로드 중...</div>
+                </div>
+            </div>`;
+        break;
+    default: // 비시즌
         recordTabHtml = `
             <div class="flex flex-col items-center justify-center text-slate-400 font-bold py-20 gap-3 border border-dashed border-slate-300 rounded-xl bg-slate-50">
                 <span class="text-2xl">🏆</span>
@@ -318,9 +335,12 @@ switch(seasonStatus.current_phase) {
                     `;
 
                     // 채팅창 엔진은 백그라운드에서 바로 가동시킵니다.
-                    setTimeout(() => {
+                  setTimeout(() => {
                         if (Boako.Team && Boako.Team.Chat && typeof Boako.Team.Chat.init === 'function') {
                             Boako.Team.Chat.init('team-chat-container');
+                        }
+                        if (seasonStatus.current_phase === 4) {
+                            Boako.Team.loadMatchSchedule();
                         }
                     }, 0);
 
