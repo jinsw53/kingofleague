@@ -278,7 +278,10 @@ Boako.League.getChallengeHTML = function() {
                         <i data-lucide="plus-circle" class="w-4 h-4"></i> 도전장 발행하기
                     </button>
                 </div>
-                <div class="relative w-36 z-30">
+                <button onclick="Boako.League.showChallengeRuleModal()" class="bg-white border border-slate-200 text-slate-600 font-black text-xs px-3 py-2.5 rounded-xl shadow-sm hover:border-violet-400 transition-colors flex items-center gap-1.5">
+    📖 규칙
+</button>
+<div class="relative w-36 z-30">
                     <button onclick="Boako.League.toggleDropdown('challenge-season-filter')" class="w-full bg-white px-3 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between text-xs font-black text-violet-700 hover:border-violet-400 transition-colors">
                         <span>시즌 ${Boako.League.State.selectedChallengeSeason || '-'}</span>
                         <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
