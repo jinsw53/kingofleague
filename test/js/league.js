@@ -1768,6 +1768,152 @@ Boako.League.updateStats = function() {
     });
     statContainer.innerHTML = html;
 };
+Boako.League.showChallengeRuleModal = function() {
+    const TOKEN_IMG = `<img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-4 h-4 inline-block align-middle mx-0.5">`;
+    const modalHtml = `
+        <div id="challenge-rule-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onclick="Boako.League.closeChallengeRuleModal()">
+            <div class="w-full max-w-xl bg-slate-900 rounded-3xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+                
+                <div class="bg-slate-950 border-b border-slate-800 p-5 flex items-center justify-between shrink-0">
+                    <div>
+                        <h2 class="text-white font-black text-lg tracking-tight flex items-center gap-2">
+                            <span class="text-indigo-500">🏆</span> 드루와! 챌린지 공식 가이드
+                        </h2>
+                        <p class="text-slate-400 text-[11px] font-bold mt-1">승자연전 결투의 진행 과정과 승점 정산 규칙 가이드</p>
+                    </div>
+                    <button onclick="Boako.League.closeChallengeRuleModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-black transition-colors">✕</button>
+                </div>
+
+                <div class="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+                    
+                    <div class="space-y-3">
+                        <label class="block text-xs font-black text-indigo-400 uppercase tracking-widest border-b border-slate-800 pb-2">📋 결투 진행 프로세스</label>
+                        
+                        <div class="relative border-l-2 border-slate-800 pl-4 space-y-4 ml-2">
+                            
+                            <div class="relative">
+                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-indigo-600 rounded-full border-4 border-slate-900"></div>
+                                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="bg-indigo-900 text-indigo-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 1</span>
+                                        <h4 class="text-white font-black text-sm">도전장 발행 (도전)</h4>
+                                    </div>
+                                    <p class="text-slate-400 text-xs font-bold leading-relaxed">
+                                        도전팀이 ${TOKEN_IMG}<span class="text-amber-400">1개를 소모</span>하여 광장에 도전장을 발행합니다.<br>
+                                        희망하는 게임 종목(최대 3개)와 진행 방식, 조율 가능한 일정을 제시합니다.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-amber-600 rounded-full border-4 border-slate-900"></div>
+                                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="bg-amber-900 text-amber-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 2</span>
+                                        <h4 class="text-white font-black text-sm">협상 및 참전 (응전)</h4>
+                                    </div>
+                                    <p class="text-slate-400 text-xs font-bold leading-relaxed">
+                                        응전팀이 참전하며 최종 종목과 일정을 확정합니다.<br>
+                                        응전팀도 ${TOKEN_IMG}<span class="text-amber-400">1개를 소모</span>하여, 승점 보상이 2배가 되는 <span class="text-amber-400">묻고 더블로 가!</span> 옵션을 선택합니다.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-emerald-600 rounded-full border-4 border-slate-900"></div>
+                                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="bg-emerald-900 text-emerald-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 3</span>
+                                        <h4 class="text-white font-black text-sm">로스터 제출 및 결전</h4>
+                                    </div>
+                                    <p class="text-slate-400 text-xs font-bold leading-relaxed">
+                                        양 팀이 <span class="text-emerald-400">4명의 출전 선수(P1~P4)</span> 명단을 순서대로 제출합니다.<br>
+                                        <span class="text-emerald-400">진행 방식</span>에 따라 <span class="text-emerald-400">엔트리가 자동</span>으로 지정됩니다.<br>
+                                        승리한 엔트리가 계속해서 다음 상대 엔트리와 맞붙는 <span class="text-emerald-400">승자연전(KOF) 룰</span>로 경기가 진행됩니다.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <div class="absolute -left-[25px] top-1 w-4 h-4 bg-rose-600 rounded-full border-4 border-slate-900"></div>
+                                <div class="bg-rose-900/20 border border-rose-700 rounded-xl p-3">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="bg-rose-900 text-rose-300 text-[9px] px-2 py-0.5 rounded font-black tracking-wider">STEP 4</span>
+                                        <h4 class="text-white font-black text-sm">최종 승점 정산</h4>
+                                    </div>
+                                    <p class="text-slate-300 text-xs font-bold leading-relaxed">
+                                        모든 결전이 종료되면 최대 연승 기록을 기반으로 <span class="text-rose-400">🏆 LP가 자동으로 정산</span>됩니다.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 pt-4 border-t border-slate-800">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-black text-amber-400 uppercase tracking-widest">💰 승점 정산 시뮬레이터</label>
+                            <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                                <span class="text-[10px] font-black text-slate-300">묻고 더블로 가! (x2배)</span>
+                                <input type="checkbox" id="rule-double-toggle" onchange="Boako.League.calcRuleSimulator()" checked
+                                       class="w-8 h-4 bg-slate-900 rounded-full appearance-none cursor-pointer border border-slate-600 checked:bg-amber-600 transition-colors">
+                            </div>
+                        </div>
+                        
+                        <p class="text-slate-400 text-[11px] font-bold">최종 승리 시, 기록한 최대 연승에 따라 포인트가 차등 지급됩니다.</p>
+                        
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="Boako.League.setRuleStreak(1)" id="rule-btn-s1" class="rule-streak-btn bg-slate-800 border border-slate-700 text-slate-400 font-black text-xs py-2.5 rounded-xl transition-all">1승</button>
+                            <button onclick="Boako.League.setRuleStreak(2)" id="rule-btn-s2" class="rule-streak-btn bg-slate-800 border border-slate-700 text-slate-400 font-black text-xs py-2.5 rounded-xl transition-all">2연승</button>
+                            <button onclick="Boako.League.setRuleStreak(3)" id="rule-btn-s3" class="rule-streak-btn bg-slate-800 border border-slate-700 text-slate-400 font-black text-xs py-2.5 rounded-xl transition-all">3연승</button>
+                            <button onclick="Boako.League.setRuleStreak(4)" id="rule-btn-s4" class="rule-streak-btn bg-slate-800 border border-slate-700 text-slate-400 font-black text-xs py-2.5 rounded-xl transition-all">4연승 (올킬)</button>
+                        </div>
+
+                        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col items-center justify-center relative min-h-[100px] shadow-inner">
+                            <div id="rule-calc-result" class="text-3xl font-black text-white">🏆 1,600 LP</div>
+                            <div id="rule-calc-formula" class="text-[10px] font-bold text-slate-500 mt-1.5 tracking-wide">연승 보상 800LP × 더블 베팅 (2배)</div>
+                            <div id="rule-stamp-overlay" class="absolute top-2 right-4 pointer-events-none">
+                                <div class="border-[3px] border-solid border-emerald-500 text-emerald-500 font-black text-sm px-3 py-1 rounded-xl tracking-widest bg-slate-950/80">
+                                    정산 완료
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    Boako.League._ruleStreak = 4;
+    Boako.League.calcRuleSimulator();
+};
+
+Boako.League.closeChallengeRuleModal = function() {
+    document.getElementById('challenge-rule-backdrop')?.remove();
+};
+
+Boako.League.setRuleStreak = function(num) {
+    Boako.League._ruleStreak = num;
+    Boako.League.calcRuleSimulator();
+};
+
+Boako.League.calcRuleSimulator = function() {
+    const rules = { 1: 100, 2: 200, 3: 400, 4: 800 };
+    const streak = Boako.League._ruleStreak || 1;
+    const isDouble = document.getElementById('rule-double-toggle')?.checked;
+    const base = rules[streak];
+    const final = base * (isDouble ? 2 : 1);
+
+    document.querySelectorAll('.rule-streak-btn').forEach(b => {
+        b.className = "rule-streak-btn bg-slate-800 border border-slate-700 text-slate-500 font-black text-xs py-2.5 rounded-xl transition-all";
+    });
+    const activeBtn = document.getElementById('rule-btn-s' + streak);
+    if (activeBtn) activeBtn.className = "rule-streak-btn bg-emerald-600/20 text-emerald-400 font-black text-xs py-2.5 rounded-xl transition-all border border-emerald-500";
+
+    const result = document.getElementById('rule-calc-result');
+    const formula = document.getElementById('rule-calc-formula');
+    if (result) result.innerText = `🏆 ${final.toLocaleString()} LP`;
+    if (formula) formula.innerText = `연승 보상 ${base.toLocaleString()}LP${isDouble ? ' × 더블 베팅 (2배)' : ''}`;
+};
 
 // ====================================================================
 // 👑 7. 챔피언 콘텐츠
