@@ -756,7 +756,7 @@ Boako.Team = {
             const { data: schedules } = await Boako.db
                 .from('match_schedules')
                 .select('*')
-                .contains('participants', [{ team_name: teamName }])
+                .filter('participants', 'cs', `[{"team_name":"${teamName}"}]`)
                 .eq('match_type', 'GRANDPRIX')
                 .order('scheduled_time', { ascending: true });
 
