@@ -2263,7 +2263,7 @@ Boako.League.getKingOfLeagueHTML = function() {
             <div class="text-center py-2 border-b border-slate-100">
                 <span class="bg-violet-100 text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">${state.seasonTitle || ''}</span>
                 <h4 class="font-black text-slate-800 text-lg mt-2">🏅 킹 오브 리그 현황판</h4>
-                <p class="text-xs text-slate-400 font-bold mt-1">팀 전원이 같은 종목을 기록하면 다른 팀을 공격합니다. 하트는 최대 7개, 30일마다 LP가 정산됩니다.</p>
+                <p class="text-xs text-slate-400 font-bold mt-1">팀 전원이 같은 종목을 기록하면 다른 팀을 공격합니다. 하트는 최대 7개, 30일마다 🏆 LP가 정산됩니다.</p>
             </div>
 
             <div class="space-y-3">
