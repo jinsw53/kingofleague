@@ -702,7 +702,7 @@ default:
     if (currentStatus.startsWith('CANCELED')) {
         const prevStatus = currentStatus.match(/\((.+)\)/)?.[1];
         const reasonLabel = prevStatus ? ` (${prevStatus})` : '';
-        statusBadgeHtml = `<span class="bg-slate-200 text-slate-500 text-[10px] px-2 py-1 rounded-md font-black">❌ 취소됨${reasonLabel}</span>`;
+        statusBadgeHtml = `<span class="bg-slate-200 text-slate-500 text-[10px] px-2 py-1 rounded-md font-black">❌ 취소됨</span>`;
         actionHtml = `<div class="text-center w-full"><span class="text-[11px] font-black text-slate-400 block">파기된 도전장</span></div>`;
     }
     break;
