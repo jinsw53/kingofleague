@@ -708,7 +708,8 @@ default:
     break;
         }
 
-        const isPendingState = currentStatus === 'PENDING';
+        const prevStatus = currentStatus.startsWith('CANCELED') ? currentStatus.match(/\((.+)\)/)?.[1] : null;
+const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
 
         let leftVisualHtml = '';
         if (isPendingState) {
