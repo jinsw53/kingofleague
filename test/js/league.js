@@ -2353,16 +2353,73 @@ Boako.League.KOL.renderEventLogHtml = function() {
 };
 
 // ---------- 공격 애니메이션 ----------
-Boako.League.KOL.playAttackAnimation = function(ev, isReplay) {
-    return new Promise(resolve => {
+Boako.League.KOL.applyHeartHit = function(defenderEl, ev, isReplay) {
+    const heartsWrap = defenderEl.querySelector('.kol-token-hearts');
+    if (!heartsWrap) return;
+    const fullHearts = heartsWrap.querySelectorAll('.kol-heart-full');
+    const lost = ev.event_type === 'ENHANCED_ATTACK' ? 2 : 1;
+    for (let i = 0; i < lost; i++) {
+        const h = fullHearts[fullHearts.length - 1 - i];
+        if (!h) continue;
+        if (isReplay) {
+            h.classList.add('kol-heart-hit-flash');
+            setTimeout(() => h.classList.remove('kol-heart-hit-flash'), 500);
+        } else {
+            h.classList.remove('kol-heart-full');
+            h.classList.add('kol-heart-empty');
+        }
+    }
+};
+
+Boako.League.KOL.fireSingleHit = function(stage, stageRect, center, fxLayer, centerXPct, centerYPct, ev, isReplay) {
+    return new Promise(resolveHit => {
+        center.classList.add('kol-center-flash');
+
+        const defenderEl = document.querySelector(`.kol-token[data-team-id="${ev.defender_team_id}"]`);
+        if (!defenderEl) { setTimeout(resolveHit, 200); return; }
+
+        const defRect = defenderEl.getBoundingClientRect();
+        const defXPct = ((defRect.left + defRect.width / 2) - stageRect.left) / stageRect.width * 100;
+        const defYPct = ((defRect.top + defRect.height / 2) - stageRect.top) / stageRect.height * 100;
+
+        const missile = document.createElement('div');
+        missile.className = 'kol-missile';
+        missile.style.left = centerXPct + '%';
+        missile.style.top = centerYPct + '%';
+        missile.style.transition = 'left .3s ease-in, top .3s ease-in';
+        fxLayer.appendChild(missile);
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                missile.style.left = defXPct + '%';
+                missile.style.top = defYPct + '%';
+            });
+        });
+
+        setTimeout(() => {
+            missile.remove();
+            defenderEl.classList.add('kol-token-shake');
+            Boako.League.KOL.applyHeartHit(defenderEl, ev, isReplay);
+
+            setTimeout(() => {
+                defenderEl.classList.remove('kol-token-shake');
+                center.classList.remove('kol-center-flash');
+                resolveHit();
+            }, 400);
+        }, 320);
+    });
+};
+
+// events: 같은 공격팀이 만든 공격 이벤트 배열. 중앙 진입 1회 → 순차 타격 N회 → 복귀 1회
+Boako.League.KOL.playAttackSequence = function(events, isReplay) {
+    return new Promise(async resolve => {
+        if (!events || events.length === 0) { resolve(); return; }
+
         const stage = document.querySelector('.kol-arena-stage');
         const center = document.getElementById('kol-arena-center');
         const fxLayer = document.getElementById('kol-arena-fx-layer');
-        if (!stage || !center || !fxLayer) { resolve(); return; }
-
-        const attackerEl = document.querySelector(`.kol-token[data-team-id="${ev.attacker_team_id}"]`);
-        const defenderEl = document.querySelector(`.kol-token[data-team-id="${ev.defender_team_id}"]`);
-        if (!attackerEl || !defenderEl) { resolve(); return; }
+        const attackerEl = document.querySelector(`.kol-token[data-team-id="${events[0].attacker_team_id}"]`);
+        if (!stage || !center || !fxLayer || !attackerEl) { resolve(); return; }
 
         const stageRect = stage.getBoundingClientRect();
         const origLeft = attackerEl.style.left;
@@ -2371,66 +2428,27 @@ Boako.League.KOL.playAttackAnimation = function(ev, isReplay) {
         const centerXPct = ((centerRect.left + centerRect.width / 2) - stageRect.left) / stageRect.width * 100;
         const centerYPct = ((centerRect.top + centerRect.height / 2) - stageRect.top) / stageRect.height * 100;
 
+        // 1. 중앙 진입 (1회)
         attackerEl.classList.add('kol-token-attacking');
         attackerEl.style.left = centerXPct + '%';
         attackerEl.style.top = centerYPct + '%';
         attackerEl.style.transform = 'translate(-50%,-50%) scale(1.3)';
+        await new Promise(r => setTimeout(r, 450));
 
+        // 2. 대상팀 순차 타격
+        for (const ev of events) {
+            await Boako.League.KOL.fireSingleHit(stage, stageRect, center, fxLayer, centerXPct, centerYPct, ev, isReplay);
+            await new Promise(r => setTimeout(r, 150)); // 타격 사이 짧은 텀
+        }
+
+        // 3. 복귀 (1회)
+        attackerEl.style.left = origLeft;
+        attackerEl.style.top = origTop;
+        attackerEl.style.transform = '';
         setTimeout(() => {
-            center.classList.add('kol-center-flash');
-
-            const defRect = defenderEl.getBoundingClientRect();
-            const defXPct = ((defRect.left + defRect.width / 2) - stageRect.left) / stageRect.width * 100;
-            const defYPct = ((defRect.top + defRect.height / 2) - stageRect.top) / stageRect.height * 100;
-
-            const missile = document.createElement('div');
-            missile.className = 'kol-missile';
-            missile.style.left = centerXPct + '%';
-            missile.style.top = centerYPct + '%';
-            missile.style.transition = 'left .35s ease-in, top .35s ease-in';
-            fxLayer.appendChild(missile);
-
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    missile.style.left = defXPct + '%';
-                    missile.style.top = defYPct + '%';
-                });
-            });
-
-            setTimeout(() => {
-                missile.remove();
-                defenderEl.classList.add('kol-token-shake');
-
-                const heartsWrap = defenderEl.querySelector('.kol-token-hearts');
-                if (heartsWrap) {
-                    const fullHearts = heartsWrap.querySelectorAll('.kol-heart-full');
-                    const lost = ev.event_type === 'ENHANCED_ATTACK' ? 2 : 1;
-                    for (let i = 0; i < lost; i++) {
-                        const h = fullHearts[fullHearts.length - 1 - i];
-                        if (!h) continue;
-                        if (isReplay) {
-                            h.classList.add('kol-heart-hit-flash');
-                            setTimeout(() => h.classList.remove('kol-heart-hit-flash'), 500);
-                        } else {
-                            h.classList.remove('kol-heart-full');
-                            h.classList.add('kol-heart-empty');
-                        }
-                    }
-                }
-
-                setTimeout(() => {
-                    defenderEl.classList.remove('kol-token-shake');
-                    center.classList.remove('kol-center-flash');
-                    attackerEl.style.left = origLeft;
-                    attackerEl.style.top = origTop;
-                    attackerEl.style.transform = '';
-                    setTimeout(() => {
-                        attackerEl.classList.remove('kol-token-attacking');
-                        resolve();
-                    }, 550);
-                }, 400);
-            }, 380);
-        }, 450);
+            attackerEl.classList.remove('kol-token-attacking');
+            resolve();
+        }, 550);
     });
 };
 
@@ -2460,19 +2478,29 @@ Boako.League.KOL.playRecoveryAnimation = function(ev, isReplay) {
 
 Boako.League.KOL.enqueueAnimation = function(ev, isReplay) {
     Boako.League.KOL.animQueue = Boako.League.KOL.animQueue.then(() => {
-        if (ev.event_type === 'RECOVERY') return Boako.League.KOL.playRecoveryAnimation(ev, isReplay);
-        return Boako.League.KOL.playAttackAnimation(ev, isReplay);
+        return Boako.League.KOL.playRecoveryAnimation(ev, isReplay);
+    });
+};
+
+Boako.League.KOL.enqueueAttackSequence = function(events, isReplay) {
+    Boako.League.KOL.animQueue = Boako.League.KOL.animQueue.then(() => {
+        return Boako.League.KOL.playAttackSequence(events, isReplay);
     });
 };
 
 Boako.League.KOL.replayEvent = function(eventId) {
     const ev = Boako.League.KOL.events.find(e => e.id === eventId);
     if (!ev) return;
-    if (!ev.attacker_team_id && ev.event_type !== 'RECOVERY') return;
-    Boako.League.KOL.enqueueAnimation(ev, true);
+    if (ev.event_type === 'RECOVERY') {
+        Boako.League.KOL.enqueueAnimation(ev, true);
+    } else {
+        Boako.League.KOL.enqueueAttackSequence([ev], true);
+    }
 };
 
 // ---------- 실시간 구독 ----------
+Boako.League.KOL.pendingAttackWaves = {};
+
 Boako.League.KOL.subscribeRealtime = function() {
     if (Boako.League.KOL.realtimeChannel || !Boako.db) return;
 
@@ -2488,10 +2516,30 @@ Boako.League.KOL.subscribeRealtime = function() {
             const t = Boako.League.KOL.teams.find(x => x.id === ev.defender_team_id);
             if (t) t.hearts = Math.max(0, Math.min(7, t.hearts + ev.hearts_change));
 
-            Boako.League.KOL.enqueueAnimation(ev);
-
             const logContainer = document.getElementById('kol-event-log-list');
             if (logContainer) logContainer.innerHTML = Boako.League.KOL.renderEventLogHtml();
+
+            if (ev.event_type === 'RECOVERY') {
+                Boako.League.KOL.enqueueAnimation(ev, false);
+                return;
+            }
+
+            // 같은 공격팀에서 짧은 시간 안에 몰려온 공격들을 한 웨이브로 묶음
+            const key = ev.attacker_team_id;
+            if (!Boako.League.KOL.pendingAttackWaves[key]) {
+                Boako.League.KOL.pendingAttackWaves[key] = [];
+            }
+            Boako.League.KOL.pendingAttackWaves[key].push(ev);
+
+            clearTimeout(Boako.League.KOL._waveTimer_ + key);
+            const timerKey = 'timer_' + key;
+            if (Boako.League.KOL[timerKey]) clearTimeout(Boako.League.KOL[timerKey]);
+            Boako.League.KOL[timerKey] = setTimeout(() => {
+                const batch = Boako.League.KOL.pendingAttackWaves[key] || [];
+                delete Boako.League.KOL.pendingAttackWaves[key];
+                delete Boako.League.KOL[timerKey];
+                if (batch.length > 0) Boako.League.KOL.enqueueAttackSequence(batch, false);
+            }, 200);
         })
         .subscribe();
 };
