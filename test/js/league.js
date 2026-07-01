@@ -2061,6 +2061,8 @@ Boako.League.injectKolStyle = function() {
         @keyframes kolShake { 0%,100%{transform:translate(-50%,-50%);} 20%{transform:translate(-56%,-50%);} 40%{transform:translate(-44%,-50%);} 60%{transform:translate(-56%,-52%);} 80%{transform:translate(-44%,-48%);} }
         .kol-token-glow { animation: kolGlow .8s ease; }
         @keyframes kolGlow { 0%,100%{filter:none;} 50%{filter: drop-shadow(0 0 10px #34d399);} }
+        .kol-heart-hit-flash { animation: kolHeartHitFlash .5s ease; }
+        @keyframes kolHeartHitFlash { 0%,100%{transform:scale(1); filter:none;} 50%{transform:scale(1.7); filter: drop-shadow(0 0 6px #f43f5e);} }
         .kol-arena-fx-layer { position:absolute; inset:0; pointer-events:none; z-index:30; }
         .kol-missile { position:absolute; width:8px; height:8px; border-radius:9999px; background:#f43f5e; box-shadow:0 0 8px 2px rgba(244,63,94,0.7); transform:translate(-50%,-50%); }
     `;
@@ -2341,7 +2343,7 @@ Boako.League.KOL.renderEventLogHtml = function() {
         }
 
         return `
-            <div class="flex items-center gap-3 p-3 rounded-xl border ${badgeClass}">
+            <div class="flex items-center gap-3 p-3 rounded-xl border ${badgeClass} cursor-pointer hover:brightness-95 active:scale-[0.98] transition-all" onclick="Boako.League.KOL.replayEvent(${e.id})" title="클릭하면 아레나에서 이 장면을 다시 재생합니다">
                 <div class="text-lg shrink-0">${iconHtml}</div>
                 <div class="flex-1 text-[11px] leading-snug">${textHtml}</div>
                 <div class="text-[9px] font-bold text-slate-400 shrink-0">${formatEventTime(e.created_at)}</div>
@@ -2351,7 +2353,7 @@ Boako.League.KOL.renderEventLogHtml = function() {
 };
 
 // ---------- 공격 애니메이션 ----------
-Boako.League.KOL.playAttackAnimation = function(ev) {
+Boako.League.KOL.playAttackAnimation = function(ev, isReplay) {
     return new Promise(resolve => {
         const stage = document.querySelector('.kol-arena-stage');
         const center = document.getElementById('kol-arena-center');
@@ -2405,7 +2407,14 @@ Boako.League.KOL.playAttackAnimation = function(ev) {
                     const lost = ev.event_type === 'ENHANCED_ATTACK' ? 2 : 1;
                     for (let i = 0; i < lost; i++) {
                         const h = fullHearts[fullHearts.length - 1 - i];
-                        if (h) { h.classList.remove('kol-heart-full'); h.classList.add('kol-heart-empty'); }
+                        if (!h) continue;
+                        if (isReplay) {
+                            h.classList.add('kol-heart-hit-flash');
+                            setTimeout(() => h.classList.remove('kol-heart-hit-flash'), 500);
+                        } else {
+                            h.classList.remove('kol-heart-full');
+                            h.classList.add('kol-heart-empty');
+                        }
                     }
                 }
 
@@ -2425,19 +2434,21 @@ Boako.League.KOL.playAttackAnimation = function(ev) {
     });
 };
 
-Boako.League.KOL.playRecoveryAnimation = function(ev) {
+Boako.League.KOL.playRecoveryAnimation = function(ev, isReplay) {
     return new Promise(resolve => {
         const defenderEl = document.querySelector(`.kol-token[data-team-id="${ev.defender_team_id}"]`);
         if (!defenderEl) { resolve(); return; }
 
         defenderEl.classList.add('kol-token-glow');
-        const heartsWrap = defenderEl.querySelector('.kol-token-hearts');
-        if (heartsWrap) {
-            const emptyHearts = heartsWrap.querySelectorAll('.kol-heart-empty');
-            const gained = ev.hearts_change;
-            for (let i = 0; i < gained; i++) {
-                const h = emptyHearts[i];
-                if (h) { h.classList.remove('kol-heart-empty'); h.classList.add('kol-heart-full'); }
+        if (!isReplay) {
+            const heartsWrap = defenderEl.querySelector('.kol-token-hearts');
+            if (heartsWrap) {
+                const emptyHearts = heartsWrap.querySelectorAll('.kol-heart-empty');
+                const gained = ev.hearts_change;
+                for (let i = 0; i < gained; i++) {
+                    const h = emptyHearts[i];
+                    if (h) { h.classList.remove('kol-heart-empty'); h.classList.add('kol-heart-full'); }
+                }
             }
         }
         setTimeout(() => {
@@ -2447,11 +2458,18 @@ Boako.League.KOL.playRecoveryAnimation = function(ev) {
     });
 };
 
-Boako.League.KOL.enqueueAnimation = function(ev) {
+Boako.League.KOL.enqueueAnimation = function(ev, isReplay) {
     Boako.League.KOL.animQueue = Boako.League.KOL.animQueue.then(() => {
-        if (ev.event_type === 'RECOVERY') return Boako.League.KOL.playRecoveryAnimation(ev);
-        return Boako.League.KOL.playAttackAnimation(ev);
+        if (ev.event_type === 'RECOVERY') return Boako.League.KOL.playRecoveryAnimation(ev, isReplay);
+        return Boako.League.KOL.playAttackAnimation(ev, isReplay);
     });
+};
+
+Boako.League.KOL.replayEvent = function(eventId) {
+    const ev = Boako.League.KOL.events.find(e => e.id === eventId);
+    if (!ev) return;
+    if (!ev.attacker_team_id && ev.event_type !== 'RECOVERY') return;
+    Boako.League.KOL.enqueueAnimation(ev, true);
 };
 
 // ---------- 실시간 구독 ----------
