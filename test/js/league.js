@@ -122,6 +122,10 @@ Boako.League.switchTab = async function(tabId) {
         }
     }
 
+if (Boako.League.KOL && Boako.League.KOL.unsubscribeRealtime) {
+        Boako.League.KOL.unsubscribeRealtime();
+    }
+
     const container = document.getElementById('league-view-container');
     if (!container) return;
 
@@ -2019,18 +2023,55 @@ Boako.League.filterChampions = function() {
 };
 
 // ====================================================================
-// 🏅 8. 킹 오브 리그 (실시간 하트/이벤트/LP 정산 연동)
+// 🏅 8. 킹 오브 리그 (원형 아레나 + 실시간 공격 애니메이션)
 // ====================================================================
 Boako.League.KOL = Boako.League.KOL || {
     season_no: null,
     teams: [],
     events: [],
-    settlements: []
+    settlements: [],
+    teamsMap: {},
+    seasonTitle: '',
+    realtimeChannel: null,
+    animQueue: Promise.resolve()
+};
+
+Boako.League.injectKolStyle = function() {
+    if (document.getElementById('kol-arena-style')) return;
+    const style = document.createElement('style');
+    style.id = 'kol-arena-style';
+    style.innerHTML = `
+        .kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; }
+        .kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; }
+        .kol-arena-center-ring { position:absolute; inset:8%; border-radius:9999px; border: 2px dashed rgba(99,102,241,0.35); }
+        .kol-arena-center-label { font-size:10px; font-weight:900; letter-spacing:.2em; color:#818cf8; opacity:.6; }
+        .kol-arena-center.kol-center-flash { animation: kolCenterFlash .5s ease; }
+        @keyframes kolCenterFlash { 0%{box-shadow:0 0 0 0 rgba(244,63,94,0.6);} 50%{box-shadow:0 0 40px 20px rgba(244,63,94,0.5);} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0);} }
+        .kol-arena-tokens { position:absolute; inset:0; }
+        .kol-token { position:absolute; transform: translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:2px; transition: left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1), transform .4s ease; z-index:5; }
+        .kol-token-logo { width:44px; height:44px; border-radius:12px; object-fit:contain; background:#fff; border:2px solid #e2e8f0; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:3px; }
+        .kol-token-me .kol-token-logo { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.25); }
+        .kol-token-name { font-size:9px; font-weight:900; color:#334155; background:rgba(255,255,255,0.9); padding:1px 5px; border-radius:6px; max-width:72px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .kol-token-hearts { display:flex; gap:1px; }
+        .kol-heart { font-size:7px; line-height:1; }
+        .kol-heart-full { color:#f43f5e; }
+        .kol-heart-empty { color:#e2e8f0; }
+        .kol-token-attacking { z-index:20; }
+        .kol-token-shake { animation: kolShake .4s ease; }
+        @keyframes kolShake { 0%,100%{transform:translate(-50%,-50%);} 20%{transform:translate(-56%,-50%);} 40%{transform:translate(-44%,-50%);} 60%{transform:translate(-56%,-52%);} 80%{transform:translate(-44%,-48%);} }
+        .kol-token-glow { animation: kolGlow .8s ease; }
+        @keyframes kolGlow { 0%,100%{filter:none;} 50%{filter: drop-shadow(0 0 10px #34d399);} }
+        .kol-arena-fx-layer { position:absolute; inset:0; pointer-events:none; z-index:30; }
+        .kol-missile { position:absolute; width:8px; height:8px; border-radius:9999px; background:#f43f5e; box-shadow:0 0 8px 2px rgba(244,63,94,0.7); transform:translate(-50%,-50%); }
+    `;
+    document.head.appendChild(style);
 };
 
 Boako.League.loadKingOfLeagueData = async function() {
     const container = document.getElementById('league-view-container');
     if (!container || !Boako.db) return;
+
+    Boako.League.injectKolStyle();
 
     try {
         const now = new Date().toISOString();
@@ -2045,12 +2086,11 @@ Boako.League.loadKingOfLeagueData = async function() {
         Boako.League.KOL.season_no = seasonNo;
 
         if (!seasonNo) {
-            container.innerHTML = Boako.League.getKingOfLeagueHTML([], [], []);
+            container.innerHTML = Boako.League.getKingOfLeagueHTML();
             if (window.lucide) window.lucide.createIcons();
             return;
         }
 
-        // 시즌 참여 팀 목록 (kol_completion_progress에 행이 있는 팀만)
         const { data: progressRows } = await Boako.db
             .from('kol_completion_progress')
             .select('team_id, game_name, is_completed')
@@ -2067,7 +2107,6 @@ Boako.League.loadKingOfLeagueData = async function() {
             teamsInfo = teamsData || [];
         }
 
-        // 하트 현재값 (v_kol_team_hearts 뷰)
         const { data: heartsData } = await Boako.db
             .from('v_kol_team_hearts')
             .select('team_id, hearts')
@@ -2075,7 +2114,6 @@ Boako.League.loadKingOfLeagueData = async function() {
         const heartsMap = {};
         (heartsData || []).forEach(h => { heartsMap[h.team_id] = h.hearts; });
 
-        // 팀별 완료 종목 수
         const completedCountMap = {};
         (progressRows || []).forEach(r => {
             if (r.is_completed) {
@@ -2083,15 +2121,17 @@ Boako.League.loadKingOfLeagueData = async function() {
             }
         });
 
-        const teamsCombined = teamsInfo.map(t => ({
-            id: t.id,
-            team_name: t.team_name,
-            logo_url: t.logo_url,
-            hearts: heartsMap[t.id] != null ? heartsMap[t.id] : 7,
-            completed_count: completedCountMap[t.id] || 0
-        })).sort((a, b) => b.hearts - a.hearts || b.completed_count - a.completed_count);
+        // 아레나 토큰 위치가 안정적으로 유지되도록 team_id 기준 정렬 (하트로 재정렬 안 함)
+        const teamsCombined = teamsInfo
+            .map(t => ({
+                id: t.id,
+                team_name: t.team_name,
+                logo_url: t.logo_url,
+                hearts: heartsMap[t.id] != null ? heartsMap[t.id] : 7,
+                completed_count: completedCountMap[t.id] || 0
+            }))
+            .sort((a, b) => a.id - b.id);
 
-        // 최근 이벤트 로그 (최근 20개)
         const { data: eventsData } = await Boako.db
             .from('kol_events')
             .select('*')
@@ -2099,7 +2139,6 @@ Boako.League.loadKingOfLeagueData = async function() {
             .order('created_at', { ascending: false })
             .limit(20);
 
-        // 이벤트에 등장하는 팀 이름 매핑용 (activeTeamIds 밖의 팀도 있을 수 있음)
         const eventTeamIds = new Set();
         (eventsData || []).forEach(e => {
             if (e.attacker_team_id) eventTeamIds.add(e.attacker_team_id);
@@ -2114,7 +2153,6 @@ Boako.League.loadKingOfLeagueData = async function() {
         const allTeamsMap = {};
         [...teamsInfo, ...extraTeams].forEach(t => { allTeamsMap[t.id] = t; });
 
-        // LP 정산 현황
         const { data: settlementsData } = await Boako.db
             .from('kol_lp_settlements')
             .select('*')
@@ -2130,6 +2168,8 @@ Boako.League.loadKingOfLeagueData = async function() {
 
         container.innerHTML = Boako.League.getKingOfLeagueHTML();
         if (window.lucide) window.lucide.createIcons();
+
+        Boako.League.KOL.subscribeRealtime();
 
     } catch (err) {
         console.error("킹 오브 리그 데이터 로드 실패:", err);
@@ -2149,6 +2189,7 @@ Boako.League.loadKingOfLeagueData = async function() {
 Boako.League.getKingOfLeagueHTML = function() {
     const state = Boako.League.KOL;
     const myTeamId = Boako.state?.team?.info?.id;
+    const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
 
     if (!state.season_no) {
         return `
@@ -2159,69 +2200,44 @@ Boako.League.getKingOfLeagueHTML = function() {
         `;
     }
 
-    const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
-
-    // ---------- 1. 팀 하트 카드 그리드 ----------
-    const heartsCardHtml = (state.teams || []).length === 0
-        ? `<div class="col-span-full text-center py-10 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 이번 시즌 킹 오브 리그에 참여한 팀이 없습니다.</div>`
-        : state.teams.map(t => {
+    // ---------- 1. 원형 아레나 ----------
+    const total = (state.teams || []).length;
+    const radius = 42;
+    const tokensHtml = total === 0
+        ? ''
+        : state.teams.map((t, i) => {
+            const angle = (360 / total) * i - 90;
+            const rad = angle * Math.PI / 180;
+            const x = 50 + radius * Math.cos(rad);
+            const y = 50 + radius * Math.sin(rad);
             const isMe = t.id === myTeamId;
-            const heartsFull = '❤️'.repeat(t.hearts);
-            const heartsEmpty = '🖤'.repeat(7 - t.hearts);
-            const cardClass = isMe
-                ? 'bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300 shadow-md ring-2 ring-violet-200'
-                : 'bg-white border-slate-200';
+            const heartsHtml = Array.from({ length: 7 }, (_, hi) =>
+                `<span class="kol-heart ${hi < t.hearts ? 'kol-heart-full' : 'kol-heart-empty'}">❤</span>`
+            ).join('');
             return `
-                <div class="p-4 rounded-2xl border ${cardClass} flex flex-col items-center text-center gap-2 transition-all">
-                    <img src="${t.logo_url || DEFAULT_LOGO}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1.5 shadow-inner">
-                    <div class="font-black text-slate-800 text-xs truncate w-full">${t.team_name}${isMe ? ' <span class="text-violet-500">(우리팀)</span>' : ''}</div>
-                    <div class="text-sm tracking-tighter leading-none">${heartsFull}${heartsEmpty}</div>
-                    <div class="text-[10px] font-bold text-slate-400">완료 종목 <span class="text-indigo-600 font-black">${t.completed_count}개</span></div>
+                <div class="kol-token${isMe ? ' kol-token-me' : ''}" data-team-id="${t.id}" style="left:${x}%; top:${y}%;">
+                    <img src="${t.logo_url || DEFAULT_LOGO}" class="kol-token-logo">
+                    <div class="kol-token-name">${t.team_name}</div>
+                    <div class="kol-token-hearts">${heartsHtml}</div>
                 </div>
             `;
         }).join('');
+
+    const arenaHtml = total === 0
+        ? `<div class="text-center py-10 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 이번 시즌 킹 오브 리그에 참여한 팀이 없습니다.</div>`
+        : `
+            <div class="kol-arena-stage">
+                <div id="kol-arena-center" class="kol-arena-center">
+                    <div class="kol-arena-center-ring"></div>
+                    <div class="kol-arena-center-label">ARENA</div>
+                </div>
+                <div class="kol-arena-tokens">${tokensHtml}</div>
+                <div id="kol-arena-fx-layer" class="kol-arena-fx-layer"></div>
+            </div>
+        `;
 
     // ---------- 2. 이벤트 로그 ----------
-    const formatEventTime = (iso) => {
-        const d = new Date(iso);
-        return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    };
-
-    const eventLogHtml = (state.events || []).length === 0
-        ? `<div class="text-center py-8 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 발생한 공격/회복 기록이 없습니다.</div>`
-        : state.events.map(e => {
-            const attackerTeam = e.attacker_team_id ? state.teamsMap[e.attacker_team_id] : null;
-            const defenderTeam = state.teamsMap[e.defender_team_id];
-            const attackerName = attackerTeam ? attackerTeam.team_name : null;
-            const defenderName = defenderTeam ? defenderTeam.team_name : '알 수 없음';
-
-            let iconHtml = '';
-            let textHtml = '';
-            let badgeClass = '';
-
-            if (e.event_type === 'RECOVERY') {
-                iconHtml = `<span class="text-emerald-500">💚</span>`;
-                textHtml = `<span class="font-black text-slate-800">${defenderName}</span>이(가) <span class="font-bold text-emerald-600">${e.game_name}</span> 완료로 하트 ${Math.abs(e.hearts_change)}개 회복`;
-                badgeClass = 'bg-emerald-50 border-emerald-100';
-            } else if (e.event_type === 'ENHANCED_ATTACK') {
-                iconHtml = `<span class="text-rose-600">🔥</span>`;
-                const ratioTxt = e.user_ratio_snapshot != null ? ` (유저비율 ${Math.round(e.user_ratio_snapshot * 100)}%)` : '';
-                textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 강화공격 → <span class="font-black text-rose-600">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}${ratioTxt}`;
-                badgeClass = 'bg-rose-50 border-rose-100';
-            } else {
-                iconHtml = `<span class="text-orange-500">⚔️</span>`;
-                textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 선점 공격 → <span class="font-black text-rose-500">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}`;
-                badgeClass = 'bg-orange-50 border-orange-100';
-            }
-
-            return `
-                <div class="flex items-center gap-3 p-3 rounded-xl border ${badgeClass}">
-                    <div class="text-lg shrink-0">${iconHtml}</div>
-                    <div class="flex-1 text-[11px] leading-snug">${textHtml}</div>
-                    <div class="text-[9px] font-bold text-slate-400 shrink-0">${formatEventTime(e.created_at)}</div>
-                </div>
-            `;
-        }).join('');
+    const eventLogHtml = Boako.League.KOL.renderEventLogHtml();
 
     // ---------- 3. LP 정산 현황 ----------
     const roundLabels = { 1: '1차 (30일)', 2: '2차 (60일)', 3: '3차 (90일)' };
@@ -2251,7 +2267,7 @@ Boako.League.getKingOfLeagueHTML = function() {
             <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
                 <div class="flex items-center justify-between mb-2">
                     <div class="text-[10px] font-black text-indigo-500 uppercase tracking-wider">${roundLabels[round]}</div>
-                    <div class="text-[10px] font-bold text-slate-400">총 풀 ${totalPool.toLocaleString()} LP</div>
+                    <div class="text-[10px] font-bold text-slate-400">총 풀 🏆 ${totalPool.toLocaleString()} LP</div>
                 </div>
                 ${rowsHtml}
             </div>
@@ -2262,20 +2278,17 @@ Boako.League.getKingOfLeagueHTML = function() {
         <div class="space-y-8">
             <div class="text-center py-2 border-b border-slate-100">
                 <span class="bg-violet-100 text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">${state.seasonTitle || ''}</span>
-                <h4 class="font-black text-slate-800 text-lg mt-2">🏅 킹 오브 리그 현황판</h4>
+                <h4 class="font-black text-slate-800 text-lg mt-2">🏅 킹 오브 리그 아레나</h4>
                 <p class="text-xs text-slate-400 font-bold mt-1">팀 전원이 같은 종목을 기록하면 다른 팀을 공격합니다. 하트는 최대 7개, 30일마다 🏆 LP가 정산됩니다.</p>
             </div>
 
             <div class="space-y-3">
-                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="heart" class="w-4 h-4 text-rose-500"></i> 팀 생존 현황</h5>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    ${heartsCardHtml}
-                </div>
+                ${arenaHtml}
             </div>
 
             <div class="space-y-3">
                 <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="scroll-text" class="w-4 h-4 text-orange-500"></i> 최근 공격/회복 로그</h5>
-                <div class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                <div id="kol-event-log-list" class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-1">
                     ${eventLogHtml}
                 </div>
             </div>
@@ -2288,4 +2301,186 @@ Boako.League.getKingOfLeagueHTML = function() {
             </div>
         </div>
     `;
+};
+
+Boako.League.KOL.renderEventLogHtml = function() {
+    const state = Boako.League.KOL;
+
+    const formatEventTime = (iso) => {
+        const d = new Date(iso);
+        return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+
+    if ((state.events || []).length === 0) {
+        return `<div class="text-center py-8 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 발생한 공격/회복 기록이 없습니다.</div>`;
+    }
+
+    return state.events.map(e => {
+        const attackerTeam = e.attacker_team_id ? state.teamsMap[e.attacker_team_id] : null;
+        const defenderTeam = state.teamsMap[e.defender_team_id];
+        const attackerName = attackerTeam ? attackerTeam.team_name : null;
+        const defenderName = defenderTeam ? defenderTeam.team_name : '알 수 없음';
+
+        let iconHtml = '';
+        let textHtml = '';
+        let badgeClass = '';
+
+        if (e.event_type === 'RECOVERY') {
+            iconHtml = `<span class="text-emerald-500">💚</span>`;
+            textHtml = `<span class="font-black text-slate-800">${defenderName}</span>이(가) <span class="font-bold text-emerald-600">${e.game_name}</span> 완료로 하트 ${Math.abs(e.hearts_change)}개 회복`;
+            badgeClass = 'bg-emerald-50 border-emerald-100';
+        } else if (e.event_type === 'ENHANCED_ATTACK') {
+            iconHtml = `<span class="text-rose-600">🔥</span>`;
+            const ratioTxt = e.user_ratio_snapshot != null ? ` (유저비율 ${Math.round(e.user_ratio_snapshot * 100)}%)` : '';
+            textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 강화공격 → <span class="font-black text-rose-600">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}${ratioTxt}`;
+            badgeClass = 'bg-rose-50 border-rose-100';
+        } else {
+            iconHtml = `<span class="text-orange-500">⚔️</span>`;
+            textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 선점 공격 → <span class="font-black text-rose-500">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}`;
+            badgeClass = 'bg-orange-50 border-orange-100';
+        }
+
+        return `
+            <div class="flex items-center gap-3 p-3 rounded-xl border ${badgeClass}">
+                <div class="text-lg shrink-0">${iconHtml}</div>
+                <div class="flex-1 text-[11px] leading-snug">${textHtml}</div>
+                <div class="text-[9px] font-bold text-slate-400 shrink-0">${formatEventTime(e.created_at)}</div>
+            </div>
+        `;
+    }).join('');
+};
+
+// ---------- 공격 애니메이션 ----------
+Boako.League.KOL.playAttackAnimation = function(ev) {
+    return new Promise(resolve => {
+        const stage = document.querySelector('.kol-arena-stage');
+        const center = document.getElementById('kol-arena-center');
+        const fxLayer = document.getElementById('kol-arena-fx-layer');
+        if (!stage || !center || !fxLayer) { resolve(); return; }
+
+        const attackerEl = document.querySelector(`.kol-token[data-team-id="${ev.attacker_team_id}"]`);
+        const defenderEl = document.querySelector(`.kol-token[data-team-id="${ev.defender_team_id}"]`);
+        if (!attackerEl || !defenderEl) { resolve(); return; }
+
+        const stageRect = stage.getBoundingClientRect();
+        const origLeft = attackerEl.style.left;
+        const origTop = attackerEl.style.top;
+        const centerRect = center.getBoundingClientRect();
+        const centerXPct = ((centerRect.left + centerRect.width / 2) - stageRect.left) / stageRect.width * 100;
+        const centerYPct = ((centerRect.top + centerRect.height / 2) - stageRect.top) / stageRect.height * 100;
+
+        attackerEl.classList.add('kol-token-attacking');
+        attackerEl.style.left = centerXPct + '%';
+        attackerEl.style.top = centerYPct + '%';
+        attackerEl.style.transform = 'translate(-50%,-50%) scale(1.3)';
+
+        setTimeout(() => {
+            center.classList.add('kol-center-flash');
+
+            const defRect = defenderEl.getBoundingClientRect();
+            const defXPct = ((defRect.left + defRect.width / 2) - stageRect.left) / stageRect.width * 100;
+            const defYPct = ((defRect.top + defRect.height / 2) - stageRect.top) / stageRect.height * 100;
+
+            const missile = document.createElement('div');
+            missile.className = 'kol-missile';
+            missile.style.left = centerXPct + '%';
+            missile.style.top = centerYPct + '%';
+            missile.style.transition = 'left .35s ease-in, top .35s ease-in';
+            fxLayer.appendChild(missile);
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    missile.style.left = defXPct + '%';
+                    missile.style.top = defYPct + '%';
+                });
+            });
+
+            setTimeout(() => {
+                missile.remove();
+                defenderEl.classList.add('kol-token-shake');
+
+                const heartsWrap = defenderEl.querySelector('.kol-token-hearts');
+                if (heartsWrap) {
+                    const fullHearts = heartsWrap.querySelectorAll('.kol-heart-full');
+                    const lost = ev.event_type === 'ENHANCED_ATTACK' ? 2 : 1;
+                    for (let i = 0; i < lost; i++) {
+                        const h = fullHearts[fullHearts.length - 1 - i];
+                        if (h) { h.classList.remove('kol-heart-full'); h.classList.add('kol-heart-empty'); }
+                    }
+                }
+
+                setTimeout(() => {
+                    defenderEl.classList.remove('kol-token-shake');
+                    center.classList.remove('kol-center-flash');
+                    attackerEl.style.left = origLeft;
+                    attackerEl.style.top = origTop;
+                    attackerEl.style.transform = '';
+                    setTimeout(() => {
+                        attackerEl.classList.remove('kol-token-attacking');
+                        resolve();
+                    }, 550);
+                }, 400);
+            }, 380);
+        }, 450);
+    });
+};
+
+Boako.League.KOL.playRecoveryAnimation = function(ev) {
+    return new Promise(resolve => {
+        const defenderEl = document.querySelector(`.kol-token[data-team-id="${ev.defender_team_id}"]`);
+        if (!defenderEl) { resolve(); return; }
+
+        defenderEl.classList.add('kol-token-glow');
+        const heartsWrap = defenderEl.querySelector('.kol-token-hearts');
+        if (heartsWrap) {
+            const emptyHearts = heartsWrap.querySelectorAll('.kol-heart-empty');
+            const gained = ev.hearts_change;
+            for (let i = 0; i < gained; i++) {
+                const h = emptyHearts[i];
+                if (h) { h.classList.remove('kol-heart-empty'); h.classList.add('kol-heart-full'); }
+            }
+        }
+        setTimeout(() => {
+            defenderEl.classList.remove('kol-token-glow');
+            resolve();
+        }, 800);
+    });
+};
+
+Boako.League.KOL.enqueueAnimation = function(ev) {
+    Boako.League.KOL.animQueue = Boako.League.KOL.animQueue.then(() => {
+        if (ev.event_type === 'RECOVERY') return Boako.League.KOL.playRecoveryAnimation(ev);
+        return Boako.League.KOL.playAttackAnimation(ev);
+    });
+};
+
+// ---------- 실시간 구독 ----------
+Boako.League.KOL.subscribeRealtime = function() {
+    if (Boako.League.KOL.realtimeChannel || !Boako.db) return;
+
+    Boako.League.KOL.realtimeChannel = Boako.db
+        .channel('kol-events-realtime')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kol_events' }, (payload) => {
+            const ev = payload.new;
+            if (ev.season_no !== Boako.League.KOL.season_no) return;
+
+            Boako.League.KOL.events.unshift(ev);
+            Boako.League.KOL.events = Boako.League.KOL.events.slice(0, 20);
+
+            const t = Boako.League.KOL.teams.find(x => x.id === ev.defender_team_id);
+            if (t) t.hearts = Math.max(0, Math.min(7, t.hearts + ev.hearts_change));
+
+            Boako.League.KOL.enqueueAnimation(ev);
+
+            const logContainer = document.getElementById('kol-event-log-list');
+            if (logContainer) logContainer.innerHTML = Boako.League.KOL.renderEventLogHtml();
+        })
+        .subscribe();
+};
+
+Boako.League.KOL.unsubscribeRealtime = function() {
+    if (Boako.League.KOL.realtimeChannel && Boako.db) {
+        Boako.db.removeChannel(Boako.League.KOL.realtimeChannel);
+        Boako.League.KOL.realtimeChannel = null;
+    }
 };
