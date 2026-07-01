@@ -135,7 +135,8 @@ Boako.League.switchTab = async function(tabId) {
         container.innerHTML = Boako.League.getChampionHTML();
         await Boako.League.fetchAndRenderChampions(); 
     } else if (tabId === 'king_of_league') {
-        container.innerHTML = Boako.League.getKingOfLeagueHTML();
+        container.innerHTML = `<div class="text-center py-20 font-black text-slate-400 animate-pulse">킹 오브 리그 데이터 동기화 중...</div>`;
+        await Boako.League.loadKingOfLeagueData();
     }
     
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -2018,39 +2019,271 @@ Boako.League.filterChampions = function() {
 };
 
 // ====================================================================
-// 🏅 8. 킹 오브 리그
+// 🏅 8. 킹 오브 리그 (실시간 하트/이벤트/LP 정산 연동)
 // ====================================================================
-Boako.League.getKingOfLeagueHTML = function() {
-    return `
-        <div class="space-y-6">
-            <div class="text-center py-4 border-b border-slate-100">
-                <span class="bg-violet-100 text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">Playoff Brackets</span>
-                <h4 class="font-black text-slate-800 text-lg mt-2">정규 오프라인 토너먼트 대진표</h4>
-                <p class="text-xs text-slate-400 font-bold mt-1">공식 경기 기록이 축적되어 실시간 트리가 연계 갱신됩니다.</p>
+Boako.League.KOL = Boako.League.KOL || {
+    season_no: null,
+    teams: [],
+    events: [],
+    settlements: []
+};
+
+Boako.League.loadKingOfLeagueData = async function() {
+    const container = document.getElementById('league-view-container');
+    if (!container || !Boako.db) return;
+
+    try {
+        const now = new Date().toISOString();
+        const { data: currentSeason } = await Boako.db
+            .from('seasons')
+            .select('season_no, title')
+            .lte('start_date', now)
+            .gte('end_date', now)
+            .single();
+
+        const seasonNo = currentSeason ? currentSeason.season_no : null;
+        Boako.League.KOL.season_no = seasonNo;
+
+        if (!seasonNo) {
+            container.innerHTML = Boako.League.getKingOfLeagueHTML([], [], []);
+            if (window.lucide) window.lucide.createIcons();
+            return;
+        }
+
+        // 시즌 참여 팀 목록 (kol_completion_progress에 행이 있는 팀만)
+        const { data: progressRows } = await Boako.db
+            .from('kol_completion_progress')
+            .select('team_id, game_name, is_completed')
+            .eq('season_no', seasonNo);
+
+        const activeTeamIds = [...new Set((progressRows || []).map(r => r.team_id))];
+
+        let teamsInfo = [];
+        if (activeTeamIds.length > 0) {
+            const { data: teamsData } = await Boako.db
+                .from('teams')
+                .select('id, team_name, logo_url')
+                .in('id', activeTeamIds);
+            teamsInfo = teamsData || [];
+        }
+
+        // 하트 현재값 (v_kol_team_hearts 뷰)
+        const { data: heartsData } = await Boako.db
+            .from('v_kol_team_hearts')
+            .select('team_id, hearts')
+            .eq('season_no', seasonNo);
+        const heartsMap = {};
+        (heartsData || []).forEach(h => { heartsMap[h.team_id] = h.hearts; });
+
+        // 팀별 완료 종목 수
+        const completedCountMap = {};
+        (progressRows || []).forEach(r => {
+            if (r.is_completed) {
+                completedCountMap[r.team_id] = (completedCountMap[r.team_id] || 0) + 1;
+            }
+        });
+
+        const teamsCombined = teamsInfo.map(t => ({
+            id: t.id,
+            team_name: t.team_name,
+            logo_url: t.logo_url,
+            hearts: heartsMap[t.id] != null ? heartsMap[t.id] : 7,
+            completed_count: completedCountMap[t.id] || 0
+        })).sort((a, b) => b.hearts - a.hearts || b.completed_count - a.completed_count);
+
+        // 최근 이벤트 로그 (최근 20개)
+        const { data: eventsData } = await Boako.db
+            .from('kol_events')
+            .select('*')
+            .eq('season_no', seasonNo)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        // 이벤트에 등장하는 팀 이름 매핑용 (activeTeamIds 밖의 팀도 있을 수 있음)
+        const eventTeamIds = new Set();
+        (eventsData || []).forEach(e => {
+            if (e.attacker_team_id) eventTeamIds.add(e.attacker_team_id);
+            if (e.defender_team_id) eventTeamIds.add(e.defender_team_id);
+        });
+        const missingIds = [...eventTeamIds].filter(id => !teamsInfo.find(t => t.id === id));
+        let extraTeams = [];
+        if (missingIds.length > 0) {
+            const { data: extraData } = await Boako.db.from('teams').select('id, team_name, logo_url').in('id', missingIds);
+            extraTeams = extraData || [];
+        }
+        const allTeamsMap = {};
+        [...teamsInfo, ...extraTeams].forEach(t => { allTeamsMap[t.id] = t; });
+
+        // LP 정산 현황
+        const { data: settlementsData } = await Boako.db
+            .from('kol_lp_settlements')
+            .select('*')
+            .eq('season_no', seasonNo)
+            .order('settlement_round', { ascending: true })
+            .order('lp_awarded', { ascending: false });
+
+        Boako.League.KOL.teams = teamsCombined;
+        Boako.League.KOL.events = eventsData || [];
+        Boako.League.KOL.settlements = settlementsData || [];
+        Boako.League.KOL.teamsMap = allTeamsMap;
+        Boako.League.KOL.seasonTitle = currentSeason.title;
+
+        container.innerHTML = Boako.League.getKingOfLeagueHTML();
+        if (window.lucide) window.lucide.createIcons();
+
+    } catch (err) {
+        console.error("킹 오브 리그 데이터 로드 실패:", err);
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-20 text-center bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mb-4 border border-rose-100">
+                    <i data-lucide="alert-triangle" class="w-8 h-8 text-rose-500"></i>
+                </div>
+                <h3 class="font-black text-slate-800 text-lg mb-2">데이터 로드 오류</h3>
+                <button onclick="Boako.League.loadKingOfLeagueData()" class="mt-6 bg-slate-800 text-white font-black text-xs px-6 py-3 rounded-xl hover:bg-slate-900 transition-all shadow-md">재시도</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center max-w-3xl mx-auto pt-4">
-                <div class="space-y-8">
-                    <div class="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-2">
-                        <div class="text-[10px] text-violet-600 font-extrabold uppercase tracking-wide">준결승 A그룹</div>
-                        <div class="flex items-center justify-between p-1.5 bg-violet-50 text-violet-800 rounded-lg px-3 text-xs font-black border border-violet-100"><span>💙 Team Arch</span><span>3</span></div>
-                        <div class="flex items-center justify-between p-1.5 text-slate-400 px-3 text-xs font-bold"><span>❤️ Team Odin</span><span>1</span></div>
-                    </div>
-                    <div class="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-2">
-                        <div class="text-[10px] text-violet-600 font-extrabold uppercase tracking-wide">준결승 B그룹</div>
-                        <div class="flex items-center justify-between p-1.5 text-slate-400 px-3 text-xs font-bold"><span>💚 Team Green</span><span>0</span></div>
-                        <div class="flex items-center justify-between p-1.5 bg-violet-50 text-violet-800 rounded-lg px-3 text-xs font-black border border-violet-100"><span>💛 Team Gold</span><span>3</span></div>
-                    </div>
+        `;
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+
+Boako.League.getKingOfLeagueHTML = function() {
+    const state = Boako.League.KOL;
+    const myTeamId = Boako.state?.team?.info?.id;
+
+    if (!state.season_no) {
+        return `
+            <div class="flex flex-col items-center justify-center py-20 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                <span class="text-3xl mb-2">🏅</span>
+                <h3 class="font-black text-slate-600 text-sm">현재 진행 중인 시즌이 없습니다.</h3>
+            </div>
+        `;
+    }
+
+    const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+
+    // ---------- 1. 팀 하트 카드 그리드 ----------
+    const heartsCardHtml = (state.teams || []).length === 0
+        ? `<div class="col-span-full text-center py-10 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 이번 시즌 킹 오브 리그에 참여한 팀이 없습니다.</div>`
+        : state.teams.map(t => {
+            const isMe = t.id === myTeamId;
+            const heartsFull = '❤️'.repeat(t.hearts);
+            const heartsEmpty = '🖤'.repeat(7 - t.hearts);
+            const cardClass = isMe
+                ? 'bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300 shadow-md ring-2 ring-violet-200'
+                : 'bg-white border-slate-200';
+            return `
+                <div class="p-4 rounded-2xl border ${cardClass} flex flex-col items-center text-center gap-2 transition-all">
+                    <img src="${t.logo_url || DEFAULT_LOGO}" class="w-14 h-14 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1.5 shadow-inner">
+                    <div class="font-black text-slate-800 text-xs truncate w-full">${t.team_name}${isMe ? ' <span class="text-violet-500">(우리팀)</span>' : ''}</div>
+                    <div class="text-sm tracking-tighter leading-none">${heartsFull}${heartsEmpty}</div>
+                    <div class="text-[10px] font-bold text-slate-400">완료 종목 <span class="text-indigo-600 font-black">${t.completed_count}개</span></div>
                 </div>
-                <div class="flex flex-col justify-around h-full py-8 text-center text-xs text-slate-400 font-bold hidden md:flex">
-                    <div class="flex items-center justify-center gap-1.5 bg-slate-100/80 border border-slate-200 p-2 rounded-xl"><span>Arch 승전</span> <i data-lucide="arrow-right" class="w-4 h-4 text-violet-500"></i></div>
-                    <div class="flex items-center justify-center gap-1.5 bg-slate-100/80 border border-slate-200 p-2 rounded-xl"><span>Gold 승전</span> <i data-lucide="arrow-right" class="w-4 h-4 text-violet-500"></i></div>
+            `;
+        }).join('');
+
+    // ---------- 2. 이벤트 로그 ----------
+    const formatEventTime = (iso) => {
+        const d = new Date(iso);
+        return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+
+    const eventLogHtml = (state.events || []).length === 0
+        ? `<div class="text-center py-8 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 발생한 공격/회복 기록이 없습니다.</div>`
+        : state.events.map(e => {
+            const attackerTeam = e.attacker_team_id ? state.teamsMap[e.attacker_team_id] : null;
+            const defenderTeam = state.teamsMap[e.defender_team_id];
+            const attackerName = attackerTeam ? attackerTeam.team_name : null;
+            const defenderName = defenderTeam ? defenderTeam.team_name : '알 수 없음';
+
+            let iconHtml = '';
+            let textHtml = '';
+            let badgeClass = '';
+
+            if (e.event_type === 'RECOVERY') {
+                iconHtml = `<span class="text-emerald-500">💚</span>`;
+                textHtml = `<span class="font-black text-slate-800">${defenderName}</span>이(가) <span class="font-bold text-emerald-600">${e.game_name}</span> 완료로 하트 ${Math.abs(e.hearts_change)}개 회복`;
+                badgeClass = 'bg-emerald-50 border-emerald-100';
+            } else if (e.event_type === 'ENHANCED_ATTACK') {
+                iconHtml = `<span class="text-rose-600">🔥</span>`;
+                const ratioTxt = e.user_ratio_snapshot != null ? ` (유저비율 ${Math.round(e.user_ratio_snapshot * 100)}%)` : '';
+                textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 강화공격 → <span class="font-black text-rose-600">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}${ratioTxt}`;
+                badgeClass = 'bg-rose-50 border-rose-100';
+            } else {
+                iconHtml = `<span class="text-orange-500">⚔️</span>`;
+                textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 선점 공격 → <span class="font-black text-rose-500">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}`;
+                badgeClass = 'bg-orange-50 border-orange-100';
+            }
+
+            return `
+                <div class="flex items-center gap-3 p-3 rounded-xl border ${badgeClass}">
+                    <div class="text-lg shrink-0">${iconHtml}</div>
+                    <div class="flex-1 text-[11px] leading-snug">${textHtml}</div>
+                    <div class="text-[9px] font-bold text-slate-400 shrink-0">${formatEventTime(e.created_at)}</div>
                 </div>
-                <div class="bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-300 p-5 rounded-3xl text-center space-y-3.5 relative overflow-hidden">
-                    <div class="text-[11px] font-black text-amber-700 tracking-wider flex items-center justify-center gap-1"><span>🏆</span> GRAND CHAMPIONSHIP</div>
-                    <div class="bg-violet-600 text-white p-2.5 rounded-xl text-xs font-black flex justify-between shadow-sm"><span>💙 Team Arch</span><span class="bg-violet-800 text-[10px] px-1.5 rounded">수성 세력</span></div>
-                    <div class="p-0.5 text-slate-400 font-black text-xs">VS</div>
-                    <div class="bg-amber-500 text-slate-950 p-2.5 rounded-xl text-xs font-black flex justify-between"><span>💛 Team Gold</span><span class="bg-amber-600 text-[10px] text-slate-950 px-1.5 rounded">도전 세력</span></div>
-                    <button onclick="if(typeof sfx !== 'undefined') sfx.playBingo();" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs py-2.5 rounded-xl transition-all shadow-md mt-2">대진 상황 예측</button>
+            `;
+        }).join('');
+
+    // ---------- 3. LP 정산 현황 ----------
+    const roundLabels = { 1: '1차 (30일)', 2: '2차 (60일)', 3: '3차 (90일)' };
+    const settlementsByRound = { 1: [], 2: [], 3: [] };
+    (state.settlements || []).forEach(s => {
+        if (settlementsByRound[s.settlement_round]) settlementsByRound[s.settlement_round].push(s);
+    });
+
+    const settlementHtml = [1, 2, 3].map(round => {
+        const rows = settlementsByRound[round];
+        if (rows.length === 0) {
+            return `
+                <div class="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                    <div class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">${roundLabels[round]}</div>
+                    <div class="text-xs font-bold text-slate-400">아직 정산되지 않았습니다.</div>
+                </div>
+            `;
+        }
+        const totalPool = rows[0].total_lp_pool;
+        const rowsHtml = rows.map((r, idx) => `
+            <div class="flex items-center justify-between py-1.5 ${idx !== rows.length - 1 ? 'border-b border-slate-100' : ''}">
+                <span class="text-xs font-black text-slate-700">${idx + 1}. ${r.team_name}</span>
+                <span class="text-xs font-black text-indigo-600">🏆 ${r.lp_awarded.toLocaleString()} LP <span class="text-slate-400 font-bold">(하트 ${r.hearts_at_settlement})</span></span>
+            </div>
+        `).join('');
+        return `
+            <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[10px] font-black text-indigo-500 uppercase tracking-wider">${roundLabels[round]}</div>
+                    <div class="text-[10px] font-bold text-slate-400">총 풀 ${totalPool.toLocaleString()} LP</div>
+                </div>
+                ${rowsHtml}
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="space-y-8">
+            <div class="text-center py-2 border-b border-slate-100">
+                <span class="bg-violet-100 text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">${state.seasonTitle || ''}</span>
+                <h4 class="font-black text-slate-800 text-lg mt-2">🏅 킹 오브 리그 현황판</h4>
+                <p class="text-xs text-slate-400 font-bold mt-1">팀 전원이 같은 종목을 기록하면 다른 팀을 공격합니다. 하트는 최대 7개, 30일마다 LP가 정산됩니다.</p>
+            </div>
+
+            <div class="space-y-3">
+                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="heart" class="w-4 h-4 text-rose-500"></i> 팀 생존 현황</h5>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    ${heartsCardHtml}
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="scroll-text" class="w-4 h-4 text-orange-500"></i> 최근 공격/회복 로그</h5>
+                <div class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                    ${eventLogHtml}
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="coins" class="w-4 h-4 text-amber-500"></i> LP 정산 현황</h5>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    ${settlementHtml}
                 </div>
             </div>
         </div>
