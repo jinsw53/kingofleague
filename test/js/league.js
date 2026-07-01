@@ -712,7 +712,9 @@ default:
 const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
 
         let leftVisualHtml = '';
-        if (isPendingState) {
+        if (currentStatus.startsWith('CANCELED')) {
+            leftVisualHtml = `<div class="w-20 h-20 bg-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 shadow-inner shrink-0"><i data-lucide="x-circle" class="w-7 h-7 mb-1"></i><span class="text-[9px] font-black tracking-widest uppercase opacity-80">CLOSED</span></div>`;
+        } else if (isPendingState) {
             leftVisualHtml = `<div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0"><i data-lucide="swords" class="w-7 h-7 mb-1 animate-pulse"></i><span class="text-[9px] font-black tracking-widest uppercase opacity-80">OPEN</span></div>`;
         } else if (currentStatus === 'NEGOTIATING') {
             const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
