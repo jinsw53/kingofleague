@@ -864,8 +864,7 @@ const isCompleted = s.status === 'COMPLETED';
                     <p class="text-xs text-slate-400 font-bold mb-4">환전 시 ${feeRatePercent}% 수수료가 차감되어 팀 금고에 적립됩니다.</p>
 
                     <div class="flex gap-2 mb-3">
-                        <input type="number" id="wallet-exchange-amount" min="1" step="1" placeholder="환전할 포인트" class="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500" oninput="Boako.Team.updateWalletFeePreview(${feeConfig?.fee_rate || 0.2})">
-                        <button onclick="Boako.Team.submitExchangeToTeam()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm px-6 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap">환전하기</button>
+                        <input type="number" id="wallet-exchange-amount" min="100" step="100" placeholder="100 단위로 입력" class="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500" oninput="Boako.Team.updateWalletFeePreview(${feeConfig?.fee_rate || 0.2})">                        <button onclick="Boako.Team.submitExchangeToTeam()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm px-6 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap">환전하기</button>
                     </div>
 
                     <div id="wallet-fee-preview" class="text-xs font-bold text-slate-400 hidden">
@@ -900,12 +899,17 @@ const isCompleted = s.status === 'COMPLETED';
         preview.classList.remove('hidden');
     },
 
-    submitExchangeToTeam: async function() {
+submitExchangeToTeam: async function() {
         const input = document.getElementById('wallet-exchange-amount');
         const amount = parseInt(input?.value, 10);
 
         if (!amount || amount <= 0) {
             Boako.Util.toast('환전할 포인트를 입력해주세요.');
+            return;
+        }
+
+        if (amount % 100 !== 0) {
+            Boako.Util.toast('100 단위로만 환전할 수 있습니다.');
             return;
         }
 
