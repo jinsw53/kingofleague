@@ -616,7 +616,7 @@ Boako.League.renderChallenges = function() {
                     actionHtml = `
                         <div class="flex flex-col gap-1.5 w-full">
                             <div class="text-[10px] text-slate-400 font-black text-center">내 팀의 도발글</div>
-                            <button onclick="Boako.League.withdrawAttackerToken(${p.id})" class="w-full bg-rose-50 hover:bg-rose-500 text-rose-500 hover:text-white font-black text-[10px] py-2 rounded-lg transition-colors border border-rose-200">도전 취소 (토큰 환불)</button>
+                            <button onclick="Boako.League.withdrawAttackerToken(${p.id})" class="w-full bg-rose-50 hover:bg-rose-500 text-rose-500 hover:text-white font-black text-[10px] py-2 rounded-lg transition-colors border border-rose-200">도전 취소 (도전권 환불)</button>
                         </div>
                     `;
                 } else {
@@ -785,10 +785,10 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
 };
 
 // ====================================================================
-// 💡 공격팀 배팅 철회 (토큰 회수) 및 협상 결정
+// 💡 공격팀 배팅 철회 (도전권 회수) 및 협상 결정
 // ====================================================================
 Boako.League.resolveNegotiation = async function(challengeId, decision) {
-    const msg = decision === 'CALL' ? "더블 배팅을 수락하고 매칭을 확정하시겠습니까?" : "배팅을 철회하시겠습니까? 소모된 토큰이 환불되며 매칭이 취소됩니다.";
+    const msg = decision === 'CALL' ? "더블 배팅을 수락하고 매칭을 확정하시겠습니까?" : "배팅을 철회하시겠습니까? 소모된 도전권이 환불되며 매칭이 취소됩니다.";
     if (!confirm(msg)) return;
 
     try {
@@ -799,26 +799,30 @@ Boako.League.resolveNegotiation = async function(challengeId, decision) {
         });
         if (error) throw error;
         
-        alert(decision === 'CALL' ? "판돈이 확정되었습니다! 로스터를 구성해 주세요." : "철회가 완료되어 토큰이 환불되었습니다.");
+        if (decision === 'CALL') { if (window.sfx) window.sfx.doubleCall(); } else { if (window.sfx) window.sfx.retreat(); }
+        alert(decision === 'CALL' ? "판돈이 확정되었습니다! 로스터를 구성해 주세요." : "철회가 완료되어 도전권이 환불되었습니다.");
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         Boako.League.renderChallenges();
     } catch (err) {
+        if (window.sfx) window.sfx.error();
         alert("처리 실패: " + err.message);
     }
 };
 
 Boako.League.withdrawAttackerToken = async function(challengeId) {
-    if (!confirm("정말 배팅을 철회하시겠습니까? 소모된 토큰 1개를 돌려받지만, 비겁하다는 소리를 들을 수 있습니다.")) return;
+    if (!confirm("정말 배팅을 철회하시겠습니까? 소모된 도전권 1개를 돌려받지만, 비겁하다는 소리를 들을 수 있습니다.")) return;
 
     try {
         if (!Boako.db) throw new Error("DB 연결 오류");
         const { error } = await Boako.db.rpc('withdraw_attacker_token', { p_challenge_id: challengeId });
         if (error) throw error;
 
-        alert("배팅 철회가 완료되었습니다. 토큰 1개가 환불되었습니다.");
+          if (window.sfx) window.sfx.cancel();
+        alert("배팅 철회가 완료되었습니다. 도전권 1개가 환불되었습니다.");
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         Boako.League.renderChallenges();
     } catch (err) {
+        if (window.sfx) window.sfx.error();
         alert("철회 실패: " + err.message);
     }
 };
@@ -830,7 +834,7 @@ Boako.League.withdrawAttackerToken = async function(challengeId) {
 Boako.League.showCreateChallengeModal = function() {
     const isTeamLeader = (Boako.state.team?.type === 'LEADER');
     if (!isTeamLeader) {
-        alert("오직 소속 팀의 '팀장'만이 팀 토큰을 소모하여 새로운 결투 판을 열 수 있습니다.");
+        alert("오직 소속 팀의 '팀장'만이 팀 도전권을 소모하여 새로운 결투 판을 열 수 있습니다.");
         return;
     }
 
@@ -876,7 +880,7 @@ Boako.League.showCreateChallengeModal = function() {
 
                 <div class="p-5 border-t border-slate-100 bg-slate-50 shrink-0">
                     <button onclick="Boako.League.registerChallenge()" class="w-full bg-slate-900 hover:bg-black text-white font-black text-sm py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-                        ⚔️ 광장에 공개 모집하기 <span class="text-slate-400 font-medium text-xs">(토큰 1개 소모)</span>
+                        ⚔️ 광장에 공개 모집하기 <span class="text-slate-400 font-medium text-xs">(도전권 1개 소모)</span>
                     </button>
                 </div>
             </div>
@@ -1175,11 +1179,12 @@ Boako.League.registerChallenge = async function() {
             if (error) throw error;
         }
 
+if (window.sfx) window.sfx.success();
         alert("모집글이 광장에 발행되었습니다!");
         Boako.League.closeCreateChallengeModal();
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         Boako.League.renderChallenges();
-    } catch (err) { alert("발행 오류 발생"); console.error(err); }
+} catch (err) { if (window.sfx) window.sfx.error(); alert("발행 오류 발생"); console.error(err); }
 };
 
 // ====================================================================
@@ -1226,7 +1231,7 @@ Boako.League.showAcceptPopup = function(challengeId) {
                     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
                         <div>
                             <span class="block text-xs font-black text-amber-800">🔥 묻고 더블로 가!</span>
-                            <span class="block text-[10px] font-bold text-amber-600 mt-0.5">우리 팀도 토큰을 걸어 판돈을 키웁니다.</span>
+                            <span class="block text-[10px] font-bold text-amber-600 mt-0.5">우리 팀도 도전권을 걸어 판돈을 키웁니다.</span>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="popup-use-token" class="sr-only peer">
@@ -1269,14 +1274,15 @@ Boako.League.confirmAcceptChallenge = async function(challengeId) {
         if (Boako.db) {
             const { error } = await Boako.db.rpc('accept_challenge', payload);
             if (error) {
-                if(error.message.includes("토큰이 부족")) return alert("보유한 챌린지 토큰이 부족하여 더블 배팅을 할 수 없습니다.");
+                if(error.message.includes("도전권이 부족")) return alert("보유한 챌린지 도전권이 부족하여 더블 배팅을 할 수 없습니다.");
                 throw error;
             }
         }
 
+if (window.sfx) window.sfx.battleStart();
         alert("매칭이 성사되었습니다!");
         document.getElementById('challenge-popup-root').innerHTML = ''; 
-    } catch (err) { alert("처리 중 오류가 발생했습니다: " + err.message); console.error(err); }
+    } catch (err) { if (window.sfx) window.sfx.error(); alert("처리 중 오류가 발생했습니다: " + err.message); console.error(err); }
 };
 
 // ====================================================================
@@ -1601,6 +1607,7 @@ Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
         const { error } = await Boako.db.rpc('submit_challenge_roster', payload);
         if (error) throw error;
 
+if (window.sfx) window.sfx.rosterLock();
         if(Boako.Util && Boako.Util.toast) Boako.Util.toast("🎯 로스터 제출이 완료되었습니다!");
         else alert("🎯 로스터 제출이 완료되었습니다!");
         
@@ -1608,7 +1615,8 @@ Boako.League.submitFinalRoster = async function(challengeId, gameMode) {
         await Boako.League.loadChallengesForSeason(Boako.League.State.selectedChallengeSeason);
         Boako.League.renderChallenges();
         
-    } catch (err) {
+   } catch (err) {
+        if (window.sfx) window.sfx.error();
         alert("로스터 제출 실패: " + err.message);
         console.error(err);
     }
@@ -2123,7 +2131,7 @@ Boako.League.loadKingOfLeagueData = async function() {
             }
         });
 
-        // 아레나 토큰 위치가 안정적으로 유지되도록 team_id 기준 정렬 (하트로 재정렬 안 함)
+        // 아레나 도전권 위치가 안정적으로 유지되도록 team_id 기준 정렬 (하트로 재정렬 안 함)
         const teamsCombined = teamsInfo
             .map(t => ({
                 id: t.id,
