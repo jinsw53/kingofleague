@@ -30,6 +30,34 @@ Boako.Inventory = {
     },
 
     /**
+     * [함수] 서포터즈 유니폼 뱃지 HTML 생성기
+     * 시즌 유니폼 이미지(있으면) 또는 코드로 그린 기본 실루엣 위에 팀 로고를 겹쳐 보여줍니다.
+     */
+    getUniformBadgeHTML: function(item, size) {
+        const opacity = item.isExpired ? 'opacity:0.4;' : '';
+        const uniformBg = item.uniformImage
+            ? `background-image:url('${item.uniformImage}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
+            : '';
+
+        const fallbackSilhouette = !item.uniformImage ? `
+            <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
+                <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
+            </svg>
+        ` : '';
+
+        return `
+            <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center; ${opacity}">
+                ${fallbackSilhouette}
+                <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
+                    ${item.teamLogo ? `
+                        <img src="${item.teamLogo}" style="position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    },
+
+    /**
      * [함수] 인벤토리 로드 및 전체 렌더링
      * 프로필의 장착 슬롯과 가방의 아이템 리스트를 화면에 그립니다.
      */
@@ -78,11 +106,30 @@ Boako.Inventory = {
                     id, 
                     item_id, 
                     quantity, 
+                    expires_at,
+                    season_no,
                     shop_items ( name, icon, item_type )
                 `)
                 .eq('user_id', Boako.state.user.id);
 
             if (iError) throw iError;
+
+            // --- 2-1단계: 서포터즈 뱃지 팀/시즌 정보 미리 조회 ---
+            const supporterRows = (myItems || []).filter(row => row.item_id && row.item_id.startsWith('item_supporter_badge_'));
+            const supporterTeamIds = [...new Set(supporterRows.map(row => Number(row.item_id.split('_').pop())))];
+            const supporterSeasonNos = [...new Set(supporterRows.map(row => row.season_no).filter(Boolean))];
+
+            let teamsMap = {};
+            if (supporterTeamIds.length > 0) {
+                const { data: teamsData } = await Boako.db.from('teams').select('id, team_name, logo_url').in('id', supporterTeamIds);
+                (teamsData || []).forEach(t => { teamsMap[t.id] = t; });
+            }
+
+            let seasonsMap = {};
+            if (supporterSeasonNos.length > 0) {
+                const { data: seasonsData } = await Boako.db.from('seasons').select('season_no, uniform_image_url').in('season_no', supporterSeasonNos);
+                (seasonsData || []).forEach(s => { seasonsMap[s.season_no] = s; });
+            }
 
             // 데이터 분류를 위한 바구니 준비
             const equippedList = []; // 장착된 배지들
@@ -90,16 +137,39 @@ Boako.Inventory = {
 
             // --- 3단계: 장착 여부에 따른 리스트 분류 ---
             (myItems || []).forEach(row => {
-                const info = row.shop_items;
-                if (!info) return; // 상점 정보가 없는 데이터는 패스
+                const isSupporter = row.item_id && row.item_id.startsWith('item_supporter_badge_');
 
-                const itemData = { 
-                    inv_id: String(row.id), // 비교를 위해 ID를 문자열로 통일
-                    name: info.name, 
-                    icon: info.icon, 
-                    type: info.item_type,
-                    quantity: row.quantity 
-                };
+                let itemData;
+                if (isSupporter) {
+                    const teamId = Number(row.item_id.split('_').pop());
+                    const team = teamsMap[teamId];
+                    const season = seasonsMap[row.season_no];
+                    const isExpired = row.expires_at && new Date(row.expires_at) < new Date();
+
+                    itemData = {
+                        inv_id: String(row.id),
+                        name: team ? `${team.team_name} 서포터즈` : '서포터즈 뱃지',
+                        type: 'SUPPORTER',
+                        quantity: row.quantity,
+                        isSupporter: true,
+                        teamLogo: team ? team.logo_url : null,
+                        uniformImage: season ? season.uniform_image_url : null,
+                        expiresAt: row.expires_at,
+                        isExpired: isExpired
+                    };
+                } else {
+                    const info = row.shop_items;
+                    if (!info) return; // 상점 정보가 없는 데이터는 패스
+
+                    itemData = {
+                        inv_id: String(row.id),
+                        name: info.name,
+                        icon: info.icon,
+                        type: info.item_type,
+                        quantity: row.quantity,
+                        isSupporter: false
+                    };
+                }
 
                 // 프로필 장착 배열에 내 인벤토리 고유 ID가 들어있는지 확인
                 if (equippedIds.includes(itemData.inv_id)) {
@@ -126,7 +196,7 @@ Boako.Inventory = {
                     <div onclick="Boako.Inventory.unequip('${b.inv_id}')" 
                          style="background:white; border:2px solid #10b981; border-radius:50px; padding:8px 18px; display:flex; align-items:center; gap:10px; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); transition:transform 0.2s;"
                          onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                        ${this.getIconHTML(b.icon, '22px')}
+                        ${b.isSupporter ? this.getUniformBadgeHTML(b, '22px') : this.getIconHTML(b.icon, '22px')}
                         <span style="font-weight:800; font-size:14px; color:#064e3b;">${b.name}</span>
                     </div>
                 `).join('');
@@ -144,25 +214,31 @@ Boako.Inventory = {
                 `;
             } else {
                 let bagHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:16px;">`;
-                bagHTML += bagList.map(item => `
+                bagHTML += bagList.map(item => {
+                    const expiryLabel = item.isSupporter
+                        ? `<div style="font-size:10px; font-weight:700; color:${item.isExpired ? '#ef4444' : '#94a3b8'}; margin-bottom:8px;">${item.isExpired ? '만료됨' : new Date(item.expiresAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) + '까지'}</div>`
+                        : '';
+
+                    return `
                     <div style="background:white; border:1px solid #e2e8f0; border-radius:16px; padding:20px 10px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                         <div style="height:60px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; position:relative;">
-                            ${this.getIconHTML(item.icon, '48px')}
+                            ${item.isSupporter ? this.getUniformBadgeHTML(item, '48px') : this.getIconHTML(item.icon, '48px')}
                             ${item.quantity > 1 ? `
                                 <span style="position:absolute; bottom:0; right:15%; background:#ef4444; color:white; font-size:11px; font-weight:900; padding:2px 7px; border-radius:10px; border:2px solid white;">
                                     x${item.quantity}
                                 </span>
                             ` : ''}
                         </div>
-                        <div style="font-size:13px; font-weight:800; color:#1e293b; margin-bottom:15px; height:36px; display:flex; align-items:center; justify-content:center; word-break:keep-all; padding:0 5px;">
+                        <div style="font-size:13px; font-weight:800; color:#1e293b; margin-bottom:6px; height:36px; display:flex; align-items:center; justify-content:center; word-break:keep-all; padding:0 5px;">
                             ${item.name}
                         </div>
-                        <button style="width:100%; padding:9px; font-size:12px; font-weight:800; background:${item.type === 'BADGE' ? '#10b981' : '#f59e0b'}; color:white; border:none; border-radius:8px; cursor:pointer;"
+                        ${expiryLabel}
+                        <button style="width:100%; padding:9px; font-size:12px; font-weight:800; background:${item.isSupporter ? '#8b5cf6' : (item.type === 'BADGE' ? '#10b981' : '#f59e0b')}; color:white; border:none; border-radius:8px; cursor:pointer;"
                                 onclick="Boako.Inventory.useItem('${item.inv_id}', '${item.type}')">
-                            ${item.type === 'BADGE' ? '장착하기' : '사용하기'}
+                            ${item.isSupporter || item.type === 'BADGE' ? '장착하기' : '사용하기'}
                         </button>
                     </div>
-                `).join('');
+                `}).join('');
                 bagHTML += `</div>`;
                 listArea.innerHTML = bagHTML;
             }
