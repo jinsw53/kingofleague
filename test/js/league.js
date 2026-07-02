@@ -2399,6 +2399,7 @@ Boako.League.KOL.fireSingleHit = function(stage, stageRect, center, fxLayer, cen
         setTimeout(() => {
             missile.remove();
             defenderEl.classList.add('kol-token-shake');
+            if (window.sfx) window.sfx.hit(ev.event_type === 'ENHANCED_ATTACK');
             Boako.League.KOL.applyHeartHit(defenderEl, ev, isReplay);
 
             setTimeout(() => {
@@ -2428,11 +2429,12 @@ Boako.League.KOL.playAttackSequence = function(events, isReplay) {
         const centerXPct = ((centerRect.left + centerRect.width / 2) - stageRect.left) / stageRect.width * 100;
         const centerYPct = ((centerRect.top + centerRect.height / 2) - stageRect.top) / stageRect.height * 100;
 
-        // 1. 중앙 진입 (1회)
+       // 1. 중앙 진입 (1회)
         attackerEl.classList.add('kol-token-attacking');
         attackerEl.style.left = centerXPct + '%';
         attackerEl.style.top = centerYPct + '%';
         attackerEl.style.transform = 'translate(-50%,-50%) scale(1.3)';
+        if (window.sfx) window.sfx.enter();
         await new Promise(r => setTimeout(r, 450));
 
         // 2. 대상팀 순차 타격
@@ -2441,10 +2443,11 @@ Boako.League.KOL.playAttackSequence = function(events, isReplay) {
             await new Promise(r => setTimeout(r, 150)); // 타격 사이 짧은 텀
         }
 
-        // 3. 복귀 (1회)
+       // 3. 복귀 (1회)
         attackerEl.style.left = origLeft;
         attackerEl.style.top = origTop;
         attackerEl.style.transform = '';
+        if (window.sfx) window.sfx.returnHome();
         setTimeout(() => {
             attackerEl.classList.remove('kol-token-attacking');
             resolve();
@@ -2458,6 +2461,7 @@ Boako.League.KOL.playRecoveryAnimation = function(ev, isReplay) {
         if (!defenderEl) { resolve(); return; }
 
         defenderEl.classList.add('kol-token-glow');
+        if (window.sfx) window.sfx.recovery();
         if (!isReplay) {
             const heartsWrap = defenderEl.querySelector('.kol-token-hearts');
             if (heartsWrap) {
