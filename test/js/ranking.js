@@ -147,9 +147,11 @@ Boako.Ranking.loadRankingTab = async function() {
 
 Boako.Ranking.getRankingHTML = function(seasonInfo, isCurrent) {
     const seasonOptionsHtml = Boako.Ranking.State.seasons.map(s => `
-        <option value="${s.season_no}" ${s.season_no === Boako.Ranking.State.selectedSeason ? 'selected' : ''}>
-            ${s.title}${s.is_current ? ' 🔴 진행중' : ''}
-        </option>
+        <div onclick="Boako.Ranking.changeSeason(${s.season_no})" class="group px-4 py-3 cursor-pointer rounded-xl font-black text-xs transition-all duration-200 flex items-center gap-2 ${s.season_no === Boako.Ranking.State.selectedSeason ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}">
+            <div class="w-1.5 h-1.5 rounded-full ${s.season_no === Boako.Ranking.State.selectedSeason ? 'bg-indigo-500' : 'bg-transparent'}"></div>
+            <span class="flex-1">${s.title}</span>
+            ${s.is_current ? '<span class="text-[9px] text-rose-500 font-black">🔴 진행중</span>' : ''}
+        </div>
     `).join('');
 
     const rows = Boako.Ranking.State.rankingRows;
@@ -240,9 +242,18 @@ const mainRow = `
                 <h3 class="font-black text-slate-800 text-lg">${seasonInfo?.title || ''}</h3>
                 <p class="text-xs text-slate-400 font-bold mt-0.5">${isCurrent ? '🔴 실시간 집계 중' : '✅ 시즌 종료, 확정된 최종 기록'}</p>
             </div>
-            <select onchange="Boako.Ranking.changeSeason(this.value)" class="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-black text-slate-700 outline-none focus:border-indigo-500 shadow-sm">
-                ${seasonOptionsHtml}
-            </select>
+<div class="relative z-30">
+                <button onclick="Boako.Ranking.toggleSeasonDropdown()" class="bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:shadow-md transition-all duration-200 group">
+                    <span>${seasonInfo?.title || ''}</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
+                </button>
+                <div id="rk-season-dropdown-overlay" onclick="Boako.Ranking.toggleSeasonDropdown()" class="hidden fixed inset-0 z-40 bg-transparent"></div>
+                <div id="rk-season-dropdown-menu" class="hidden absolute top-full right-0 mt-2 w-[200px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_15px_40px_-10px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden z-50 p-1">
+                    <div class="max-h-64 overflow-y-auto custom-scrollbar">
+                        ${seasonOptionsHtml}
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -258,6 +269,16 @@ const mainRow = `
             </table>
         </div>
     `;
+};
+
+Boako.Ranking.toggleSeasonDropdown = function() {
+    if (window.sfx) window.sfx.click();
+    const menu = document.getElementById('rk-season-dropdown-menu');
+    const overlay = document.getElementById('rk-season-dropdown-overlay');
+    if (menu && overlay) {
+        menu.classList.toggle('hidden');
+        overlay.classList.toggle('hidden');
+    }
 };
 
 Boako.Ranking.changeSeason = async function(seasonNo) {
@@ -347,7 +368,10 @@ Boako.Ranking.getHofHTML = function() {
     if (!d) return '';
 
     const seasonOptionsHtml = Boako.Ranking.State.hofSeasons.map(sNo => `
-        <option value="${sNo}" ${sNo === Boako.Ranking.State.hofSelectedSeason ? 'selected' : ''}>시즌 ${sNo}</option>
+        <div onclick="Boako.Ranking.changeHofSeason(${sNo})" class="group px-4 py-3 cursor-pointer rounded-xl font-black text-xs transition-all duration-200 flex items-center gap-2 ${sNo === Boako.Ranking.State.hofSelectedSeason ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}">
+            <div class="w-1.5 h-1.5 rounded-full ${sNo === Boako.Ranking.State.hofSelectedSeason ? 'bg-indigo-500' : 'bg-transparent'}"></div>
+            <span>시즌 ${sNo}</span>
+        </div>
     `).join('');
 
     const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
@@ -396,9 +420,18 @@ Boako.Ranking.getHofHTML = function() {
     return `
         <div class="mb-5 flex items-center justify-between">
             <h3 class="font-black text-slate-800 text-lg">${d.seasonTitle} 명예의 전당</h3>
-            <select onchange="Boako.Ranking.changeHofSeason(this.value)" class="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-black text-slate-700 outline-none focus:border-indigo-500 shadow-sm">
-                ${seasonOptionsHtml}
-            </select>
+<div class="relative z-30">
+                <button onclick="Boako.Ranking.toggleHofSeasonDropdown()" class="bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:shadow-md transition-all duration-200 group">
+                    <span>시즌 ${Boako.Ranking.State.hofSelectedSeason}</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
+                </button>
+                <div id="rk-hof-season-dropdown-overlay" onclick="Boako.Ranking.toggleHofSeasonDropdown()" class="hidden fixed inset-0 z-40 bg-transparent"></div>
+                <div id="rk-hof-season-dropdown-menu" class="hidden absolute top-full right-0 mt-2 w-[160px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_15px_40px_-10px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden z-50 p-1">
+                    <div class="max-h-64 overflow-y-auto custom-scrollbar">
+                        ${seasonOptionsHtml}
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -411,6 +444,16 @@ Boako.Ranking.getHofHTML = function() {
             ${championGamesHtml}
         </div>
     `;
+};
+
+Boako.Ranking.toggleHofSeasonDropdown = function() {
+    if (window.sfx) window.sfx.click();
+    const menu = document.getElementById('rk-hof-season-dropdown-menu');
+    const overlay = document.getElementById('rk-hof-season-dropdown-overlay');
+    if (menu && overlay) {
+        menu.classList.toggle('hidden');
+        overlay.classList.toggle('hidden');
+    }
 };
 
 Boako.Ranking.changeHofSeason = async function(seasonNo) {
