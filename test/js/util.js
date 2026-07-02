@@ -60,3 +60,82 @@ Boako.Util = {
         }
     }
 };
+window.sfx = (function() {
+    let ctx = null;
+    function getCtx() {
+        if (!ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            ctx = new AC();
+        }
+        if (ctx.state === 'suspended') ctx.resume();
+        return ctx;
+    }
+
+    function tone(freq, duration, type, startGain, delay) {
+        const c = getCtx();
+        if (!c) return;
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.setValueAtTime(freq, c.currentTime + (delay || 0));
+        gain.gain.setValueAtTime(startGain, c.currentTime + (delay || 0));
+        gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + (delay || 0) + duration);
+        osc.connect(gain);
+        gain.connect(c.destination);
+        osc.start(c.currentTime + (delay || 0));
+        osc.stop(c.currentTime + (delay || 0) + duration);
+    }
+
+    function noiseBurst(duration, startGain, delay) {
+        const c = getCtx();
+        if (!c) return;
+        const bufferSize = c.sampleRate * duration;
+        const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+        const src = c.createBufferSource();
+        src.buffer = buffer;
+        const gain = c.createGain();
+        gain.gain.setValueAtTime(startGain, c.currentTime + (delay || 0));
+        gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + (delay || 0) + duration);
+        src.connect(gain);
+        gain.connect(c.destination);
+        src.start(c.currentTime + (delay || 0));
+    }
+
+    return {
+        // 범용 클릭음 (전체 클릭 위임에서 사용)
+        click: function() { tone(700, 0.05, 'sine', 0.06); },
+        // 기존 코드에 이미 있던 이름들 (playClick / playBingo)
+        playClick: function() { tone(700, 0.05, 'sine', 0.06); },
+        playBingo: function() {
+            tone(523.25, 0.12, 'triangle', 0.15);
+            tone(659.25, 0.12, 'triangle', 0.13, 0.1);
+            tone(783.99, 0.12, 'triangle', 0.13, 0.2);
+            tone(1046.5, 0.3, 'triangle', 0.15, 0.3);
+        },
+        success: function() {
+            tone(523.25, 0.1, 'sine', 0.15);
+            tone(783.99, 0.2, 'sine', 0.13, 0.08);
+        },
+        error: function() {
+            tone(180, 0.2, 'sawtooth', 0.12);
+        },
+        // 킹 오브 리그 아레나 전용
+        enter: function() {
+            tone(220, 0.35, 'sawtooth', 0.15);
+            tone(330, 0.35, 'sawtooth', 0.08, 0.03);
+        },
+        hit: function(enhanced) {
+            noiseBurst(0.15, enhanced ? 0.35 : 0.22);
+            tone(enhanced ? 130 : 180, 0.18, 'square', enhanced ? 0.25 : 0.15);
+        },
+        recovery: function() {
+            tone(523.25, 0.15, 'sine', 0.15);
+            tone(659.25, 0.15, 'sine', 0.12, 0.1);
+            tone(783.99, 0.25, 'sine', 0.12, 0.2);
+        },
+        returnHome: function() { tone(180, 0.25, 'sawtooth', 0.1); }
+    };
+})();
