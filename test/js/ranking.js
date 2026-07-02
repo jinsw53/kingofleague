@@ -160,7 +160,7 @@ Boako.Ranking.getRankingHTML = function(seasonInfo, isCurrent) {
             const rankBadgeClass = r._rank === 1 ? 'rk-rank-1' : r._rank === 2 ? 'rk-rank-2' : r._rank === 3 ? 'rk-rank-3' : 'rk-rank-other';
             const isExpanded = Boako.Ranking.State.expandedTeam === r.team_name;
 
-            const mainRow = `
+const mainRow = `
                 <tr class="rk-row border-b border-slate-100 cursor-pointer" onclick="Boako.Ranking.toggleTeamDetail('${r.team_name.replace(/'/g, "\\'")}')">
                     <td class="py-3 px-3"><div class="rk-rank-badge ${rankBadgeClass}">${r._rank ?? '-'}</div></td>
                     <td class="py-3 px-3">
@@ -170,28 +170,48 @@ Boako.Ranking.getRankingHTML = function(seasonInfo, isCurrent) {
                             <i data-lucide="chevron-${isExpanded ? 'up' : 'down'}" class="w-3.5 h-3.5 text-slate-300"></i>
                         </div>
                     </td>
-                    <td class="py-3 px-3 text-center text-xs font-bold text-slate-500">${r.grandprix_lp ?? 0}</td>
-                    <td class="py-3 px-3 text-center text-xs font-bold text-slate-500">${r.bingo_lp ?? 0}</td>
-                    <td class="py-3 px-3 text-center text-xs font-bold text-slate-500">${r.challenge_lp ?? 0}</td>
-                    <td class="py-3 px-3 text-center text-xs font-bold text-slate-500">${r.kol_lp ?? 0}</td>
-                    <td class="py-3 px-3 text-center text-xs font-bold text-slate-500">${r.champion_lp ?? 0}</td>
-                    <td class="py-3 px-3 text-center text-xs font-bold text-indigo-500">${(() => {
-                        const sum = [1,2,3,4,5,6,7,8,9].reduce((acc, n) => acc + (Number(r[`round_${n}_lp`]) || 0), 0);
-                        const excludedSum = [r.excluded_round_1, r.excluded_round_2].reduce((acc, e) => {
-                            if (!e) return acc;
-                            const val = Object.values(e)[0];
-                            return acc + (Number(val) || 0);
-                        }, 0);
-                        return (sum - excludedSum).toLocaleString();
-                    })()}</td>
                     <td class="py-3 px-3 text-right font-black text-indigo-700">🏆 ${Number(r.total_lp).toLocaleString()} LP</td>
                 </tr>
             `;
 
             const detailRow = isExpanded ? `
                 <tr class="rk-detail-row">
-                    <td colspan="9" class="p-4">
-                        <div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+                    <td colspan="3" class="p-4">
+                        <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3">
+                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center">
+                                <div class="text-[9px] font-black text-slate-400 uppercase">대항전</div>
+                                <div class="text-sm font-black text-slate-700">${r.grandprix_lp ?? 0}</div>
+                            </div>
+                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center">
+                                <div class="text-[9px] font-black text-slate-400 uppercase">빙고</div>
+                                <div class="text-sm font-black text-slate-700">${r.bingo_lp ?? 0}</div>
+                            </div>
+                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center">
+                                <div class="text-[9px] font-black text-slate-400 uppercase">챌린지</div>
+                                <div class="text-sm font-black text-slate-700">${r.challenge_lp ?? 0}</div>
+                            </div>
+                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center">
+                                <div class="text-[9px] font-black text-slate-400 uppercase">킹오브리그</div>
+                                <div class="text-sm font-black text-slate-700">${r.kol_lp ?? 0}</div>
+                            </div>
+                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center">
+                                <div class="text-[9px] font-black text-slate-400 uppercase">챔피언</div>
+                                <div class="text-sm font-black text-slate-700">${r.champion_lp ?? 0}</div>
+                            </div>
+                            <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-2 text-center">
+                                <div class="text-[9px] font-black text-indigo-400 uppercase">정규리그</div>
+                                <div class="text-sm font-black text-indigo-700">${(() => {
+                                    const sum = [1,2,3,4,5,6,7,8,9].reduce((acc, n) => acc + (Number(r[`round_${n}_lp`]) || 0), 0);
+                                    const excludedSum = [r.excluded_round_1, r.excluded_round_2].reduce((acc, e) => {
+                                        if (!e) return acc;
+                                        const val = Object.values(e)[0];
+                                        return acc + (Number(val) || 0);
+                                    }, 0);
+                                    return (sum - excludedSum).toLocaleString();
+                                })()}</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 sm:grid-cols-9 gap-2">
                             ${[1,2,3,4,5,6,7,8,9].map(n => {
                                 const val = r[`round_${n}_lp`];
                                 const excluded1Round = r.excluded_round_1 ? Object.keys(r.excluded_round_1)[0] : null;
@@ -206,7 +226,7 @@ Boako.Ranking.getRankingHTML = function(seasonInfo, isCurrent) {
                                 `;
                             }).join('')}
                         </div>
-                        <div class="text-[10px] text-slate-400 font-bold mt-2 text-center">상위 7라운드만 반영, 하위 2라운드는 제외됩니다.</div>
+                        <div class="text-[10px] text-slate-400 font-bold mt-2 text-center">정규리그는 상위 7라운드만 반영, 하위 2라운드는 제외됩니다.</div>
                     </td>
                 </tr>
             ` : '';
@@ -225,18 +245,12 @@ Boako.Ranking.getRankingHTML = function(seasonInfo, isCurrent) {
             </select>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm overflow-x-auto">
-            <table class="w-full text-left min-w-[720px]">
+        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <table class="w-full text-left">
                 <thead class="bg-slate-50 border-b border-slate-200">
                     <tr class="text-[10px] font-black text-slate-400 uppercase tracking-wider">
                         <th class="py-3 px-3">순위</th>
                         <th class="py-3 px-3">팀</th>
-                        <th class="py-3 px-3 text-center">대항전</th>
-                        <th class="py-3 px-3 text-center">빙고</th>
-                        <th class="py-3 px-3 text-center">챌린지</th>
-                        <th class="py-3 px-3 text-center">킹오브리그</th>
-                        <th class="py-3 px-3 text-center">챔피언</th>
-                        <th class="py-3 px-3 text-center">정규리그</th>
                         <th class="py-3 px-3 text-right">총 LP</th>
                     </tr>
                 </thead>
