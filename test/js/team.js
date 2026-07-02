@@ -919,6 +919,7 @@ submitExchangeToTeam: async function() {
             const { data, error } = await Boako.db.rpc('exchange_personal_to_team', { p_amount: amount });
             if (error) throw error;
 
+            if (window.sfx) window.sfx.buy();
             Boako.Util.toast(`✅ 환전 완료! 팀에 ${data.net_to_team.toLocaleString()}P가 적립되었습니다.`);
             Boako.Team.loadWalletTab();
 
