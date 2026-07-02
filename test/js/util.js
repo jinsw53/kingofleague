@@ -140,8 +140,13 @@ window.sfx = (function() {
             tone(600, 0.06, 'sine', 0.1);
             tone(400, 0.1, 'sine', 0.1, 0.05);
         },
-        rosterLock: function() {
+rosterLock: function() {
             const audio = new Audio('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/sfx/591155__ultraaxvii__sword-contact-with-swipe.wav');
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
+        },
+        buy: function() {
+            const audio = new Audio('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/sfx/buy.mp3');
             audio.volume = 0.6;
             audio.play().catch(() => {});
         },
