@@ -2174,7 +2174,7 @@ Boako.League.loadKingOfLeagueData = async function() {
         Boako.League.KOL.events = eventsData || [];
         Boako.League.KOL.settlements = settlementsData || [];
         Boako.League.KOL.teamsMap = allTeamsMap;
-        Boako.League.KOL.seasonTitle = currentSeason.title;
+        Boako.League.KOL.seasonTitle = `시즌 ${currentSeason.season_no}`;
 
         container.innerHTML = Boako.League.getKingOfLeagueHTML();
         if (window.lucide) window.lucide.createIcons();
