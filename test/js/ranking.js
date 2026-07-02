@@ -35,7 +35,7 @@ Boako.Ranking.init = async function() {
 
         Boako.Ranking.State.seasons = (allSeasons || []).map(s => ({
             season_no: s.season_no,
-            title: s.title,
+            title: `시즌 ${s.season_no}`,
             is_current: currentSeason ? s.season_no === currentSeason.season_no : false
         }));
 
@@ -281,7 +281,7 @@ Boako.Ranking.loadHofTab = async function() {
     try {
         const seasonNo = Boako.Ranking.State.hofSelectedSeason;
 
-        const { data: seasonMeta } = await Boako.db.from('seasons').select('title').eq('season_no', seasonNo).single();
+
 
         const { data: championTeamRow } = await Boako.db
             .from('season_final_rankings')
@@ -312,8 +312,8 @@ Boako.Ranking.loadHofTab = async function() {
             .eq('season_no', seasonNo)
             .order('game_popularity_rank', { ascending: true });
 
-        Boako.Ranking.State.hofData = {
-            seasonTitle: seasonMeta?.title || '',
+         Boako.Ranking.State.hofData = {
+            seasonTitle: `시즌 ${seasonNo}`,
             championTeam: championTeamRow,
             mvp,
             championGames: championGames || []
@@ -332,10 +332,9 @@ Boako.Ranking.getHofHTML = function() {
     const d = Boako.Ranking.State.hofData;
     if (!d) return '';
 
-    const seasonOptionsHtml = Boako.Ranking.State.hofSeasons.map(sNo => {
-        const meta = Boako.Ranking.State.seasons.find(s => s.season_no === sNo);
-        return `<option value="${sNo}" ${sNo === Boako.Ranking.State.hofSelectedSeason ? 'selected' : ''}>${meta?.title || `시즌 ${sNo}`}</option>`;
-    }).join('');
+    const seasonOptionsHtml = Boako.Ranking.State.hofSeasons.map(sNo => `
+        <option value="${sNo}" ${sNo === Boako.Ranking.State.hofSelectedSeason ? 'selected' : ''}>시즌 ${sNo}</option>
+    `).join('');
 
     const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
 
