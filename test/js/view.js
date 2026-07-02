@@ -297,6 +297,8 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                     </div>
                                 </div>
                                 
+                                <div id="team-wallet-container" style="margin-top:40px;" class="min-h-[100px]"></div>
+
                                 <div class="member-section" style="margin-top:40px;">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
                                         <h4 style="font-weight:950; font-size:20px;">👥 팀 멤버 (${members?.length || 0}/4)</h4>
@@ -341,12 +343,15 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                     `;
 
                     // 채팅창 엔진은 백그라운드에서 바로 가동시킵니다.
-                  setTimeout(() => {
+                 setTimeout(() => {
                         if (Boako.Team && Boako.Team.Chat && typeof Boako.Team.Chat.init === 'function') {
                             Boako.Team.Chat.init('team-chat-container');
                         }
                         if (seasonStatus.current_phase === 4) {
                             Boako.Team.loadMatchSchedule();
+                        }
+                        if (Boako.Team && Boako.Team.loadWalletTab) {
+                            Boako.Team.loadWalletTab();
                         }
                     }, 0);
 
