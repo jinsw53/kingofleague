@@ -205,7 +205,7 @@ switch(seasonStatus.current_phase) {
         recordTabHtml = `
             <div class="flex flex-col items-center justify-center text-slate-600 py-16 gap-4 border border-red-200 rounded-xl bg-red-50 shadow-sm">
                 <span class="text-4xl">🚫</span>
-                <h3 class="text-xl font-black text-red-600">${seasonStatus.title} 밴(Ban) 투표 진행 중</h3>
+                <h3 class="text-xl font-black text-red-600">시즌 ${seasonStatus.season_no} 밴(Ban) 투표 진행 중</h3>
                 <p class="font-bold text-red-400">우리 팀의 밴 투표 권한을 행사하세요! (마감까지 D-${52 - seasonStatus.day_count}일)</p>
                 <button onclick="Boako.Team.openBanVote()" class="mt-2 bg-red-600 text-white px-8 py-3 rounded-xl font-black shadow-md hover:bg-red-700 transition-colors hover:-translate-y-1">투표소 입장하기</button>
             </div>`;
@@ -214,7 +214,7 @@ switch(seasonStatus.current_phase) {
         recordTabHtml = `
             <div class="flex flex-col items-center justify-center text-slate-600 py-16 gap-4 border border-emerald-200 rounded-xl bg-emerald-50 shadow-sm">
                 <span class="text-4xl">📝</span>
-                <h3 class="text-xl font-black text-emerald-700">${seasonStatus.title} 출전 엔트리 마감 임박</h3>
+                <h3 class="text-xl font-black text-emerald-700">시즌 ${seasonStatus.season_no} 출전 엔트리 마감 임박</h3>
                 <p class="font-bold text-emerald-500">최종 확정된 종목에 출전할 선수를 등록하세요. (마감까지 D-${60 - seasonStatus.day_count}일)</p>
                 <button onclick="Boako.Team.openEntryForm()" class="mt-2 bg-emerald-600 text-white px-8 py-3 rounded-xl font-black shadow-md hover:bg-emerald-700 transition-colors hover:-translate-y-1">엔트리 작전판 열기</button>
             </div>`;
@@ -228,7 +228,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                             ? `<img src="${seasonStatus.logo_url}" class="h-10 w-auto object-contain">`
                             : `<span class="text-2xl">🏆</span>`}
                         <div>
-                            <div class="font-black text-slate-800 text-sm">${seasonStatus.title}</div>
+                            <div class="font-black text-slate-800 text-sm">시즌 ${seasonStatus.season_no}</div>
                             <div class="text-xs text-blue-600 font-bold">${seasonStatus.day_count}일차 · 본게임 진행 중</div>
                         </div>
                     </div>
