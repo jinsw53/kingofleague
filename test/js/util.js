@@ -119,8 +119,30 @@ window.sfx = (function() {
             tone(523.25, 0.1, 'sine', 0.15);
             tone(783.99, 0.2, 'sine', 0.13, 0.08);
         },
-        error: function() {
+       error: function() {
             tone(180, 0.2, 'sawtooth', 0.12);
+        },
+        battleStart: function() {
+            tone(392, 0.1, 'square', 0.15);
+            tone(523.25, 0.1, 'square', 0.15, 0.08);
+            tone(659.25, 0.2, 'square', 0.15, 0.16);
+        },
+        doubleCall: function() {
+            tone(220, 0.08, 'sawtooth', 0.2);
+            tone(440, 0.08, 'sawtooth', 0.2, 0.06);
+            tone(880, 0.25, 'sawtooth', 0.18, 0.12);
+        },
+        retreat: function() {
+            tone(400, 0.3, 'triangle', 0.15);
+            tone(200, 0.3, 'triangle', 0.12, 0.1);
+        },
+        cancel: function() {
+            tone(600, 0.06, 'sine', 0.1);
+            tone(400, 0.1, 'sine', 0.1, 0.05);
+        },
+        rosterLock: function() {
+            tone(150, 0.15, 'square', 0.15);
+            tone(100, 0.25, 'square', 0.18, 0.1);
         },
         // 킹 오브 리그 아레나 전용
         enter: function() {
