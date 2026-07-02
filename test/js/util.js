@@ -139,3 +139,10 @@ window.sfx = (function() {
         returnHome: function() { tone(180, 0.25, 'sawtooth', 0.1); }
     };
 })();
+// 클릭 가능한 모든 요소에 범용 클릭음 자동 부착
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('button, [onclick], a, .btn, input[type="button"], input[type="submit"]');
+    if (target && window.sfx) {
+        window.sfx.click();
+    }
+}, true);
