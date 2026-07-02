@@ -160,6 +160,7 @@ Boako.RecordVerify = {
             }
 
             // 깔끔한 최종 성공 토스트 발송
+            if (window.sfx) window.sfx.buy();
             Boako.Util.toast("✅ 기록이 정상 승인되었으며 10포인트가 지급되었습니다.");
             
             // 대기열 리스트 리로드 및 화면 갱신
