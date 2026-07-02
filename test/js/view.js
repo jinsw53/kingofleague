@@ -196,7 +196,7 @@ switch(seasonStatus.current_phase) {
         recordTabHtml = `
             <div class="flex flex-col items-center justify-center text-slate-600 py-16 gap-4 border border-slate-200 rounded-xl bg-white shadow-sm">
                 <span class="text-4xl">⚔️</span>
-                <h3 class="text-xl font-black">${seasonStatus.title} 준비 기간</h3>
+                <h3 class="text-xl font-black">시즌 ${seasonStatus.season_no} 준비 기간</h3>
                 <p class="font-bold text-slate-400">후보 종목 선발을 위한 데이터가 집계 중입니다. (현재 ${seasonStatus.day_count}일 차)</p>
                 <button onclick="Boako.View.render('match')" class="mt-2 bg-indigo-50 text-indigo-600 px-6 py-2 rounded-lg font-bold hover:bg-indigo-100 transition-colors">실시간 랭킹 보러가기</button>
             </div>`;
