@@ -141,8 +141,9 @@ window.sfx = (function() {
             tone(400, 0.1, 'sine', 0.1, 0.05);
         },
         rosterLock: function() {
-            tone(150, 0.15, 'square', 0.15);
-            tone(100, 0.25, 'square', 0.18, 0.1);
+            const audio = new Audio('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/sfx/591155__ultraaxvii__sword-contact-with-swipe.wav');
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
         },
         // 킹 오브 리그 아레나 전용
         enter: function() {
