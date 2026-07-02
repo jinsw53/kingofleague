@@ -828,6 +828,102 @@ const isCompleted = s.status === 'COMPLETED';
         }
     },
 
+    loadWalletTab: async function() {
+        const container = document.getElementById('team-wallet-container');
+        if (!container) return;
+
+        container.innerHTML = `<div class="text-center py-10 font-black text-slate-400 animate-pulse">지갑 정보 로드 중...</div>`;
+
+        try {
+            const userId = Boako.state.user.id;
+            const teamId = Boako.state.team.info.id;
+
+            const { data: profile } = await Boako.db.from('profiles').select('points').eq('id', userId).single();
+            const { data: teamInfo } = await Boako.db.from('teams').select('tpoint').eq('id', teamId).single();
+
+            const myPoints = profile?.points || 0;
+            const teamPoints = teamInfo?.tpoint || 0;
+
+            const { data: feeConfig } = await Boako.db.from('point_exchange_config').select('fee_rate').eq('key', 'default').single();
+            const feeRatePercent = Math.round((feeConfig?.fee_rate || 0.2) * 100);
+
+            container.innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                        <div class="text-xs font-black text-slate-400 uppercase tracking-wider mb-1">내 개인 포인트</div>
+                        <div class="text-2xl font-black text-slate-800">${myPoints.toLocaleString()} <span class="text-sm text-slate-400">P</span></div>
+                    </div>
+                    <div class="bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-200 rounded-2xl p-5 shadow-sm">
+                        <div class="text-xs font-black text-indigo-400 uppercase tracking-wider mb-1">우리 팀 금고</div>
+                        <div class="text-2xl font-black text-indigo-700">${teamPoints.toLocaleString()} <span class="text-sm text-indigo-400">P</span></div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                    <h5 class="font-black text-slate-800 text-sm mb-1 flex items-center gap-1.5">💱 팀으로 포인트 환전하기</h5>
+                    <p class="text-xs text-slate-400 font-bold mb-4">환전 시 ${feeRatePercent}% 수수료가 차감되어 팀 금고에 적립됩니다.</p>
+
+                    <div class="flex gap-2 mb-3">
+                        <input type="number" id="wallet-exchange-amount" min="1" step="1" placeholder="환전할 포인트" class="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500" oninput="Boako.Team.updateWalletFeePreview(${feeConfig?.fee_rate || 0.2})">
+                        <button onclick="Boako.Team.submitExchangeToTeam()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm px-6 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap">환전하기</button>
+                    </div>
+
+                    <div id="wallet-fee-preview" class="text-xs font-bold text-slate-400 hidden">
+                        수수료 <span id="wallet-fee-amount" class="text-rose-500">0</span> P 차감 → 팀에 <span id="wallet-net-amount" class="text-indigo-600">0</span> P 적립
+                    </div>
+                </div>
+            `;
+
+        } catch (e) {
+            console.error('지갑 탭 로드 실패:', e);
+            container.innerHTML = `<div class="text-center py-10 text-red-400 font-bold">오류: ${e.message}</div>`;
+        }
+    },
+
+    updateWalletFeePreview: function(feeRate) {
+        const input = document.getElementById('wallet-exchange-amount');
+        const preview = document.getElementById('wallet-fee-preview');
+        const feeEl = document.getElementById('wallet-fee-amount');
+        const netEl = document.getElementById('wallet-net-amount');
+        if (!input || !preview) return;
+
+        const amount = parseInt(input.value, 10);
+        if (!amount || amount <= 0) {
+            preview.classList.add('hidden');
+            return;
+        }
+
+        const fee = Math.floor(amount * feeRate);
+        const net = amount - fee;
+        feeEl.innerText = fee.toLocaleString();
+        netEl.innerText = net.toLocaleString();
+        preview.classList.remove('hidden');
+    },
+
+    submitExchangeToTeam: async function() {
+        const input = document.getElementById('wallet-exchange-amount');
+        const amount = parseInt(input?.value, 10);
+
+        if (!amount || amount <= 0) {
+            Boako.Util.toast('환전할 포인트를 입력해주세요.');
+            return;
+        }
+
+        if (!confirm(`${amount.toLocaleString()}P를 팀으로 환전하시겠습니까?`)) return;
+
+        try {
+            const { data, error } = await Boako.db.rpc('exchange_personal_to_team', { p_amount: amount });
+            if (error) throw error;
+
+            Boako.Util.toast(`✅ 환전 완료! 팀에 ${data.net_to_team.toLocaleString()}P가 적립되었습니다.`);
+            Boako.Team.loadWalletTab();
+
+        } catch (err) {
+            Boako.Util.toast('환전 실패: ' + err.message);
+            console.error('환전 실패:', err);
+        }
+    },
+
     loadChallengeTab: async function() {
         const container = document.getElementById('team-challenge-container');
         if (!container) return;
