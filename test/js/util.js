@@ -154,10 +154,28 @@ window.sfx = (function() {
             noiseBurst(0.15, enhanced ? 0.35 : 0.22);
             tone(enhanced ? 130 : 180, 0.18, 'square', enhanced ? 0.25 : 0.15);
         },
-        recovery: function() {
-            tone(523.25, 0.15, 'sine', 0.15);
-            tone(659.25, 0.15, 'sine', 0.12, 0.1);
-            tone(783.99, 0.25, 'sine', 0.12, 0.2);
+recovery: function() {
+            const c = getCtx();
+            if (!c) return;
+            const dur = 1.0;
+            const o = c.createOscillator(); const g = c.createGain();
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(150, c.currentTime);
+            o.frequency.exponentialRampToValueAtTime(500, c.currentTime + dur * 0.8);
+            g.gain.setValueAtTime(0.001, c.currentTime);
+            g.gain.linearRampToValueAtTime(0.18, c.currentTime + dur * 0.5);
+            g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+            o.connect(g); g.connect(c.destination);
+            o.start(); o.stop(c.currentTime + dur);
+
+            const o2 = c.createOscillator(); const g2 = c.createGain();
+            o2.type = 'sine';
+            o2.frequency.setValueAtTime(600, c.currentTime + dur * 0.5);
+            g2.gain.setValueAtTime(0.001, c.currentTime + dur * 0.5);
+            g2.gain.linearRampToValueAtTime(0.08, c.currentTime + dur * 0.7);
+            g2.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+            o2.connect(g2); g2.connect(c.destination);
+            o2.start(c.currentTime + dur * 0.5); o2.stop(c.currentTime + dur);
         },
         returnHome: function() { tone(180, 0.25, 'sawtooth', 0.1); }
     };
