@@ -50,7 +50,7 @@ Boako.Inventory = {
                 ${fallbackSilhouette}
                 <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
                     ${item.teamLogo ? `
-                        <img src="${item.teamLogo}" style="position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">
+                        <img src="${item.teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:28%; height:28%; object-fit:contain;">
                     ` : ''}
                 </div>
             </div>
