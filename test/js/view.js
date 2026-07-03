@@ -497,6 +497,20 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                     .eq('is_active', true)
                     .order('price', { ascending: true, nullsFirst: false });
 
+                // 서포터즈 카드용: 현재 진행 중인 시즌의 유니폼 이미지 조회
+                let currentSeasonUniform = null;
+                const hasSupporterItem = (shopItems || []).some(i => i.item_type === 'SUPPORTER');
+                if (hasSupporterItem) {
+                    const now = new Date().toISOString();
+                    const { data: currentSeasonRow } = await Boako.db
+                        .from('seasons')
+                        .select('uniform_image_url')
+                        .lte('start_date', now)
+                        .gte('end_date', now)
+                        .maybeSingle();
+                    currentSeasonUniform = currentSeasonRow?.uniform_image_url || null;
+                }
+
                 html = `
                 <div class="main-banner" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                     <h1>🛒 프리미엄 포인트 샵</h1>
@@ -506,13 +520,26 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                 </div>
                 
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:25px; margin-bottom:40px;">
-                    ${(shopItems || []).map(item => `
+                    ${(shopItems || []).map(item => {
+                        const isSupporter = item.item_type === 'SUPPORTER';
+                        const supporterIconHtml = `
+                            <div style="width:100%; height:100%; position:relative; ${currentSeasonUniform ? `background-image:url('${currentSeasonUniform}'); background-size:contain; background-repeat:no-repeat; background-position:center;` : ''}">
+                                ${!currentSeasonUniform ? `
+                                    <svg width="100%" height="100%" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
+                                        <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
+                                    </svg>
+                                ` : ''}
+                            </div>
+                        `;
+                        return `
                         <div class="section-card" style="margin-bottom:0; display:flex; flex-direction:column; text-align:center; transition:0.3s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                             <div class="card-body" style="flex:1;">
                                 <div style="width: 80px; height: 80px; font-size: 60px; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                    ${item.icon && item.icon.startsWith('http') 
-                                        ? `<img src="${item.icon}" style="width: 100%; height: 100%; object-fit: contain;">` 
-                                        : (item.icon || '❓')
+                                    ${isSupporter
+                                        ? supporterIconHtml
+                                        : (item.icon && item.icon.startsWith('http')
+                                            ? `<img src="${item.icon}" style="width: 100%; height: 100%; object-fit: contain;">`
+                                            : (item.icon || '❓'))
                                     }
                                 </div>
                                 <h3 style="font-size:20px; font-weight:900; margin-bottom:10px;">${item.name}</h3>
@@ -527,7 +554,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                 </button>
                             </div>
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
 
                 <section class="section-card">
