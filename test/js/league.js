@@ -2062,12 +2062,14 @@ Boako.League.injectKolStyle = function() {
     .kol-arena-wrapper { margin: 0 -2rem; }
 }
 .kol-arena-wrapper::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at center, transparent 40%, rgba(255,255,255,0.4) 70%, rgba(255,255,255,0.9) 100%);
-            pointer-events: none;
-        }
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-shadow:
+        inset 0 0 40px 15px rgba(255,255,255,0.55),
+        inset 0 0 80px 40px rgba(255,255,255,0.35);
+    pointer-events: none;
+}
         .kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; }
 .kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; z-index:6; }
         .kol-arena-center-ring { position:absolute; inset:8%; border-radius:9999px; border: 2px dashed rgba(99,102,241,0.35); }
