@@ -113,20 +113,25 @@ Boako.Inventory = {
             // 해금된 슬롯 수 (데이터가 없으면 기본 1개)
             const maxSlots = profile.unlocked_badge_slots || 1;
 
-            // --- 2단계: 유저 인벤토리 아이템 가져오기 (상점 정보 조인) ---
+            // --- 2단계: 유저 인벤토리 아이템 가져오기 (FK 없이 수동 조인) ---
             const { data: myItems, error: iError } = await Boako.db
                 .from('inventory')
-                .select(`
-                    id, 
-                    item_id, 
-                    quantity, 
-                    expires_at,
-                    season_no,
-                    shop_items ( name, icon, item_type )
-                `)
+                .select('id, item_id, quantity, expires_at, season_no')
                 .eq('user_id', Boako.state.user.id);
 
             if (iError) throw iError;
+
+            // 서포터즈가 아닌 일반 아이템들의 상점 정보를 별도로 조회해서 합침
+            const normalItemIds = [...new Set((myItems || [])
+                .filter(row => !(row.item_id && row.item_id.startsWith('item_supporter_badge_')))
+                .map(row => row.item_id))];
+
+            let shopItemsMap = {};
+            if (normalItemIds.length > 0) {
+                const { data: shopRows } = await Boako.db.from('shop_items').select('item_id, name, icon, item_type').in('item_id', normalItemIds);
+                (shopRows || []).forEach(s => { shopItemsMap[s.item_id] = s; });
+            }
+            (myItems || []).forEach(row => { row.shop_items = shopItemsMap[row.item_id] || null; });
 
             // --- 2-1단계: 서포터즈 뱃지 팀/시즌 정보 미리 조회 ---
             const supporterRows = (myItems || []).filter(row => row.item_id && row.item_id.startsWith('item_supporter_badge_'));
