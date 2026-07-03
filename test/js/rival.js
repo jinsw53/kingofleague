@@ -194,21 +194,17 @@ Boako.Rival = {
         if (!confirm(`[${gameName}] 종목으로 라이벌 매치 도전장을 보내시겠습니까?`)) return;
 
         try {
-            const payload = {
-                challenger_id: Boako.state.user.id,
-                defender_id: defenderId,
-                game_name: gameName,
-                status: 'PENDING'
-            };
-
-            const { error } = await Boako.db.from('rival_matches').insert([payload]);
+            const { error } = await Boako.db.rpc('send_rival_challenge', {
+                p_defender_id: defenderId,
+                p_game_name: gameName
+            });
             if (error) throw error;
 
             Boako.Util.toast("🎉 매치 도전장이 성공적으로 발송되었습니다!");
 
         } catch (err) {
             console.error(err);
-            Boako.Util.toast("❌ 발송 실패: 이미 진행 중인 매치가 있거나 오류가 발생했습니다.");
+            Boako.Util.toast("❌ 발송 실패: " + (err.message || "이미 진행 중인 매치가 있거나 오류가 발생했습니다."));
         }
     }
 };
