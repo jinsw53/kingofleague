@@ -959,9 +959,37 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 </ul>
             `;
 
+            Boako.Team.subscribePointHistoryRealtime(teamId);   // 👈 이 줄 추가
+
         } catch (e) {
             console.error('팀 포인트 내역 로드 실패:', e);
             container.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444; font-weight:700;">내역 로드 실패: ${e.message}</div>`;
+        }
+    },
+
+    // ---------- 팀 포인트 내역 실시간 구독 ----------
+    pointHistoryChannel: null,
+
+    subscribePointHistoryRealtime: function(teamId) {
+        if (Boako.Team.pointHistoryChannel || !Boako.db) return;
+
+        Boako.Team.pointHistoryChannel = Boako.db
+            .channel(`team-point-history-${teamId}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'team_point_history',
+                filter: `team_id=eq.${teamId}`
+            }, (payload) => {
+                Boako.Team.loadTeamPointHistory();
+            })
+            .subscribe();
+    },
+
+    unsubscribePointHistoryRealtime: function() {
+        if (Boako.Team.pointHistoryChannel && Boako.db) {
+            Boako.db.removeChannel(Boako.Team.pointHistoryChannel);
+            Boako.Team.pointHistoryChannel = null;
         }
     },
 
