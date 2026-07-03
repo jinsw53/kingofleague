@@ -2050,14 +2050,18 @@ Boako.League.injectKolStyle = function() {
     style.id = 'kol-arena-style';
     style.innerHTML = `
 .kol-arena-wrapper {
-            position: relative;
-            border-radius: 24px;
-            overflow: hidden;
-            padding: 20px 0;
-            background: url("https://jinsw53.github.io/kingofleague/kingbg.png") no-repeat center center;
-            background-size: cover;
-        }
-        .kol-arena-wrapper::after {
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    padding: 20px 0;
+    margin: 0 -1.5rem;
+    background: url("https://jinsw53.github.io/kingofleague/kingbg.png") no-repeat center center;
+    background-size: cover;
+}
+@media (min-width: 640px) {
+    .kol-arena-wrapper { margin: 0 -2rem; }
+}
+.kol-arena-wrapper::after {
             content: '';
             position: absolute;
             inset: 0;
