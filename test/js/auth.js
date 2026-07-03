@@ -127,6 +127,17 @@ Boako.Auth = {
         const badgeArea = document.getElementById('widget-badge-area');
         if (!badgeArea) return;
 
+        if (!document.getElementById('badge-zoom-style')) {
+            const style = document.createElement('style');
+            style.id = 'badge-zoom-style';
+            style.innerHTML = `
+                .badge-zoom-wrap { display:inline-block; position:relative; transition: transform .18s ease; transform-origin:center; cursor:help; }
+                .badge-zoom-wrap:hover { z-index:999; }
+                .badge-zoom-sm:hover { transform: scale(3); }
+            `;
+            document.head.appendChild(style);
+        }
+
         try {
             // inventory 테이블에서 is_equipped가 true인 것만 shop_items와 조인해서 가져옵니다.
             const { data: equippedItems, error } = await Boako.db
@@ -144,9 +155,9 @@ Boako.Auth = {
                     const name = item.shop_items?.name || '배지';
                     
                     if (icon.startsWith('http')) {
-                        return `<img src="${icon}" title="${name}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: help; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">`;
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${icon}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"></div>`;
                     } else {
-                        return `<span title="${name}" style="font-size: 22px; cursor: help; transition: transform 0.2s; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">${icon}</span>`;
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
                     }
                 }).join('');
             } else {
