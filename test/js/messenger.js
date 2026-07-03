@@ -577,9 +577,10 @@ Boako.Messenger = {
                     if (error) {
                         Boako.Util.toast("캘린더 등록에 실패했습니다.");
                     } else {
-                        // 🌟 라이벌 매치는 일정 확정 시 ACCEPTED → UPCOMING으로 상태 전환
+                        // 🌟 라이벌 매치는 일정 확정 시 ACCEPTED → UPCOMING으로 상태 전환 (RPC 경유)
                         if (msgInfo.match_id && msgInfo.metadata.match_type === 'RIVAL') {
-                            await Boako.db.from('rival_matches').update({ status: 'UPCOMING' }).eq('match_id', msgInfo.match_id).eq('status', 'ACCEPTED');
+                            const { error: rpcError } = await Boako.db.rpc('confirm_rival_schedule', { p_match_id: msgInfo.match_id });
+                            if (rpcError) console.error("라이벌 매치 상태 전환 실패:", rpcError);
                         }
                         Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
                     }
