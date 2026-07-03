@@ -22,6 +22,11 @@ if (itemErr || !targetItem) return Boako.Util.toast("판매하지 않는 아이�
                 return Boako.Shop.openSupporterModal(targetItem);
             }
 
+            // 도전권은 팀 포인트(t_price)로, 팀장만 구매 가능한 흐름으로 분기
+            if (targetItem.item_type === 'CHALLENGE_TOKEN') {
+                return Boako.Shop.openChallengeTokenModal(targetItem);
+            }
+
             // 2) 내 포인트 및 현재 슬롯 개수 같이 조회
             const { data: profile, error: profErr } = await Boako.db.from('profiles')
                 .select('points, unlocked_badge_slots')
@@ -179,6 +184,100 @@ if (window.sfx) window.sfx.buy();
 
     closeSupporterModal: () => {
         document.getElementById('supporter-modal-backdrop')?.remove();
+    },
+
+    // 도전권 구매 모달 (팀장 전용, t_price로 팀 포인트 사용)
+    openChallengeTokenModal: async (targetItem) => {
+        const isLeader = Boako.state.team?.type === 'LEADER';
+        if (!isLeader) {
+            return Boako.Util.toast("🔒 팀장만 도전권을 구매할 수 있습니다.");
+        }
+
+        const teamId = Boako.state.team.info.id;
+        const { data: teamInfo } = await Boako.db.from('teams').select('tpoint, challengetokens').eq('id', teamId).single();
+        const teamPoints = teamInfo?.tpoint || 0;
+        const currentTokens = teamInfo?.challengetokens || 0;
+
+        const modalHtml = `
+            <div id="token-modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="if(event.target===this) Boako.Shop.closeTokenModal()">
+                <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div class="bg-gradient-to-r from-amber-500 to-orange-600 p-5 flex items-center justify-between">
+                        <h3 class="font-black text-white text-base flex items-center gap-2">
+                            <img src="${targetItem.icon}" class="w-6 h-6"> 도전권 구매
+                        </h3>
+                        <button onclick="Boako.Shop.closeTokenModal()" class="text-white/70 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div class="p-6 space-y-5">
+                        <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                                <div class="text-[10px] font-black text-amber-500 uppercase tracking-wider">우리 팀 금고</div>
+                                <div class="text-lg font-black text-amber-800">${teamPoints.toLocaleString()} P</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[10px] font-black text-slate-400 uppercase tracking-wider">보유 도전권</div>
+                                <div class="text-lg font-black text-slate-700 flex items-center gap-1 justify-end">
+                                    <img src="${targetItem.icon}" class="w-4 h-4">${currentTokens}개
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-black text-slate-700 mb-1.5">구매 개수 (개당 ${Number(targetItem.t_price).toLocaleString()}P)</label>
+                            <input type="number" id="token-amount-input" min="1" step="1" value="1" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-amber-500 shadow-inner" oninput="Boako.Shop.updateTokenPreview(${targetItem.t_price})">
+                        </div>
+
+                        <div id="token-preview" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-600">
+                            총 <span class="text-amber-600">${Number(targetItem.t_price).toLocaleString()} P</span> 소모하여 도전권 <span class="text-amber-600">1개</span>를 획득합니다.
+                        </div>
+
+                        <button onclick="Boako.Shop.confirmTokenPurchase()" class="w-full bg-slate-900 hover:bg-black text-white font-black text-sm py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                            <img src="${targetItem.icon}" class="w-4 h-4"> 도전권 구매하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
+    },
+
+    closeTokenModal: () => {
+        document.getElementById('token-modal-backdrop')?.remove();
+    },
+
+    updateTokenPreview: (pricePerToken) => {
+        const input = document.getElementById('token-amount-input');
+        const preview = document.getElementById('token-preview');
+        const amount = parseInt(input?.value, 10);
+
+        if (!amount || amount <= 0) {
+            preview.innerHTML = `<span class="text-rose-600">1개 이상 입력해주세요.</span>`;
+            return;
+        }
+        const cost = amount * pricePerToken;
+        preview.innerHTML = `총 <span class="text-amber-600">${cost.toLocaleString()} P</span> 소모하여 도전권 <span class="text-amber-600">${amount}개</span>를 획득합니다.`;
+    },
+
+    confirmTokenPurchase: async () => {
+        const input = document.getElementById('token-amount-input');
+        const amount = parseInt(input?.value, 10);
+
+        if (!amount || amount <= 0) return Boako.Util.toast('구매 개수를 입력해주세요.');
+
+        try {
+            const { data, error } = await Boako.db.rpc('purchase_challenge_token', { p_amount: amount });
+            if (error) throw error;
+
+            if (window.sfx) window.sfx.buy();
+            Boako.Util.toast(`✅ 도전권 ${data.purchased_tokens}개 구매 완료! (${data.total_cost.toLocaleString()}P 소모)`);
+            Boako.Shop.closeTokenModal();
+            Boako.Auth.renderWidget();
+
+        } catch (err) {
+            console.error(err);
+            Boako.Util.toast('구매 실패: ' + err.message);
+        }
     },
 
     updateSupporterPreview: () => {
