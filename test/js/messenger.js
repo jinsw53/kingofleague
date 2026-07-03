@@ -560,7 +560,19 @@ Boako.Messenger = {
             if (status === 'ACCEPTED') {
                 const { data: msgInfo } = await Boako.db.from('messages').select('*').eq('message_id', messageId).single();
                 if (msgInfo) {
-                    const payload = { proposer_id: msgInfo.sender_id, responder_id: msgInfo.receiver_id, game_name: msgInfo.metadata.game_name || '미정', match_type: msgInfo.metadata.match_type || 'FRIENDLY', scheduled_time: msgInfo.metadata.proposed_time, status: 'UPCOMING', original_message_id: messageId };
+                    const payload = {
+                        game_name: msgInfo.metadata.game_name || '미정',
+                        match_type: msgInfo.metadata.match_type || 'FRIENDLY',
+                        scheduled_time: msgInfo.metadata.proposed_time,
+                        status: 'UPCOMING',
+                        original_message_id: messageId,
+                        source_type: msgInfo.match_id ? msgInfo.metadata.match_type : null,
+                        reference_id: msgInfo.match_id ? String(msgInfo.match_id) : null,
+                        participants: [
+                            { player_name: msgInfo.sender_name_override, role: 'PROPOSER' },
+                            { player_name: msgInfo.receiver_name_override, role: 'PARTICIPANT' }
+                        ]
+                    };
                     const { error } = await Boako.db.from('match_schedules').insert([payload]);
                     if (error) Boako.Util.toast("캘린더 등록에 실패했습니다."); else Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
                 }
