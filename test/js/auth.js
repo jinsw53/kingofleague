@@ -139,36 +139,42 @@ Boako.Auth = {
         }
 
         try {
-            // inventory 테이블에서 is_equipped가 true인 것만 shop_items와 조인해서 가져옵니다.
+            // inventory 테이블에서 is_equipped가 true인 것을 item_id/season_no와 함께 가져옵니다.
             const { data: equippedItems, error } = await Boako.db
                 .from('inventory')
-                .select('shop_items(name, icon)')
+                .select('item_id, season_no, shop_items(name, icon)')
                 .eq('user_id', Boako.state.user.id)
                 .eq('is_equipped', true);
 
             if (error) throw error;
 
             if (equippedItems && equippedItems.length > 0) {
-                // 아이콘 타입(이미지 vs 이모지)에 맞춰 HTML 생성
-                badgeArea.innerHTML = equippedItems.map(item => {
-                    const icon = item.shop_items?.icon || '🏅';
-                    const name = item.shop_items?.name || '배지';
-                    
-                    if (icon.startsWith('http')) {
-                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${icon}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"></div>`;
-                    } else {
-                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
-                    }
-                }).join('');
-            } else {
-                // 장착된 배지가 없는 경우 (공간만 차지하도록 처리하거나 연한 글씨 출력)
-                badgeArea.innerHTML = `<span style="font-size:11px; color:#cbd5e1; font-weight:600;">장착된 배지가 없습니다</span>`;
-            }
-        } catch (err) {
-            console.error("위젯 배지 로드 오류:", err);
-            badgeArea.innerHTML = `<span style="font-size:11px; color:#ef4444;">배지 로드 실패</span>`;
-        }
-    },
+                // 🌟 서포터즈 배지(item_supporter_badge_<teamId>)는 팀/시즌 정보를 따로 조인해야 함
+                const supporterRows = equippedItems.filter(row => row.item_id && row.item_id.startsWith('item_supporter_badge_'));
+                const supporterTeamIds = [...new Set(supporterRows.map(row => Number(row.item_id.split('_').pop())))];
+                const supporterSeasonNos = [...new Set(supporterRows.map(row => row.season_no).filter(Boolean))];
+
+                let teamsMap = {};
+                if (supporterTeamIds.length > 0) {
+                    const { data: teamsData } = await Boako.db.from('teams').select('id, team_name, logo_url').in('id', supporterTeamIds);
+                    (teamsData || []).forEach(t => { teamsMap[t.id] = t; });
+                }
+
+                let seasonsMap = {};
+                if (supporterSeasonNos.length > 0) {
+                    const { data: seasonsData } = await Boako.db.from('seasons').select('season_no, uniform_image_url').in('season_no', supporterSeasonNos);
+                    (seasonsData || []).forEach(s => { seasonsMap[s.season_no] = s; });
+                }
+
+                const buildUniformHtml = (teamLogo, uniformImage, size) => {
+                    const uniformBg = uniformImage
+                        ? `background-image:url('${uniformImage}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
+                        : '';
+                    const fallbackSilhouette = !uniformImage ? `
+                        <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
+                            <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
+                        </svg>
+                    ` : '';
 
     checkAdminMenu: async function() {
         if (!Boako.state.user) return;
