@@ -95,75 +95,24 @@ Boako.RecordVerify = {
         if (this.isApproving) return;
 
         if (!confirm("이 기록을 정상적인 경기로 승인하시겠습니까?")) return;
-        
+
         try {
             this.isApproving = true; // 🔒 진입과 동시에 락 걸기
 
-            let targetTable = matchType === 'TOURNAMENT' ? 'boako_tournaments' : 'BTLDB';
-            const leaderUuid = Boako.state.user?.id;
-            const nowTimestamp = new Date().toISOString();
+            const { error } = await Boako.db.rpc('approve_cross_verification', {
+                p_record_id: String(recordId),
+                p_match_type: matchType
+            });
 
-            if (!leaderUuid) {
-                Boako.Util.toast("❌ 인증 정보(UUID)를 찾을 수 없습니다. 다시 로그인해 주세요.");
+            if (error) {
+                Boako.Util.toast("❌ " + (error.message || "승인 처리에 실패했습니다."));
                 this.isApproving = false;
                 return;
             }
 
-            // 🎯 [1단계] 경기 기록 실물 테이블 타격 (승인 도장 쾅)
-            const { data, error } = await Boako.db
-                .from(targetTable) 
-                .update({ 
-                    verified_by: leaderUuid,   
-                    verified_at: nowTimestamp   
-                })
-                .eq('id', isNaN(recordId) ? recordId : Number(recordId))
-                .select(); 
-
-            if (error) throw error;
-
-            // 실물 반영 최종 확인 검문소
-            if (!data || data.length === 0) {
-                Boako.Util.toast("❌ RLS 권한이 없거나 대상을 찾을 수 없어 승인에 실패했습니다.");
-                this.isApproving = false;
-                return;
-            }
-
-            // 🔥 [2단계] 소장님의 진짜 규격(point_change, description)에 맞춘 포인트 정산 프로세스
-            try {
-                // 1. profiles 테이블에서 기존 잔액 가져오기
-                const { data: pData, error: pError } = await Boako.db
-                    .from('profiles')
-                    .select('points')
-                    .eq('id', leaderUuid)
-                    .single();
-
-                if (!pError && pData) {
-                    const currentPoints = Number(pData.points || 0);
-                    
-                    // 2. 기존 잔액에 +10점 가산하여 profiles 업데이트
-                    await Boako.db
-                        .from('profiles')
-                        .update({ points: currentPoints + 10 })
-                        .eq('id', leaderUuid);
-                }
-
-                // 3. shop 코드의 컬럼명(point_change, description) 규격을 그대로 적용하여 이력 적재
-                await Boako.db.from('point_history').insert([{
-                    user_id: leaderUuid,
-                    point_change: 10, // 🎯 points가 아니라 point_change가 맞았네요!
-                    description: `[기록 승인] 교차 검증 완료 보상 (ID: ${recordId})` // 🎯 reason이 아니라 description이 맞았습니다!
-                }]);
-
-            } catch (pointErr) {
-                // 혹시 모를 에러 발생 시 경기 승인은 유지되도록 방어막 유지
-                console.error("⚠️ 경기 승인은 성공했으나, 포인트 갱신 중 오류가 발생했습니다:", pointErr);
-            }
-
-            // 깔끔한 최종 성공 토스트 발송
             if (window.sfx) window.sfx.buy();
             Boako.Util.toast("✅ 기록이 정상 승인되었으며 10포인트가 지급되었습니다.");
-            
-            // 대기열 리스트 리로드 및 화면 갱신
+
             await this.loadPendingData();
 
             if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
