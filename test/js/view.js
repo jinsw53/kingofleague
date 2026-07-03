@@ -176,6 +176,45 @@ Boako.View = {
                     const { info: team, type } = Boako.state.team;
                     const isLeader = type === 'LEADER';
                     const { data: members } = await Boako.db.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
+
+                    // 🌟 팀 시즌 이력 배너용 데이터 수집
+                    let teamBannerStats = {
+                        currentSeasonRank: null,
+                        currentSeasonTeamCount: 0,
+                        totalChampionships: 0,
+                        bestRank: null,
+                        supporterCount: 0,
+                        uniformImageUrl: null,
+                        liveSeasonNo: null
+                    };
+                    try {
+                        const nowIso = new Date().toISOString();
+                        const { data: liveSeason } = await Boako.db.from('seasons').select('season_no, uniform_image_url').lte('start_date', nowIso).gte('end_date', nowIso).maybeSingle();
+
+                        if (liveSeason) {
+                            teamBannerStats.uniformImageUrl = liveSeason.uniform_image_url;
+                            teamBannerStats.liveSeasonNo = liveSeason.season_no;
+
+                            const { data: currentRanking } = await Boako.db.from('v_season_current_ranking').select('team_name, total_lp').eq('season_no', liveSeason.season_no).order('total_lp', { ascending: false });
+                            if (currentRanking) {
+                                teamBannerStats.currentSeasonTeamCount = currentRanking.length;
+                                const myIdx = currentRanking.findIndex(r => r.team_name === team.team_name);
+                                if (myIdx !== -1) teamBannerStats.currentSeasonRank = myIdx + 1;
+                            }
+                        }
+
+                        const { data: historyRows } = await Boako.db.from('season_final_rankings').select('final_rank').eq('team_name', team.team_name);
+                        if (historyRows && historyRows.length > 0) {
+                            teamBannerStats.totalChampionships = historyRows.filter(r => r.final_rank === 1).length;
+                            teamBannerStats.bestRank = Math.min(...historyRows.map(r => r.final_rank));
+                        }
+
+                        const { count: supporterCount } = await Boako.db.from('inventory').select('id', { count: 'exact', head: true }).like('item_id', `item_supporter_badge_${team.id}`).gt('expires_at', nowIso);
+                        teamBannerStats.supporterCount = supporterCount || 0;
+
+                    } catch (bannerErr) {
+                        console.error('팀 배너 통계 로드 실패:', bannerErr);
+                    }
                     // 🌟 여기서 바로 정렬해버리면 됩니다!
         if (members) {
             members.sort((a, b) => (a.role === 'LEADER' ? -1 : 1));
@@ -251,9 +290,36 @@ case 4: // 대항전 본게임 진행 중 (60일~)
         break;
 }
                     // 🌟 탭이 포함된 팀 레이아웃으로 변경
+                    const DEFAULT_LOGO_ICON = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+                    const CHALLENGE_TOKEN_ICON = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png';
+
+                    const uniformIconHtml = teamBannerStats.uniformImageUrl
+                        ? `<img src="${teamBannerStats.uniformImageUrl}" style="width:22px; height:22px; object-fit:contain;">`
+                        : `<svg width="22" height="22" viewBox="0 0 100 100"><path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="3"/></svg>`;
+
+                    const currentSeasonLineHtml = teamBannerStats.currentSeasonRank
+                        ? `🔴 시즌 ${teamBannerStats.liveSeasonNo} 진행 중 · 잠정 ${teamBannerStats.currentSeasonRank}위 / ${teamBannerStats.currentSeasonTeamCount}팀`
+                        : `⚪ 현재 진행 중인 시즌 기록 없음`;
+
+                    const historyLineHtml = teamBannerStats.bestRank
+                        ? `🏆 통산 ${teamBannerStats.totalChampionships}회 우승 · 최고 순위 ${teamBannerStats.bestRank}위`
+                        : `🏆 아직 종료된 시즌 기록이 없습니다`;
+
                     html = `
-                    <div class="main-banner" style="margin-bottom: 20px;">
+                    <div class="main-banner" style="margin-bottom: 20px; display:flex; flex-direction:column; gap:10px;">
                         <h1>${team.team_name}</h1>
+                        <div style="font-size:13px; font-weight:800; opacity:0.9; display:flex; flex-direction:column; gap:4px;">
+                            <div>${currentSeasonLineHtml}</div>
+                            <div>${historyLineHtml}</div>
+                        </div>
+                        <div style="display:flex; gap:16px; margin-top:6px;">
+                            <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:900;">
+                                ${uniformIconHtml} 서포터즈 ${teamBannerStats.supporterCount}명
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:900;">
+                                <img src="${CHALLENGE_TOKEN_ICON}" style="width:20px; height:20px; object-fit:contain;"> 도전권 ${team.challengetokens || 0}개
+                            </div>
+                        </div>
                     </div>
 
                     <section class="section-card">
