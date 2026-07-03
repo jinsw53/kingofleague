@@ -882,13 +882,13 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
                     <div id="wallet-mode-default">
                         <h5 class="font-black text-slate-800 text-sm mb-1 flex items-center gap-1.5">💱 팀으로 포인트 환전하기</h5>
-                        <p class="text-xs text-slate-400 font-bold mb-1">내 포인트를 팀 금고로 보냅니다. ${feeRatePercent}% 수수료가 차감됩니다.</p>
+                        <p class="text-xs text-slate-400 font-bold mb-1">내 포인트를 팀 금고로 보냅니다. <span class="inline-flex items-center bg-rose-100 text-rose-600 font-black px-2 py-0.5 rounded-md mx-0.5">⚠️ ${feeRatePercent}% 수수료</span> 가 차감됩니다.</p>
                         ${isLeader ? `<p class="text-[11px] text-indigo-500 font-bold mb-3">💡 아래 팀원을 이 카드 위로 드래그하면 그 팀원에게 지급하는 모드로 바뀌어요.</p>` : '<div class="mb-3"></div>'}
                     </div>
 
                     <div id="wallet-mode-target" class="hidden mb-3">
                         <h5 class="font-black text-amber-800 text-sm mb-1 flex items-center gap-1.5">👑 팀원에게 포인트 지급하기</h5>
-                        <p class="text-xs text-amber-600 font-bold mb-3">팀 금고에서 아래 팀원에게 직접 지급합니다. ${feeRatePercent}% 수수료가 차감됩니다.</p>
+                        <p class="text-xs text-amber-600 font-bold mb-3">팀 금고에서 아래 팀원에게 직접 지급합니다. <span class="inline-flex items-center bg-rose-100 text-rose-600 font-black px-2 py-0.5 rounded-md mx-0.5">⚠️ ${feeRatePercent}% 수수료</span> 가 차감됩니다.</p>
                         <div id="wallet-target-display" class="flex items-center gap-2"></div>
                     </div>
 
