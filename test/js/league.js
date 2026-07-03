@@ -2049,7 +2049,7 @@ Boako.League.injectKolStyle = function() {
     const style = document.createElement('style');
     style.id = 'kol-arena-style';
     style.innerHTML = `
-        .kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; }
+.kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; background: url("https://jinsw53.github.io/kingofleague/kingbg.png") no-repeat center center; background-size: cover; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
         .kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; }
         .kol-arena-center-ring { position:absolute; inset:8%; border-radius:9999px; border: 2px dashed rgba(99,102,241,0.35); }
         .kol-arena-center-label { font-size:10px; font-weight:900; letter-spacing:.2em; color:#818cf8; opacity:.6; }
