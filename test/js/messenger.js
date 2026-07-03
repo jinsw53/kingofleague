@@ -558,32 +558,11 @@ Boako.Messenger = {
             if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
             await Boako.db.from('messages').update({ action_status: status }).eq('message_id', messageId);
             if (status === 'ACCEPTED') {
-                const { data: msgInfo } = await Boako.db.from('messages').select('*').eq('message_id', messageId).single();
-                if (msgInfo) {
-                    const payload = {
-                        game_name: msgInfo.metadata.game_name || '미정',
-                        match_type: msgInfo.metadata.match_type || 'FRIENDLY',
-                        scheduled_time: msgInfo.metadata.proposed_time,
-                        status: 'UPCOMING',
-                        original_message_id: messageId,
-                        source_type: msgInfo.match_id ? msgInfo.metadata.match_type : null,
-                        reference_id: msgInfo.match_id ? String(msgInfo.match_id) : null,
-                        participants: [
-                            { player_name: msgInfo.sender_name_override, role: 'PROPOSER' },
-                            { player_name: msgInfo.receiver_name_override, role: 'PARTICIPANT' }
-                        ]
-                    };
-                    const { error } = await Boako.db.from('match_schedules').insert([payload]);
-                    if (error) {
-                        Boako.Util.toast("캘린더 등록에 실패했습니다.");
-                    } else {
-                        // 🌟 라이벌 매치는 일정 확정 시 ACCEPTED → UPCOMING으로 상태 전환 (RPC 경유)
-                        if (msgInfo.match_id && msgInfo.metadata.match_type === 'RIVAL') {
-                            const { error: rpcError } = await Boako.db.rpc('confirm_rival_schedule', { p_match_id: msgInfo.match_id });
-                            if (rpcError) console.error("라이벌 매치 상태 전환 실패:", rpcError);
-                        }
-                        Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
-                    }
+                const { error } = await Boako.db.rpc('confirm_direct_match_schedule', { p_message_id: messageId });
+                if (error) {
+                    Boako.Util.toast("캘린더 등록에 실패했습니다.");
+                } else {
+                    Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
                 }
             }
             await Boako.Messenger.fetchUnreadCount(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
