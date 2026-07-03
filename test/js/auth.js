@@ -175,6 +175,46 @@ Boako.Auth = {
                             <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
                         </svg>
                     ` : '';
+                    return `
+                        <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; border:1px solid #e2e8f0; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                            ${fallbackSilhouette}
+                            <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
+                                ${teamLogo ? `<img src="${teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:60%; height:60%; object-fit:contain;">` : ''}
+                            </div>
+                        </div>
+                    `;
+                };
+
+                // 아이콘 타입(이미지 vs 이모지 vs 서포터즈)에 맞춰 HTML 생성
+                badgeArea.innerHTML = equippedItems.map(item => {
+                    const isSupporter = item.item_id && item.item_id.startsWith('item_supporter_badge_');
+
+                    if (isSupporter) {
+                        const teamId = Number(item.item_id.split('_').pop());
+                        const team = teamsMap[teamId];
+                        const season = seasonsMap[item.season_no];
+                        const name = team ? `${team.team_name} 서포터즈` : '서포터즈 뱃지';
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}">${buildUniformHtml(team?.logo_url, season?.uniform_image_url, '26px')}</div>`;
+                    }
+
+                    const icon = item.shop_items?.icon || '🏅';
+                    const name = item.shop_items?.name || '배지';
+
+                    if (icon.startsWith('http')) {
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${icon}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"></div>`;
+                    } else {
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
+                    }
+                }).join('');
+            } else {
+                // 장착된 배지가 없는 경우 (공간만 차지하도록 처리하거나 연한 글씨 출력)
+                badgeArea.innerHTML = `<span style="font-size:11px; color:#cbd5e1; font-weight:600;">장착된 배지가 없습니다</span>`;
+            }
+        } catch (err) {
+            console.error("위젯 배지 로드 오류:", err);
+            badgeArea.innerHTML = `<span style="font-size:11px; color:#ef4444;">배지 로드 실패</span>`;
+        }
+    },
 
     checkAdminMenu: async function() {
         if (!Boako.state.user) return;
