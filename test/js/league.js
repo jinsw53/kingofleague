@@ -2049,23 +2049,22 @@ Boako.League.injectKolStyle = function() {
     const style = document.createElement('style');
     style.id = 'kol-arena-style';
     style.innerHTML = `
-.kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 24px; overflow: hidden; }
-        .kol-arena-stage::before {
-            content: '';
-            position: absolute;
-            inset: 0;
+.kol-arena-wrapper {
+            position: relative;
+            border-radius: 24px;
+            overflow: hidden;
+            padding: 20px 0;
             background: url("https://jinsw53.github.io/kingofleague/kingbg.png") no-repeat center center;
             background-size: cover;
-            z-index: 0;
         }
-        .kol-arena-stage::after {
+        .kol-arena-wrapper::after {
             content: '';
             position: absolute;
             inset: 0;
-            background: radial-gradient(circle at center, transparent 45%, rgba(255,255,255,0.5) 75%, rgba(255,255,255,0.95) 100%);
-            z-index: 1;
+            background: radial-gradient(circle at center, transparent 40%, rgba(255,255,255,0.4) 70%, rgba(255,255,255,0.9) 100%);
             pointer-events: none;
         }
+        .kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; }
 .kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; z-index:6; }
         .kol-arena-center-ring { position:absolute; inset:8%; border-radius:9999px; border: 2px dashed rgba(99,102,241,0.35); }
         .kol-arena-center-label { font-size:10px; font-weight:900; letter-spacing:.2em; color:#818cf8; opacity:.6; }
@@ -2259,6 +2258,7 @@ Boako.League.getKingOfLeagueHTML = function() {
     const arenaHtml = total === 0
         ? `<div class="text-center py-10 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 이번 시즌 킹 오브 리그에 참여한 팀이 없습니다.</div>`
         : `
+            <div class="kol-arena-wrapper">
             <div class="kol-arena-stage">
                 <div id="kol-arena-center" class="kol-arena-center">
                     <div class="kol-arena-center-ring"></div>
@@ -2266,6 +2266,7 @@ Boako.League.getKingOfLeagueHTML = function() {
                 </div>
                 <div class="kol-arena-tokens">${tokensHtml}</div>
                 <div id="kol-arena-fx-layer" class="kol-arena-fx-layer"></div>
+            </div>
             </div>
         `;
 
