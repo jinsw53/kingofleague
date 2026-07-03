@@ -850,26 +850,7 @@ const isCompleted = s.status === 'COMPLETED';
             const feeRate = realFeeRate != null ? realFeeRate : 0.2;
             const feeRatePercent = Math.round(feeRate * 100);
 
-            const isLeader = Boako.state.team.type === 'LEADER';
-            let memberCardsHtml = '';
-
-            if (isLeader) {
-                const { data: members } = await Boako.db.from('team_members')
-                    .select('player_name, role')
-                    .eq('team_id', teamId)
-                    .eq('is_active', true);
-
-                memberCardsHtml = (members || [])
-                    .filter(m => m.player_name !== Boako.state.user.nickname)
-                    .map(m => `
-                        <div class="wallet-member-chip" draggable="true"
-                             ondragstart="Boako.Team.onMemberDragStart(event, '${m.player_name.replace(/'/g, "\\'")}')"
-                             ondragend="Boako.Team.onMemberDragEnd(event)">
-                            <span class="wallet-member-chip-role">${m.role === 'LEADER' ? '👑' : '👤'}</span>
-                            <span>${m.player_name}</span>
-                        </div>
-                    `).join('');
-            }
+const isLeader = Boako.state.team.type === 'LEADER';
 
             container.innerHTML = `
                 <style>
@@ -921,14 +902,7 @@ const isCompleted = s.status === 'COMPLETED';
                     </div>
                 </div>
 
-                ${isLeader ? `
-                <div class="mt-4">
-                    <h6 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">👥 팀원 (드래그해서 지급 대상 선택)</h6>
-                    <div class="flex flex-wrap gap-2">
-                        ${memberCardsHtml || '<span class="text-xs text-slate-400 font-bold">다른 팀원이 없습니다.</span>'}
-                    </div>
-                </div>
-                ` : ''}
+
             `;
 
         } catch (e) {
