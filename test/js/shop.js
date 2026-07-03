@@ -80,9 +80,10 @@ if (itemErr || !targetItem) return Boako.Util.toast("판매하지 않는 아이�
                             user_id: user.id, point_change: -targetItem.price, description: `[아이템 즉시 사용] ${targetItem.name}`
                         }]);
                         
+if (window.sfx) window.sfx.buy();
                         Boako.Util.toast(`✅ ${targetItem.name} 사용 완료!`);
                         Boako.Auth.renderWidget(); 
-                        Boako.View.render('shop'); 
+                        Boako.View.render('shop');
 
                     } catch (error) {
                         // 액션 로직 내부에서 취소했거나 에러가 났을 때 방어
@@ -118,7 +119,8 @@ if (itemErr || !targetItem) return Boako.Util.toast("판매하지 않는 아이�
                             user_id: user.id, item_id: itemId, item_type: targetItem.item_type, quantity: 1
                         }]);
                     }
-                    
+
+                    if (window.sfx) window.sfx.buy();
                     Boako.Util.toast("🎁 구매 완료! 인벤토리에 지급되었습니다.");
                     Boako.View.render('shop');
                 }
