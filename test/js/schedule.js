@@ -144,8 +144,9 @@ Boako.Schedule = {
                     else if (sch.match_type === 'LEAGUE') typeBadge = `<span style="background:#3b82f6; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:bold;">🏆 공식리그</span>`;
                     else typeBadge = `<span style="background:#10b981; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:bold;">🤝 친선전</span>`;
 
-                    const player1 = sch.proposer_name_override || '알 수 없음';
-                    const player2 = sch.responder_name_override || '알 수 없음';
+                    const parts = Array.isArray(sch.participants) ? sch.participants : [];
+                    const player1 = parts[0]?.player_name || parts[0]?.team_name || '알 수 없음';
+                    const player2 = parts[1]?.player_name || parts[1]?.team_name || '알 수 없음';
 
                     listHtml += `
                         <div style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition:all 0.2s;">
