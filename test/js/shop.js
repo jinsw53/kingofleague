@@ -136,7 +136,7 @@ if (window.sfx) window.sfx.buy();
         }
     },
 
-    // 서포터즈 팀 선택/금액 입력 모달
+    // 서포터즈 팀 선택/금액 입력 모달 (검색형 카드 그리드 + 실시간 뱃지 미리보기)
     openSupporterModal: async (targetItem) => {
         const user = Boako.state.user;
 
@@ -144,24 +144,59 @@ if (window.sfx) window.sfx.buy();
         const { data: profile } = await Boako.db.from('profiles').select('points').eq('id', user.id).single();
         const myPoints = profile?.points || 0;
 
-        const teamOptionsHtml = (teams || []).map(t =>
-            `<option value="${t.id}">${t.team_name}</option>`
-        ).join('');
+        const now = new Date().toISOString();
+        const { data: currentSeason } = await Boako.db
+            .from('seasons')
+            .select('season_no, uniform_image_url')
+            .lte('start_date', now)
+            .gte('end_date', now)
+            .maybeSingle();
+
+        const rankMap = {};
+        if (currentSeason) {
+            const { data: rankRows } = await Boako.db
+                .from('v_season_current_ranking')
+                .select('team_name, total_lp')
+                .eq('season_no', currentSeason.season_no)
+                .order('total_lp', { ascending: false });
+            (rankRows || []).forEach((r, idx) => { rankMap[r.team_name] = idx + 1; });
+        }
+
+        Boako.Shop._supporterState = {
+            teams: teams || [],
+            rankMap,
+            uniformImage: currentSeason?.uniform_image_url || null,
+            selectedTeamId: null,
+            myPoints
+        };
 
         const modalHtml = `
             <div id="supporter-modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="if(event.target===this) Boako.Shop.closeSupporterModal()">
-                <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                    <div class="bg-gradient-to-r from-violet-600 to-indigo-600 p-5 flex items-center justify-between">
+                <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                    <div class="bg-gradient-to-r from-violet-600 to-indigo-600 p-5 flex items-center justify-between shrink-0">
                         <h3 class="font-black text-white text-base flex items-center gap-2">📣 팀 서포터즈 되기</h3>
                         <button onclick="Boako.Shop.closeSupporterModal()" class="text-white/70 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
-                    <div class="p-6 space-y-5">
-                        <div>
-                            <label class="block text-xs font-black text-slate-700 mb-1.5">🛡️ 응원할 팀</label>
-                            <select id="supporter-team-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 cursor-pointer shadow-inner">
-                                ${teamOptionsHtml}
-                            </select>
+
+                    <div class="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+
+                        <div id="supporter-preview-card" class="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-5 flex items-center gap-4">
+                            <div id="supporter-preview-badge" class="w-20 h-20 shrink-0"></div>
+                            <div class="flex-1 min-w-0">
+                                <div id="supporter-preview-name" class="font-black text-slate-400 text-sm">응원할 팀을 선택하세요</div>
+                                <div id="supporter-preview-rank" class="text-[11px] font-bold text-slate-400 mt-1"></div>
+                            </div>
                         </div>
+
+                        <div>
+                            <label class="block text-xs font-black text-slate-700 mb-1.5">🛡️ 응원할 팀 검색</label>
+                            <div class="relative mb-3">
+                                <input type="text" id="supporter-team-search" placeholder="팀 이름으로 검색..." class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 shadow-inner" oninput="Boako.Shop.renderSupporterTeamGrid()">
+                                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400"></i>
+                            </div>
+                            <div id="supporter-team-grid" class="grid grid-cols-3 gap-2.5 max-h-56 overflow-y-auto pr-1 custom-scrollbar"></div>
+                        </div>
+
                         <div>
                             <label class="block text-xs font-black text-slate-700 mb-1.5">💰 후원 금액 (1000P 단위)</label>
                             <input type="number" id="supporter-amount-input" min="1000" step="1000" value="1000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 shadow-inner" oninput="Boako.Shop.updateSupporterPreview()">
@@ -179,11 +214,86 @@ if (window.sfx) window.sfx.buy();
         `;
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
+        Boako.Shop.renderSupporterTeamGrid();
         setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
     },
 
     closeSupporterModal: () => {
         document.getElementById('supporter-modal-backdrop')?.remove();
+        Boako.Shop._supporterState = null;
+    },
+
+    getUniformPreviewHTML: (teamLogo, uniformImage, size) => {
+        const uniformBg = uniformImage
+            ? `background-image:url('${uniformImage}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
+            : '';
+        const fallbackSilhouette = !uniformImage ? `
+            <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
+                <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
+            </svg>
+        ` : '';
+        return `
+            <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center;">
+                ${fallbackSilhouette}
+                <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
+                    ${teamLogo ? `<img src="${teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:28%; height:28%; object-fit:contain;">` : ''}
+                </div>
+            </div>
+        `;
+    },
+
+    renderSupporterTeamGrid: () => {
+        const state = Boako.Shop._supporterState;
+        const grid = document.getElementById('supporter-team-grid');
+        if (!state || !grid) return;
+
+        const keyword = document.getElementById('supporter-team-search')?.value.trim().toLowerCase() || '';
+        const filtered = keyword
+            ? state.teams.filter(t => t.team_name.toLowerCase().includes(keyword))
+            : state.teams;
+
+        if (filtered.length === 0) {
+            grid.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-400 text-xs font-bold">검색된 팀이 없습니다.</div>`;
+            return;
+        }
+
+        const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+
+        grid.innerHTML = filtered.map(t => {
+            const isSelected = state.selectedTeamId === t.id;
+            const rank = state.rankMap[t.team_name];
+            const rankBadge = rank
+                ? `<span class="absolute -top-1.5 -right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm ${rank === 1 ? 'bg-amber-400 text-white' : rank === 2 ? 'bg-slate-400 text-white' : rank === 3 ? 'bg-orange-400 text-white' : 'bg-slate-100 text-slate-500 border border-slate-200'}">${rank}위</span>`
+                : '';
+
+            return `
+                <div onclick="Boako.Shop.selectSupporterTeam(${t.id})" class="relative flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 cursor-pointer transition-all ${isSelected ? 'border-violet-600 bg-violet-50 shadow-md' : 'border-slate-200 bg-white hover:border-violet-300 hover:shadow-sm'}">
+                    ${rankBadge}
+                    <img src="${t.logo_url || DEFAULT_LOGO}" class="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1">
+                    <span class="text-[10px] font-black text-slate-700 text-center truncate w-full">${t.team_name}</span>
+                </div>
+            `;
+        }).join('');
+    },
+
+    selectSupporterTeam: (teamId) => {
+        const state = Boako.Shop._supporterState;
+        if (!state) return;
+        state.selectedTeamId = teamId;
+
+        const team = state.teams.find(t => t.id === teamId);
+        const rank = team ? state.rankMap[team.team_name] : null;
+
+        const badgeEl = document.getElementById('supporter-preview-badge');
+        const nameEl = document.getElementById('supporter-preview-name');
+        const rankEl = document.getElementById('supporter-preview-rank');
+
+        if (badgeEl && team) badgeEl.innerHTML = Boako.Shop.getUniformPreviewHTML(team.logo_url, state.uniformImage, '80px');
+        if (nameEl && team) nameEl.innerHTML = `<span class="text-violet-700">${team.team_name}</span> 서포터즈 뱃지`;
+        if (rankEl) rankEl.innerText = rank ? `현재 시즌 실시간 순위 🏅 ${rank}위` : '이번 시즌 아직 순위 집계 전';
+
+        if (window.sfx) window.sfx.click();
+        Boako.Shop.renderSupporterTeamGrid();
     },
 
     // 도전권 구매 모달 (팀장 전용, t_price로 팀 포인트 사용)
@@ -294,9 +404,9 @@ if (window.sfx) window.sfx.buy();
     },
 
     confirmSupporterPurchase: async () => {
-        const teamSelect = document.getElementById('supporter-team-select');
+        const state = Boako.Shop._supporterState;
         const amountInput = document.getElementById('supporter-amount-input');
-        const teamId = Number(teamSelect?.value);
+        const teamId = state?.selectedTeamId;
         const amount = parseInt(amountInput?.value, 10);
 
         if (!teamId) return Boako.Util.toast('응원할 팀을 선택해주세요.');
