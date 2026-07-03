@@ -911,6 +911,60 @@ const isLeader = Boako.state.team.type === 'LEADER';
         }
     },
 
+   loadTeamPointHistory: async function() {
+        const container = document.getElementById('team-point-history-container');
+        if (!container) return;
+
+        try {
+            const teamId = Boako.state.team.info.id;
+
+            const { data: history, error } = await Boako.db
+                .from('team_point_history')
+                .select('*')
+                .eq('team_id', teamId)
+                .order('created_at', { ascending: false })
+                .limit(15);
+
+            if (error) throw error;
+
+            if (!history || history.length === 0) {
+                container.innerHTML = `
+                    <h4 style="font-weight:950; font-size:20px; margin-bottom:20px;">🧾 팀 포인트 이용 내역</h4>
+                    <div style="text-align:center; padding:30px; color:#94a3b8; font-weight:700; background:#f8fafc; border-radius:12px;">아직 이용 내역이 없습니다.</div>
+                `;
+                return;
+            }
+
+            const rowsHtml = history.map(log => {
+                const date = new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                const isPlus = log.point_change > 0;
+                const color = isPlus ? '#10b981' : '#ef4444';
+                const sign = isPlus ? '+' : '';
+                return `
+                    <li style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #f1f5f9;">
+                        <div>
+                            <div style="font-size:12px; color:#94a3b8; font-weight:600; margin-bottom:3px;">${date}</div>
+                            <div style="font-size:15px; font-weight:800; color:#334155;">${log.description}</div>
+                        </div>
+                        <div style="font-size:16px; font-weight:900; color:${color}; white-space:nowrap;">
+                            ${sign}${log.point_change.toLocaleString()} P
+                        </div>
+                    </li>`;
+            }).join('');
+
+            container.innerHTML = `
+                <h4 style="font-weight:950; font-size:20px; margin-bottom:20px;">🧾 팀 포인트 이용 내역</h4>
+                <ul style="list-style:none; margin:0; padding:0; background:white; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden;">
+                    ${rowsHtml}
+                </ul>
+            `;
+
+        } catch (e) {
+            console.error('팀 포인트 내역 로드 실패:', e);
+            container.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444; font-weight:700;">내역 로드 실패: ${e.message}</div>`;
+        }
+    },
+
     // ---------- 드래그앤드롭 상태 ----------
     walletDragTarget: null,
 
