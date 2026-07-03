@@ -236,7 +236,7 @@ if (window.sfx) window.sfx.buy();
             <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center;">
                 ${fallbackSilhouette}
                 <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
-                    ${teamLogo ? `<img src="${teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:28%; height:28%; object-fit:contain;">` : ''}
+                    ${teamLogo ? `<img src="${teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">` : ''}
                 </div>
             </div>
         `;
