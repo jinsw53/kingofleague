@@ -139,14 +139,26 @@ Boako.Auth = {
         }
 
         try {
-            // inventory 테이블에서 is_equipped가 true인 것을 item_id/season_no와 함께 가져옵니다.
+            // inventory 테이블에서 is_equipped가 true인 것을 가져옵니다. (FK 없이 수동 조인)
             const { data: equippedItems, error } = await Boako.db
                 .from('inventory')
-                .select('item_id, season_no, shop_items(name, icon)')
+                .select('item_id, season_no')
                 .eq('user_id', Boako.state.user.id)
                 .eq('is_equipped', true);
 
             if (error) throw error;
+
+            // 서포터즈가 아닌 일반 배지들의 상점 정보를 별도로 조회해서 합침
+            const normalItemIds = [...new Set((equippedItems || [])
+                .filter(row => !(row.item_id && row.item_id.startsWith('item_supporter_badge_')))
+                .map(row => row.item_id))];
+
+            let shopItemsMap = {};
+            if (normalItemIds.length > 0) {
+                const { data: shopRows } = await Boako.db.from('shop_items').select('item_id, name, icon').in('item_id', normalItemIds);
+                (shopRows || []).forEach(s => { shopItemsMap[s.item_id] = s; });
+            }
+            (equippedItems || []).forEach(row => { row.shop_items = shopItemsMap[row.item_id] || null; });
 
             if (equippedItems && equippedItems.length > 0) {
                 // 🌟 서포터즈 배지(item_supporter_badge_<teamId>)는 팀/시즌 정보를 따로 조인해야 함
