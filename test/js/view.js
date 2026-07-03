@@ -495,7 +495,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                 const { data: shopItems } = await Boako.db.from('shop_items')
                     .select('*')
                     .eq('is_active', true)
-                    .order('price', { ascending: true });
+                    .order('price', { ascending: true, nullsFirst: false });
 
                 html = `
                 <div class="main-banner" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
