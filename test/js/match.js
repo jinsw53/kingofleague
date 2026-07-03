@@ -204,8 +204,8 @@ Boako.Match = {
                 titleEl.style.display = 'none'; // 불필요한 중복 텍스트(제 1회 대항전 등) 강제 숨김
                 logoEl.className = "flex flex-col gap-3 mt-2"; // 로고와 날짜를 위아래로 깔끔하게 배치
                 
-                let logoHtml = currentSeason?.logo_url 
-                    ? `<img src="${currentSeason.logo_url}" class="h-16 md:h-20 object-contain drop-shadow-lg" alt="시즌 로고">`
+                let logoHtml = currentSeason?.season_logo_url 
+                    ? `<img src="${currentSeason.season_logo_url}" class="h-16 md:h-20 object-contain drop-shadow-lg" alt="시즌 로고">`
                     : `<div class="text-white/50 text-sm font-bold border-2 border-dashed border-white/20 px-6 py-4 rounded-2xl w-max">시즌 로고 대기 중</div>`;
                 
                 let dateHtml = `<div class="text-indigo-200 text-xs font-black bg-indigo-900/60 px-3 py-1.5 rounded-lg border border-indigo-500/30 w-max shadow-inner">
