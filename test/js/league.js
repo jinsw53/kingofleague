@@ -2053,6 +2053,7 @@ Boako.League.injectKolStyle = function() {
         .kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; }
         .kol-arena-center-ring { position:absolute; inset:8%; border-radius:9999px; border: 2px dashed rgba(99,102,241,0.35); }
         .kol-arena-center-label { font-size:10px; font-weight:900; letter-spacing:.2em; color:#818cf8; opacity:.6; }
+        .kol-arena-center-logo { width:60%; height:60%; object-fit:contain; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.15)); }
         .kol-arena-center.kol-center-flash { animation: kolCenterFlash .5s ease; }
         @keyframes kolCenterFlash { 0%{box-shadow:0 0 0 0 rgba(244,63,94,0.6);} 50%{box-shadow:0 0 40px 20px rgba(244,63,94,0.5);} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0);} }
         .kol-arena-tokens { position:absolute; inset:0; }
@@ -2087,7 +2088,7 @@ Boako.League.loadKingOfLeagueData = async function() {
         const now = new Date().toISOString();
         const { data: currentSeason } = await Boako.db
             .from('seasons')
-            .select('season_no, title')
+            .select('season_no, title, season_logo_url')
             .lte('start_date', now)
             .gte('end_date', now)
             .single();
@@ -2175,6 +2176,7 @@ Boako.League.loadKingOfLeagueData = async function() {
         Boako.League.KOL.settlements = settlementsData || [];
         Boako.League.KOL.teamsMap = allTeamsMap;
         Boako.League.KOL.seasonTitle = `시즌 ${currentSeason.season_no}`;
+        Boako.League.KOL.seasonLogoUrl = currentSeason.season_logo_url;
 
         container.innerHTML = Boako.League.getKingOfLeagueHTML();
         if (window.lucide) window.lucide.createIcons();
@@ -2233,13 +2235,18 @@ Boako.League.getKingOfLeagueHTML = function() {
             `;
         }).join('');
 
+    const seasonLogoUrl = state.seasonLogoUrl;
+    const arenaCenterContent = seasonLogoUrl
+        ? `<img src="${seasonLogoUrl}" class="kol-arena-center-logo" alt="시즌 로고">`
+        : `<div class="kol-arena-center-label">ARENA</div>`;
+
     const arenaHtml = total === 0
         ? `<div class="text-center py-10 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 이번 시즌 킹 오브 리그에 참여한 팀이 없습니다.</div>`
         : `
             <div class="kol-arena-stage">
                 <div id="kol-arena-center" class="kol-arena-center">
                     <div class="kol-arena-center-ring"></div>
-                    <div class="kol-arena-center-label">ARENA</div>
+                    ${arenaCenterContent}
                 </div>
                 <div class="kol-arena-tokens">${tokensHtml}</div>
                 <div id="kol-arena-fx-layer" class="kol-arena-fx-layer"></div>
