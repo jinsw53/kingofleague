@@ -574,7 +574,15 @@ Boako.Messenger = {
                         ]
                     };
                     const { error } = await Boako.db.from('match_schedules').insert([payload]);
-                    if (error) Boako.Util.toast("캘린더 등록에 실패했습니다."); else Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
+                    if (error) {
+                        Boako.Util.toast("캘린더 등록에 실패했습니다.");
+                    } else {
+                        // 🌟 라이벌 매치는 일정 확정 시 ACCEPTED → UPCOMING으로 상태 전환
+                        if (msgInfo.match_id && msgInfo.metadata.match_type === 'RIVAL') {
+                            await Boako.db.from('rival_matches').update({ status: 'UPCOMING' }).eq('match_id', msgInfo.match_id).eq('status', 'ACCEPTED');
+                        }
+                        Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
+                    }
                 }
             }
             await Boako.Messenger.fetchUnreadCount(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
