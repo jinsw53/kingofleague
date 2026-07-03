@@ -2075,7 +2075,7 @@ Boako.League.injectKolStyle = function() {
         .kol-arena-center-logo { width:60%; height:60%; object-fit:contain; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.15)); }
         .kol-arena-center.kol-center-flash { animation: kolCenterFlash .5s ease; }
         @keyframes kolCenterFlash { 0%{box-shadow:0 0 0 0 rgba(244,63,94,0.6);} 50%{box-shadow:0 0 40px 20px rgba(244,63,94,0.5);} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0);} }
-.kol-arena-tokens { position:absolute; inset:0; z-index:5; }
+.kol-arena-tokens { position:absolute; inset:0; z-index:10; }
         .kol-token { position:absolute; transform: translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:2px; transition: left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1), transform .4s ease; z-index:5; }
         .kol-token-logo { width:44px; height:44px; border-radius:12px; object-fit:contain; background:#fff; border:2px solid #e2e8f0; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:3px; }
         .kol-token-me .kol-token-logo { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.25); }
