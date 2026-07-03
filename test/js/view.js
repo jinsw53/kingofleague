@@ -323,6 +323,8 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                         }).join('')}
                                     </div>
                                 </div>
+
+                                <div id="team-point-history-container" style="margin-top:40px;" class="min-h-[80px]"></div>
                             </div>
 
                             <div id="tab-chat" class="team-tab-content hidden animate-in fade-in duration-300 w-full pt-4">
