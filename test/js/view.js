@@ -357,6 +357,9 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                         if (Boako.Team && Boako.Team.loadWalletTab) {
                             Boako.Team.loadWalletTab();
                         }
+                        if (Boako.Team && Boako.Team.loadTeamPointHistory) {
+                            Boako.Team.loadTeamPointHistory();
+                        }
                     }, 0);
 
                 } else {
