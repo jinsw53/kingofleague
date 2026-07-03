@@ -307,7 +307,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                     <div class="member-grid">
                                         ${members?.map(m => {
                                             const isMe = m.player_name === Boako.state.user.nickname;
-                                            const isDraggable = isLeader && m.role !== 'LEADER';
+                                            const isDraggable = isLeader;
                                             return `
                                             <div class="member-item" ${isDraggable ? `draggable="true" ondragstart="Boako.Team.onMemberDragStart(event, '${m.player_name.replace(/'/g, "\\'")}')" ondragend="Boako.Team.onMemberDragEnd(event)" style="cursor:grab;"` : ''}>
                                                 <div style="display:flex; align-items:center; gap:18px;">
