@@ -152,7 +152,7 @@ if (window.sfx) window.sfx.buy();
             <div id="supporter-modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="if(event.target===this) Boako.Shop.closeSupporterModal()">
                 <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                     <div class="bg-gradient-to-r from-violet-600 to-indigo-600 p-5 flex items-center justify-between">
-                        <h3 class="font-black text-white text-base flex items-center gap-2">🎗️ 팀 서포터즈 되기</h3>
+                        <h3 class="font-black text-white text-base flex items-center gap-2">📣 팀 서포터즈 되기</h3>
                         <button onclick="Boako.Shop.closeSupporterModal()" class="text-white/70 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div class="p-6 space-y-5">
@@ -171,7 +171,7 @@ if (window.sfx) window.sfx.buy();
                             1000P 후원 시 <span class="text-violet-900">30일</span>간 유효한 뱃지를 받습니다.
                         </div>
                         <button onclick="Boako.Shop.confirmSupporterPurchase()" class="w-full bg-slate-900 hover:bg-black text-white font-black text-sm py-3.5 rounded-xl shadow-lg transition-all">
-                            🎗️ 서포터즈 되기
+                            📣 서포터즈 되기
                         </button>
                     </div>
                 </div>
