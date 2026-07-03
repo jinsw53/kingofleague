@@ -61,7 +61,21 @@ Boako.Inventory = {
      * [함수] 인벤토리 로드 및 전체 렌더링
      * 프로필의 장착 슬롯과 가방의 아이템 리스트를 화면에 그립니다.
      */
+    injectZoomStyle: function() {
+        if (document.getElementById('badge-zoom-style')) return;
+        const style = document.createElement('style');
+        style.id = 'badge-zoom-style';
+        style.innerHTML = `
+            .badge-zoom-wrap { display:inline-block; position:relative; transition: transform .18s ease; transform-origin:center; cursor:help; }
+            .badge-zoom-wrap:hover { z-index:999; }
+            .badge-zoom-sm:hover { transform: scale(3); }
+            .badge-zoom-md:hover { transform: scale(1.8); }
+        `;
+        document.head.appendChild(style);
+    },
+
     loadItems: async function() {
+        Boako.Inventory.injectZoomStyle();
         // 로그인 체크
         if (!Boako.state.user) {
             console.error("사용자 정보가 없습니다. 로그인을 확인하세요.");
@@ -196,7 +210,7 @@ Boako.Inventory = {
                     <div onclick="Boako.Inventory.unequip('${b.inv_id}')" 
                          style="background:white; border:2px solid #10b981; border-radius:50px; padding:8px 18px; display:flex; align-items:center; gap:10px; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); transition:transform 0.2s;"
                          onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                        ${b.isSupporter ? this.getUniformBadgeHTML(b, '22px') : this.getIconHTML(b.icon, '22px')}
+                        <div class="badge-zoom-wrap badge-zoom-sm">${b.isSupporter ? this.getUniformBadgeHTML(b, '22px') : this.getIconHTML(b.icon, '22px')}</div>
                         <span style="font-weight:800; font-size:14px; color:#064e3b;">${b.name}</span>
                     </div>
                 `).join('');
@@ -222,7 +236,7 @@ Boako.Inventory = {
                     return `
                     <div style="background:white; border:1px solid #e2e8f0; border-radius:16px; padding:20px 10px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                         <div style="height:60px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; position:relative;">
-                            ${item.isSupporter ? this.getUniformBadgeHTML(item, '48px') : this.getIconHTML(item.icon, '48px')}
+                            <div class="badge-zoom-wrap badge-zoom-md">${item.isSupporter ? this.getUniformBadgeHTML(item, '48px') : this.getIconHTML(item.icon, '48px')}</div>
                             ${item.quantity > 1 ? `
                                 <span style="position:absolute; bottom:0; right:15%; background:#ef4444; color:white; font-size:11px; font-weight:900; padding:2px 7px; border-radius:10px; border:2px solid white;">
                                     x${item.quantity}
