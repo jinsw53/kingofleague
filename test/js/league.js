@@ -2049,14 +2049,30 @@ Boako.League.injectKolStyle = function() {
     const style = document.createElement('style');
     style.id = 'kol-arena-style';
     style.innerHTML = `
-.kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; background: url("https://jinsw53.github.io/kingofleague/kingbg.png") no-repeat center center; background-size: cover; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
-        .kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; }
+.kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 24px; overflow: hidden; }
+        .kol-arena-stage::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("https://jinsw53.github.io/kingofleague/kingbg.png") no-repeat center center;
+            background-size: cover;
+            z-index: 0;
+        }
+        .kol-arena-stage::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 45%, rgba(255,255,255,0.5) 75%, rgba(255,255,255,0.95) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+.kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; z-index:6; }
         .kol-arena-center-ring { position:absolute; inset:8%; border-radius:9999px; border: 2px dashed rgba(99,102,241,0.35); }
         .kol-arena-center-label { font-size:10px; font-weight:900; letter-spacing:.2em; color:#818cf8; opacity:.6; }
         .kol-arena-center-logo { width:60%; height:60%; object-fit:contain; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.15)); }
         .kol-arena-center.kol-center-flash { animation: kolCenterFlash .5s ease; }
         @keyframes kolCenterFlash { 0%{box-shadow:0 0 0 0 rgba(244,63,94,0.6);} 50%{box-shadow:0 0 40px 20px rgba(244,63,94,0.5);} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0);} }
-        .kol-arena-tokens { position:absolute; inset:0; }
+.kol-arena-tokens { position:absolute; inset:0; z-index:5; }
         .kol-token { position:absolute; transform: translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:2px; transition: left .5s cubic-bezier(.4,0,.2,1), top .5s cubic-bezier(.4,0,.2,1), transform .4s ease; z-index:5; }
         .kol-token-logo { width:44px; height:44px; border-radius:12px; object-fit:contain; background:#fff; border:2px solid #e2e8f0; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:3px; }
         .kol-token-me .kol-token-logo { border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,0.25); }
