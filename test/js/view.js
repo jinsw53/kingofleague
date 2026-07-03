@@ -520,7 +520,10 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                             </div>
                             <div style="padding:20px; border-top:1px solid #f1f5f9; background:#fafafa;">
                                 <button class="btn-submit" style="padding:15px; font-size:16px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 10px 20px rgba(245, 158, 11, 0.2);" onclick="Boako.Shop.buyItem('${item.item_id}')">
-                                    💎 ${item.price.toLocaleString()} P 구매
+                                    ${item.t_price != null
+                                        ? `🛡️ 팀 포인트 ${Number(item.t_price).toLocaleString()} P`
+                                        : `💎 ${Number(item.price).toLocaleString()} P 구매`
+                                    }
                                 </button>
                             </div>
                         </div>
