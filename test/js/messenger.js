@@ -574,7 +574,6 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
 
             Boako.Messenger.ScheduleModal.open(roomId);
         },
-    },
 
     // 🌟 [신규] 라이벌/승자연전 1:1 일정 제안용 달력 모달 (다중 날짜 선택)
     ScheduleModal: {
@@ -750,8 +749,6 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
             }
         }
     },
-
-    View: {
 
         replySchedule: async (messageId, status, chosenTime = null) => {
             if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
