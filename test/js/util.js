@@ -106,6 +106,9 @@ Boako.Util = {
 
 // 커스텀 드롭다운 바깥 클릭 시 자동 닫힘
 document.addEventListener('click', function() {
+    document.querySelectorAll('[id^="cselect-"][id$="-menu"]').forEach(el => el.classList.add('hidden'));
+});
+
 window.sfx = (function() {
     let ctx = null;
     function getCtx() {
