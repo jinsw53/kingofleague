@@ -1279,7 +1279,26 @@ Boako.Match = {
         },
 
                 forceConfirmPoll: async (pollId, confirmedTime, proposerId, gameName, seasonNo) => {
+            try {
+                const { error } = await Boako.db.rpc('confirm_match_schedule', {
+                    p_poll_id: pollId,
+                    p_confirmed_time: confirmedTime,
+                    p_proposer_id: proposerId,
+                    p_season_no: seasonNo || Boako.Match.Chat.currentSeason,
+                    p_game_name: gameName || Boako.Match.Chat.currentGame
+                });
 
+                if (error) throw error;
+                
+                if (window.sfx) window.sfx.rosterLock();
+                Boako.Util.toast("🎉 참가자 전원의 일정이 공식 캘린더에 성공적으로 등재되었습니다!");
+                await Boako.Match.Chat.loadMessagesAndPolls();
+
+            } catch (err) {
+                console.error("일정 확정 (RPC) 에러:", err);
+                alert("일정 테이블 이관 중 오류가 발생했습니다: " + err.message);
+            }
+        },
 
         renderMessage: (msg) => {
             const container = document.getElementById('match-chat-messages');
