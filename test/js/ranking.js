@@ -75,10 +75,33 @@ Boako.Ranking.injectStyle = function() {
         .rk-rank-3 { background: linear-gradient(135deg,#fb923c,#ea580c); color:#fff; }
         .rk-rank-other { background:#f1f5f9; color:#64748b; }
         .rk-detail-row { background: #fafaff; }
-        .hof-card { background: linear-gradient(160deg,#1e1b4b,#312e81); border-radius: 24px; padding: 24px; color: #fff; position: relative; overflow: hidden; }
+.hof-card { background: linear-gradient(160deg,#1e1b4b,#312e81); border-radius: 24px; padding: 24px; color: #fff; position: relative; overflow: hidden; }
         .hof-card::before { content:''; position:absolute; top:-40%; right:-20%; width:200px; height:200px; background: radial-gradient(circle, rgba(251,191,36,.25), transparent 70%); }
-        .hof-champion-card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:14px; text-align:center; transition: transform .2s; }
-        .hof-champion-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,.08); }
+
+        .hof-champion-card {
+            position:relative; width:100%; min-height:280px; border-radius:18px; overflow:hidden;
+            box-shadow: 0 8px 20px rgba(30,27,75,.3); text-align:left;
+            background: linear-gradient(135deg, #312e81 0%, #312e81 45%, #1e1b4b 45%, #1e1b4b 100%);
+            transition: transform .2s;
+        }
+        .hof-champion-card:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(30,27,75,.35); }
+        .hcc-bg-diagonal { position:absolute; inset:0; background: linear-gradient(135deg, rgba(124,58,237,.35) 0%, transparent 40%), linear-gradient(315deg, rgba(0,0,0,.35) 0%, transparent 45%); }
+        .hcc-bg-scrim { position:absolute; inset:0; background: linear-gradient(180deg, rgba(30,27,75,.35) 0%, rgba(30,27,75,.15) 35%, rgba(17,15,45,.92) 100%); }
+        .hcc-season-overlay { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+        .hcc-season-overlay span { position:absolute; line-height:1; }
+        .hcc-game-badge-wrap { position:absolute; z-index:3; top:8px; left:50%; transform:translateX(-50%); }
+        .hcc-game-badge { width:160px; height:160px; object-fit:contain; filter: drop-shadow(0 2px 8px rgba(0,0,0,.4)); }
+        .hcc-body { position:relative; z-index:1; padding: 150px 10px 6px; }
+        .hcc-top-row { display:flex; align-items:center; gap:4px; margin-bottom:14px; margin-left:11px; }
+        .hcc-mvp-wrap { position:relative; width:100px; height:100px; margin-left:-22px; flex-shrink:0; }
+        .hcc-mvp-photo { position:absolute; top:58%; left:49%; transform:translate(-50%,-50%); width:71px; height:71px; border-radius:50%; object-fit:cover; background:#fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+        .hcc-fire-ring { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 8px rgba(249,115,22,.55)); }
+        .hcc-name-col { flex:1; text-align:left; padding-right:14px; min-width:0; }
+        .hcc-nickname { font-size:21px; font-weight:900; font-style:italic; color:#fff; -webkit-text-stroke:1.7px #1e1b4b; paint-order: stroke fill; letter-spacing:.01em; line-height:1.05; margin:0 0 6px; text-shadow:2px 2px 0 rgba(0,0,0,.35); white-space:nowrap; display:inline-block; }
+        .hcc-team-row { display:flex; align-items:center; gap:5px; min-width:0; margin-left:-8px; }
+        .hcc-team-row img { width:15px; height:15px; border-radius:4px; object-fit:contain; background:#fff; padding:1px; flex-shrink:0; }
+        .hcc-team-row span { font-size:10.5px; font-weight:800; color:#e9d5ff; white-space:nowrap; display:inline-block; }
+        .hcc-stamp { position:absolute; z-index:2; bottom:8px; left:53px; width:130px; height:auto; transform:rotate(-14deg); filter: drop-shadow(0 3px 6px rgba(0,0,0,.55)); opacity:.97; pointer-events:none; }
     `;
     document.head.appendChild(style);
 };
@@ -378,6 +401,7 @@ Boako.Ranking.loadHofTab = async function() {
 
         content.innerHTML = Boako.Ranking.getHofHTML();
         if (window.lucide) window.lucide.createIcons();
+        Boako.Ranking.autoFitChampionNames();
 
     } catch (e) {
         console.error('명예의 전당 로드 실패:', e);
@@ -429,22 +453,36 @@ Boako.Ranking.getHofHTML = function() {
     `;
 
     const CHAMPION_BELT = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png';
+    const FIRE_RING = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/firering.png';
+    const seasonKey = Boako.Ranking.getSeasonKey();
+    const seasonOverlayHtml = Boako.Ranking.getSeasonOverlayHtml(seasonKey);
 
     const championGamesHtml = d.championGames.length === 0
         ? `<div class="col-span-full text-center py-10 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl bg-slate-50">챔피언 기록이 없습니다.</div>`
         : d.championGames.map(g => `
-            <div class="hof-champion-card relative">
-                <img src="${CHAMPION_BELT}" class="absolute -top-2 -right-2 w-7 h-7 object-contain" alt="champion belt">
-                <img src="${g.game_logo || DEFAULT_LOGO}" class="w-10 h-10 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 mx-auto mb-2">
-                <div class="text-sm font-black text-slate-800 truncate mb-1.5">${g.game_name}</div>
-                <div class="flex items-center justify-center gap-1.5 mb-1">
-                    <img src="${g.team_logo || DEFAULT_LOGO}" class="w-4 h-4 rounded object-contain">
-                    <span class="text-xs font-bold text-violet-600 truncate">${g.team_name}</span>
+            <div class="hof-champion-card" data-season="${seasonKey}">
+                <div class="hcc-bg-diagonal"></div>
+                <div class="hcc-bg-scrim"></div>
+                ${seasonOverlayHtml}
+                <div class="hcc-game-badge-wrap">
+                    <img class="hcc-game-badge" src="${g.game_logo || DEFAULT_LOGO}">
                 </div>
-                <div class="flex items-center justify-center gap-1">
-                    <img src="${g.mvp_profile || DEFAULT_LOGO}" class="w-4 h-4 rounded-full object-cover">
-                    <span class="text-[10px] text-slate-400 font-bold truncate">${g.mvp_nickname || ''}</span>
+                <div class="hcc-body">
+                    <div class="hcc-top-row">
+                        <div class="hcc-mvp-wrap">
+                            <img class="hcc-mvp-photo" src="${g.mvp_profile || DEFAULT_LOGO}">
+                            <img class="hcc-fire-ring" src="${FIRE_RING}">
+                        </div>
+                        <div class="hcc-name-col">
+                            <div class="hcc-nickname">${g.mvp_nickname || '미정'}</div>
+                            <div class="hcc-team-row">
+                                <img src="${g.team_logo || DEFAULT_LOGO}">
+                                <span>${g.team_name}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                <img class="hcc-stamp" src="${CHAMPION_BELT}">
             </div>
         `).join('');
 
@@ -471,10 +509,86 @@ Boako.Ranking.getHofHTML = function() {
         </div>
 
         <h5 class="font-black text-slate-800 text-sm mb-3 flex items-center gap-2">🎮 종목별 챔피언 (인기 TOP 10)</h5>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             ${championGamesHtml}
         </div>
     `;
+};
+
+Boako.Ranking.getSeasonKey = function() {
+    const m = new Date().getMonth() + 1;
+    if (m === 12 || m <= 2) return 'winter';
+    if (m >= 3 && m <= 5) return 'spring';
+    if (m >= 6 && m <= 8) return 'summer';
+    return '';
+};
+
+Boako.Ranking.getSeasonOverlayHtml = function(season) {
+    if (season === 'winter') {
+        return `<div class="hcc-season-overlay">
+            <span style="top:10%; left:8%; font-size:14px; opacity:.5;">❄️</span>
+            <span style="top:22%; left:80%; font-size:10px; opacity:.4;">❄️</span>
+            <span style="top:40%; left:15%; font-size:9px; opacity:.35;">❄️</span>
+            <span style="top:55%; left:88%; font-size:16px; opacity:.3;">❄️</span>
+            <span style="top:70%; left:5%; font-size:12px; opacity:.4;">❄️</span>
+            <span style="top:85%; left:75%; font-size:11px; opacity:.35;">❄️</span>
+            <span style="top:5%; left:55%; font-size:9px; opacity:.3;">❄️</span>
+            <span style="top:33%; left:45%; font-size:8px; opacity:.25;">❄️</span>
+        </div>`;
+    }
+    if (season === 'spring') {
+        return `<div class="hcc-season-overlay">
+            <span style="top:8%; left:12%; font-size:13px; opacity:.55;">🌸</span>
+            <span style="top:20%; left:78%; font-size:10px; opacity:.4;">🌸</span>
+            <span style="top:38%; left:20%; font-size:9px; opacity:.35;">🌸</span>
+            <span style="top:52%; left:85%; font-size:15px; opacity:.35;">🌸</span>
+            <span style="top:68%; left:8%; font-size:11px; opacity:.4;">🌸</span>
+            <span style="top:82%; left:70%; font-size:10px; opacity:.35;">🌸</span>
+            <span style="top:4%; left:50%; font-size:8px; opacity:.3;">🌸</span>
+            <span style="top:30%; left:48%; font-size:8px; opacity:.25;">🌸</span>
+        </div>`;
+    }
+    if (season === 'summer') {
+        return `<div class="hcc-season-overlay">
+            <span style="top:6%; left:20%; font-size:16px; opacity:.35;">☀️</span>
+            <span style="top:15%; left:70%; font-size:10px; opacity:.3;">🌴</span>
+            <span style="top:45%; left:85%; font-size:12px; opacity:.3;">🌊</span>
+            <span style="top:60%; left:6%; font-size:11px; opacity:.3;">🌊</span>
+            <span style="top:75%; left:60%; font-size:10px; opacity:.28;">🌴</span>
+            <span style="top:30%; left:10%; font-size:9px; opacity:.25;">☀️</span>
+        </div>`;
+    }
+    return '';
+};
+
+Boako.Ranking.autoFitChampionNames = function() {
+    document.querySelectorAll('.hcc-nickname, .hcc-team-row span').forEach(el => {
+        const card = el.closest('.hof-champion-card');
+        const cardRect = card.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const edgeMargin = 10;
+        const availWidth = (cardRect.right - elRect.left) - edgeMargin;
+
+        const clone = el.cloneNode(true);
+        clone.style.position = 'absolute';
+        clone.style.visibility = 'hidden';
+        clone.style.whiteSpace = 'nowrap';
+        clone.style.webkitTextStroke = '0px';
+        clone.style.left = '-9999px';
+        clone.style.top = '0';
+        document.body.appendChild(clone);
+
+        let size = parseFloat(getComputedStyle(el).fontSize);
+        let guard = 0;
+        while (clone.offsetWidth > availWidth && size > 7 && guard < 30) {
+            size -= 0.5;
+            clone.style.fontSize = size + 'px';
+            guard++;
+        }
+
+        el.style.fontSize = size + 'px';
+        document.body.removeChild(clone);
+    });
 };
 
 Boako.Ranking.toggleHofSeasonDropdown = function() {
