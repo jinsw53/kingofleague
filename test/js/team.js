@@ -685,51 +685,29 @@ Boako.Team = {
         e.preventDefault();
         try {
             const formData = new FormData(e.target);
-            const upsertData = [];
-            const gamesToDelete = []; 
+            const entries = [];
 
             for (const [key, value] of formData.entries()) {
                 if (key.startsWith('entry_game_')) {
-                    const gameName = key.replace('entry_game_', '');
-                    if (value) {
-                        upsertData.push({
-                            season_no: seasonNo,
-                            team_name: teamName,
-                            game_name: gameName,
-                            player_name: value,
-                            registered_by: Boako.state.user.nickname
-                        });
-                    } else {
-                        gamesToDelete.push(gameName);
-                    }
+                    entries.push({
+                        game_name: key.replace('entry_game_', ''),
+                        player_name: value || null
+                    });
                 }
             }
 
-            if (gamesToDelete.length > 0) {
-                await Boako.db.from('grandprix_entries')
-                    .delete()
-                    .eq('season_no', seasonNo)
-                    .eq('team_name', teamName)
-                    .in('game_name', gamesToDelete);
-            }
-
-            if (upsertData.length > 0) {
-                const { error: upsertErr } = await Boako.db.from('grandprix_entries')
-                    .upsert(upsertData, { 
-                        onConflict: 'season_no, team_name, game_name' 
-                    });
-                
-                if (upsertErr) throw upsertErr;
-            }
+            const { error } = await Boako.db.rpc('save_grandprix_entries', {
+                p_season_no: seasonNo,
+                p_entries: entries
+            });
+            if (error) throw error;
 
             Boako.Util.toast('✅ 엔트리가 성공적으로 업데이트 되었습니다!');
-            
-            // 모달 닫기
             document.getElementById('entry-modal-overlay').remove();
             
         } catch (err) {
             console.error("엔트리 저장 에러:", err);
-            Boako.Util.toast('저장 중 오류가 발생했습니다. 다시 시도해 주세요.', 'error');
+            Boako.Util.toast('저장 실패: ' + (err.message || '다시 시도해 주세요.'), 'error');
         }
     },
 
