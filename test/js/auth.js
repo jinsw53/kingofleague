@@ -188,7 +188,7 @@ Boako.Auth = {
                         </svg>
                     ` : '';
                     return `
-                        <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; border:1px solid #e2e8f0; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center;">
                             ${fallbackSilhouette}
                             <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
                                 ${teamLogo ? `<img src="${teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:60%; height:60%; object-fit:contain;">` : ''}
