@@ -1241,10 +1241,15 @@ Boako.Match = {
             if (!confirm("이 제안된 시간을 최종 일정으로 수락하시겠습니까?")) return;
 
             try {
-                const { error } = await Boako.db.rpc('accept_schedule_poll', { p_poll_id: pollId });
+                const { data: isConfirmed, error } = await Boako.db.rpc('accept_schedule_poll', { p_poll_id: pollId });
                 if (error) throw error;
 
-                Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
+                if (isConfirmed === true) {
+                    if (window.sfx) window.sfx.rosterLock();
+                    Boako.Util.toast("🎉 참가자 전원의 일정이 확정되었습니다!");
+                } else {
+                    Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
+                }
                 await Boako.Match.Chat.loadMessagesAndPolls();
             } catch (err) {
                 Boako.Util.toast("🚨 " + (err.message || "처리에 실패했습니다."));
@@ -1273,26 +1278,8 @@ Boako.Match = {
             }
         },
 
-        forceConfirmPoll: async (pollId, confirmedTime, proposerId, gameName, seasonNo) => {
-            try {
-                const { error } = await Boako.db.rpc('confirm_match_schedule', {
-                    p_poll_id: pollId,
-                    p_confirmed_time: confirmedTime,
-                    p_proposer_id: proposerId,
-                    p_season_no: seasonNo || Boako.Match.Chat.currentSeason,
-                    p_game_name: gameName || Boako.Match.Chat.currentGame
-                });
+                forceConfirmPoll: async (pollId, confirmedTime, proposerId, gameName, seasonNo) => {
 
-                if (error) throw error;
-                
-                Boako.Util.toast("🎉 참가자 전원의 일정이 공식 캘린더에 성공적으로 등재되었습니다!");
-                await Boako.Match.Chat.loadMessagesAndPolls();
-
-            } catch (err) {
-                console.error("일정 확정 (RPC) 에러:", err);
-                alert("일정 테이블 이관 중 오류가 발생했습니다: " + err.message);
-            }
-        },
 
         renderMessage: (msg) => {
             const container = document.getElementById('match-chat-messages');
