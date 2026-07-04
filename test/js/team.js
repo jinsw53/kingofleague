@@ -604,17 +604,24 @@ Boako.Team = {
                 // 🔥 [핵심 로직] 권한에 따른 드롭다운 분기 처리
                 if (isLeader) {
                     // 👑 1. 팀장: 모든 팀원을 선택할 수 있는 전권 드롭다운
+                    const entryCId = `entry-${game.game_name}`.replace(/\s+/g, '_');
                     selectHtml = `
-                        <select name="entry_game_${game.game_name}" class="w-full appearance-none bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-3 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer text-sm shadow-inner transition-all">
-                            <option value="">미정 / 출전 포기</option>
-                            ${members.map(m => `
-                                <option value="${m.player_name}" ${m.player_name === savedPlayer ? 'selected' : ''}>
-                                    ${m.player_name} ${m.role === 'LEADER' ? '(팀장)' : ''}
-                                </option>
-                            `).join('')}
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-600">▼</div>
+                        <input type="hidden" name="entry_game_${game.game_name}" id="hidden-${entryCId}" value="${savedPlayer}">
+                        ${Boako.Util.renderCSelect(
+                            entryCId,
+                            [
+                                { value: '', label: '미정 / 출전 포기' },
+                                ...members.map(m => ({ value: m.player_name, label: `${m.player_name} ${m.role === 'LEADER' ? '(팀장)' : ''}` }))
+                            ],
+                            savedPlayer,
+                            'w-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-3 pl-4 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer text-sm shadow-inner transition-all',
+                            `Boako.Team.setEntryHidden_${entryCId}`
+                        )}
                     `;
+                    Boako.Team[`setEntryHidden_${entryCId}`] = (value) => {
+                        const el = document.getElementById(`hidden-${entryCId}`);
+                        if (el) el.value = value;
+                    };
                 } else {
                     // 👤 2. 일반 팀원 로직
                     if (savedPlayer && savedPlayer !== myName) {
@@ -629,13 +636,24 @@ Boako.Team = {
                         `;
                     } else {
                         // 빈자리이거나, 내가 선점한 자리인 경우 -> 본인 선택 또는 취소(미정) 가능
+                        const entryCId = `entry-${game.game_name}`.replace(/\s+/g, '_');
                         selectHtml = `
-                            <select name="entry_game_${game.game_name}" class="w-full appearance-none bg-white border border-blue-200 text-blue-700 font-bold py-3 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm shadow-sm transition-all hover:bg-blue-50">
-                                <option value="">미정 (빈자리)</option>
-                                <option value="${myName}" ${savedPlayer === myName ? 'selected' : ''}>🙋‍♂️ ${myName} (본인 출전)</option>
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-blue-500">▼</div>
+                            <input type="hidden" name="entry_game_${game.game_name}" id="hidden-${entryCId}" value="${savedPlayer}">
+                            ${Boako.Util.renderCSelect(
+                                entryCId,
+                                [
+                                    { value: '', label: '미정 (빈자리)' },
+                                    { value: myName, label: `🙋‍♂️ ${myName} (본인 출전)` }
+                                ],
+                                savedPlayer,
+                                'w-full bg-white border border-blue-200 text-blue-700 font-bold py-3 pl-4 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm shadow-sm transition-all hover:bg-blue-50',
+                                `Boako.Team.setEntryHidden_${entryCId}`
+                            )}
                         `;
+                        Boako.Team[`setEntryHidden_${entryCId}`] = (value) => {
+                            const el = document.getElementById(`hidden-${entryCId}`);
+                            if (el) el.value = value;
+                        };
                     }
                 }
 
