@@ -200,6 +200,7 @@ Boako.Rival = {
             });
             if (error) throw error;
 
+            if (window.sfx) window.sfx.rosterLock();
             Boako.Util.toast("🎉 매치 도전장이 성공적으로 발송되었습니다!");
 
         } catch (err) {
