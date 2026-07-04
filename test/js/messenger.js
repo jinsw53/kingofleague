@@ -451,15 +451,38 @@ Boako.Messenger = {
                     messagesHtml += `<div class="flex justify-center my-2 w-full self-center"><div class="bg-gradient-to-b from-indigo-50 to-white border-2 border-indigo-200/60 rounded-2xl p-4 w-72 shadow-md">${cardInnerHtml}</div></div>`;
                 } 
                 else if (msg.action_type === 'SCHEDULE_PROPOSE') {
-                    const proposedTime = msg.metadata?.proposed_time ? new Date(msg.metadata.proposed_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '미정';
+                    const proposedTimes = Array.isArray(msg.metadata?.proposed_times) ? msg.metadata.proposed_times : [];
                     const status = msg.action_status || 'PENDING';
-                    let actionButtons = '', statusBadge = '';
+                    const fmt = (iso) => new Date(iso).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                    let bodyHtml = '', statusBadge = '';
                     if (status === 'PENDING') {
-                        if (!isMe) actionButtons = `<div class="flex gap-2 mt-3"><button onclick="Boako.Messenger.View.replySchedule('${msg.message_id}', 'ACCEPTED')" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded-lg">🟢 수락</button><button onclick="Boako.Messenger.View.replySchedule('${msg.message_id}', 'REJECTED')" class="flex-1 bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-lg">❌ 거절</button></div>`;
-                        else statusBadge = `<div class="mt-3 text-xs text-slate-500 font-bold text-center bg-white/50 py-1.5 rounded-lg">상대방의 수락 대기 중...</div>`;
-                    } else if (status === 'ACCEPTED') statusBadge = `<div class="mt-3 text-xs text-emerald-600 font-bold text-center bg-emerald-50 py-1.5 rounded-lg border border-emerald-100">✅ 수락됨 (캘린더 등록 완료)</div>`;
-                    else if (status === 'REJECTED') statusBadge = `<div class="mt-3 text-xs text-red-500 font-bold text-center bg-red-50 py-1.5 rounded-lg border border-red-100">❌ 거절됨</div>`;
-                    messagesHtml += `<div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${senderName}</div>` : ''}<div class="flex items-end gap-2">${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}<div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800"><div class="flex items-center gap-2 font-black text-indigo-900 mb-2">📅 일정 제안</div><div class="text-sm font-bold text-slate-700 bg-white p-2 rounded-lg border border-indigo-100 text-center">${proposedTime}</div>${actionButtons}${statusBadge}</div>${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}</div></div>`;
+                        if (!isMe) {
+                            const optionButtons = proposedTimes.map(t => `
+                                <button onclick="Boako.Messenger.View.replySchedule('${msg.message_id}', 'ACCEPTED', '${t}')" class="w-full text-left bg-white border border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-slate-700 text-xs font-bold py-2 px-3 rounded-lg mb-1.5 transition-all">
+                                    🟢 ${fmt(t)}
+                                </button>
+                            `).join('');
+                            bodyHtml = `
+                                <div class="text-[11px] text-slate-400 font-bold mb-2">아래 후보 중 하나를 선택하면 바로 확정됩니다.</div>
+                                ${optionButtons}
+                                <button onclick="Boako.Messenger.View.replySchedule('${msg.message_id}', 'REJECTED')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-bold py-2 rounded-lg mt-1">
+                                    ❌ 전부 거절
+                                </button>
+                            `;
+                        } else {
+                            bodyHtml = proposedTimes.map(t => `<div class="text-sm font-bold text-slate-700 bg-white p-2 rounded-lg border border-indigo-100 text-center mb-1.5">${fmt(t)}</div>`).join('');
+                            statusBadge = `<div class="mt-1 text-xs text-slate-500 font-bold text-center bg-white/50 py-1.5 rounded-lg">상대방의 선택 대기 중...</div>`;
+                        }
+                    } else if (status === 'ACCEPTED') {
+                        const chosen = msg.metadata?.chosen_time;
+                        bodyHtml = `<div class="text-sm font-black text-emerald-800 bg-white p-2 rounded-lg border border-emerald-200 text-center mb-2">${chosen ? fmt(chosen) : '확정됨'}</div>`;
+                        statusBadge = `<div class="text-xs text-emerald-600 font-bold text-center bg-emerald-50 py-1.5 rounded-lg border border-emerald-100">✅ 수락됨 (캘린더 등록 완료)</div>`;
+                    } else if (status === 'REJECTED') {
+                        statusBadge = `<div class="text-xs text-red-500 font-bold text-center bg-red-50 py-1.5 rounded-lg border border-red-100">❌ 거절됨</div>`;
+                    }
+
+                    messagesHtml += `<div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${senderName}</div>` : ''}<div class="flex items-end gap-2">${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}<div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 w-72 shadow-sm text-slate-800"><div class="flex items-center gap-2 font-black text-indigo-900 mb-2">📅 일정 제안 (${proposedTimes.length}개 후보)</div>${bodyHtml}${statusBadge}</div>${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}</div></div>`;
                 } else if (msg.action_type === 'CHALLENGE_CARD') {
                     const gameName = msg.metadata?.game_name || '종목미정';
                     const points = msg.metadata?.reward_points || 0;
@@ -730,14 +753,15 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
 
     View: {
 
-        replySchedule: async (messageId, status) => {
+        replySchedule: async (messageId, status, chosenTime = null) => {
             if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
             await Boako.db.from('messages').update({ action_status: status }).eq('message_id', messageId);
             if (status === 'ACCEPTED') {
-                const { error } = await Boako.db.rpc('confirm_direct_match_schedule', { p_message_id: messageId });
+                const { error } = await Boako.db.rpc('confirm_direct_match_schedule', { p_message_id: messageId, p_chosen_time: chosenTime });
                 if (error) {
-                    Boako.Util.toast("캘린더 등록에 실패했습니다.");
+                    Boako.Util.toast("캘린더 등록에 실패했습니다: " + error.message);
                 } else {
+                    if (window.sfx) window.sfx.rosterLock();
                     Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
                 }
             }
