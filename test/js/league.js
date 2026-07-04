@@ -1212,18 +1212,30 @@ Boako.League.showAcceptPopup = function(challengeId) {
     const p = Boako.League.State.challenges.find(c => c.id === challengeId);
     if (!p) return;
     
-    // 포매팅 적용
-    const gamesOptions = (p.proposed_games || []).map((g, i) => `<option value="${i}">${g.name} (${Boako.League.formatMode(g.mode)})</option>`).join('');
-    
-    let schedulesOptions = '<option value="">선택 불가 (일정 없음)</option>';
+    // 포매팅 적용 (커스텀 드롭다운용 옵션 배열)
+    const gamesOptionsArr = (p.proposed_games || []).map((g, i) => ({ value: i, label: `${g.name} (${Boako.League.formatMode(g.mode)})` }));
+
+    let schedulesOptionsArr = [{ value: '', label: '선택 불가 (일정 없음)' }];
     if (p.schedule && p.schedule.length > 0) {
-        schedulesOptions = p.schedule.map((d) => {
+        schedulesOptionsArr = p.schedule.map((d) => {
             const dt = new Date(d);
             const isZeroTime = dt.getHours() === 0 && dt.getMinutes() === 0;
             const display = isZeroTime ? `${dt.getMonth()+1}월 ${dt.getDate()}일 (시간 상관없음)` : `${dt.getMonth()+1}월 ${dt.getDate()}일 ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
-            return `<option value="${d}">${display}</option>`;
-        }).join('');
+            return { value: d, label: display };
+        });
     }
+
+    const firstGameValue = gamesOptionsArr[0]?.value ?? '';
+    const firstScheduleValue = schedulesOptionsArr[0]?.value ?? '';
+
+    Boako.League.setPopupGame = (value) => {
+        const el = document.getElementById('popup-selected-game');
+        if (el) el.value = value;
+    };
+    Boako.League.setPopupSchedule = (value) => {
+        const el = document.getElementById('popup-confirmed-schedule');
+        if (el) el.value = value;
+    };
     
     const safeTeamLogo = (p.attacker_team_logo_url && p.attacker_team_logo_url !== 'null') ? p.attacker_team_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png';
 
@@ -1239,11 +1251,25 @@ Boako.League.showAcceptPopup = function(challengeId) {
                 <div class="p-6 space-y-5">
                     <div>
                         <label class="block text-xs font-black text-slate-700 mb-1.5">🎯 맞붙을 종목 선택</label>
-                        <select id="popup-selected-game" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 cursor-pointer shadow-inner">${gamesOptions}</select>
+                        <input type="hidden" id="popup-selected-game" value="${firstGameValue}">
+                        ${Boako.Util.renderCSelect(
+                            'popup-game',
+                            gamesOptionsArr,
+                            firstGameValue,
+                            'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 cursor-pointer shadow-inner',
+                            'Boako.League.setPopupGame'
+                        )}
                     </div>
                     <div>
                         <label class="block text-xs font-black text-slate-700 mb-1.5">🕒 최종 확정 일정 선택</label>
-                        <select id="popup-confirmed-schedule" class="w-full bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2.5 text-xs font-black text-indigo-800 outline-none focus:border-indigo-500 cursor-pointer shadow-inner">${schedulesOptions}</select>
+                        <input type="hidden" id="popup-confirmed-schedule" value="${firstScheduleValue}">
+                        ${Boako.Util.renderCSelect(
+                            'popup-schedule',
+                            schedulesOptionsArr,
+                            firstScheduleValue,
+                            'w-full bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2.5 text-xs font-black text-indigo-800 outline-none focus:border-indigo-500 cursor-pointer shadow-inner',
+                            'Boako.League.setPopupSchedule'
+                        )}
                     </div>
                     
                     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
