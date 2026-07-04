@@ -61,9 +61,15 @@ Boako.View = {
         if (pageId === 'inventory') {
             targetMenuId = 'menu-shop'; 
         }
-        // 🌟 팀 목록은 pageId(team_list, 언더스코어)와 실제 메뉴 id(menu-team-list, 하이픈)가 달라서 매핑 필요
-        if (pageId === 'team_list') {
-            targetMenuId = 'menu-team-list';
+        // 🌟 pageId와 실제 메뉴 HTML id 표기가 다른 것들 전부 매핑 (카페는 별도 작업 예정이라 제외)
+        const menuIdOverrides = {
+            'boardgame': 'menu-first-item',
+            'team_list': 'menu-team-list',
+            'admin_review': 'menu-admin-review',
+            'record_verify': 'menu-record-verify'
+        };
+        if (menuIdOverrides[pageId]) {
+            targetMenuId = menuIdOverrides[pageId];
         }
 
         // 버튼 불 켜고 그 위치로 스르륵 이동!
