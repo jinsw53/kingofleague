@@ -974,21 +974,31 @@ Boako.League.renderSelectedGames = function() {
                 <span class="text-xs font-black text-slate-800">${g.name}</span>
             </div>
             <div class="flex items-center gap-2">
-                <div class="relative">
-                    <select class="appearance-none bg-violet-50 border border-violet-200 hover:border-violet-400 hover:bg-white rounded-lg text-[10px] pl-2.5 pr-6 py-1.5 font-black text-violet-700 outline-none cursor-pointer shadow-sm focus:ring-2 focus:ring-violet-200 transition-all" onchange="Boako.League.State.selectedProposedGames[${idx}].mode = this.value">
-                        <option value="4v4" ${g.mode==='4v4'?'selected':''}>4vs4</option>
-                        <option value="3v3" ${g.mode==='3v3'?'selected':''}>3vs3</option>
-                        <option value="2v2" ${g.mode==='2v2'?'selected':''}>2vs2</option>
-                        <option value="1v1" ${g.mode==='1v1'?'selected':''}>1vs1</option>
-                    </select>
-                    <i data-lucide="chevron-down" class="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-500 pointer-events-none transition-transform group-hover:translate-y(-40%)"></i>
-                </div>
+                ${Boako.Util.renderCSelect(
+                    `mode-${idx}`,
+                    [
+                        { value: '4v4', label: '4vs4' },
+                        { value: '3v3', label: '3vs3' },
+                        { value: '2v2', label: '2vs2' },
+                        { value: '1v1', label: '1vs1' }
+                    ],
+                    g.mode,
+                    'bg-violet-50 border border-violet-200 hover:border-violet-400 hover:bg-white rounded-lg text-[10px] pl-2.5 pr-2.5 py-1.5 font-black text-violet-700 outline-none cursor-pointer shadow-sm transition-all',
+                    `Boako.League.updateProposedGameMode_${idx}`
+                )}
                 <button type="button" class="w-6 h-6 flex items-center justify-center rounded-md bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors" onclick="Boako.League.removeProposedGame(${idx})">
                     <i data-lucide="x" class="w-3 h-3 font-black"></i>
                 </button>
             </div>
         </div>
     `}).join('');
+
+    // 🌟 커스텀 드롭다운용 인덱스별 모드 변경 함수 동적 등록
+    Boako.League.State.selectedProposedGames.forEach((g, idx) => {
+        Boako.League[`updateProposedGameMode_${idx}`] = (value) => {
+            Boako.League.State.selectedProposedGames[idx].mode = value;
+        };
+    });
 
     setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 
