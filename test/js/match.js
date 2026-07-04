@@ -978,15 +978,23 @@ Boako.Match = {
 
                         <div class="bg-indigo-50 p-3 border-b border-indigo-100 flex items-center gap-2">
                             <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 고정 시간</span>
-                            <select id="poll-fixed-time-select" onchange="Boako.Match.Chat.changeFixedTime(this.value)" class="flex-1 bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
-                                <option value="시간 상관없음">☀️ 시간 상관없음</option>
-                                ${Array.from({length: 24}, (_, i) => {
-                                    const time = String(i).padStart(2, '0') + ':00';
-                                    const ampm = i < 12 ? '오전' : '오후';
-                                    const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
-                                    return `<option value="${time}" ${time === '20:00' ? 'selected' : ''}>${time} (${ampm} ${h}시)</option>`;
-                                }).join('')}
-                            </select>
+                            <div class="flex-1">
+                                ${Boako.Util.renderCSelect(
+                                    'poll-fixed-time',
+                                    [
+                                        { value: '시간 상관없음', label: '☀️ 시간 상관없음' },
+                                        ...Array.from({length: 24}, (_, i) => {
+                                            const time = String(i).padStart(2, '0') + ':00';
+                                            const ampm = i < 12 ? '오전' : '오후';
+                                            const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
+                                            return { value: time, label: `${time} (${ampm} ${h}시)` };
+                                        })
+                                    ],
+                                    '20:00',
+                                    'w-full bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none',
+                                    'Boako.Match.Chat.changeFixedTime'
+                                )}
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-white pt-3 pb-1">
