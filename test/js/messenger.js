@@ -171,6 +171,7 @@ Boako.Messenger = {
                             id: roomId,
                             isMatch: isMatch,
                             matchType: msg.metadata?.match_type,
+                            gameName: msg.metadata?.game_name || '종목미정',
                             otherId: otherId,
                             otherName: otherName, 
                             title: roomTitle,
@@ -532,7 +533,7 @@ Boako.Messenger = {
                 success = await Boako.Messenger.sendMatchChannel(room.seasonNo, room.gameName, content);
             } else {
                 const matchId = room.isMatch ? room.id : null;
-                const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.title.replace(/\[|\]/g, '').split(' ')[0] } : {};
+const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.gameName } : {};
                 success = await Boako.Messenger.sendDirect(room.otherId, content, room.otherName, 'DEFAULT', metadata, matchId);
             }
 
