@@ -291,6 +291,181 @@ Boako.Messenger = {
         Boako.Messenger.realtimeChannels.push(msgChannel, matchChannel, pollChannel);
     },
 
+    // 🌟 [신규] 라이벌/승자연전 1:1 일정 제안용 달력 모달 (다중 날짜 선택)
+    ScheduleModal: {
+        roomId: null,
+        calYear: new Date().getFullYear(),
+        calMonth: new Date().getMonth() + 1,
+        selectedTimesState: [],
+        currentFixedTime: '20:00',
+
+        open: (roomId) => {
+            Boako.Messenger.ScheduleModal.roomId = roomId;
+            Boako.Messenger.ScheduleModal.calYear = new Date().getFullYear();
+            Boako.Messenger.ScheduleModal.calMonth = new Date().getMonth() + 1;
+            Boako.Messenger.ScheduleModal.selectedTimesState = [];
+            Boako.Messenger.ScheduleModal.currentFixedTime = '20:00';
+
+            const existing = document.getElementById('dm-schedule-modal');
+            if (existing) existing.remove();
+
+            const modalHtml = `
+                <div id="dm-schedule-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div class="bg-white rounded-3xl w-80 shadow-2xl overflow-hidden flex flex-col relative">
+
+                        <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10">
+                            <button onclick="Boako.Messenger.ScheduleModal.changeMonth(-1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">◀</button>
+                            <h3 id="dm-cal-month-title" class="font-black text-sm tracking-widest"></h3>
+                            <button onclick="Boako.Messenger.ScheduleModal.changeMonth(1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">▶</button>
+                        </div>
+                        <button onclick="document.getElementById('dm-schedule-modal').remove()" class="absolute top-3 right-3 text-white/50 hover:text-white font-black text-xl z-20">×</button>
+
+                        <div class="bg-indigo-50 p-3 border-b border-indigo-100 flex items-center gap-2">
+                            <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 고정 시간</span>
+                            <div class="flex-1">
+                                ${Boako.Util.renderCSelect(
+                                    'dm-fixed-time',
+                                    Array.from({length: 24}, (_, i) => {
+                                        const time = String(i).padStart(2, '0') + ':00';
+                                        const ampm = i < 12 ? '오전' : '오후';
+                                        const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
+                                        return { value: time, label: `${time} (${ampm} ${h}시)` };
+                                    }),
+                                    '20:00',
+                                    'w-full bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none',
+                                    'Boako.Messenger.ScheduleModal.changeFixedTime'
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-white pt-3 pb-1">
+                            <div class="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-400">토</div>
+                        </div>
+
+                        <div id="dm-cal-days-grid" class="grid grid-cols-7 gap-1.5 p-3 bg-white mb-2"></div>
+
+                        <div class="p-3 bg-white border-t border-slate-100">
+                            <button id="dm-schedule-submit-btn" onclick="Boako.Messenger.ScheduleModal.submit()" class="w-full bg-slate-200 text-slate-500 text-xs font-black py-3 rounded-xl transition-all shadow-sm cursor-not-allowed" disabled>
+                                날짜를 클릭하여 선택하세요
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            Boako.Messenger.ScheduleModal.renderCalendarGrid();
+        },
+
+        changeFixedTime: (val) => {
+            Boako.Messenger.ScheduleModal.currentFixedTime = val;
+        },
+
+        changeMonth: (delta) => {
+            let m = Boako.Messenger.ScheduleModal.calMonth + delta;
+            let y = Boako.Messenger.ScheduleModal.calYear;
+            if (m > 12) { m = 1; y++; }
+            if (m < 1) { m = 12; y--; }
+            Boako.Messenger.ScheduleModal.calYear = y;
+            Boako.Messenger.ScheduleModal.calMonth = m;
+            Boako.Messenger.ScheduleModal.renderCalendarGrid();
+        },
+
+        renderCalendarGrid: () => {
+            const year = Boako.Messenger.ScheduleModal.calYear;
+            const month = Boako.Messenger.ScheduleModal.calMonth;
+            document.getElementById('dm-cal-month-title').innerText = `${year}년 ${month}월`;
+
+            const firstDay = new Date(year, month - 1, 1).getDay();
+            const lastDate = new Date(year, month, 0).getDate();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let gridHtml = '';
+            for (let i = 0; i < firstDay; i++) gridHtml += `<div class="p-2"></div>`;
+
+            for (let day = 1; day <= lastDate; day++) {
+                const currentCellDate = new Date(year, month - 1, day);
+                const isPast = currentCellDate < today;
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                const dayTimes = Boako.Messenger.ScheduleModal.selectedTimesState.filter(t => t.dateKey === dateStr);
+                const isSelected = dayTimes.length > 0;
+
+                let cellClass = "w-full aspect-square flex flex-col items-center justify-center rounded-xl transition-all relative ";
+                let innerHtml = `<span class="text-xs font-bold">${day}</span>`;
+
+                if (isPast) {
+                    cellClass += "text-slate-300 cursor-not-allowed bg-slate-50/50";
+                } else if (isSelected) {
+                    cellClass += "bg-indigo-600 text-white shadow-md transform scale-105 cursor-pointer ring-2 ring-indigo-200 ring-offset-1";
+                    innerHtml += `<span class="text-[8px] font-mono mt-0.5 opacity-90">${dayTimes[0].timeLabel}</span>`;
+                } else {
+                    cellClass += "text-slate-700 bg-slate-50 hover:bg-indigo-100 hover:text-indigo-700 cursor-pointer border border-slate-100";
+                }
+
+                gridHtml += `<div onclick="${isPast ? '' : `Boako.Messenger.ScheduleModal.toggleDate('${dateStr}')`}" class="${cellClass}">${innerHtml}</div>`;
+            }
+
+            document.getElementById('dm-cal-days-grid').innerHTML = gridHtml;
+            Boako.Messenger.ScheduleModal.updateSubmitButton();
+        },
+
+        toggleDate: (dateStr) => {
+            const timeStr = Boako.Messenger.ScheduleModal.currentFixedTime;
+            const [hh, mm] = timeStr.split(':');
+            const isoTime = new Date(`${dateStr}T${hh}:${mm}:00+09:00`).toISOString();
+
+            const idx = Boako.Messenger.ScheduleModal.selectedTimesState.findIndex(t => t.dateKey === dateStr);
+            if (idx > -1) {
+                Boako.Messenger.ScheduleModal.selectedTimesState.splice(idx, 1);
+            } else {
+                Boako.Messenger.ScheduleModal.selectedTimesState.push({ dateKey: dateStr, iso: isoTime, timeLabel: timeStr });
+            }
+            Boako.Messenger.ScheduleModal.renderCalendarGrid();
+        },
+
+        updateSubmitButton: () => {
+            const btn = document.getElementById('dm-schedule-submit-btn');
+            const count = Boako.Messenger.ScheduleModal.selectedTimesState.length;
+            if (count > 0) {
+                btn.disabled = false;
+                btn.className = "w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-3 rounded-xl transition-all shadow-md active:scale-95 flex justify-center items-center gap-2";
+                btn.innerHTML = `<span class="bg-white text-indigo-700 px-1.5 py-0.5 rounded-md text-[10px] leading-none">${count}</span> 개 후보 일정 제안하기`;
+            } else {
+                btn.disabled = true;
+                btn.className = "w-full bg-slate-200 text-slate-500 text-xs font-black py-3 rounded-xl transition-all shadow-sm cursor-not-allowed";
+                btn.innerHTML = "달력의 날짜를 클릭하여 선택하세요";
+            }
+        },
+
+        submit: async () => {
+            const times = Boako.Messenger.ScheduleModal.selectedTimesState;
+            if (times.length === 0) return;
+            if (!confirm(`${times.length}개의 후보 일정을 제안하시겠습니까?`)) return;
+
+            const roomId = Boako.Messenger.ScheduleModal.roomId;
+            const room = Boako.Messenger.chatRooms[roomId];
+
+            const md = {
+                match_type: room.matchType,
+                game_name: room.gameName,
+                proposed_times: times.map(t => t.iso)
+            };
+
+            const success = await Boako.Messenger.sendDirect(room.otherId, "매치 일정을 제안합니다.", room.otherName, 'SCHEDULE_PROPOSE', md, roomId);
+            document.getElementById('dm-schedule-modal').remove();
+
+            if (success) {
+                Boako.Util.toast(`📅 ${times.length}개의 후보 일정이 제안되었습니다!`);
+                await Boako.Messenger.View.refreshRoomList();
+                Boako.Messenger.View.openRoom(roomId);
+            } else {
+                Boako.Util.toast("❌ 전송에 실패했습니다.");
+            }
+        }
+    },
+
     View: {
         renderMain: async () => {
             const container = document.getElementById('main-content');
@@ -574,181 +749,6 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
 
             Boako.Messenger.ScheduleModal.open(roomId);
         },
-
-    // 🌟 [신규] 라이벌/승자연전 1:1 일정 제안용 달력 모달 (다중 날짜 선택)
-    ScheduleModal: {
-        roomId: null,
-        calYear: new Date().getFullYear(),
-        calMonth: new Date().getMonth() + 1,
-        selectedTimesState: [],
-        currentFixedTime: '20:00',
-
-        open: (roomId) => {
-            Boako.Messenger.ScheduleModal.roomId = roomId;
-            Boako.Messenger.ScheduleModal.calYear = new Date().getFullYear();
-            Boako.Messenger.ScheduleModal.calMonth = new Date().getMonth() + 1;
-            Boako.Messenger.ScheduleModal.selectedTimesState = [];
-            Boako.Messenger.ScheduleModal.currentFixedTime = '20:00';
-
-            const existing = document.getElementById('dm-schedule-modal');
-            if (existing) existing.remove();
-
-            const modalHtml = `
-                <div id="dm-schedule-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div class="bg-white rounded-3xl w-80 shadow-2xl overflow-hidden flex flex-col relative">
-
-                        <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10">
-                            <button onclick="Boako.Messenger.ScheduleModal.changeMonth(-1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">◀</button>
-                            <h3 id="dm-cal-month-title" class="font-black text-sm tracking-widest"></h3>
-                            <button onclick="Boako.Messenger.ScheduleModal.changeMonth(1)" class="p-1 hover:bg-white/20 rounded-lg transition-colors">▶</button>
-                        </div>
-                        <button onclick="document.getElementById('dm-schedule-modal').remove()" class="absolute top-3 right-3 text-white/50 hover:text-white font-black text-xl z-20">×</button>
-
-                        <div class="bg-indigo-50 p-3 border-b border-indigo-100 flex items-center gap-2">
-                            <span class="text-[10px] font-black text-indigo-800 shrink-0">⏰ 고정 시간</span>
-                            <div class="flex-1">
-                                ${Boako.Util.renderCSelect(
-                                    'dm-fixed-time',
-                                    Array.from({length: 24}, (_, i) => {
-                                        const time = String(i).padStart(2, '0') + ':00';
-                                        const ampm = i < 12 ? '오전' : '오후';
-                                        const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
-                                        return { value: time, label: `${time} (${ampm} ${h}시)` };
-                                    }),
-                                    '20:00',
-                                    'w-full bg-white border border-indigo-200 text-indigo-900 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none',
-                                    'Boako.Messenger.ScheduleModal.changeFixedTime'
-                                )}
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-7 text-center text-[10px] font-black text-slate-400 bg-white pt-3 pb-1">
-                            <div class="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-400">토</div>
-                        </div>
-
-                        <div id="dm-cal-days-grid" class="grid grid-cols-7 gap-1.5 p-3 bg-white mb-2"></div>
-
-                        <div class="p-3 bg-white border-t border-slate-100">
-                            <button id="dm-schedule-submit-btn" onclick="Boako.Messenger.ScheduleModal.submit()" class="w-full bg-slate-200 text-slate-500 text-xs font-black py-3 rounded-xl transition-all shadow-sm cursor-not-allowed" disabled>
-                                날짜를 클릭하여 선택하세요
-                            </button>
-                        </div>
-
-                    </div>
-                </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            Boako.Messenger.ScheduleModal.renderCalendarGrid();
-        },
-
-        changeFixedTime: (val) => {
-            Boako.Messenger.ScheduleModal.currentFixedTime = val;
-        },
-
-        changeMonth: (delta) => {
-            let m = Boako.Messenger.ScheduleModal.calMonth + delta;
-            let y = Boako.Messenger.ScheduleModal.calYear;
-            if (m > 12) { m = 1; y++; }
-            if (m < 1) { m = 12; y--; }
-            Boako.Messenger.ScheduleModal.calYear = y;
-            Boako.Messenger.ScheduleModal.calMonth = m;
-            Boako.Messenger.ScheduleModal.renderCalendarGrid();
-        },
-
-        renderCalendarGrid: () => {
-            const year = Boako.Messenger.ScheduleModal.calYear;
-            const month = Boako.Messenger.ScheduleModal.calMonth;
-            document.getElementById('dm-cal-month-title').innerText = `${year}년 ${month}월`;
-
-            const firstDay = new Date(year, month - 1, 1).getDay();
-            const lastDate = new Date(year, month, 0).getDate();
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            let gridHtml = '';
-            for (let i = 0; i < firstDay; i++) gridHtml += `<div class="p-2"></div>`;
-
-            for (let day = 1; day <= lastDate; day++) {
-                const currentCellDate = new Date(year, month - 1, day);
-                const isPast = currentCellDate < today;
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-                const dayTimes = Boako.Messenger.ScheduleModal.selectedTimesState.filter(t => t.dateKey === dateStr);
-                const isSelected = dayTimes.length > 0;
-
-                let cellClass = "w-full aspect-square flex flex-col items-center justify-center rounded-xl transition-all relative ";
-                let innerHtml = `<span class="text-xs font-bold">${day}</span>`;
-
-                if (isPast) {
-                    cellClass += "text-slate-300 cursor-not-allowed bg-slate-50/50";
-                } else if (isSelected) {
-                    cellClass += "bg-indigo-600 text-white shadow-md transform scale-105 cursor-pointer ring-2 ring-indigo-200 ring-offset-1";
-                    innerHtml += `<span class="text-[8px] font-mono mt-0.5 opacity-90">${dayTimes[0].timeLabel}</span>`;
-                } else {
-                    cellClass += "text-slate-700 bg-slate-50 hover:bg-indigo-100 hover:text-indigo-700 cursor-pointer border border-slate-100";
-                }
-
-                gridHtml += `<div onclick="${isPast ? '' : `Boako.Messenger.ScheduleModal.toggleDate('${dateStr}')`}" class="${cellClass}">${innerHtml}</div>`;
-            }
-
-            document.getElementById('dm-cal-days-grid').innerHTML = gridHtml;
-            Boako.Messenger.ScheduleModal.updateSubmitButton();
-        },
-
-        toggleDate: (dateStr) => {
-            const timeStr = Boako.Messenger.ScheduleModal.currentFixedTime;
-            const [hh, mm] = timeStr.split(':');
-            const isoTime = new Date(`${dateStr}T${hh}:${mm}:00+09:00`).toISOString();
-
-            const idx = Boako.Messenger.ScheduleModal.selectedTimesState.findIndex(t => t.dateKey === dateStr);
-            if (idx > -1) {
-                Boako.Messenger.ScheduleModal.selectedTimesState.splice(idx, 1);
-            } else {
-                Boako.Messenger.ScheduleModal.selectedTimesState.push({ dateKey: dateStr, iso: isoTime, timeLabel: timeStr });
-            }
-            Boako.Messenger.ScheduleModal.renderCalendarGrid();
-        },
-
-        updateSubmitButton: () => {
-            const btn = document.getElementById('dm-schedule-submit-btn');
-            const count = Boako.Messenger.ScheduleModal.selectedTimesState.length;
-            if (count > 0) {
-                btn.disabled = false;
-                btn.className = "w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-3 rounded-xl transition-all shadow-md active:scale-95 flex justify-center items-center gap-2";
-                btn.innerHTML = `<span class="bg-white text-indigo-700 px-1.5 py-0.5 rounded-md text-[10px] leading-none">${count}</span> 개 후보 일정 제안하기`;
-            } else {
-                btn.disabled = true;
-                btn.className = "w-full bg-slate-200 text-slate-500 text-xs font-black py-3 rounded-xl transition-all shadow-sm cursor-not-allowed";
-                btn.innerHTML = "달력의 날짜를 클릭하여 선택하세요";
-            }
-        },
-
-        submit: async () => {
-            const times = Boako.Messenger.ScheduleModal.selectedTimesState;
-            if (times.length === 0) return;
-            if (!confirm(`${times.length}개의 후보 일정을 제안하시겠습니까?`)) return;
-
-            const roomId = Boako.Messenger.ScheduleModal.roomId;
-            const room = Boako.Messenger.chatRooms[roomId];
-
-            const md = {
-                match_type: room.matchType,
-                game_name: room.gameName,
-                proposed_times: times.map(t => t.iso)
-            };
-
-            const success = await Boako.Messenger.sendDirect(room.otherId, "매치 일정을 제안합니다.", room.otherName, 'SCHEDULE_PROPOSE', md, roomId);
-            document.getElementById('dm-schedule-modal').remove();
-
-            if (success) {
-                Boako.Util.toast(`📅 ${times.length}개의 후보 일정이 제안되었습니다!`);
-                await Boako.Messenger.View.refreshRoomList();
-                Boako.Messenger.View.openRoom(roomId);
-            } else {
-                Boako.Util.toast("❌ 전송에 실패했습니다.");
-            }
-        }
-    },
 
         replySchedule: async (messageId, status, chosenTime = null) => {
             if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
