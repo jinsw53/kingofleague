@@ -573,6 +573,7 @@ Boako.Messenger = {
             try {
                 const { error } = await Boako.db.rpc('respond_to_rival_match', { p_match_id: matchId, p_action: status });
                 if (error) throw new Error("처리 실패");
+                if (status === 'ACCEPTED' && window.sfx) window.sfx.rosterLock();
                 Boako.Util.toast(`✅ 라이벌 도전을 처리했습니다!`);
                 await Boako.Messenger.fetchUnreadCount(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
             } catch (err) { alert(err.message); }
