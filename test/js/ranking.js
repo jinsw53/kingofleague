@@ -347,11 +347,33 @@ Boako.Ranking.loadHofTab = async function() {
             .eq('season_no', seasonNo)
             .order('game_popularity_rank', { ascending: true });
 
+        // 🌟 게임 로고 / 팀 로고 / MVP 프로필 사진 별도 조회 후 병합
+        const gameNames = [...new Set((championGames || []).map(g => g.game_name).filter(Boolean))];
+        const teamNames = [...new Set((championGames || []).map(g => g.team_name).filter(Boolean))];
+        const mvpNicknames = [...new Set((championGames || []).map(g => g.mvp_nickname).filter(Boolean))];
+
+        const [{ data: gameImgs }, { data: teamLogos }, { data: mvpProfiles }] = await Promise.all([
+            gameNames.length ? Boako.db.from('games').select('game_name, image_url').in('game_name', gameNames) : { data: [] },
+            teamNames.length ? Boako.db.from('teams').select('team_name, logo_url').in('team_name', teamNames) : { data: [] },
+            mvpNicknames.length ? Boako.db.from('profiles').select('full_name, profile_url').in('full_name', mvpNicknames) : { data: [] }
+        ]);
+
+        const gameImgMap = Object.fromEntries((gameImgs || []).map(g => [g.game_name, g.image_url]));
+        const teamLogoMap = Object.fromEntries((teamLogos || []).map(t => [t.team_name, t.logo_url]));
+        const mvpProfileMap = Object.fromEntries((mvpProfiles || []).map(p => [p.full_name, p.profile_url]));
+
+        const championGamesEnriched = (championGames || []).map(g => ({
+            ...g,
+            game_logo: gameImgMap[g.game_name] || null,
+            team_logo: teamLogoMap[g.team_name] || null,
+            mvp_profile: mvpProfileMap[g.mvp_nickname] || null
+        }));
+
          Boako.Ranking.State.hofData = {
             seasonTitle: `시즌 ${seasonNo}`,
             championTeam: championTeamRow,
             mvp,
-            championGames: championGames || []
+            championGames: championGamesEnriched
         };
 
         content.innerHTML = Boako.Ranking.getHofHTML();
@@ -406,14 +428,23 @@ Boako.Ranking.getHofHTML = function() {
         <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm text-center text-slate-400 font-bold text-sm">MVP 기록 없음</div>
     `;
 
+    const CHAMPION_BELT = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png';
+
     const championGamesHtml = d.championGames.length === 0
         ? `<div class="col-span-full text-center py-10 text-slate-400 font-bold border border-dashed border-slate-200 rounded-xl bg-slate-50">챔피언 기록이 없습니다.</div>`
         : d.championGames.map(g => `
-            <div class="hof-champion-card">
-                <div class="text-[9px] font-black text-slate-300 uppercase mb-1">TOP ${g.game_popularity_rank}</div>
-                <div class="text-sm font-black text-slate-800 truncate mb-1">${g.game_name}</div>
-                <div class="text-xs font-bold text-violet-600">${g.team_name}</div>
-                <div class="text-[10px] text-slate-400 font-bold mt-0.5">${g.mvp_nickname || ''}</div>
+            <div class="hof-champion-card relative">
+                <img src="${CHAMPION_BELT}" class="absolute -top-2 -right-2 w-7 h-7 object-contain" alt="champion belt">
+                <img src="${g.game_logo || DEFAULT_LOGO}" class="w-10 h-10 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 mx-auto mb-2">
+                <div class="text-sm font-black text-slate-800 truncate mb-1.5">${g.game_name}</div>
+                <div class="flex items-center justify-center gap-1.5 mb-1">
+                    <img src="${g.team_logo || DEFAULT_LOGO}" class="w-4 h-4 rounded object-contain">
+                    <span class="text-xs font-bold text-violet-600 truncate">${g.team_name}</span>
+                </div>
+                <div class="flex items-center justify-center gap-1">
+                    <img src="${g.mvp_profile || DEFAULT_LOGO}" class="w-4 h-4 rounded-full object-cover">
+                    <span class="text-[10px] text-slate-400 font-bold truncate">${g.mvp_nickname || ''}</span>
+                </div>
             </div>
         `).join('');
 
