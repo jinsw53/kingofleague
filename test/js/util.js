@@ -58,8 +58,54 @@ Boako.Util = {
         if (targetBtn) {
             targetBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
+    },
+
+    // 🎨 6. [신규] 네이티브 <select> 대체용 공용 커스텀 드롭다운
+    //    options: [{ value, label }], onSelectFn: 문자열로 된 전역 함수 경로 (예: 'Boako.Match.Chat.changeFixedTime')
+    renderCSelect: (id, options, selectedValue, buttonClass, onSelectFn) => {
+        const selectedOpt = options.find(o => String(o.value) === String(selectedValue)) || options[0] || { label: '' };
+        const itemsHtml = options.map(o => `
+            <div onclick="Boako.Util.selectCSelect('${id}', '${String(o.value).replace(/'/g, "\\'")}', '${String(o.label).replace(/'/g, "\\'")}', '${onSelectFn}')"
+                 class="px-3 py-2 text-xs font-bold cursor-pointer hover:bg-indigo-50 transition-colors ${String(o.value) === String(selectedValue) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}">
+                ${o.label}
+            </div>
+        `).join('');
+
+        return `
+            <div class="relative" id="cselect-${id}">
+                <button type="button" onclick="event.stopPropagation(); Boako.Util.toggleCSelect('${id}')" class="${buttonClass} flex justify-between items-center gap-2">
+                    <span id="cselect-${id}-label">${selectedOpt.label}</span>
+                    <svg class="w-3 h-3 shrink-0 opacity-60" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"></path></svg>
+                </button>
+                <div id="cselect-${id}-menu" class="hidden absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg custom-scrollbar">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    },
+
+    toggleCSelect: (id) => {
+        // 다른 곳에 열려있는 드롭다운은 전부 닫고 이것만 토글
+        document.querySelectorAll('[id^="cselect-"][id$="-menu"]').forEach(el => {
+            if (el.id !== `cselect-${id}-menu`) el.classList.add('hidden');
+        });
+        document.getElementById(`cselect-${id}-menu`)?.classList.toggle('hidden');
+    },
+
+    selectCSelect: (id, value, label, onSelectFn) => {
+        const labelEl = document.getElementById(`cselect-${id}-label`);
+        if (labelEl) labelEl.innerText = label;
+        document.getElementById(`cselect-${id}-menu`)?.classList.add('hidden');
+
+        if (onSelectFn) {
+            const fn = onSelectFn.split('.').reduce((o, k) => (o ? o[k] : undefined), window);
+            if (typeof fn === 'function') fn(value);
+        }
     }
 };
+
+// 커스텀 드롭다운 바깥 클릭 시 자동 닫힘
+document.addEventListener('click', function() {
 window.sfx = (function() {
     let ctx = null;
     function getCtx() {
