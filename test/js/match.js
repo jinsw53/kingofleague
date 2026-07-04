@@ -1111,99 +1111,23 @@ Boako.Match = {
             if (myTimes.length === 0) return;
 
             const roomId = `${Boako.Match.Chat.currentSeason}_${Boako.Match.Chat.currentGame}`;
-            const myId = String(Boako.state.user.id);
 
-            // 🚨 [핵심 방어 2] OPEN/PROPOSED만 긁어오지 않고, 일단 전부 다 긁어옴
-            const { data: existingPolls } = await Boako.db.from('schedule_polls')
-                .select('*')
-                .eq('target_id', roomId)
-                .order('created_at', { ascending: false });
+            try {
+                const { error } = await Boako.db.rpc('submit_schedule_poll', {
+                    p_target_id: roomId,
+                    p_target_type: 'MATCH_CHANNEL',
+                    p_game_name: Boako.Match.Chat.currentGame,
+                    p_mode: Boako.Match.Chat.currentFormat || 'SWISS',
+                    p_my_times: myTimes
+                });
+                if (error) throw error;
 
-            // 만약 이미 확정된(CONFIRMED) 투표가 단 1개라도 있다면 인서트/업데이트 전면 차단
-            if (existingPolls && existingPolls.some(p => p.status === 'CONFIRMED')) {
-                Boako.Util.toast("🚨 이미 일정이 최종 확정되어 제출이 취소되었습니다.");
                 document.getElementById('poll-calendar-modal').remove();
-                return;
+                Boako.Util.toast(`📅 ${myTimes.length}개의 후보 일정이 성공적으로 제출되었습니다!`);
+                await Boako.Match.Chat.loadMessagesAndPolls();
+            } catch (err) {
+                Boako.Util.toast("🚨 " + (err.message || "제출에 실패했습니다."));
             }
-
-            // 확정된 게 없다면 진행 중인(OPEN/PROPOSED) 투표를 찾음
-            const existingPoll = existingPolls && existingPolls.find(p => p.status === 'OPEN' || p.status === 'PROPOSED');
-
-            if (!existingPoll) {
-                const initialVotes = {};
-                initialVotes[myId] = myTimes;
-
-                const insertPayload = {
-                    target_id: roomId,
-                    target_type: 'MATCH_CHANNEL',
-                    game_name: Boako.Match.Chat.currentGame,
-                    mode: Boako.Match.Chat.currentFormat || 'SWISS', 
-                    proposer_id: myId,
-                    votes: initialVotes,
-                    status: 'OPEN'
-                };
-                await Boako.db.from('schedule_polls').insert([insertPayload]);
-            } else {
-                const currentVotes = existingPoll.votes || {};
-                currentVotes[myId] = myTimes;
-
-                const voters = Object.keys(currentVotes);
-                let perfectMatchTime = null;
-                
-                const majorityCount = Math.floor(Boako.Match.Chat.currentEntryCount / 2) + 1;
-
-                if (voters.length >= majorityCount) {
-                    const allUniqueSubmissions = new Set();
-                    voters.forEach(v => currentVotes[v].forEach(t => allUniqueSubmissions.add(t)));
-
-                    const sortedCandidates = Array.from(allUniqueSubmissions).sort();
-
-                    for (const candidate of sortedCandidates) {
-                        const [candDate, candTime] = candidate.split(' '); 
-                        
-                        let allAccept = true;
-                        
-                        for (const voter of voters) {
-                            const myChoices = currentVotes[voter] || [];
-                            
-                            let accepts = myChoices.includes(candidate);
-                            
-                            if (!accepts && candTime !== '시간 상관없음') {
-                                if (myChoices.includes(`${candDate} 시간 상관없음`)) {
-                                    accepts = true;
-                                }
-                            }
-                            
-                            if (!accepts) {
-                                allAccept = false;
-                                break;
-                            }
-                        }
-
-                        if (allAccept) {
-                            perfectMatchTime = candidate;
-                            break; 
-                        }
-                    }
-                }
-
-                const updatePayload = { votes: currentVotes };
-                
-                if (perfectMatchTime) {
-                    updatePayload.proposed_time = perfectMatchTime;
-                    updatePayload.status = 'PROPOSED';
-                } else {
-                    updatePayload.proposed_time = null;
-                    updatePayload.status = 'OPEN';
-                    updatePayload.confirmations = [];
-                }
-
-                await Boako.db.from('schedule_polls').update(updatePayload).eq('poll_id', existingPoll.poll_id);
-            }
-
-            document.getElementById('poll-calendar-modal').remove();
-            Boako.Util.toast(`📅 ${myTimes.length}개의 후보 일정이 성공적으로 제출되었습니다!`);
-            await Boako.Match.Chat.loadMessagesAndPolls();
         },
 
         renderPollCard: (poll) => {
@@ -1316,65 +1240,37 @@ Boako.Match = {
         acceptProposedTime: async (pollId) => {
             if (!confirm("이 제안된 시간을 최종 일정으로 수락하시겠습니까?")) return;
 
-            const myId = String(Boako.state.user.id);
-            
-            const { data: poll } = await Boako.db.from('schedule_polls').select('*').eq('poll_id', pollId).single();
-            if (!poll) return;
-
-            let currentConfirmations = poll.confirmations || [];
-            if (!currentConfirmations.some(id => String(id) === myId)) {
-                currentConfirmations.push(myId);
-            }
-
-// 💡 DB에서 실제 entry_count 조회 (전역 변수 의존 제거)
-            const _seasonNo = parseInt(poll.target_id?.split('_')[0]) || Boako.Match.Chat.currentSeason;
-            let totalExpectedVoters = Boako.Match.Chat.currentEntryCount;
             try {
-                const { data: gameInfo } = await Boako.db.from('grandprix_games')
-                    .select('entry_count')
-                    .eq('game_name', poll.game_name)
-                    .eq('season_no', _seasonNo)
-                    .single();
-                if (gameInfo?.entry_count) totalExpectedVoters = gameInfo.entry_count;
-            } catch(e) { /* fallback to currentEntryCount */ }
+                const { error } = await Boako.db.rpc('accept_schedule_poll', { p_poll_id: pollId });
+                if (error) throw error;
 
-            if (currentConfirmations.length >= totalExpectedVoters) {
-                await Boako.Match.Chat.forceConfirmPoll(pollId, poll.proposed_time, poll.proposer_id, poll.game_name, _seasonNo);
-            } else {
-                await Boako.db.from('schedule_polls').update({ confirmations: currentConfirmations }).eq('poll_id', pollId);
                 Boako.Util.toast("🟢 수락 처리가 기록되었습니다.");
                 await Boako.Match.Chat.loadMessagesAndPolls();
+            } catch (err) {
+                Boako.Util.toast("🚨 " + (err.message || "처리에 실패했습니다."));
             }
         },
 
         rejectProposedTime: async (pollId) => {
             if (!confirm("이 제안을 거절하고 일정을 다시 조율하시겠습니까?\n거절 시 기존 교집합 제안이 취소되고 재투표가 진행됩니다.")) return;
 
-            const myId = String(Boako.state.user.id);
-            const { data: poll } = await Boako.db.from('schedule_polls').select('*').eq('poll_id', pollId).single();
-            if (!poll) return;
+            try {
+                const { data: poll } = await Boako.db.from('schedule_polls').select('game_name, target_id').eq('poll_id', pollId).single();
+                if (poll) {
+                    const _seasonNo = parseInt(poll.target_id?.split('_')[0]);
+                    if (poll.game_name) Boako.Match.Chat.currentGame = poll.game_name;
+                    if (_seasonNo) Boako.Match.Chat.currentSeason = _seasonNo;
+                }
 
-            // 💡 메신저에서 호출 시에도 currentGame/currentSeason 보장
-            const _seasonNo = parseInt(poll.target_id?.split('_')[0]);
-            if (poll.game_name) Boako.Match.Chat.currentGame = poll.game_name;
-            if (_seasonNo) Boako.Match.Chat.currentSeason = _seasonNo;
+                const { error } = await Boako.db.rpc('reject_schedule_poll', { p_poll_id: pollId });
+                if (error) throw error;
 
-            let currentConfirmations = (poll.confirmations || []).filter(id => String(id) !== myId);
-            let currentVotes = poll.votes || {};
-            currentVotes[myId] = []; 
-
-            const updatePayload = {
-                votes: currentVotes,
-                confirmations: currentConfirmations,
-                proposed_time: null,
-                status: 'OPEN'
-            };
-
-            await Boako.db.from('schedule_polls').update(updatePayload).eq('poll_id', pollId);
-            Boako.Util.toast("🔴 거절 처리되었습니다. 새로운 시간대를 선택해 주세요.");
-            
-            await Boako.Match.Chat.loadMessagesAndPolls();
-            Boako.Match.Chat.openPollModal();
+                Boako.Util.toast("🔴 거절 처리되었습니다. 새로운 시간대를 선택해 주세요.");
+                await Boako.Match.Chat.loadMessagesAndPolls();
+                Boako.Match.Chat.openPollModal();
+            } catch (err) {
+                Boako.Util.toast("🚨 " + (err.message || "처리에 실패했습니다."));
+            }
         },
 
         forceConfirmPoll: async (pollId, confirmedTime, proposerId, gameName, seasonNo) => {
