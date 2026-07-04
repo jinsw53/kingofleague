@@ -720,6 +720,7 @@ Boako.Team = {
             });
             if (error) throw error;
 
+            if (window.sfx) window.sfx.rosterLock();
             Boako.Util.toast('✅ 엔트리가 성공적으로 업데이트 되었습니다!');
             document.getElementById('entry-modal-overlay').remove();
             
