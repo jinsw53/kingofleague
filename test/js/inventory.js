@@ -272,7 +272,7 @@ Boako.Inventory = {
      * [함수] 아이템 사용 및 장착 처리
      */
     useItem: async function(inventoryId, itemType) {
-        if (itemType !== 'BADGE') {
+        if (itemType !== 'BADGE' && itemType !== 'SUPPORTER') {
             alert("소모성 아이템은 현재 사용할 수 없습니다.");
             return;
         }
