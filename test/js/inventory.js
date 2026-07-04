@@ -306,6 +306,7 @@ Boako.Inventory = {
             await Boako.db.from('inventory').update({ is_equipped: true }).eq('id', inventoryId);
 
             this.loadItems(); // 화면 새로고침
+            if (Boako.Auth && typeof Boako.Auth.loadWidgetBadges === 'function') Boako.Auth.loadWidgetBadges();
 
         } catch (err) {
             console.error("장착 중 오류:", err);
@@ -333,6 +334,7 @@ Boako.Inventory = {
             await Boako.db.from('inventory').update({ is_equipped: false }).eq('id', inventoryId);
 
             this.loadItems(); // 화면 새로고침
+            if (Boako.Auth && typeof Boako.Auth.loadWidgetBadges === 'function') Boako.Auth.loadWidgetBadges();
 
         } catch (err) {
             console.error("해제 중 오류:", err);
