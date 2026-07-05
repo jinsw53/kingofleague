@@ -2121,10 +2121,9 @@ function addTournamentRecordButton() {
 
   const button = document.createElement("button");
   button.id = "boako-tournament-save-button";
-  button.innerText = "토너먼트 기록 저장";
+  button.innerText = "토너먼트 정보 등록";
   button.classList.add("boako-tournament-button", "bgabutton", "bgabutton_blue");
 
-  // 👊 그냥 body에 추가하면 CSS의 fixed 속성 때문에 알아서 오른쪽 아래로 갑니다.
   document.body.appendChild(button);
 
   console.log("✅ 버튼을 다시 편안한 오른쪽 아래로 보냈습니다.");
@@ -2152,18 +2151,76 @@ function addTournamentRecordButton() {
       return;
     }
 
-    if (!tournamentData || tournamentData.players.length === 0) {
-      resetButton(button, originalText);
-      button.classList.remove("disabled-button");
-      showPopupMessage("토너먼트 순위 데이터를 찾지 못했습니다.", false, button);
+    // 🎯 분기점: 순위 데이터가 있으면 → 기록 저장 (기존 그대로)
+    if (tournamentData && tournamentData.players.length > 0) {
+      console.log("[토너먼트 기록] 추출 데이터:", tournamentData);
+      sendTournamentToBackground(tournamentData, button, originalText);
       return;
     }
 
-    console.log("[토너먼트 기록] 추출 데이터:", tournamentData);
-    sendTournamentToBackground(tournamentData, button, originalText);
-  };
+    // 순위 데이터가 없는 경우 → 시작일 기준으로 "이미 시작함(끝나기 전)"인지 "시작 전"인지 판별
+    const scheduledDate = parseKoreanDateTimeToTZ(extractTournamentStartTime());
+    const hasStarted = scheduledDate ? (new Date(scheduledDate).getTime() < Date.now()) : false;
 
-  document.body.appendChild(button);
+    if (hasStarted) {
+      resetButton(button, originalText);
+      button.classList.remove("disabled-button");
+      showPopupMessage("토너먼트 순위 데이터를 찾지 못했습니다. 토너먼트가 끝나면 기록 저장을 시도해주세요.", false, button);
+      return;
+    }
+
+    // 아직 시작 전 → 개최 공지로 등록
+    const gameLink = document.querySelector('a.bga-link[href*="gamepanel?game="]');
+    const gameName = gameLink ? gameLink.innerText.trim() : null;
+    const maxParticipants = extractTournamentMaxParticipants();
+    const shareLink = extractTournamentShareLink();
+
+    const announceData = {
+      title: tournamentData?.tournamentName || extractTournamentName(),
+      gameName: gameName,
+      sourceUrl: shareLink || window.location.href,
+      reporter: reporter,
+      maxParticipants: maxParticipants,
+      scheduledDate: scheduledDate
+    };
+
+    console.log("[토너먼트 공지] 전송 데이터:", announceData);
+
+    chrome.runtime.sendMessage({ action: "saveTournamentAnnouncement", data: announceData }, (response) => {
+      resetButton(button, originalText);
+      button.classList.remove("disabled-button");
+
+      if (chrome.runtime.lastError) {
+        showPopupMessage("저장 실패: 확장 프로그램을 새로고침하세요", false, button);
+        return;
+      }
+
+      if (response && response.success) {
+        showPopupMessage("🏆 개최 공지가 등록되었습니다!", true, button);
+      } else {
+        showPopupMessage("공지 등록 실패", false, button);
+      }
+    });
+  };
+}
+
+// 🌟 "복사하기" 옆 readonly input에서 초대 공유 링크(토큰 포함) 읽어오기
+function extractTournamentShareLink() {
+  const input = document.querySelector('.bga-copy-text-box__copy-display');
+  return input && input.value ? input.value.trim() : null;
+}
+
+// 🌟 .text-xl.truncate 요소 안의 숫자만 추출 (번역 문구가 바뀌어도 안전)
+function extractTournamentMaxParticipants() {
+  const candidates = document.querySelectorAll('.text-xl.truncate');
+  for (const el of candidates) {
+    const text = el.textContent || '';
+    const match = text.match(/(\d+)/);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+  return null;
 }
 
 function extractTournamentData(reporter) {
