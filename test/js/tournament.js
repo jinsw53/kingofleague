@@ -182,7 +182,7 @@ Boako.Tournament = {
                     ${p.max_participants ? `<span class="text-[11px] text-slate-400 font-bold">👥 희망 인원 ${p.max_participants}명</span>` : '<span></span>'}
                 </div>
                 ${!isFulfilled
-                    ? `<div class="text-center mt-3 text-[11px] text-slate-400 font-bold">🎯 크롬 확장으로 같은 종목 개최 시 자동으로 채워집니다</div>`
+                    ? `<div class="text-center mt-3 text-[11px] text-slate-400 font-bold">🎯 아레나에서 토너먼트 개최 후, 크롬 확장으로 등록 시 자동으로 매칭됩니다</div>`
                     : `<a href="${p.source_url}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
