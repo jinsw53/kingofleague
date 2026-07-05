@@ -82,9 +82,11 @@ Boako.Tournament = {
     },
 
     loadPosts: async () => {
+        const nowIso = new Date().toISOString();
         const { data, error } = await Boako.db
             .from('tournament_posts')
             .select('*')
+            .or(`scheduled_date.is.null,scheduled_date.gte.${nowIso}`)
             .order('created_at', { ascending: false });
 
         if (error) {
