@@ -33,7 +33,7 @@ Boako.Tournament = {
                     <div id="tourney-guide-box" class="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-5 text-xs font-bold text-violet-700 leading-relaxed">
                         📋 <b>토너먼트 개설 규칙</b><br>
                         1. 토너먼트 이름에는 반드시 영문 "boako"(대소문자 무관)가 포함되어야 합니다. (기록 추적을 위해 필수)<br>
-                        2. 최대 참가 인원은 <b>32명</b>을 넘을 수 없습니다.
+                        2. 원활한 진행을 위해, 최대 참가 인원은 <b>32명</b>까지만 가능해요.
                     </div>
                     <div id="tourney-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="col-span-full text-center py-16 text-slate-400 font-bold">불러오는 중...</div>
@@ -154,7 +154,7 @@ Boako.Tournament = {
                     </div>
 
                     <div class="bg-violet-50 border border-violet-200 rounded-lg p-3 mb-4 text-[11px] font-bold text-violet-700">
-                        ⚠️ 제목엔 영문 "boako"(대소문자 무관)가 꼭 들어가야 해요. 최대 참가 인원은 32명입니다.
+                        ⚠️ 제목엔 영문 "boako"(대소문자 무관)가 꼭 들어가야 해요. 원활한 진행을 위해 최대 참가 인원은 32명까지만 가능해요.
                     </div>
 
                     <form onsubmit="Boako.Tournament.submitPost(event, '${isAnnouncement ? 'ANNOUNCEMENT' : 'REQUEST'}')">
@@ -174,10 +174,12 @@ Boako.Tournament = {
                             <label class="text-xs font-bold text-slate-600 block mb-1">예정 일시 (선택)</label>
                             <input type="datetime-local" id="tourney-input-date" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
                         </div>
+                        ${!isAnnouncement ? `
                         <div class="mb-3">
-                            <label class="text-xs font-bold text-slate-600 block mb-1">최대 참가 인원 (32명 이하)</label>
+                            <label class="text-xs font-bold text-slate-600 block mb-1">희망 최대 참가 인원 (32명 이하)</label>
                             <input type="number" id="tourney-input-max" min="1" max="32" placeholder="예: 16" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
                         </div>
+                        ` : ''}
                         ${isAnnouncement ? `
                         <div class="mb-4">
                             <label class="text-xs font-bold text-slate-600 block mb-1">실제 개설한 토너먼트 링크 (필수)</label>
