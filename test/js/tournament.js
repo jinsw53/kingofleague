@@ -253,6 +253,10 @@ Boako.Tournament = {
                             <label class="text-xs font-bold text-slate-600 block mb-1">희망 최대 참가 인원 (32명 이하)</label>
                             <input type="number" id="tourney-input-max" min="1" max="32" placeholder="예: 16" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
                         </div>
+                        <div class="mb-4 flex items-center gap-2">
+                            <input type="checkbox" id="tourney-input-convert" checked class="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500">
+                            <label for="tourney-input-convert" class="text-xs font-bold text-slate-600">개설 완료되면 "개최 공지" 게시판에도 공개하기</label>
+                        </div>
                         ` : ''}
                         ${isAnnouncement ? `
                         <div class="mb-4">
@@ -292,9 +296,12 @@ Boako.Tournament = {
                 if (window.sfx) window.sfx.battleStart();
                 Boako.Util.toast('🏆 개최 공지가 등록되었습니다! (+50P)');
             } else {
+                const convertInput = document.getElementById('tourney-input-convert');
+                const convertToAnnouncement = convertInput ? convertInput.checked : true;
                 const { error } = await Boako.db.rpc('create_tournament_request', {
                     p_title: title, p_game_name: gameName, p_content: content,
-                    p_scheduled_date: scheduledDate, p_max_participants: maxParticipants
+                    p_scheduled_date: scheduledDate, p_max_participants: maxParticipants,
+                    p_convert_to_announcement: convertToAnnouncement
                 });
                 if (error) throw error;
                 Boako.Util.toast('🙋 개최 요청이 등록되었습니다!');
