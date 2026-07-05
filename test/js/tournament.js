@@ -204,8 +204,8 @@ Boako.Tournament = {
         const content = document.getElementById('tourney-input-content').value.trim() || null;
         const dateVal = document.getElementById('tourney-input-date').value;
         const scheduledDate = dateVal ? new Date(dateVal).toISOString() : null;
-        const maxVal = document.getElementById('tourney-input-max').value;
-        const maxParticipants = maxVal ? parseInt(maxVal) : null;
+        const maxInput = document.getElementById('tourney-input-max');
+        const maxParticipants = maxInput && maxInput.value ? parseInt(maxInput.value) : null;
 
         try {
             if (type === 'ANNOUNCEMENT') {
