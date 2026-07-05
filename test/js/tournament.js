@@ -4,7 +4,9 @@
 Boako.Tournament = {
     State: {
         currentTab: 'ANNOUNCEMENT', // 'ANNOUNCEMENT' | 'REQUEST'
-        posts: []
+        posts: [],
+        gameLogoMap: {},
+        realtimeChannel: null
     },
 
     init: async (containerId) => {
@@ -26,7 +28,7 @@ Boako.Tournament = {
                             <span id="tourney-request-badge" class="hidden absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">0</span>
                         </button>
                     </div>
-<button id="tourney-write-btn" class="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-violet-700 transition-colors" onclick="Boako.Tournament.openWriteModal()">+ 공지하기</button>
+                    <button id="tourney-write-btn" class="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-violet-700 transition-colors" onclick="Boako.Tournament.openWriteModal()">+ 공지하기</button>
                 </div>
 
                 <div class="card-body" style="background:#f8fafc; padding:20px;">
@@ -45,6 +47,18 @@ Boako.Tournament = {
         `;
 
         await Boako.Tournament.loadPosts();
+        Boako.Tournament.subscribeRealtime();
+    },
+
+    // 🌟 실시간 구독 — 양쪽 탭 다 실시간 반영
+    subscribeRealtime: () => {
+        if (Boako.Tournament.State.realtimeChannel) return; // 이미 구독 중이면 중복 방지
+        Boako.Tournament.State.realtimeChannel = Boako.db
+            .channel('tournament-posts-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
+                Boako.Tournament.loadPosts();
+            })
+            .subscribe();
     },
 
     switchTab: (tab) => {
@@ -78,6 +92,15 @@ Boako.Tournament = {
             Boako.Tournament.State.posts = [];
         } else {
             Boako.Tournament.State.posts = data || [];
+        }
+
+        // 🌟 카드에 표시할 게임 로고 조회 (games 테이블과 별도 조인)
+        const gameNames = [...new Set(Boako.Tournament.State.posts.map(p => p.game_name).filter(Boolean))];
+        if (gameNames.length > 0) {
+            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url').in('game_name', gameNames);
+            Boako.Tournament.State.gameLogoMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.image_url]));
+        } else {
+            Boako.Tournament.State.gameLogoMap = {};
         }
 
         const openRequestCount = Boako.Tournament.State.posts.filter(p => p.type === 'REQUEST' && p.status === 'OPEN').length;
@@ -114,39 +137,81 @@ Boako.Tournament = {
         const dateStr = p.scheduled_date
             ? new Date(p.scheduled_date).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
             : '일정 미정';
+        const gameLogo = Boako.Tournament.State.gameLogoMap[p.game_name] || DEFAULT_LOGO_FALLBACK;
 
         if (p.type === 'ANNOUNCEMENT') {
             return `
                 <div class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="window.open('${p.source_url}', '_blank')">
-                    <div class="flex justify-between items-start mb-2">
-                        <h3 class="font-black text-slate-800 text-sm">${p.title}</h3>
-                        <span class="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0 ml-2">🔗 바로가기</span>
+                    <div class="flex items-center gap-3">
+                        <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-base font-black text-violet-700">📅 ${dateStr}</div>
+                            <div class="text-[11px] text-slate-400 truncate">${p.title}</div>
+                        </div>
+                        <span class="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">🔗</span>
                     </div>
-                    ${p.game_name ? `<div class="text-xs text-slate-500 font-bold mb-1">🎲 ${p.game_name}</div>` : ''}
-                    <div class="text-xs text-slate-400 font-bold mb-2">📅 ${dateStr} ${p.max_participants ? `· 최대 ${p.max_participants}명` : ''}</div>
-                    <p class="text-xs text-slate-600 whitespace-pre-wrap">${p.content || ''}</p>
+                    ${p.max_participants ? `<div class="text-[11px] text-slate-400 font-bold mt-2">👥 최대 ${p.max_participants}명</div>` : ''}
                 </div>
             `;
         }
 
+        // REQUEST 카드 — 내용(요청사항)을 더 신경써서 눈에 띄게
         const isFulfilled = p.status === 'FULFILLED';
         return `
             <div class="bg-white border ${isFulfilled ? 'border-slate-200 opacity-70' : 'border-amber-200'} rounded-xl p-4">
-                <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-black text-slate-800 text-sm">${p.title}</h3>
-                    <span class="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ml-2 ${isFulfilled ? 'text-slate-400 bg-slate-100' : 'text-amber-600 bg-amber-50'}">
-                        ${isFulfilled ? '✅ 개설 완료' : '🙋 대기 중'}
+                <div class="flex items-center gap-3 mb-3">
+                    <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-base font-black text-amber-700">📅 ${dateStr}</div>
+                        <div class="text-[11px] text-slate-400 truncate">${p.title}</div>
+                    </div>
+                    <span class="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${isFulfilled ? 'text-slate-400 bg-slate-100' : 'text-amber-600 bg-amber-50'}">
+                        ${isFulfilled ? '✅ 완료' : '🙋 대기'}
                     </span>
                 </div>
-                ${p.game_name ? `<div class="text-xs text-slate-500 font-bold mb-1">🎲 ${p.game_name}</div>` : ''}
-                <div class="text-xs text-slate-400 font-bold mb-2">📅 ${dateStr} ${p.max_participants ? `· 최대 ${p.max_participants}명` : ''}</div>
-                <p class="text-xs text-slate-600 whitespace-pre-wrap mb-3">${p.content || ''}</p>
-                ${isFulfilled
-                    ? `<a href="${p.source_url}" target="_blank" class="text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`
-                    : `<button onclick="Boako.Tournament.openFulfillModal(${p.id}, '${p.title.replace(/'/g, "\\'")}')" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-black py-2 rounded-lg transition-colors">🎯 제가 개설해드릴게요 (+100P)</button>`
-                }
+                ${p.content ? `<div class="bg-amber-50/60 border border-amber-100 rounded-lg p-3 mb-3"><p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${p.content}</p></div>` : ''}
+                <div class="flex items-center justify-between">
+                    ${p.max_participants ? `<span class="text-[11px] text-slate-400 font-bold">👥 희망 인원 ${p.max_participants}명</span>` : '<span></span>'}
+                </div>
+                ${!isFulfilled ? `<button onclick="Boako.Tournament.openFulfillModal(${p.id}, '${p.title.replace(/'/g, "\\'")}')" class="w-full mt-3 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black py-2 rounded-lg transition-colors">🎯 제가 개설해드릴게요 (+100P)</button>` : `<a href="${p.source_url}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
+    },
+
+    // 🌟 게임 검색 (games 테이블 자동완성)
+    searchGames: async (query) => {
+        const resultsBox = document.getElementById('tourney-game-search-results');
+        if (!resultsBox) return;
+        if (!query || query.trim().length === 0) {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+            return;
+        }
+
+        const { data } = await Boako.db.from('games').select('game_name, image_url').ilike('game_name', `%${query.trim()}%`).limit(8);
+
+        if (!data || data.length === 0) {
+            resultsBox.innerHTML = `<div class="p-3 text-xs text-slate-400 font-bold">검색 결과가 없습니다.</div>`;
+            resultsBox.classList.remove('hidden');
+            return;
+        }
+
+        resultsBox.innerHTML = data.map(g => `
+            <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer transition-colors" onclick="Boako.Tournament.selectGame('${g.game_name.replace(/'/g, "\\'")}', '${(g.image_url || '').replace(/'/g, "\\'")}')">
+                <img src="${g.image_url || DEFAULT_LOGO_FALLBACK}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
+                <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
+            </div>
+        `).join('');
+        resultsBox.classList.remove('hidden');
+    },
+
+    selectGame: (name, logo) => {
+        const input = document.getElementById('tourney-input-game-search');
+        if (!input) return;
+        input.value = name;
+        input.dataset.logo = logo;
+        const resultsBox = document.getElementById('tourney-game-search-results');
+        if (resultsBox) resultsBox.classList.add('hidden');
     },
 
     openWriteModal: () => {
@@ -168,9 +233,10 @@ Boako.Tournament = {
                             <label class="text-xs font-bold text-slate-600 block mb-1">제목 (boako 포함 필수)</label>
                             <input type="text" id="tourney-input-title" required placeholder="예: BOAKO 스플렌더 토너먼트" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
                         </div>
-                        <div class="mb-3">
-                            <label class="text-xs font-bold text-slate-600 block mb-1">종목(게임명)</label>
-                            <input type="text" id="tourney-input-game" placeholder="예: 스플렌더" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        <div class="mb-3 relative">
+                            <label class="text-xs font-bold text-slate-600 block mb-1">종목(게임) 검색</label>
+                            <input type="text" id="tourney-input-game-search" autocomplete="off" placeholder="게임명을 입력해 검색하세요" oninput="Boako.Tournament.searchGames(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                            <div id="tourney-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
                         </div>
                         <div class="mb-3">
                             <label class="text-xs font-bold text-slate-600 block mb-1">설명</label>
@@ -206,7 +272,7 @@ Boako.Tournament = {
         e.preventDefault();
 
         const title = document.getElementById('tourney-input-title').value.trim();
-        const gameName = document.getElementById('tourney-input-game').value.trim() || null;
+        const gameName = document.getElementById('tourney-input-game-search').value.trim() || null;
         const content = document.getElementById('tourney-input-content').value.trim() || null;
         const dateVal = document.getElementById('tourney-input-date').value;
         const scheduledDate = dateVal ? new Date(dateVal).toISOString() : null;
@@ -277,3 +343,6 @@ Boako.Tournament = {
         }
     }
 };
+
+// 게임 로고를 못 찾았을 때 대체용 (사이트 전체에서 공용으로 쓰는 기본 로고 URL로 바꿔주세요)
+const DEFAULT_LOGO_FALLBACK = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
