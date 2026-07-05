@@ -145,7 +145,10 @@ Boako.Tournament = {
             return `
                 <div class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="window.open('${p.source_url}', '_blank')">
                     <div class="flex items-center gap-3">
-                        <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0">
+                        <div class="flex flex-col items-center shrink-0" style="width:52px;">
+                            <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
+                            <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
+                        </div>
                         <div class="flex-1 min-w-0">
                             <div class="text-base font-black text-violet-700">📅 ${dateStr}</div>
                             <div class="text-[11px] text-slate-400 truncate">${p.title}</div>
@@ -162,7 +165,10 @@ Boako.Tournament = {
         return `
             <div class="bg-white border ${isFulfilled ? 'border-slate-200 opacity-70' : 'border-amber-200'} rounded-xl p-4">
                 <div class="flex items-center gap-3 mb-3">
-                    <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0">
+                    <div class="flex flex-col items-center shrink-0" style="width:52px;">
+                        <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
+                        <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
+                    </div>
                     <div class="flex-1 min-w-0">
                         <div class="text-base font-black text-amber-700">📅 ${dateStr}</div>
                         <div class="text-[11px] text-slate-400 truncate">${p.title}</div>
@@ -175,7 +181,9 @@ Boako.Tournament = {
                 <div class="flex items-center justify-between">
                     ${p.max_participants ? `<span class="text-[11px] text-slate-400 font-bold">👥 희망 인원 ${p.max_participants}명</span>` : '<span></span>'}
                 </div>
-                ${!isFulfilled ? `<button onclick="Boako.Tournament.openFulfillModal(${p.id}, '${p.title.replace(/'/g, "\\'")}')" class="w-full mt-3 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black py-2 rounded-lg transition-colors">🎯 제가 개설해드릴게요 (+100P)</button>` : `<a href="${p.source_url}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
+                ${!isFulfilled
+                    ? `<div class="text-center mt-3 text-[11px] text-slate-400 font-bold">🎯 크롬 확장으로 같은 종목 개최 시 자동으로 채워집니다</div>`
+                    : `<a href="${p.source_url}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
     },
@@ -315,43 +323,7 @@ Boako.Tournament = {
         }
     },
 
-    openFulfillModal: (postId, title) => {
-        const modalHtml = `
-            <div id="tourney-fulfill-modal-overlay" class="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl w-full max-w-sm p-6">
-                    <h3 class="font-black text-lg mb-2">🎯 개최 완료 등록</h3>
-                    <p class="text-xs text-slate-500 font-bold mb-4">"${title}" 요청을 대신 개설해주셔서 감사합니다! 실제로 만든 토너먼트 링크를 입력해주세요.</p>
-                    <form onsubmit="Boako.Tournament.submitFulfill(event, ${postId})">
-                        <input type="url" id="tourney-fulfill-url" required placeholder="https://boardgamearena.com/tournament?id=..." class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-4">
-                        <div class="flex gap-2">
-                            <button type="button" onclick="document.getElementById('tourney-fulfill-modal-overlay').remove()" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl">취소</button>
-                            <button type="submit" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors">등록 (+100P)</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
-        document.getElementById('tourney-modal-root').innerHTML = modalHtml;
-    },
-
-    submitFulfill: async (e, postId) => {
-        e.preventDefault();
-        const url = document.getElementById('tourney-fulfill-url').value.trim();
-
-        try {
-            const { error } = await Boako.db.rpc('fulfill_tournament_request', { p_post_id: postId, p_source_url: url });
-            if (error) throw error;
-
-            if (window.sfx) window.sfx.battleStart();
-            Boako.Util.toast('🎉 개최 완료 처리되었습니다! (+100P)');
-            document.getElementById('tourney-fulfill-modal-overlay').remove();
-            await Boako.Tournament.loadPosts();
-        } catch (err) {
-            console.error(err);
-            Boako.Util.toast('❌ ' + (err.message || '처리에 실패했습니다.'));
-        }
-    }
-};
+    };
 
 // 게임 로고를 못 찾았을 때 대체용 (사이트 전체에서 공용으로 쓰는 기본 로고 URL로 바꿔주세요)
 const DEFAULT_LOGO_FALLBACK = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
