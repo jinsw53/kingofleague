@@ -22,6 +22,10 @@ Boako.Auth = {
         Boako.Auth.renderWidget();
         Boako.View.render('main'); 
 
+        // 🌟 토너먼트 개최 요청 미해결 건수 — 로그인 여부 무관하게 항상 표시
+        Boako.Auth.checkTournamentBadge();
+        Boako.Auth.subscribeTournamentBadge(); 
+
         // 2. 상태 변화 감지 (탭 복귀 시)
         Boako.db.auth.onAuthStateChange(async (e, s) => {
             if (e === 'INITIAL_SESSION') return;
@@ -242,6 +246,29 @@ Boako.Auth = {
                 }
             }
         } catch (err) { console.error(err); }
+    },
+
+    checkTournamentBadge: async function() {
+        try {
+            const { count } = await Boako.db.from('tournament_posts').select('*', { count: 'exact', head: true }).eq('type', 'REQUEST').eq('status', 'OPEN');
+            const badge = document.getElementById('menu-tournament-badge');
+            if (!badge) return;
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch (err) { console.error("토너먼트 뱃지 갱신 실패:", err); }
+    },
+
+    subscribeTournamentBadge: function() {
+        if (Boako.Auth._tournamentBadgeChannel) return; // 중복 구독 방지
+        Boako.Auth._tournamentBadgeChannel = Boako.db.channel('tournament-badge-global')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
+                Boako.Auth.checkTournamentBadge();
+            })
+            .subscribe();
     },
 
     checkLeaderMenu: async function() {
