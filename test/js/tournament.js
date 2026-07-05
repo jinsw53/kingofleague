@@ -26,7 +26,7 @@ Boako.Tournament = {
                             <span id="tourney-request-badge" class="hidden absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">0</span>
                         </button>
                     </div>
-                    <button id="tourney-write-btn" class="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-violet-700 transition-colors" onclick="Boako.Tournament.openWriteModal()">+ 글쓰기</button>
+<button id="tourney-write-btn" class="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-violet-700 transition-colors" onclick="Boako.Tournament.openWriteModal()">+ 공지하기</button>
                 </div>
 
                 <div class="card-body" style="background:#f8fafc; padding:20px;">
@@ -58,6 +58,12 @@ Boako.Tournament = {
             activeBtn.classList.remove('bg-slate-100', 'text-slate-500');
             activeBtn.classList.add('bg-slate-800', 'text-white');
         }
+
+        const writeBtn = document.getElementById('tourney-write-btn');
+        if (writeBtn) {
+            writeBtn.textContent = tab === 'ANNOUNCEMENT' ? '+ 공지하기' : '+ 요청하기';
+        }
+
         Boako.Tournament.renderList();
     },
 
