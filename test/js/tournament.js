@@ -213,7 +213,7 @@ Boako.Tournament = {
                     p_scheduled_date: scheduledDate, p_max_participants: maxParticipants, p_source_url: sourceUrl
                 });
                 if (error) throw error;
-                if (window.sfx) window.sfx.rosterLock();
+                if (window.sfx) window.sfx.battleStart();
                 Boako.Util.toast('🏆 개최 공지가 등록되었습니다! (+50P)');
             } else {
                 const { error } = await Boako.db.rpc('create_tournament_request', {
@@ -259,7 +259,7 @@ Boako.Tournament = {
             const { error } = await Boako.db.rpc('fulfill_tournament_request', { p_post_id: postId, p_source_url: url });
             if (error) throw error;
 
-            if (window.sfx) window.sfx.rosterLock();
+            if (window.sfx) window.sfx.battleStart();
             Boako.Util.toast('🎉 개최 완료 처리되었습니다! (+100P)');
             document.getElementById('tourney-fulfill-modal-overlay').remove();
             await Boako.Tournament.loadPosts();
