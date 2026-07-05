@@ -146,6 +146,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         return true;
     }
+
+    // 🌟 [신규] 토너먼트 개최 공지 자동 등록 (PHP 중계 없이 슈파베이스 직행, 중복 방지는 DB가 담당)
+    else if (message.action === "saveTournamentAnnouncement") {
+        console.log("📩 토너먼트 개최 공지 등록 요청:", message.data);
+        pushToSupabase("TOURNAMENT_ANNOUNCEMENT", message.data);
+        sendResponse({ success: true, message: "공지 등록 요청 완료" });
+        return true;
+    }
 });
 
 // ==============================================================================
