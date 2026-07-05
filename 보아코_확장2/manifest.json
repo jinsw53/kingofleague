@@ -3,7 +3,7 @@
 
   "manifest_version": 3,
   "name": "BOAKO 팀 리그 기록 저장",
-  "version": "2.17",
+  "version": "2.18",
   "description": "보드게임 아레나의 게임 기록을 BOAKO 팀 리그에 자동 저장하는 확장 기능",
   "author": "jinsw53",
   "permissions": ["storage", "activeTab", "contextMenus"],
