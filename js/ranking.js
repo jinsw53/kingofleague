@@ -190,7 +190,7 @@ const mainRow = `
                     <td class="py-3 px-3"><div class="rk-rank-badge ${rankBadgeClass}">${r._rank ?? '-'}</div></td>
                     <td class="py-3 px-3">
                         <div class="flex items-center gap-2">
-                            <img src="${r.logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" class="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-slate-100 p-0.5">
+                            <img src="${Boako.Util.cdn(r.logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png')}" class="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-slate-100 p-0.5">
                             <span class="font-black text-slate-800 text-sm">${r.team_name}</span>
                             <i data-lucide="chevron-${isExpanded ? 'up' : 'down'}" class="w-3.5 h-3.5 text-slate-300"></i>
                         </div>
@@ -420,12 +420,12 @@ Boako.Ranking.getHofHTML = function() {
         </div>
     `).join('');
 
-    const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+    const DEFAULT_LOGO = Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
 
     const championTeamHtml = d.championTeam ? `
         <div class="hof-card">
             <div class="relative z-10 flex items-center gap-5">
-                <img src="${d.championTeam.logo_url || DEFAULT_LOGO}" class="w-20 h-20 rounded-2xl object-contain bg-white/10 border border-white/20 p-2 shadow-lg">
+                <img src="${Boako.Util.cdn(d.championTeam.logo_url) || DEFAULT_LOGO}" class="w-20 h-20 rounded-2xl object-contain bg-white/10 border border-white/20 p-2 shadow-lg">
                 <div>
                     <div class="text-[10px] font-black text-amber-300 uppercase tracking-widest mb-1">👑 시즌 우승팀</div>
                     <div class="text-2xl font-black text-white">${d.championTeam.team_name}</div>
@@ -441,7 +441,7 @@ Boako.Ranking.getHofHTML = function() {
 
     const mvpHtml = d.mvp ? `
         <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex items-center gap-5">
-            <img src="${d.mvp.teamLogo || DEFAULT_LOGO}" class="w-16 h-16 rounded-2xl object-contain bg-slate-50 border border-slate-100 p-1.5">
+            <img src="${Boako.Util.cdn(d.mvp.teamLogo) || DEFAULT_LOGO}" class="w-16 h-16 rounded-2xl object-contain bg-slate-50 border border-slate-100 p-1.5">
             <div>
                 <div class="text-[10px] font-black text-violet-500 uppercase tracking-widest mb-1">⭐ 시즌 MVP</div>
                 <div class="text-xl font-black text-slate-800">${d.mvp.nickname}</div>
@@ -452,8 +452,8 @@ Boako.Ranking.getHofHTML = function() {
         <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm text-center text-slate-400 font-bold text-sm">MVP 기록 없음</div>
     `;
 
-    const CHAMPION_BELT = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png';
-    const FIRE_RING = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/firering.png';
+    const CHAMPION_BELT = Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png');
+    const FIRE_RING = Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/firering.png');
     const seasonKey = Boako.Ranking.getSeasonKey();
     const seasonOverlayHtml = Boako.Ranking.getSeasonOverlayHtml(seasonKey);
 
@@ -465,18 +465,18 @@ Boako.Ranking.getHofHTML = function() {
                 <div class="hcc-bg-scrim"></div>
                 ${seasonOverlayHtml}
                 <div class="hcc-game-badge-wrap">
-                    <img class="hcc-game-badge" src="${g.game_logo || DEFAULT_LOGO}">
+                    <img class="hcc-game-badge" src="${Boako.Util.cdn(g.game_logo) || DEFAULT_LOGO}">
                 </div>
                 <div class="hcc-body">
                     <div class="hcc-top-row">
                         <div class="hcc-mvp-wrap">
-                            <img class="hcc-mvp-photo" src="${g.mvp_profile || DEFAULT_LOGO}">
+                            <img class="hcc-mvp-photo" src="${Boako.Util.cdn(g.mvp_profile) || DEFAULT_LOGO}">
                             <img class="hcc-fire-ring" src="${FIRE_RING}">
                         </div>
                         <div class="hcc-name-col">
                             <div class="hcc-nickname">${g.mvp_nickname || '미정'}</div>
                             <div class="hcc-team-row">
-                                <img src="${g.team_logo || DEFAULT_LOGO}">
+                                <img src="${Boako.Util.cdn(g.team_logo) || DEFAULT_LOGO}">
                                 <span>${g.team_name}</span>
                             </div>
                         </div>
