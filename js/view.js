@@ -274,7 +274,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                 <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
                     <div class="flex items-center gap-3">
                         ${seasonStatus.logo_url
-                            ? `<img src="${seasonStatus.logo_url}" class="h-10 w-auto object-contain">`
+                            ? `<img src="${Boako.Util.cdn(seasonStatus.logo_url)}" class="h-10 w-auto object-contain">`
                             : `<span class="text-2xl">🏆</span>`}
                         <div>
                             <div class="font-black text-slate-800 text-sm">시즌 ${seasonStatus.season_no}</div>
@@ -304,7 +304,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                     const CHALLENGE_TOKEN_ICON = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png';
 
                     const uniformIconHtml = teamBannerStats.uniformImageUrl
-                        ? `<img src="${teamBannerStats.uniformImageUrl}" style="width:22px; height:22px; object-fit:contain;">`
+                        ? `<img src="${Boako.Util.cdn(teamBannerStats.uniformImageUrl)}" style="width:22px; height:22px; object-fit:contain;">`
                         : `<svg width="22" height="22" viewBox="0 0 100 100"><path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="3"/></svg>`;
 
                     const currentSeasonLineHtml = teamBannerStats.currentSeasonRank
@@ -327,7 +327,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                 ${uniformIconHtml} 서포터즈 ${teamBannerStats.supporterCount}명
                             </div>
                             <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:900;">
-                                <img src="${CHALLENGE_TOKEN_ICON}" style="width:20px; height:20px; object-fit:contain;"> 도전권 ${team.challengetokens || 0}개
+                                <img src="${Boako.Util.cdn(CHALLENGE_TOKEN_ICON)}" style="width:20px; height:20px; object-fit:contain;"> 도전권 ${team.challengetokens || 0}개
                             </div>
                         </div>
                     </div>
@@ -347,7 +347,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                             
                             <div id="tab-info" class="team-tab-content block animate-in fade-in duration-300">
                                 <div class="team-profile-header">
-                                    <img src="${team.logo_url || 'https://via.placeholder.com/160'}" class="team-logo-preview">
+                                    <img src="${Boako.Util.cdn(team.logo_url) || 'https://via.placeholder.com/160'}" class="team-logo-preview">
                                     <div class="team-info-txt">
                                         <h2>${team.team_name}</h2>
                                         <div id="motto-display-row" style="display:flex; align-items:center; gap:12px;">
@@ -606,7 +606,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                     ${(shopItems || []).map(item => {
                         const isSupporter = item.item_type === 'SUPPORTER';
                         const supporterIconHtml = `
-                            <div style="width:100%; height:100%; position:relative; ${currentSeasonUniform ? `background-image:url('${currentSeasonUniform}'); background-size:contain; background-repeat:no-repeat; background-position:center;` : ''}">
+                            <div style="width:100%; height:100%; position:relative; ${currentSeasonUniform ? `background-image:url('${Boako.Util.cdn(currentSeasonUniform)}'); background-size:contain; background-repeat:no-repeat; background-position:center;` : ''}">
                                 ${!currentSeasonUniform ? `
                                     <svg width="100%" height="100%" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
                                         <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
@@ -621,7 +621,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                     ${isSupporter
                                         ? supporterIconHtml
                                         : (item.icon && item.icon.startsWith('http')
-                                            ? `<img src="${item.icon}" style="width: 100%; height: 100%; object-fit: contain;">`
+                                            ? `<img src="${Boako.Util.cdn(item.icon)}" style="width: 100%; height: 100%; object-fit: contain;">`
                                             : (item.icon || '❓'))
                                     }
                                 </div>
