@@ -373,7 +373,7 @@ Boako.Together = {
             if (error) throw error;
 
             if (window.sfx) window.sfx.success();
-            Boako.Util.toast('🎲 모집 글이 등록되었습니다!');
+            Boako.Util.toast('🎲 모집 글이 등록되었습니다! (+10P)');
             document.getElementById('together-write-modal-overlay').remove();
             await Boako.Together.loadPosts();
         } catch (err) {
@@ -395,7 +395,7 @@ Boako.Together = {
             if (error) throw error;
 
             if (window.sfx) window.sfx.success();
-            Boako.Util.toast('🙋 참가 완료!');
+            Boako.Util.toast('🙋 참가 완료! (+5P)');
             await Boako.Together.loadPosts();
         } catch (err) {
             console.error(err);
