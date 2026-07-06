@@ -21,8 +21,8 @@ Boako.Inventory = {
 
         // 문자열이 'http'로 시작하면 <img> 태그로 생성
         if (icon.startsWith('http')) {
-            return `<img src="${icon}" style="width:${size}; height:${size}; object-fit:contain; display:block;">`;
-        } 
+            return `<img src="${Boako.Util.cdn(icon)}" style="width:${size}; height:${size}; object-fit:contain; display:block;">`;
+        }
         // 그렇지 않으면 일반 텍스트(이모지)로 생성
         else {
             return `<span style="font-size:${size}; line-height:1; display:block;">${icon}</span>`;
@@ -36,7 +36,7 @@ Boako.Inventory = {
     getUniformBadgeHTML: function(item, size) {
         const opacity = item.isExpired ? 'opacity:0.4;' : '';
         const uniformBg = item.uniformImage
-            ? `background-image:url('${item.uniformImage}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
+            ? `background-image:url('${Boako.Util.cdn(item.uniformImage)}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
             : '';
 
         const fallbackSilhouette = !item.uniformImage ? `
@@ -50,7 +50,7 @@ Boako.Inventory = {
                 ${fallbackSilhouette}
                 <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
                     ${item.teamLogo ? `
-                        <img src="${item.teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">
+                        <img src="${Boako.Util.cdn(item.teamLogo)}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">
                     ` : ''}
                 </div>
             </div>
