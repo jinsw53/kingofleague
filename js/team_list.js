@@ -125,8 +125,8 @@ Boako.TeamList = {
                 listHtml += `
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] group flex flex-col">
                         <div class="h-32 bg-slate-50 border-b border-slate-100 flex items-center justify-center relative overflow-hidden p-4">
-                            <div class="absolute inset-0 opacity-5 bg-center bg-cover blur-sm transition-transform duration-500 group-hover:scale-110" style="background-image: url('${logoSrc}')"></div>
-                            <img src="${logoSrc}" class="h-full w-full object-contain relative z-10 drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=NO+LOGO'">
+                            <div class="absolute inset-0 opacity-5 bg-center bg-cover blur-sm transition-transform duration-500 group-hover:scale-110" style="background-image: url('${Boako.Util.cdn(logoSrc)}')"></div>
+                            <img src="${Boako.Util.cdn(logoSrc)}" class="h-full w-full object-contain relative z-10 drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=NO+LOGO'">
                         </div>
                         <div class="p-5 flex-1 flex flex-col">
                             
@@ -141,7 +141,7 @@ Boako.TeamList = {
                                 <div class="flex justify-between items-center">
                                     <div class="flex items-center gap-2">
                                         <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-300 shadow-sm">
-                                            <img src="${leaderAvatar}" class="w-full h-full object-cover">
+                                            <img src="${Boako.Util.cdn(leaderAvatar)}" class="w-full h-full object-cover">
                                         </div>
                                         <span class="text-xs font-black text-slate-600">${leaderName}</span>
                                     </div>
