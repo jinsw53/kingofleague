@@ -26,6 +26,10 @@ Boako.Auth = {
         Boako.Auth.checkTournamentBadge();
         Boako.Auth.subscribeTournamentBadge(); 
 
+        // 🌟 같이하자 모집중인 글 개수 — 로그인 여부 무관하게 항상 표시
+        Boako.Auth.checkTogetherBadge();
+        Boako.Auth.subscribeTogetherBadge(); 
+
         // 2. 상태 변화 감지 (탭 복귀 시)
         Boako.db.auth.onAuthStateChange(async (e, s) => {
             if (e === 'INITIAL_SESSION') return;
@@ -267,6 +271,33 @@ Boako.Auth = {
         Boako.Auth._tournamentBadgeChannel = Boako.db.channel('tournament-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
                 Boako.Auth.checkTournamentBadge();
+            })
+            .subscribe();
+    },
+
+    // 🌟 [추가] 같이하자 모집중인 글 개수 뱃지
+    checkTogetherBadge: async function() {
+        try {
+            const { count } = await Boako.db.from('together_posts')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'RECRUITING')
+                .gt('scheduled_date', new Date().toISOString());
+            const badge = document.getElementById('menu-together-badge');
+            if (!badge) return;
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch (err) { console.error("같이하자 뱃지 갱신 실패:", err); }
+    },
+
+    subscribeTogetherBadge: function() {
+        if (Boako.Auth._togetherBadgeChannel) return; // 중복 구독 방지
+        Boako.Auth._togetherBadgeChannel = Boako.db.channel('together-badge-global')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
+                Boako.Auth.checkTogetherBadge();
             })
             .subscribe();
     },
