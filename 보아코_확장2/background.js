@@ -172,7 +172,7 @@ chrome.runtime.onInstalled.addListener(() => {
 // 우클릭 메뉴를 클릭했을 때의 동작
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "open-boako-archive") {
-        // 아카이브 주소로 새 탭 열기 (아래 URL을 실제 아카이브 주소로 변경해 줘!)
-        chrome.tabs.create({ url: "https://jinsw53.github.io/kingofleague/test/%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83-%EB%A1%9C%EA%B7%B8%EC%9D%B8.html#" });
+        // 아카이브 주소로 새 탭 열기
+        chrome.tabs.create({ url: "https://boakoarchive.co.kr/" });
     }
 });
