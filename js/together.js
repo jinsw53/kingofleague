@@ -210,7 +210,7 @@ Boako.Together = {
         else statusBadge = `<span class="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 text-sky-600 bg-sky-50">🙋 모집중</span>`;
 
         const avatarsHtml = participants.slice(0, 6).map(u => `
-            <img src="${u.profile_url || TOGETHER_DEFAULT_AVATAR}" title="${u.full_name || '익명'}" class="w-6 h-6 rounded-full object-cover border-2 border-white -ml-2 first:ml-0 bg-slate-200">
+            <img src="${Boako.Util.cdn(u.profile_url || TOGETHER_DEFAULT_AVATAR)}" title="${u.full_name || '익명'}" class="w-6 h-6 rounded-full object-cover border-2 border-white -ml-2 first:ml-0 bg-slate-200">
         `).join('');
 
         let actionHtml = '';
@@ -234,7 +234,7 @@ Boako.Together = {
             <div class="bg-white border ${confirmed ? 'border-emerald-200' : cancelled ? 'border-slate-200 opacity-70' : 'border-sky-200'} rounded-xl p-4">
                 <div class="flex items-center gap-3 mb-2">
                     <div class="flex flex-col items-center shrink-0" style="width:52px;">
-                        <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
+                        <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
                         <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
                     </div>
                     <div class="flex-1 min-w-0">
@@ -273,7 +273,7 @@ Boako.Together = {
 
         resultsBox.innerHTML = data.map(g => `
             <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.selectGame('${g.game_name.replace(/'/g, "\\'")}')">
-                <img src="${g.image_url || TOGETHER_DEFAULT_LOGO}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
+                <img src="${Boako.Util.cdn(g.image_url || TOGETHER_DEFAULT_LOGO)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
                 <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
             </div>
         `).join('');
