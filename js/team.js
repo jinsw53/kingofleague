@@ -158,7 +158,7 @@ Boako.Team = {
                     <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-indigo-100 transition-all group">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border border-slate-200 flex-shrink-0">
-                                ${secureProfileUrl ? `<img src="${secureProfileUrl}" class="w-full h-full object-cover">` : '<span class="text-xl">👤</span>'}
+                                ${secureProfileUrl ? `<img src="${Boako.Util.cdn(secureProfileUrl)}" class="w-full h-full object-cover">` : '<span class="text-xl">👤</span>'}
                             </div>
                             <span class="font-black text-slate-700 text-sm">${u.full_name}</span>
                         </div>
@@ -478,7 +478,7 @@ Boako.Team = {
 
                         <div class="aspect-square flex items-center justify-center relative overflow-hidden border-b ${showBannedEffect ? 'border-red-600 bg-slate-300' : 'border-slate-100 bg-slate-100'}">
                             ${game.game_logo_url 
-                                ? `<img src="${game.game_logo_url}" class="${imgClass}">` 
+                                ? `<img src="${Boako.Util.cdn(game.game_logo_url)}" class="${imgClass}">` 
                                 : `<span class="text-5xl drop-shadow-md ${showBannedEffect ? 'grayscale opacity-30' : ''}">🎲</span>`
                             }
                             
@@ -660,7 +660,7 @@ Boako.Team = {
                 html += `
                     <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 hover:border-emerald-300 transition-colors shadow-sm">
                         <div class="w-16 h-16 shrink-0 bg-slate-100 rounded-xl flex items-center justify-center p-2 border border-slate-200 relative">
-                            ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="max-h-full max-w-full object-contain">` : '<span class="text-3xl">🎲</span>'}
+                            ${game.game_logo_url ? `<img src="${Boako.Util.cdn(game.game_logo_url)}" class="max-h-full max-w-full object-contain">` : '<span class="text-3xl">🎲</span>'}
                         </div>
                         <div class="flex-1 text-center sm:text-left w-full">
                             <h4 class="font-black text-slate-800 text-lg">${game.game_name}</h4>
@@ -781,7 +781,7 @@ const { data: gameList } = await Boako.db.from('games').select('game_name, image
                 const st = statusMap[s.status] || { label: s.status, cls: 'bg-slate-100 text-slate-500' };
                 const logoUrl = gameLogoMap[s.game_name];
                 const logoHtml = logoUrl
-                    ? `<img src="${logoUrl}" class="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-100 shadow-sm flex-shrink-0 p-1">`
+                    ? `<img src="${Boako.Util.cdn(logoUrl)}" class="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-100 shadow-sm flex-shrink-0 p-1">`
                     : `<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">🎲</div>`;
 
                 const opponent = (s.participants || []).find(p => p.team_name !== teamName);
