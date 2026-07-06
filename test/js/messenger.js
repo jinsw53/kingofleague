@@ -136,6 +136,68 @@ Boako.Messenger = {
             }
         } catch (e) { console.error("소통채널 로드 실패:", e); }
 
+        // 3. [같이하자] 확정된 모임 채팅방 로드
+        try {
+            const { data: myTogetherParticipation } = await Boako.db
+                .from('together_participants')
+                .select('post_id')
+                .eq('user_id', myId);
+
+            const myTogetherPostIds = [...new Set((myTogetherParticipation || []).map(r => r.post_id))];
+            if (myTogetherPostIds.length > 0) {
+                const { data: togetherPosts } = await Boako.db
+                    .from('together_posts')
+                    .select('*')
+                    .in('id', myTogetherPostIds);
+
+                const confirmedPosts = (togetherPosts || []).filter(p =>
+                    Boako.Together && Boako.Together.isReallyConfirmed
+                        ? Boako.Together.isReallyConfirmed(p)
+                        : p.status === 'CONFIRMED'
+                );
+
+                confirmedPosts.forEach(post => {
+                    const uiRoomId = `together_${post.id}`;
+                    Boako.Messenger.chatRooms[uiRoomId] = {
+                        id: uiRoomId,
+                        isTogether: true,
+                        postId: post.id,
+                        gameName: post.game_name,
+                        title: post.title || `${post.game_name || '같이하자'} 모임`,
+                        badge: `<span class="bg-sky-100 text-sky-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">같이하자</span>`,
+                        lastMessage: '채팅방이 열렸습니다. 자유롭게 소통하세요.',
+                        lastTime: post.created_at,
+                        unread: 0,
+                        messages: []
+                    };
+                });
+
+                if (confirmedPosts.length > 0) {
+                    const { data: togetherMsgs } = await Boako.db.from('together_chats')
+                        .select('*, profiles(full_name)')
+                        .in('post_id', confirmedPosts.map(p => p.id))
+                        .order('created_at', { ascending: true });
+
+                    const togetherReadStorage = JSON.parse(localStorage.getItem('boako_together_read') || '{}');
+
+                    (togetherMsgs || []).forEach(m => {
+                        const uiRoomId = `together_${m.post_id}`;
+                        const room = Boako.Messenger.chatRooms[uiRoomId];
+                        if (!room) return;
+                        room.messages.push({ ...m, type: 'TOGETHER_CHAT' });
+                        if (new Date(m.created_at) >= new Date(room.lastTime)) {
+                            room.lastTime = m.created_at;
+                            room.lastMessage = m.content;
+                        }
+                        const lastRead = togetherReadStorage[uiRoomId] || 0;
+                        if (m.sender_id !== myId && new Date(m.created_at).getTime() > lastRead) {
+                            room.unread++;
+                        }
+                    });
+                }
+            }
+        } catch (e) { console.error("같이하자 채팅방 로드 실패:", e); }
+
         // 2. [일반 쪽지] 기존 messages 테이블 데이터 로드
         try {
             const { data: directMsgs, error } = await Boako.db.from('messages')
@@ -226,11 +288,24 @@ Boako.Messenger = {
         } catch (err) { console.error(err); return false; }
     },
 
+    sendTogetherChat: async (postId, content) => {
+        try {
+            const payload = {
+                post_id: postId,
+                sender_id: Boako.state.user.id,
+                content: content
+            };
+            const { error } = await Boako.db.from('together_chats').insert([payload]);
+            if (error) throw error;
+            return true;
+        } catch (err) { console.error(err); return false; }
+    },
+
     hideRoom: async (roomId) => {
         const room = Boako.Messenger.chatRooms[roomId];
         if(!room || !confirm("이 대화방을 나가시겠습니까?\n(새로운 쪽지가 도착하면 다시 나타납니다.)")) return;
 
-        if (!room.isMatchChannel) {
+        if (!room.isMatchChannel && !room.isTogether) {
             await Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`);
         }
         
@@ -288,7 +363,25 @@ Boako.Messenger = {
                 }
             }).subscribe();
 
-        Boako.Messenger.realtimeChannels.push(msgChannel, matchChannel, pollChannel);
+        // 🌟 [추가] 같이하자 채팅 리얼타임 감지
+        const togetherChannel = Boako.db.channel('together-chats-changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'together_chats' }, async (payload) => {
+                const newMsg = payload.new;
+                const uiRoomId = `together_${newMsg.post_id}`;
+                if (Boako.Messenger.chatRooms[uiRoomId]) {
+                    await Boako.Messenger.View.refreshRoomList();
+                    if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
+                    else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`🎲 [같이하자] 채팅방에 새 메시지가 도착했습니다!`);
+                }
+            }).subscribe();
+
+        // 🌟 [추가] 같이하자 모집글 상태 변화(확정/취소) 감지 → 방 목록 자체가 새로 생기거나 사라짐
+        const togetherPostsChannel = Boako.db.channel('together-posts-status-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, async () => {
+                await Boako.Messenger.View.refreshRoomList();
+            }).subscribe();
+
+        Boako.Messenger.realtimeChannels.push(msgChannel, matchChannel, pollChannel, togetherChannel, togetherPostsChannel);
     },
 
     // 🌟 [신규] 라이벌/승자연전 1:1 일정 제안용 달력 모달 (다중 날짜 선택)
@@ -517,7 +610,7 @@ Boako.Messenger = {
             roomArray.forEach(room => {
                 const unreadBadge = room.unread > 0 ? `<div class="bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full">${room.unread}</div>` : '';
                 const activeClass = Boako.Messenger.currentRoomId === room.id ? 'bg-white shadow-sm border-indigo-200' : 'border-transparent hover:bg-white/60';
-                const icon = room.isMatchChannel ? '📣' : (room.isMatch ? '⚔️' : room.title.charAt(0));
+                const icon = room.isMatchChannel ? '📣' : (room.isMatch ? '⚔️' : (room.isTogether ? '🎲' : room.title.charAt(0)));
                 listHtml += `
                     <div onclick="Boako.Messenger.View.openRoom('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
                         <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center text-slate-500 font-black">${icon}</div>
@@ -545,6 +638,11 @@ Boako.Messenger = {
                 matchRead[roomId] = Date.now();
                 localStorage.setItem('boako_match_read', JSON.stringify(matchRead));
                 room.unread = 0;
+            } else if (room.isTogether) {
+                let togetherRead = JSON.parse(localStorage.getItem('boako_together_read') || '{}');
+                togetherRead[roomId] = Date.now();
+                localStorage.setItem('boako_together_read', JSON.stringify(togetherRead));
+                room.unread = 0;
             } else {
                 Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`).then(() => Boako.Messenger.fetchUnreadCount());
             }
@@ -561,6 +659,14 @@ Boako.Messenger = {
                         <div class="font-black text-white text-sm flex items-center gap-2"><span class="animate-pulse">📣</span> [대항전] ${room.gameName} 채널</div>
                         <div class="flex gap-2">
                             ${actionBtn}
+                        </div>
+                    </div>`;
+            } else if (room.isTogether) {
+                bannerHtml = `
+                    <div class="bg-sky-900 border-b border-sky-800 p-3 px-5 flex items-center justify-between shadow-sm z-10">
+                        <div class="font-black text-white text-sm flex items-center gap-2">🎲 ${room.title}</div>
+                        <div class="flex gap-2">
+                            <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                         </div>
                     </div>`;
             } else if (room.isMatch) {
@@ -584,7 +690,7 @@ Boako.Messenger = {
             room.messages.forEach(msg => {
                 const isMe = msg.sender_id === Boako.state.user.id;
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-                const senderName = room.isMatchChannel ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override;
+                const senderName = (room.isMatchChannel || room.isTogether) ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override;
 
                 if (msg.type === 'POLL') {
                     const poll = msg;
@@ -729,6 +835,8 @@ Boako.Messenger = {
             let success = false;
             if (room.isMatchChannel) {
                 success = await Boako.Messenger.sendMatchChannel(room.seasonNo, room.gameName, content);
+            } else if (room.isTogether) {
+                success = await Boako.Messenger.sendTogetherChat(room.postId, content);
             } else {
                 const matchId = room.isMatch ? room.id : null;
 const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.gameName } : {};
