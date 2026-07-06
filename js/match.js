@@ -97,7 +97,7 @@ Boako.Match = {
         if (!overlay || !img) return;
 
         if (isShow) {
-            img.src = url;
+            img.src = Boako.Util.cdn(url);
             overlay.classList.add('active');
         } else {
             overlay.classList.remove('active');
@@ -205,7 +205,7 @@ Boako.Match = {
                 logoEl.className = "flex flex-col gap-3 mt-2"; // 로고와 날짜를 위아래로 깔끔하게 배치
                 
                 let logoHtml = currentSeason?.season_logo_url 
-                    ? `<img src="${currentSeason.season_logo_url}" class="h-16 md:h-20 object-contain drop-shadow-lg" alt="시즌 로고">`
+                    ? `<img src="${Boako.Util.cdn(currentSeason.season_logo_url)}" class="h-16 md:h-20 object-contain drop-shadow-lg" alt="시즌 로고">`
                     : `<div class="text-white/50 text-sm font-bold border-2 border-dashed border-white/20 px-6 py-4 rounded-2xl w-max">시즌 로고 대기 중</div>`;
                 
                 let dateHtml = `<div class="text-indigo-200 text-xs font-black bg-indigo-900/60 px-3 py-1.5 rounded-lg border border-indigo-500/30 w-max shadow-inner">
@@ -344,7 +344,7 @@ Boako.Match = {
                     
                     <div class="w-20 h-20 mb-4 flex items-center justify-center relative">
                         ${game.game_logo_url 
-                            ? `<img src="${game.game_logo_url}" class="max-h-full max-w-full object-contain ${imgClass}">` 
+                            ? `<img src="${Boako.Util.cdn(game.game_logo_url)}" class="max-h-full max-w-full object-contain ${imgClass}">` 
                             : `<span class="text-5xl ${imgClass}">🎲</span>`
                         }
                     </div>
@@ -409,7 +409,7 @@ Boako.Match = {
                         <div class="flex items-center gap-4 ${isEntryOpen ? 'cursor-pointer group' : ''}" ${isEntryOpen ? `onclick="Boako.Team.openEntryForm()"` : ''}>
                             
                             <div class="w-14 h-14 shrink-0 rounded-xl bg-white flex items-center justify-center shadow-sm p-1 ${isEntryOpen ? 'group-hover:scale-110 transition-transform duration-300' : ''}">
-                                ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="w-full h-full object-contain">` : '<span class="text-2xl">🎲</span>'}
+                                ${game.game_logo_url ? `<img src="${Boako.Util.cdn(game.game_logo_url)}" class="w-full h-full object-contain">` : '<span class="text-2xl">🎲</span>'}
                             </div>
                             
                             <div class="flex flex-col justify-center">
@@ -426,7 +426,7 @@ Boako.Match = {
 
                             ${!isEntryOpen && game.tournament_format_logo ? `
                                 <div class="ml-2 pl-4 border-l border-slate-600 flex items-center shrink-0">
-                                    <img src="${game.tournament_format_logo}" 
+                                    <img src="${Boako.Util.cdn(game.tournament_format_logo)}" 
                                          class="h-10 w-auto object-contain drop-shadow-md opacity-90 tournament-thumbnail" 
                                          title="크게 보려면 마우스를 올리세요"
                                          onmouseover="Boako.Match.magnify('${game.tournament_format_logo}', true)"
@@ -454,7 +454,7 @@ Boako.Match = {
                                 ${gameEntries.map(entry => `
                                     <div class="bg-white border-2 border-indigo-100 rounded-xl p-4 text-center shadow-sm relative overflow-hidden flex flex-col items-center">
                                         <div class="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shadow-sm flex items-center justify-center mb-2 z-10">
-                                            ${entry.teams?.logo_url ? `<img src="${entry.teams.logo_url}" class="w-full h-full object-cover">` : '<span class="text-xl">🏴</span>'}
+                                            ${entry.teams?.logo_url ? `<img src="${Boako.Util.cdn(entry.teams.logo_url)}" class="w-full h-full object-cover">` : '<span class="text-xl">🏴</span>'}
                                         </div>
                                         <span class="text-indigo-600 font-black text-sm mb-2 block relative z-10">${entry.team_name}</span>
                                         <div class="text-slate-700 font-bold text-sm bg-slate-50 py-3 rounded-lg border border-slate-200 relative z-10 w-full">
@@ -643,7 +643,7 @@ Boako.Match = {
                     html += `
                         <div class="flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
                             <div class="w-8 h-8 shrink-0 bg-slate-50 rounded-lg p-1 border border-slate-100 flex justify-center items-center">
-                                ${game.game_logo_url ? `<img src="${game.game_logo_url}" class="max-w-full max-h-full object-contain">` : `<span>🎲</span>`}
+                                ${game.game_logo_url ? `<img src="${Boako.Util.cdn(game.game_logo_url)}" class="max-w-full max-h-full object-contain">` : `<span>🎲</span>`}
                             </div>
                             <span class="text-[11px] font-bold text-slate-600 truncate" title="${game.game_name}">${game.game_name}</span>
                         </div>
