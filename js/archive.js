@@ -362,10 +362,10 @@ Boako.Archive = {
             let logoHTML = `<span class="text-[10px]">👤</span>`;
             if (rec.logo_url && rec.b_all_team !== 'Free Agent') {
                 logoHTML = `
-                    <img src="${rec.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
+                    <img src="${Boako.Util.cdn(rec.logo_url)}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
                     <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
                          style="display: none; opacity: 0; transform: translate(-50%, -100%); top: var(--archive-top, auto); left: var(--archive-left, auto);">
-                        <img src="${rec.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
+                        <img src="${Boako.Util.cdn(rec.logo_url)}" class="w-full h-full object-contain" alt="Large Logo">
                         <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
                     </div>
                 `;
@@ -495,10 +495,10 @@ Boako.Archive = {
             
             if (p.logo_url && p.team !== 'Free Agent') {
                 logoHTML = `
-                    <img src="${p.logo_url}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
+                    <img src="${Boako.Util.cdn(p.logo_url)}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
                     <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
                          style="display: none; opacity: 0; transform: translate(-50%, -100%);">
-                        <img src="${p.logo_url}" class="w-full h-full object-contain" alt="Large Logo">
+                        <img src="${Boako.Util.cdn(p.logo_url)}" class="w-full h-full object-contain" alt="Large Logo">
                         <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
                     </div>
                 `;
@@ -513,7 +513,7 @@ Boako.Archive = {
                     
                     <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
                         <div class="relative group-hover:scale-105 transition-transform duration-300">
-                            <img src="${(p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80').replace('http://', 'https://')}" 
+                            <img src="${Boako.Util.cdn((p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80').replace('http://', 'https://'))}" 
                                  class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
                                  onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
                                  alt="${p.name}">
