@@ -228,9 +228,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     <div class="section-card" style="margin-top:25px;">
                         <div class="card-header" style="font-size:16px;">🔥 실시간 이슈</div>
                         <div class="card-body" style="padding:20px 25px;">
-                            <ul style="font-size:15px; font-weight:800; color:#475569; line-height:2.5;">
-                                <li>1. 스플렌더 밸런스 토론 <span style="float:right; color:var(--primary);">HOT</span></li>
-                                <li>2. 신입 팀 '아크' 모집 중 <span style="float:right; color:var(--primary);">NEW</span></li>
+                            <ul id="hot-issue-list" style="font-size:14px; font-weight:800; color:#475569; line-height:2.2; display:flex; flex-direction:column; gap:6px;">
+                                <li style="list-style:none; color:#94a3b8; font-weight:600;">불러오는 중...</li>
                             </ul>
                         </div>
                     </div>
@@ -250,6 +249,7 @@ document.addEventListener("DOMContentLoaded", function() {
     <script src="js/match.js" defer></script>
     <script src="js/shop.js"></script>
     <script src="js/view.js"></script>
+    <script src="js/hot_issue.js"></script>
     <script src="js/main.js"></script>
 
 </body>
