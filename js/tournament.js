@@ -146,7 +146,7 @@ Boako.Tournament = {
                 <div class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="window.open('${p.source_url}', '_blank')">
                     <div class="flex items-center gap-3">
                         <div class="flex flex-col items-center shrink-0" style="width:52px;">
-                            <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
+                            <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
                             <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
                         </div>
                         <div class="flex-1 min-w-0">
@@ -166,7 +166,7 @@ Boako.Tournament = {
             <div class="bg-white border ${isFulfilled ? 'border-slate-200 opacity-70' : 'border-amber-200'} rounded-xl p-4">
                 <div class="flex items-center gap-3 mb-3">
                     <div class="flex flex-col items-center shrink-0" style="width:52px;">
-                        <img src="${gameLogo}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
+                        <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
                         <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
                     </div>
                     <div class="flex-1 min-w-0">
@@ -208,7 +208,7 @@ Boako.Tournament = {
 
         resultsBox.innerHTML = data.map(g => `
             <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer transition-colors" onclick="Boako.Tournament.selectGame('${g.game_name.replace(/'/g, "\\'")}', '${(g.image_url || '').replace(/'/g, "\\'")}')">
-                <img src="${g.image_url || DEFAULT_LOGO_FALLBACK}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
+                <img src="${Boako.Util.cdn(g.image_url || DEFAULT_LOGO_FALLBACK)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
                 <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
             </div>
         `).join('');
