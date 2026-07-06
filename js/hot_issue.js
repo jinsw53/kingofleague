@@ -79,7 +79,7 @@ Boako.HotIssue = {
         } catch (e) { console.error("같이하자 이슈 로드 실패:", e); }
 
         items.sort((a, b) => new Date(b.time) - new Date(a.time));
-        return items.slice(0, 6);
+        return items.slice(0, 5);
     },
 
     render: (items) => {
