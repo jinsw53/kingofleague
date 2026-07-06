@@ -1,7 +1,256 @@
-&lt;!DOCTYPE html&gt;
-&lt;html lang="ko"&gt;
-&lt;head&gt;
-    &lt;meta charset="UTF-8"&gt;
-    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
-    &lt;title&gt;BOAKO BOARDGAME ARCHIVE - PREMIUM MASTER&lt;/title&gt;
-    &lt;link rel="icon" href="data:image/svg+xml,&lt;svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22&gt;&lt;text y=%22.9em%22 font-size=%2290%22&gt;🎮&lt;/text&gt;&lt;/svg&gt;"&gt;
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOAKO BOARDGAME ARCHIVE - PREMIUM MASTER</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- CSS 부분 (기존과 동일하게 유지) -->
+    <style>
+        :root {
+            --primary: #7c3aed; --primary-light: #a78bfa; --primary-dark: #5b21b6;
+            --accent: #f59e0b; --bg-body: #f0f2f5; --bg-card: #ffffff;
+            --text-main: #1e293b; --text-sub: #64748b; --border-color: #e2e8f0;
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --inner-width: 1130px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--bg-body); font-family: 'Noto Sans KR', sans-serif; color: var(--text-main); line-height: 1.6; overflow-y: scroll; word-break: keep-all; }
+        .inner { width: 95%; max-width: var(--inner-width); margin: 0 auto; }
+        ul { list-style: none; }
+        button { cursor: pointer; border: none; background: none; font-family: inherit; transition: all 0.2s; }
+        input, textarea { font-family: inherit; }
+
+        /* Header & Nav */
+        .header { background-color: #fff; border-bottom: 1px solid var(--border-color); padding: 24px 0; }
+        .header .inner { display: flex; align-items: center; gap: 45px; }
+        .logo { font-size: 44px; font-weight: 950; color: var(--primary); letter-spacing: -3px; cursor: pointer; }
+        .search-box { width: 100%; max-width: 600px; height: 56px; border: 2px solid var(--primary); display: flex; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: var(--shadow-md); }
+        .search-box input { flex: 1; border: none; padding: 0 24px; outline: none; font-size: 18px; font-weight: 600; }
+        .btn-search { width: 68px; background: var(--primary); color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+        .nav { background-color: #fff; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 900; }
+        .menu-list { display: flex; gap: 40px; height: 60px; align-items: center; }
+        .menu-item { font-size: 16px; font-weight: 800; color: #444; padding: 10px 0; border-bottom: 3px solid transparent; cursor: pointer; }
+        .menu-item.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+
+        /* Layout */
+        /* 🌟 이름을 변경하여 테일윈드의 강제 왼쪽 정렬 레이아웃을 완전히 무력화합니다 */
+.main-container-wrap { padding: 30px 0 120px 0; }
+        .flex-container { display: flex; gap: 30px; align-items: flex-start; }
+        .main-content { flex: 1; min-width: 0; }
+        .side-content { width: 340px; flex-shrink: 0; position: sticky; top: 90px; }
+        .main-banner { height: 200px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-radius: 20px; margin-bottom: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; box-shadow: 0 15px 30px rgba(124, 58, 237, 0.25); text-align: center; }
+        .section-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; margin-bottom: 30px; box-shadow: var(--shadow-md); }
+        .card-header { padding: 24px 30px; font-size: 20px; font-weight: 900; border-bottom: 1px solid #f1f5f9; background: #fafafa; }
+        .card-body { padding: 35px; }
+
+        /* Premium Form Controls */
+        .edit-input-box { width: 100%; padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; outline: none; font-size: 16px; transition: border-color 0.2s; }
+        .edit-input-box:focus { border-color: var(--primary); }
+        .custom-upload { position: relative; width: 100%; height: 200px; border: 3px dashed #cbd5e1; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #f8fafc; cursor: pointer; transition: 0.3s; }
+        .custom-upload:hover { border-color: var(--primary); background-color: #f5f3ff; }
+        .preview-img-container { position: absolute; inset: 0; background: #fff; display: none; align-items: center; justify-content: center; padding: 20px; z-index: 5; }
+        .preview-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .btn-submit { width: 100%; background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); color: #fff; padding: 22px; border-radius: 14px; font-size: 19px; font-weight: 950; box-shadow: 0 10px 25px rgba(124, 58, 237, 0.35); }
+
+        /* Dashboard items */
+        .team-profile-header { display: flex; align-items: center; gap: 35px; margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid #f1f5f9; }
+        .team-logo-preview { width: 160px; height: 160px; border-radius: 24px; object-fit: contain; background: #fff; border: 2px solid var(--border-color); padding: 15px; box-shadow: var(--shadow-lg); }
+        .btn-edit-small { font-size: 12px; padding: 5px 14px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 800; color: #64748b; }
+        .btn-edit-small:hover { background: var(--primary); color: white; }
+        .member-item { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 12px; transition: 0.2s; }
+        .role-tag { font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; color: white; text-transform: uppercase; }
+        .role-leader { background: var(--primary); }
+        .role-member { background: #94a3b8; }
+        /* [추가] 메뉴 클릭 씹힘 방지용 */
+        .menu-item i, 
+        .menu-item span {
+                pointer-events: none;
+        }
+        /* Widget */
+        .login-widget { background: #fff; border: 1px solid var(--border-color); padding: 40px 30px; border-radius: 20px; box-shadow: var(--shadow-lg); text-align: center; }
+        .user-avatar { width: 85px; height: 85px; background: #f5f3ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 44px; color: #7c3aed; margin: 0 auto 20px; border: 4px solid #fff; box-shadow: 0 0 25px rgba(124, 58, 237, 0.25); }
+        .btn-kakao { width: 100%; height: 58px; background-color: #FEE500; border-radius: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 17px; color: #3c1e1e; }
+        .badge-premium { font-size: 12px; color: var(--primary); font-weight: 800; background: #f5f3ff; padding: 3px 10px; border-radius: 4px; display: inline-block; margin-top: 5px; }
+
+        #boako-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 16px 32px; border-radius: 50px; font-weight: 700; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 10000; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        #boako-toast.show { opacity: 1; bottom: 50px; }
+
+        @media (max-width: 960px) { .flex-container { flex-direction: column; } .side-content { width: 100%; order: -1; position: static; margin-bottom: 30px; } }
+    </style>
+</head>
+<body>
+
+    <!-- HTML 바디 내용 유지 -->
+    <div id="wrap">
+        <header class="header">
+            <div class="inner">
+                <div onclick="Boako.View.render('main')" class="logo">BOAKO</div>
+                <div class="search-area">
+                    <div class="search-box">
+                        <input type="text" id="main-search" placeholder="통합 검색 (팀, 유저, 전적, 게시글)">
+                        <button type="button" class="btn-search">🔍</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+<nav class="nav" style="position: sticky; top: 0; z-index: 900; background-color: #fff; border-bottom: 1px solid var(--border-color);">
+    <div class="inner" style="display: flex; align-items: center; width: 100%; position: relative;">
+        
+        <div id="nav-arrow-left" style="display: none; position: absolute; left: 0px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.2); cursor: pointer; transition: color 0.2s; user-select: none;" onmouseover="this.style.color='rgba(0,0,0,0.6)'" onmouseout="this.style.color='rgba(0,0,0,0.2)'">
+            ◀
+        </div>
+
+        <ul class="menu-list" id="boako-main-nav-bar" style="
+            display: flex; 
+            align-items: center; 
+            flex-wrap: nowrap; 
+            overflow-x: auto; 
+            white-space: nowrap; 
+            scroll-behavior: smooth;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+            flex-grow: 1;
+            margin-right: 16px;
+            /* ❌ 기존 padding: 0 35px; 을 삭제하여 첫 메뉴 정렬 라인을 본래대로 회복합니다! */
+        ">
+            <style>
+                .menu-list::-webkit-scrollbar { display: none; }
+                .menu-item { flex-shrink: 0; }
+                
+                /* 🎯 소식지와 팀 목록 양 끝단에만 화살표 방어용 가변 마진 주입 */
+                #menu-first-item { margin-left: 0px; transition: margin 0.2s; }
+                #menu-last-item { margin-right: 35px; }
+            </style>
+
+            <li class="menu-item" id="menu-first-item" onclick="Boako.View.render('boardgame')">📰 소식지</li>
+            <li class="menu-item" id="menu-rival" onclick="Boako.View.render('rival')">⚡ 라이벌 매치</li>
+            <li class="menu-item" id="menu-ranking" onclick="Boako.View.render('ranking')">🏆 랭킹</li>
+            <li class="menu-item" id="menu-match" onclick="Boako.View.render('match')">⚔️ 대항전</li>
+            <li class="menu-item" id="menu-league" onclick="Boako.View.render('league')">🎯 리그 콘텐츠</li>
+            <li class="menu-item" id="menu-records" onclick="Boako.View.render('records')">📋 전적기록</li>
+            <li class="menu-item" id="menu-tournament" onclick="Boako.View.render('tournament')" style="position:relative;">🏅 토너먼트
+                <span id="menu-tournament-badge" style="display:none; position:absolute; top:2px; right:-12px; background:#f43f5e; color:#fff; font-size:10px; font-weight:900; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; line-height:1;">0</span>
+            </li>
+            <li class="menu-item" id="menu-together" onclick="Boako.View.render('together')">🤝 같이 하자</li>
+            <li class="menu-item" id="menu-team" onclick="Boako.View.render('team')">🛡️ <span id="team-menu-text">팀 창단</span></li>
+            <li class="menu-item" id="menu-team-list" onclick="Boako.View.render('team_list')">👥 팀 목록</li>
+            <li class="menu-item" onclick="Boako.View.render('cafe')">☕ 카페</li>
+            <li class="menu-item" id="menu-shop" id="menu-last-item" onclick="Boako.View.render('shop')">🛒 포인트 샵</li>
+            <li class="menu-item" id="menu-schedule" onclick="Boako.View.render('schedule')">📅 일정표</li>
+            <li class="menu-item" id="menu-admin-review" onclick="Boako.View.render('admin_review')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">🛠️ 검수센터</li>
+            <li class="menu-item" id="menu-record-verify" onclick="Boako.View.render('record_verify')" style="display:none; padding: 12px 20px; border-radius: 8px; transition: all 0.3s; flex-shrink: 0;">✅ 기록 인증</li>
+        </ul>
+
+        <div id="nav-arrow-right" style="display: flex; position: absolute; right: 155px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.2); cursor: pointer; transition: color 0.2s; user-select: none;" onmouseover="this.style.color='rgba(0,0,0,0.6)'" onmouseout="this.style.color='rgba(0,0,0,0.2)'">
+            ▶
+        </div>
+
+        <div style="flex-shrink: 0; margin-left: auto; z-index: 960;">
+            <a href="https://chromewebstore.google.com/detail/boako-%ED%8C%80-%EB%A6%AC%EA%B7%B8-%EA%B8%B0%EB%A1%9D-%EC%A0%80%EC%9E%A5/ieeaooigcejnffgcmcaannlpkbejniil" 
+               target="_blank" 
+               rel="noopener noreferrer" 
+               style="display: flex; align-items: center; gap: 8px; background: var(--primary); color: white; padding: 10px 20px; border-radius: 12px; font-weight: 800; font-size: 15px; text-decoration: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.3); transition: all 0.2s;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.backgroundColor='var(--primary-dark)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='var(--primary)';">🧩 기록기 설치</a>
+        </div>
+
+    </div>
+</nav>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const navBar = document.getElementById("boako-main-nav-bar");
+    const arrowLeft = document.getElementById("nav-arrow-left");
+    const arrowRight = document.getElementById("nav-arrow-right");
+    const firstItem = document.getElementById("menu-first-item");
+
+    if (!navBar || !arrowLeft || !arrowRight || !firstItem) return;
+
+    function updateArrows() {
+        const scrollLeft = navBar.scrollLeft;
+        const maxScroll = navBar.scrollWidth - navBar.clientWidth;
+
+        if (scrollLeft > 5) {
+            arrowLeft.style.display = "flex";
+            firstItem.style.marginLeft = "30px";
+        } else {
+            arrowLeft.style.display = "none";
+            firstItem.style.marginLeft = "0px";
+        }
+
+        if (scrollLeft >= maxScroll - 5) {
+            arrowRight.style.display = "none";
+        } else {
+            arrowRight.style.display = "flex";
+        }
+    }
+
+    navBar.addEventListener("scroll", updateArrows);
+    window.addEventListener("resize", updateArrows);
+    setTimeout(updateArrows, 300);
+
+    let scrollInterval = null;
+
+    function startScroll(direction) {
+        if (scrollInterval) clearInterval(scrollInterval);
+        scrollInterval = setInterval(() => {
+            navBar.scrollLeft += direction * 4; 
+        }, 8);
+    }
+
+    function stopScroll() {
+        if (scrollInterval) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+        }
+    }
+
+    arrowLeft.addEventListener("mouseenter", () => startScroll(-1));
+    arrowLeft.addEventListener("mouseleave", stopScroll);
+    arrowRight.addEventListener("mouseenter", () => startScroll(1));
+    arrowRight.addEventListener("mouseleave", stopScroll);
+});
+</script>
+
+        <div class="main-container-wrap">
+            <div class="inner flex-container">
+                <main class="main-content" id="main-content-area"></main>
+                <aside class="side-content">
+                    <div class="login-widget" id="login-widget-area">연결 중...</div>
+                    <div class="section-card" style="margin-top:25px;">
+                        <div class="card-header" style="font-size:16px;">🔥 실시간 이슈</div>
+                        <div class="card-body" style="padding:20px 25px;">
+                            <ul style="font-size:15px; font-weight:800; color:#475569; line-height:2.5;">
+                                <li>1. 스플렌더 밸런스 토론 <span style="float:right; color:var(--primary);">HOT</span></li>
+                                <li>2. 신입 팀 '아크' 모집 중 <span style="float:right; color:var(--primary);">NEW</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+    <div id="boako-toast"></div>
+
+    <!-- 
+      [JS 파일 분할 로드] 
+      주의: 객체를 생성하는 core.js가 무조건 제일 먼저 로드되어야 합니다!
+    -->
+    <script src="js/core.js"></script>
+    <script src="js/util.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/match.js" defer></script>
+    <script src="js/shop.js"></script>
+    <script src="js/view.js"></script>
+    <script src="js/main.js"></script>
+
+</body>
+</html>
