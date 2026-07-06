@@ -66,7 +66,7 @@ Boako.AdminReview = {
         <div style="padding:30px;">
             <!-- 🖼️ 이미지 업로드 구역 -->
             <div style="margin-bottom:25px; text-align:center; border:2px dashed #e2e8f0; padding:20px; border-radius:16px; background:#f8fafc;">
-                <img id="image-preview" src="${game.image_url || ''}" 
+                <img id="image-preview" src="${Boako.Util.cdn(game.image_url) || ''}" 
                      style="max-width:150px; margin:0 auto 15px; border-radius:12px; display:${game.image_url ? 'block' : 'none'}; box-shadow:0 8px 15px rgba(0,0,0,0.1);">
                 <label for="file-upload" style="cursor:pointer; background:#fff; padding:8px 16px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:700; color:#64748b;">
                     📷 이미지 선택 (WebP 권장)
