@@ -89,7 +89,7 @@ Boako.Auth = {
                 const teamLogo = Boako.state.team.info.logo_url || 'https://via.placeholder.com/16';
                 membershipBadgeHtml = `
                 <span class="badge-premium" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; margin-top:12px; padding:4px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:12px; font-weight:900; color:#1e40af; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-                    <img src="${teamLogo}" style="width:16px; height:16px; border-radius:50%; object-fit:cover; border:1px solid #93c5fd;"> 
+                    <img src="${Boako.Util.cdn(teamLogo)}" style="width:16px; height:16px; border-radius:50%; object-fit:cover; border:1px solid #93c5fd;"> 
                     ${teamName} 멤버
                 </span>`;
             }
@@ -188,7 +188,7 @@ Boako.Auth = {
 
                 const buildUniformHtml = (teamLogo, uniformImage, size) => {
                     const uniformBg = uniformImage
-                        ? `background-image:url('${uniformImage}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
+                        ? `background-image:url('${Boako.Util.cdn(uniformImage)}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
                         : '';
                     const fallbackSilhouette = !uniformImage ? `
                         <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
@@ -199,7 +199,7 @@ Boako.Auth = {
                         <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center;">
                             ${fallbackSilhouette}
                             <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
-                                ${teamLogo ? `<img src="${teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:60%; height:60%; object-fit:contain;">` : ''}
+                                ${teamLogo ? `<img src="${Boako.Util.cdn(teamLogo)}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:60%; height:60%; object-fit:contain;">` : ''}
                             </div>
                         </div>
                     `;
@@ -221,7 +221,7 @@ Boako.Auth = {
                     const name = item.shop_items?.name || '배지';
 
                     if (icon.startsWith('http')) {
-                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${icon}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"></div>`;
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${Boako.Util.cdn(icon)}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"></div>`;
                     } else {
                         return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
                     }
