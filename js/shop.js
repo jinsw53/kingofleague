@@ -225,7 +225,7 @@ if (window.sfx) window.sfx.buy();
 
     getUniformPreviewHTML: (teamLogo, uniformImage, size) => {
         const uniformBg = uniformImage
-            ? `background-image:url('${uniformImage}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
+            ? `background-image:url('${Boako.Util.cdn(uniformImage)}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
             : '';
         const fallbackSilhouette = !uniformImage ? `
             <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
@@ -236,7 +236,7 @@ if (window.sfx) window.sfx.buy();
             <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center;">
                 ${fallbackSilhouette}
                 <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
-                    ${teamLogo ? `<img src="${teamLogo}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">` : ''}
+                    ${teamLogo ? `<img src="${Boako.Util.cdn(teamLogo)}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">` : ''}
                 </div>
             </div>
         `;
@@ -257,7 +257,7 @@ if (window.sfx) window.sfx.buy();
             return;
         }
 
-        const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+        const DEFAULT_LOGO = Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
 
         grid.innerHTML = filtered.map(t => {
             const isSelected = state.selectedTeamId === t.id;
@@ -269,7 +269,7 @@ if (window.sfx) window.sfx.buy();
             return `
                 <div onclick="Boako.Shop.selectSupporterTeam(${t.id})" class="relative flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 cursor-pointer transition-all ${isSelected ? 'border-violet-600 bg-violet-50 shadow-md' : 'border-slate-200 bg-white hover:border-violet-300 hover:shadow-sm'}">
                     ${rankBadge}
-                    <img src="${t.logo_url || DEFAULT_LOGO}" class="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1">
+                    <img src="${Boako.Util.cdn(t.logo_url) || DEFAULT_LOGO}" class="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1">
                     <span class="text-[10px] font-black text-slate-700 text-center truncate w-full">${t.team_name}</span>
                 </div>
             `;
@@ -313,7 +313,7 @@ if (window.sfx) window.sfx.buy();
                 <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                     <div class="bg-gradient-to-r from-amber-500 to-orange-600 p-5 flex items-center justify-between">
                         <h3 class="font-black text-white text-base flex items-center gap-2">
-                            <img src="${targetItem.icon}" class="w-6 h-6"> 도전권 구매
+                            <img src="${Boako.Util.cdn(targetItem.icon)}" class="w-6 h-6"> 도전권 구매
                         </h3>
                         <button onclick="Boako.Shop.closeTokenModal()" class="text-white/70 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
@@ -326,7 +326,7 @@ if (window.sfx) window.sfx.buy();
                             <div class="text-right">
                                 <div class="text-[10px] font-black text-slate-400 uppercase tracking-wider">보유 도전권</div>
                                 <div class="text-lg font-black text-slate-700 flex items-center gap-1 justify-end">
-                                    <img src="${targetItem.icon}" class="w-4 h-4">${currentTokens}개
+                                    <img src="${Boako.Util.cdn(targetItem.icon)}" class="w-4 h-4">${currentTokens}개
                                 </div>
                             </div>
                         </div>
@@ -341,7 +341,7 @@ if (window.sfx) window.sfx.buy();
                         </div>
 
                         <button onclick="Boako.Shop.confirmTokenPurchase()" class="w-full bg-slate-900 hover:bg-black text-white font-black text-sm py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-                            <img src="${targetItem.icon}" class="w-4 h-4"> 도전권 구매하기
+                            <img src="${Boako.Util.cdn(targetItem.icon)}" class="w-4 h-4"> 도전권 구매하기
                         </button>
                     </div>
                 </div>
