@@ -9,6 +9,10 @@ window.onload = () => {
         return;
     }
 
+    if (Boako.HotIssue && Boako.HotIssue.init) {
+        Boako.HotIssue.init();
+    }
+
     // 탭 복귀 시 토큰 갱신만 조용히 요청 (화면 버벅임 없음)
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible') {
