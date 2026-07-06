@@ -25,7 +25,6 @@ Boako.Schedule = {
             const { data, error } = await Boako.db
                 .from('match_schedules')
                 .select('*')
-                .eq('status', 'UPCOMING')
                 .order('scheduled_time', { ascending: true });
             if (error) throw error;
 
@@ -54,9 +53,7 @@ Boako.Schedule = {
             const { data, error } = await Boako.db
                 .from('challenges')
                 .select('*')
-                .in('status', ['UPCOMING', 'ROSTER_WAITING'])
-                .not('confirmed_schedule', 'is', null)
-                .gte('confirmed_schedule', nowIso);
+                .not('confirmed_schedule', 'is', null);
             if (error) throw error;
 
             (data || []).forEach(c => {
@@ -78,8 +75,7 @@ Boako.Schedule = {
             const { data, error } = await Boako.db
                 .from('together_posts')
                 .select('*')
-                .eq('status', 'CONFIRMED')
-                .gte('scheduled_date', nowIso);
+                .eq('status', 'CONFIRMED');
             if (error) throw error;
 
             (data || []).forEach(p => {
@@ -102,8 +98,7 @@ Boako.Schedule = {
                 .from('tournament_posts')
                 .select('*')
                 .eq('type', 'ANNOUNCEMENT')
-                .not('scheduled_date', 'is', null)
-                .gte('scheduled_date', nowIso);
+                .not('scheduled_date', 'is', null);
             if (error) throw error;
 
             (data || []).forEach(p => {
@@ -122,10 +117,10 @@ Boako.Schedule = {
 
         // 5. 리그 시즌 일정 — 시즌 시작일/종료일 + 밴투표 마감(시작+50일) + 엔트리 마감(시작+58일)
         try {
+            try {
             const { data, error } = await Boako.db
                 .from('seasons')
-                .select('*')
-                .gte('end_date', nowIso);
+                .select('*');
             if (error) throw error;
 
             (data || []).forEach(season => {
@@ -135,17 +130,16 @@ Boako.Schedule = {
                 const banDeadline = new Date(startMs + 50 * DAY).toISOString();
                 const entryDeadline = new Date(startMs + 58 * DAY).toISOString();
 
-                if (season.start_date >= nowIso) {
-                    items.push({
-                        id: `season_start_${season.season_no}`,
-                        typeKey: 'SEASON',
-                        scheduled_time: season.start_date,
-                        title: `시즌 ${season.season_no} 시작`,
-                        subtitle: season.title || '',
-                        linkUrl: null
-                    });
-                }
-                if (banDeadline >= nowIso && banDeadline <= season.end_date) {
+                items.push({
+                    id: `season_start_${season.season_no}`,
+                    typeKey: 'SEASON',
+                    scheduled_time: season.start_date,
+                    title: `시즌 ${season.season_no} 시작`,
+                    subtitle: season.title || '',
+                    linkUrl: null
+                });
+
+                if (banDeadline <= season.end_date) {
                     items.push({
                         id: `season_ban_${season.season_no}`,
                         typeKey: 'GRANDPRIX',
@@ -155,7 +149,7 @@ Boako.Schedule = {
                         linkUrl: null
                     });
                 }
-                if (entryDeadline >= nowIso && entryDeadline <= season.end_date) {
+                if (entryDeadline <= season.end_date) {
                     items.push({
                         id: `season_entry_${season.season_no}`,
                         typeKey: 'GRANDPRIX',
