@@ -114,7 +114,7 @@ Boako.Rival = {
                                 <span class="text-slate-300 font-bold w-4 text-center">${index + 1}</span>
                                 
                                 <div class="w-10 h-8 shrink-0 flex items-center justify-center bg-transparent">
-                                    <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/150x150?text=GAME'">
+                                    <img src="${Boako.Util.cdn(logoSrc)}" class="w-full h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/150x150?text=GAME'">
                                 </div>
                                 
                                 <span class="text-[15px] group-hover:text-red-600 transition-colors">${match.game_name}</span>
@@ -131,7 +131,7 @@ Boako.Rival = {
                                 <div class="flex flex-col items-center mb-8">
                                     
                                     <div class="w-24 h-20 mb-3 transform -rotate-3 flex items-center justify-center">
-                                        <img src="${logoSrc}" class="w-full h-full object-contain drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=GAME'">
+                                        <img src="${Boako.Util.cdn(logoSrc)}" class="w-full h-full object-contain drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=GAME'">
                                     </div>
                                     
                                     <h3 class="font-black text-2xl text-slate-800 tracking-tight">${match.game_name}</h3>
@@ -141,7 +141,7 @@ Boako.Rival = {
                                 <div class="flex items-center justify-center gap-8 w-full max-w-sm mb-8">
                                     <div class="flex flex-col items-center gap-2 flex-1">
                                         <div class="w-16 h-16 rounded-full bg-slate-200 border-4 border-slate-100 flex items-center justify-center text-slate-500 font-black text-xl shadow-lg relative overflow-visible">
-                                            ${myProfileUrl ? `<img src="${myProfileUrl}" class="w-full h-full object-cover rounded-full">` : myProfileInitial}
+                                            ${myProfileUrl ? `<img src="${Boako.Util.cdn(myProfileUrl)}" class="w-full h-full object-cover rounded-full">` : myProfileInitial}
                                         </div>
                                         <div class="text-sm font-black text-slate-800">${myNickname} (${match.my_record_count}회)</div>
                                     </div>
@@ -150,7 +150,7 @@ Boako.Rival = {
                                     
                                     <div class="flex flex-col items-center gap-2 flex-1">
                                         <div class="w-16 h-16 rounded-full bg-slate-200 border-4 ${isPerfectMatch ? 'border-red-400' : 'border-slate-100'} flex items-center justify-center text-slate-500 font-black text-xl shadow-lg relative overflow-visible">
-                                            ${profileSrc ? `<img src="${profileSrc}" class="w-full h-full object-cover rounded-full">` : match.rival_nickname.charAt(0)}
+                                            ${profileSrc ? `<img src="${Boako.Util.cdn(profileSrc)}" class="w-full h-full object-cover rounded-full">` : match.rival_nickname.charAt(0)}
                                             ${matchBadge}
                                         </div>
                                         <div class="text-sm font-black text-slate-800">${match.rival_nickname} (${match.rival_record_count}회)</div>
