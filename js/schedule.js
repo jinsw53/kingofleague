@@ -116,7 +116,6 @@ Boako.Schedule = {
         }
 
         // 5. 리그 시즌 일정 — 시즌 시작일/종료일 + 밴투표 마감(시작+50일) + 엔트리 마감(시작+58일)
-        try {
             try {
             const { data, error } = await Boako.db
                 .from('seasons')
