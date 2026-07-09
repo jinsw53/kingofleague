@@ -213,6 +213,8 @@ Boako.Together = {
             <img src="${Boako.Util.cdn(u.profile_url || TOGETHER_DEFAULT_AVATAR)}" title="${u.full_name || '익명'}" class="w-6 h-6 rounded-full object-cover border-2 border-white -ml-2 first:ml-0 bg-slate-200">
         `).join('');
 
+        const namesText = participants.map(u => u.full_name || '익명').join(', ');
+
         let actionHtml = '';
         if (confirmed) {
             actionHtml = `<button class="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-2.5 rounded-lg transition-colors" onclick="Boako.Together.goToChat(${p.id})">💬 채팅방 입장</button>`;
@@ -248,6 +250,7 @@ Boako.Together = {
                     <div class="flex items-center">${avatarsHtml}</div>
                     <span class="text-[11px] text-slate-500 font-bold">👥 ${p.current_count} / ${p.max_participants}명</span>
                 </div>
+                ${namesText ? `<div class="text-[10px] text-slate-400 font-bold mt-1 truncate" title="${namesText}">${namesText}</div>` : ''}
                 ${actionHtml}
             </div>
         `;
