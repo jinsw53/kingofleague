@@ -18,6 +18,10 @@ Boako.Archive = {
     currentRoundFilter: 'all',
     availableSeasons: [],
     availableRounds: [],
+
+    // 🌟 지난 시즌 MVP 강조용
+    prevMvpNickname: null,
+    prevMvpSeasonNo: null,
     
     // 🎯 탭별로 완벽하게 최적화된 페이지당 사출 개수 정의
     getLimit: function() {
@@ -27,10 +31,33 @@ Boako.Archive = {
         return 20;
     },
 
+        // 🌟 지난 시즌 MVP 카드 전용 스타일 (한 번만 주입)
+    injectMvpStyle: function() {
+        if (document.getElementById('archive-mvp-style')) return;
+        const style = document.createElement('style');
+        style.id = 'archive-mvp-style';
+        style.innerHTML = `
+            .mvp-card-navy { background: linear-gradient(160deg,#1e1b4b,#312e81) !important; position: relative; overflow: hidden; }
+            .mvp-card-navy::before { content:''; position:absolute; top:-40%; right:-15%; width:180px; height:180px; background: radial-gradient(circle, rgba(251,191,36,.25), transparent 70%); }
+            .mvp-card-navy .mvp-rank-badge { background: rgba(255,255,255,0.15) !important; color: #fff !important; }
+            .mvp-card-navy .mvp-name { color: #fff !important; }
+            .mvp-card-navy .mvp-team-text { color: #c7d2fe !important; }
+            .mvp-card-navy .mvp-stat-box { background: rgba(255,255,255,0.1) !important; }
+            .mvp-card-navy .mvp-stat-label { color: #c7d2fe !important; }
+            .mvp-card-navy .mvp-stat-value-rp { color: #fbbf24 !important; }
+            .mvp-card-navy .mvp-stat-value-matches { color: #fff !important; }
+            .mvp-card-navy .mvp-fwb-label { color: #a5b4fc !important; }
+            .mvp-card-navy .mvp-fwb-badge { background: rgba(251,191,36,.15) !important; color: #fbbf24 !important; border-color: rgba(251,191,36,.3) !important; }
+            .mvp-card-navy .mvp-progress-track { background: rgba(255,255,255,0.15) !important; }
+        `;
+        document.head.appendChild(style);
+    },
+
     // 1. view.js가 호출하는 최초 진입점
     buildUI: function(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return;
+        this.injectMvpStyle();
 
         container.innerHTML = `
             <div class="w-full animate-in fade-in duration-500">
@@ -82,13 +109,44 @@ Boako.Archive = {
         this.init();
     },
 
-    // 2. DB 초기화 및 메타데이터 로드
+   // 2. DB 초기화 및 메타데이터 로드
     init: async function() {
         if (!Boako.db) {
             setTimeout(() => this.init(), 500);
             return;
         }
+        if (this.currentTab === 'rankings' && this.prevMvpNickname === null) {
+            await this.loadPrevMvpInfo();
+        }
         await this.loadData();
+    },
+
+    // 🌟 지난 시즌 MVP 닉네임만 가볍게 로드 (카드 강조 판별용)
+    loadPrevMvpInfo: async function() {
+        try {
+            const { data: latestMvp } = await Boako.db
+                .from('season_mvp')
+                .select('season_no, nickname')
+                .order('season_no', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            this.prevMvpNickname = latestMvp?.nickname || null;
+            this.prevMvpSeasonNo = latestMvp?.season_no || null;
+        } catch (e) {
+            console.error('지난 시즌 MVP 정보 로드 실패:', e);
+            this.prevMvpNickname = null;
+        }
+    },
+
+    // 🌟 지난 시즌 MVP가 현재 랭킹표에 없을 때만 뜨는 대체 안내 배너
+    getPrevMvpFallbackBannerHTML: function() {
+        return `
+            <div style="background:linear-gradient(160deg,#1e1b4b,#312e81); border-radius:16px; padding:16px 20px; margin-bottom:24px; display:flex; align-items:center; gap:10px; position:relative; overflow:hidden;">
+                <div style="position:absolute; top:-60%; right:-10%; width:140px; height:140px; background:radial-gradient(circle, rgba(251,191,36,.25), transparent 70%);"></div>
+                <span style="font-size:18px; position:relative; z-index:1;">👑</span>
+                <span style="color:#fff; font-weight:700; font-size:13px; position:relative; z-index:1;">시즌 ${this.prevMvpSeasonNo} MVP <b style="color:#fbbf24;">${this.prevMvpNickname}</b> 님은 이번 시즌 아직 활동 기록이 없습니다.</span>
+            </div>
+        `;
     },
 
     loadData: async function() {
@@ -269,9 +327,13 @@ Boako.Archive = {
     },
 
     // 4. 탭 전환 로직
-    switchTab: function(tabName) {
+    switchTab: async function(tabName) {
         this.currentTab = tabName;
         this.currentPage = 1;
+
+        if (tabName === 'rankings' && this.prevMvpNickname === null) {
+            await this.loadPrevMvpInfo();
+        }
         
         const activeClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap shrink-0';
         const inactiveClass = 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0';
@@ -487,10 +549,13 @@ Boako.Archive = {
             return;
         }
 
-        let html = `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
+        const mvpInList = this.prevMvpNickname && allSorted.some(p => p.name === this.prevMvpNickname);
+        let html = (this.prevMvpNickname && !mvpInList) ? this.getPrevMvpFallbackBannerHTML() : '';
+        html += `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-500">`;
 
         html += paginatedSorted.map((p, index) => {
             const idx = from + index;
+            const isPrevMvp = this.prevMvpNickname && p.name === this.prevMvpNickname;
             let logoHTML = `<span class="text-[10px]">👤</span>`;
             
             if (p.logo_url && p.team !== 'Free Agent') {
@@ -505,45 +570,45 @@ Boako.Archive = {
             }
 
             return `
-                <div class="bg-white rounded-[2.5rem] p-8 shadow-xl border border-white relative group hover:-translate-y-2 transition-transform duration-300">
-                    <div class="absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
+                <div class="${isPrevMvp ? 'mvp-card-navy' : 'bg-white border-white'} rounded-[2.5rem] p-8 shadow-xl border relative group hover:-translate-y-2 transition-transform duration-300">
+                    ${isPrevMvp ? `<div style="position:absolute; top:16px; left:16px; background:#fbbf24; color:#78350f; font-size:9px; font-weight:900; padding:4px 11px; border-radius:999px; z-index:2;">👑 전 시즌 MVP</div>` : ''}
+                    <div class="mvp-rank-badge absolute top-0 right-0 px-5 py-2 rounded-bl-2xl rounded-tr-[2.5rem] font-black text-xs tracking-widest ${idx < 3 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'} flex items-baseline gap-1.5">
                         ${idx < 3 ? `<span class="text-xl select-none leading-none relative -top-[2px]">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>` : ''}
                         <span>RANK #${idx + 1}</span>
                     </div>
                     
-                    <div class="flex items-center gap-5 mb-8 pt-2 overflow-visible">
+                    <div class="flex items-center gap-5 mb-8 ${isPrevMvp ? 'pt-8' : 'pt-2'} overflow-visible">
                         <div class="relative shrink-0 group-hover:scale-105 transition-transform duration-300">
                             <img src="${Boako.Util.cdn((p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80').replace('http://', 'https://'))}" 
-                                 class="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-100 bg-slate-50 p-0.5"
+                                 class="w-14 h-14 rounded-2xl object-cover shadow-md border ${isPrevMvp ? 'border-amber-400' : 'border-slate-100'} bg-slate-50 p-0.5"
                                  onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
                                  alt="${p.name}">
-                            ${p.is_prev_mvp ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-[10px] select-none text-slate-900">👑</div>` : ''}
                         </div>
                         <div>
-                            <h3 class="text-xl font-black text-slate-900 leading-none">${p.name}</h3>
+                            <h3 class="mvp-name text-xl font-black text-slate-900 leading-none">${p.name}</h3>
                             <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer overflow-visible" data-handler="ranking-tooltip">
                                 ${logoHTML}
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
+                                <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
                             </div>
                         </div>
                     </div>
                     
                     <div class="grid grid-cols-2 gap-4 mb-8">
-                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm overflow-hidden">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total RP</p>
-                            <p class="${(() => { const len = String(Math.floor(p.rp)).length; return len >= 7 ? 'text-lg' : len >= 5 ? 'text-2xl' : 'text-3xl'; })()} font-black text-indigo-600 tracking-tighter leading-none whitespace-nowrap">${Math.floor(p.rp)}</p>
+                        <div class="mvp-stat-box bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm overflow-hidden">
+                            <p class="mvp-stat-label text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total RP</p>
+                            <p class="mvp-stat-value-rp ${(() => { const len = String(Math.floor(p.rp)).length; return len >= 7 ? 'text-lg' : len >= 5 ? 'text-2xl' : 'text-3xl'; })()} font-black text-indigo-600 tracking-tighter leading-none whitespace-nowrap">${Math.floor(p.rp)}</p>
                         </div>
-                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Matches</p>
-                            <p class="text-3xl font-black text-slate-800 tracking-tighter leading-none">${p.games}</p>
+                        <div class="mvp-stat-box bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
+                            <p class="mvp-stat-label text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Matches</p>
+                            <p class="mvp-stat-value-matches text-3xl font-black text-slate-800 tracking-tighter leading-none">${p.games}</p>
                         </div>
                     </div>
                     
                     <div class="flex justify-between items-center text-[11px] font-black tracking-tight uppercase mb-4 overflow-visible">
-                        <span class="text-slate-400 italic">First Win Bonus</span>
-                        <span class="text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100 overflow-visible">+${p.wins} Times</span>
+                        <span class="mvp-fwb-label text-slate-400 italic">First Win Bonus</span>
+                        <span class="mvp-fwb-badge text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100 overflow-visible">+${p.wins} Times</span>
                     </div>
-                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
+                    <div class="mvp-progress-track w-full bg-slate-100 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
                         <div class="bg-gradient-to-r from-indigo-500 to-indigo-700 h-full rounded-full transition-all duration-1000 ease-out" style="width: ${Math.min(100, (p.rp / allSorted[0].rp) * 100)}%"></div>
                     </div>
                 </div>
