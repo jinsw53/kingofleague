@@ -84,11 +84,20 @@ Boako.View = {
                 if (!Boako.Ranking || !Boako.Ranking.init) {
                     await Boako.Util.loadScript('js/ranking.js');
                 }
-                html = `<div class="main-banner"><h1>🏆 실시간 랭킹</h1></div><section class="section-card"><div class="card-body">집계 중...</div></section>`;
+                html = `
+                    <div class="main-banner" style="flex-direction:column; gap:6px;">
+                        <h1>🏆 실시간 랭킹</h1>
+                        <div id="ranking-prize-banner" style="font-size:14px; font-weight:700; opacity:0.9;">상금 정보를 불러오는 중...</div>
+                    </div>
+                    <section class="section-card"><div class="card-body">집계 중...</div></section>
+                `;
                 
                 setTimeout(() => {
                     if (Boako.Ranking && typeof Boako.Ranking.init === 'function') {
                         Boako.Ranking.init();
+                    }
+                    if (Boako.Ranking && typeof Boako.Ranking.loadPrizeBanner === 'function') {
+                        Boako.Ranking.loadPrizeBanner();
                     }
                 }, 0);
                 break;
