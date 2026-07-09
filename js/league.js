@@ -526,7 +526,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                         <div class="md:col-span-3 space-y-4 relative transition-all duration-500" style="${atkStyle}">
                             ${atkStamp}
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
-                                <img src="${p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
+                                <img src="${Boako.Util.cdn(p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png')}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-violet-100 text-violet-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Challenger</span>
                                 <h4 class="font-black text-slate-800 text-sm truncate w-full">${p.attacker_team_name}</h4>
                             </div>
@@ -547,7 +547,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                         <div class="md:col-span-3 space-y-4 relative transition-all duration-500" style="${defStyle}">
                             ${defStamp}
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
-                                <img src="${p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png'}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
+                                <img src="${Boako.Util.cdn(p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png')}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Opponent</span>
                                 <h4 class="font-black text-slate-800 text-sm truncate w-full">${p.defender_team_name || '대기 중'}</h4>
                             </div>
@@ -745,8 +745,8 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
                 <div class="flex items-center gap-2">
                     ${statusBadgeHtml}
                     <div class="flex items-center gap-1">
-                        ${p.is_attacker_token_used ? `<span class="bg-amber-50 text-amber-600 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded">도전팀 <img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-3 h-3 inline-block"></span>` : ''}
-                        ${p.is_defender_token_used ? `<span class="bg-orange-50 text-orange-600 border border-orange-200 text-[9px] font-black px-1.5 py-0.5 rounded">응전팀 <img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-3 h-3 inline-block"></span>` : ''}
+                        ${p.is_attacker_token_used ? `<span class="bg-amber-50 text-amber-600 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded">도전팀 <img src="${Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png')}" class="w-3 h-3 inline-block"></span>` : ''}
+                        ${p.is_defender_token_used ? `<span class="bg-orange-50 text-orange-600 border border-orange-200 text-[9px] font-black px-1.5 py-0.5 rounded">응전팀 <img src="${Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png')}" class="w-3 h-3 inline-block"></span>` : ''}
                     </div>
                 </div>
                 
@@ -755,7 +755,7 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
                     <div class="flex flex-wrap gap-1.5">
                         ${isPendingState 
                             ? gamesHtml 
-                            : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><img src="${(p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" class="w-4 h-4 object-contain rounded bg-white p-0.5" /><span class="text-xs font-black">${p.game_name}</span><span class="text-[9px] font-black text-slate-400 border-l border-slate-600 pl-2 ml-1">${Boako.League.formatMode(p.game_mode)}</span></div>`
+                            : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><img src="${Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png')}" class="w-4 h-4 object-contain rounded bg-white p-0.5" /><span class="text-xs font-black">${p.game_name}</span><span class="text-[9px] font-black text-slate-400 border-l border-slate-600 pl-2 ml-1">${Boako.League.formatMode(p.game_mode)}</span></div>`
                         }
                     </div>
                 </div>
@@ -1238,7 +1238,7 @@ Boako.League.showAcceptPopup = function(challengeId) {
         if (el) el.value = value;
     };
     
-    const safeTeamLogo = (p.attacker_team_logo_url && p.attacker_team_logo_url !== 'null') ? p.attacker_team_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png';
+    const safeTeamLogo = Boako.Util.cdn((p.attacker_team_logo_url && p.attacker_team_logo_url !== 'null') ? p.attacker_team_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png');
 
     const popupHtml = `
         <div id="challenge-modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="document.getElementById('challenge-popup-root').innerHTML=''">
@@ -1776,13 +1776,13 @@ Boako.League.renderBingoBoard = function() {
         if (diffStatus === 'HARD_CENTER_PENALTY') bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group cursor-pointer ${bgClass}`;
         const gameLogoOpacity = ownerTeam ? "opacity-20 grayscale transition-all duration-300 group-hover:opacity-10" : "opacity-100 drop-shadow-md";
-        const gameImageHtml = gameLogoUrl ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-3"><img src="${gameLogoUrl}" alt="${gameName}" class="w-[65%] h-auto max-h-full object-contain ${gameLogoOpacity}"></div>` : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
-        let massiveOverlayHtml = ''; if (ownerTeam) { const teamLogoUrl = Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'; massiveOverlayHtml = `<div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-2 pointer-events-none"><img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-14 h-14 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300"></div>`; }
+        const gameImageHtml = gameLogoUrl ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-3"><img src="${Boako.Util.cdn(gameLogoUrl)}" alt="${gameName}" class="w-[65%] h-auto max-h-full object-contain ${gameLogoOpacity}"></div>` : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
+        let massiveOverlayHtml = ''; if (ownerTeam) { const teamLogoUrl = Boako.Util.cdn(Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'); massiveOverlayHtml = `<div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-2 pointer-events-none"><img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-14 h-14 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300"></div>`; }
         let diffBadgeHtml = ''; if (diffStatus === 'HARD_CENTER_PENALTY') { diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[7px] px-1.5 py-0.5 rounded shadow-sm pointer-events-none">🔥 CENTER</span>`; } else { const diffColors = { EASY: "bg-emerald-500/90 text-white", NORMAL: "bg-blue-500/90 text-white", HARD: "bg-rose-500/90 text-white" }; diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm pointer-events-none">${diffStatus}</span>`; }
         const crownHtml = isWinner ? `<span class="absolute top-1 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-12' : 'right-8'} text-xs text-amber-400 animate-bounce z-30 pointer-events-none">👑</span>` : '';
         const gameLabelHtml = `<div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30 pointer-events-none"><div class="w-full px-1 bg-white/90 backdrop-blur-md py-0.5 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[18px]"><span class="text-[8px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${gameName}</span></div></div>`;
         cell.innerHTML = `${gameImageHtml}${massiveOverlayHtml}${diffBadgeHtml}${crownHtml}${gameLabelHtml}`;
-        cell.addEventListener('mouseenter', () => { globalTooltip.innerHTML = `${gameLogoUrl ? `<img src="${gameLogoUrl}" class="w-20 h-20 object-contain mb-3 drop-shadow-md" alt="Game Logo">` : `<div class="text-4xl mb-2">🎲</div>`}<div class="text-xs font-black text-slate-800 text-center w-full break-keep">${gameName}</div><div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"></div>`; globalTooltip.style.display = 'flex'; setTimeout(() => { globalTooltip.style.opacity = '1'; }, 10); });
+        cell.addEventListener('mouseenter', () => { globalTooltip.innerHTML = `${gameLogoUrl ? `<img src="${Boako.Util.cdn(gameLogoUrl)}" class="w-20 h-20 object-contain mb-3 drop-shadow-md" alt="Game Logo">` : `<div class="text-4xl mb-2">🎲</div>`}<div class="text-xs font-black text-slate-800 text-center w-full break-keep">${gameName}</div><div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"></div>`; globalTooltip.style.display = 'flex'; setTimeout(() => { globalTooltip.style.opacity = '1'; }, 10); });
         cell.addEventListener('mousemove', (e) => { globalTooltip.style.top = `${e.clientY - 15}px`; globalTooltip.style.left = `${e.clientX}px`; });
         cell.addEventListener('mouseleave', () => { globalTooltip.style.opacity = '0'; setTimeout(() => { if (globalTooltip.style.opacity === '0') globalTooltip.style.display = 'none'; }, 200); });
         grid.appendChild(cell);
@@ -1829,7 +1829,7 @@ Boako.League.updateStats = function() {
         if (!badgesHtml) badgesHtml = `<span class="text-slate-400 font-medium text-[10px] italic">현재 빙고 조합 연산 중...</span>`;
         html += `
             <div class="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-sm space-y-3 transition-all hover:border-slate-300">
-                <div class="flex justify-between items-center"><span class="font-black text-slate-800 text-xs flex items-center gap-1.5"><img src="${teamLogoUrl}" class="w-4 h-4 object-contain rounded-full shadow-sm bg-slate-50 border border-slate-100"> ${teamName}</span><div class="text-right flex items-center"><span class="text-indigo-600 font-black text-sm ml-0.5"><span class="flex flex-col items-end leading-tight">🏆 ${totalScore} LP<span class="text-slate-400 font-bold">획득</span></span></span></div></div>
+                <div class="flex justify-between items-center"><span class="font-black text-slate-800 text-xs flex items-center gap-1.5"><img src="${Boako.Util.cdn(teamLogoUrl)}" class="w-4 h-4 object-contain rounded-full shadow-sm bg-slate-50 border border-slate-100"> ${teamName}</span><div class="text-right flex items-center"><span class="text-indigo-600 font-black text-sm ml-0.5"><span class="flex flex-col items-end leading-tight">🏆 ${totalScore} LP<span class="text-slate-400 font-bold">획득</span></span></span></div></div>
                 <div class="grid grid-cols-2 gap-2 text-center bg-slate-50 p-2 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><div>점유 영토 <span class="text-slate-800 font-black">${basicSlots}칸</span></div><div class="border-l border-slate-200">완성 라인 <span class="text-amber-500 font-black">${totalLines}줄</span></div></div>
                 <div class="flex flex-wrap gap-1 pt-1 border-t border-dashed border-slate-100">${badgesHtml}</div>
             </div>
@@ -1847,7 +1847,7 @@ Boako.League.showChallengeRuleModal = async function() {
         alert('승점 규칙 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
         return;
     }
-    const TOKEN_IMG = `<img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png" class="w-4 h-4 inline-block align-middle mx-0.5">`;
+    const TOKEN_IMG = `<img src="${Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png')}" class="w-4 h-4 inline-block align-middle mx-0.5">`;
     const modalHtml = `
         <div id="challenge-rule-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onclick="Boako.League.closeChallengeRuleModal()">
             <div class="w-full max-w-xl bg-slate-900 rounded-3xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
@@ -2050,13 +2050,13 @@ Boako.League.drawChampionRows = function(dataList) {
     <tr class="hover:bg-slate-50/50 transition-colors">
         <td class="p-4 text-center font-black text-violet-600"><span class="bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100 text-xs">TOP ${gameRank}</span></td>
         <td class="p-4 font-black text-slate-800 text-sm"><div>${gameName}</div><div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-1.5"><span class="text-violet-600">🔥 총 ${totalPlays}회 플레이</span><span class="w-0.5 h-2 bg-slate-200"></span><span class="text-blue-600">👥 ${uniquePlayers}명 참여</span></div></td>
-       <td class="p-4"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0"><img src="https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png" alt="CHAMPION BADGE" class="w-full h-full object-contain"></div><span class="font-extrabold text-slate-900">${mvpName}</span></div></td>
+       <td class="p-4"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0"><img src="${Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png')}" alt="CHAMPION BADGE" class="w-full h-full object-contain"></div><span class="font-extrabold text-slate-900">${mvpName}</span></div></td>
        <td class="p-4 text-slate-500 font-bold relative group/handler">
             <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center shadow-sm shrink-0 relative cursor-pointer"><img src="${row.mvp_team_logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" alt="TEAM LOGO" class="w-full h-full object-contain rounded-full"></div>
+                <div class="w-6 h-6 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center shadow-sm shrink-0 relative cursor-pointer"><img src="${Boako.Util.cdn(row.mvp_team_logo) || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" alt="TEAM LOGO" class="w-full h-full object-contain rounded-full"></div>
                 <span class="cursor-pointer">${mvpTeam}</span>
                 <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center" style="top: var(--tooltip-top, auto); left: var(--tooltip-left, auto);">
-                    <img src="${row.mvp_team_logo || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" alt="LARGE TEAM LOGO" class="w-full h-full object-contain">
+                    <img src="${Boako.Util.cdn(row.mvp_team_logo) || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" alt="LARGE TEAM LOGO" class="w-full h-full object-contain">
                     <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
                 </div>
             </div>
@@ -2267,7 +2267,7 @@ Boako.League.loadKingOfLeagueData = async function() {
 Boako.League.getKingOfLeagueHTML = function() {
     const state = Boako.League.KOL;
     const myTeamId = Boako.state?.team?.info?.id;
-    const DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+    const DEFAULT_LOGO = Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
 
     if (!state.season_no) {
         return `
@@ -2303,7 +2303,7 @@ Boako.League.getKingOfLeagueHTML = function() {
 
     const seasonLogoUrl = state.seasonLogoUrl;
     const arenaCenterContent = seasonLogoUrl
-        ? `<img src="${seasonLogoUrl}" class="kol-arena-center-logo" alt="시즌 로고">`
+        ? `<img src="${Boako.Util.cdn(seasonLogoUrl)}" class="kol-arena-center-logo" alt="시즌 로고">`
         : `<div class="kol-arena-center-label">ARENA</div>`;
 
     const arenaHtml = total === 0
