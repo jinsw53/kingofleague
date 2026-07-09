@@ -529,9 +529,9 @@ Boako.Archive = {
                     </div>
                     
                     <div class="grid grid-cols-2 gap-4 mb-8">
-                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
+                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm overflow-hidden">
                             <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total RP</p>
-                            <p class="text-3xl font-black text-indigo-600 tracking-tighter leading-none">${Math.floor(p.rp)}</p>
+                            <p class="${(() => { const len = String(Math.floor(p.rp)).length; return len >= 7 ? 'text-lg' : len >= 5 ? 'text-2xl' : 'text-3xl'; })()} font-black text-indigo-600 tracking-tighter leading-none whitespace-nowrap">${Math.floor(p.rp)}</p>
                         </div>
                         <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
                             <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Matches</p>
