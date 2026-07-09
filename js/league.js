@@ -325,10 +325,11 @@ Boako.League.viewMatchLineup = async function(challengeId) {
 
     const getSecureAvatar = (name) => {
         const url = profiles.find(pr => pr.full_name === name)?.profile_url;
-        return url ? url.replace(/^http:\/\//i, 'https://') : null;
+        return url ? Boako.Util.cdn(url.replace(/^http:\/\//i, 'https://')) : null;
+    };
     };
 
-    const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+    const safeGameLogo = Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
     const isCompleted = (p.status === 'COMPLETED');
     
     let matches = {};
@@ -594,7 +595,7 @@ Boako.League.renderChallenges = function() {
         let gamesHtml = '';
         if (p.proposed_games && Array.isArray(p.proposed_games)) {
             gamesHtml = p.proposed_games.map(g => {
-                const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+                const safeLogo = Boako.Util.cdn((g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
                 return `<div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm"><img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" /><div class="flex flex-col"><span class="text-[11px] font-black text-slate-800 leading-tight">${g.name}</span><span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${Boako.League.formatMode(g.mode)}</span></div></div>`;
             }).join('');
         }
@@ -722,7 +723,7 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
         } else if (isPendingState) {
             leftVisualHtml = `<div class="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex flex-col items-center justify-center text-white shadow-md shrink-0"><i data-lucide="swords" class="w-7 h-7 mb-1 animate-pulse"></i><span class="text-[9px] font-black tracking-widest uppercase opacity-80">OPEN</span></div>`;
         } else if (currentStatus === 'NEGOTIATING') {
-            const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+            const safeGameLogo = Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
             leftVisualHtml = `
                 <div class="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 border border-amber-400 rounded-2xl flex flex-col items-center justify-center p-1.5 shrink-0 relative overflow-hidden shadow-lg shadow-amber-500/30">
                     <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
@@ -731,7 +732,7 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
                 </div>
             `;
         } else {
-            const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+            const safeGameLogo = Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
             leftVisualHtml = `<div class="w-20 h-20 bg-white border border-slate-200 rounded-2xl flex flex-col items-center justify-center p-2 shrink-0 relative overflow-hidden shadow-sm"><img src="${safeGameLogo}" class="max-w-full max-h-full object-contain" /><div class="absolute bottom-0 inset-x-0 bg-slate-800 text-white text-[8px] font-black py-0.5 text-center truncate">${Boako.League.formatMode(p.game_mode)}</div></div>`;
         }
 
@@ -917,7 +918,7 @@ Boako.League.initGameSearch = function() {
 
         if (matchedGames.length > 0) {
             autocompleteList.innerHTML = matchedGames.map(g => {
-                const safeLogo = (g.game_logo_url && g.game_logo_url !== 'null') ? g.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+                const safeLogo = Boako.Util.cdn((g.game_logo_url && g.game_logo_url !== 'null') ? g.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
                 return `
                 <li class="p-3 hover:bg-violet-50 cursor-pointer flex items-center gap-3 border-b border-slate-100 last:border-0"
                     onmousedown="event.preventDefault(); Boako.League.addProposedGame('${g.game_name.replace(/'/g, "\\'")}', '${safeLogo}')">
@@ -964,7 +965,7 @@ Boako.League.renderSelectedGames = function() {
     if(!container) return;
 
     container.innerHTML = Boako.League.State.selectedProposedGames.map((g, idx) => {
-        const safeLogo = (g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+        const safeLogo = Boako.Util.cdn((g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
         return `
         <div class="flex items-center justify-between bg-white border border-violet-100 px-3 py-2 rounded-xl shadow-sm mb-2 transition-all hover:border-violet-300 group">
             <div class="flex items-center gap-2.5">
@@ -1398,7 +1399,7 @@ Boako.League.showRosterModal = async function(challengeId) {
         return alert(`DB 조회 실패: ${err.message}`);
     }
 
-    const safeGameLogo = (p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+    const safeGameLogo = Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
     const gameMode = p.game_mode || '4v4'; 
     const displayGameMode = Boako.League.formatMode(gameMode);
 
@@ -1506,7 +1507,7 @@ Boako.League.renderRosterList = function() {
             : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-sm cursor-pointer";
 
         // 🚨 HTTP -> HTTPS 변환 로직 추가
-        const secureAvatar = m.avatar ? m.avatar.replace(/^http:\/\//i, 'https://') : null;
+        const secureAvatar = m.avatar ? Boako.Util.cdn(m.avatar.replace(/^http:\/\//i, 'https://')) : null;
 
         const avatarHtml = secureAvatar 
             ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
