@@ -605,3 +605,38 @@ Boako.Ranking.changeHofSeason = async function(seasonNo) {
     Boako.Ranking.State.hofSelectedSeason = Number(seasonNo);
     await Boako.Ranking.loadHofTab();
 };
+
+// 🌟 [신규] 배너에 이번 시즌 예상 상금 표시 + 계산 방식 설명 토글
+Boako.Ranking.loadPrizeBanner = async function() {
+    const el = document.getElementById('ranking-prize-banner');
+    if (!el) return;
+
+    try {
+        const { data, error } = await Boako.db.rpc('fn_get_current_season_prize_estimate');
+        if (error) throw error;
+
+        if (!data || !data.active) {
+            el.innerHTML = `진행 중인 시즌이 없습니다.`;
+            return;
+        }
+
+        el.innerHTML = `
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span>🏆 이번 시즌 예상 상금: <b>${Number(data.total_estimate).toLocaleString()}P</b> (진행 중, 변동 가능)</span>
+                <button onclick="Boako.Ranking.togglePrizeInfo()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:18px; height:18px; border-radius:50%; font-size:11px; font-weight:900; cursor:pointer; line-height:1;">ⓘ</button>
+            </div>
+            <div id="ranking-prize-info" class="hidden" style="margin-top:8px; font-size:12px; font-weight:600; opacity:0.85; line-height:1.6; max-width:600px;">
+                상금 재원 = (참가 팀 수 × 10,000P 지원금) + (시즌 중 도전권 구매·환전 수수료로 자연 적립된 금액)<br>
+                시즌 종료 후 7일 뒤, 참가한 모든 팀에게 순위 역순 가중치(1등이 2등의 2배, 조화수열 방식)로 나눠 지급됩니다. 1팀만 참가한 시즌은 지급 없이 다음 시즌으로 이월됩니다.
+            </div>
+        `;
+    } catch (e) {
+        console.error('상금 배너 로드 실패:', e);
+        el.innerHTML = '';
+    }
+};
+
+Boako.Ranking.togglePrizeInfo = function() {
+    if (window.sfx) window.sfx.click();
+    document.getElementById('ranking-prize-info')?.classList.toggle('hidden');
+};
