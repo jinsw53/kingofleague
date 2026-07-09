@@ -112,13 +112,13 @@ Boako.League.switchTab = async function(tabId) {
     if (mainImg) {
         mainImg.style.objectFit = "contain"; 
         if (tabId === 'bingo') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/teambingo.png";
+            mainImg.src = Boako.Util.cdn("https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/teambingo.png");
         } else if (tabId === 'challenge') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png";
+            mainImg.src = Boako.Util.cdn("https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png");
         } else if (tabId === 'champion') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png";
+            mainImg.src = Boako.Util.cdn("https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png");
         } else if (tabId === 'king_of_league') {
-            mainImg.src = "https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/king_of_league.png";
+            mainImg.src = Boako.Util.cdn("https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/king_of_league.png");
         }
     }
 
@@ -326,7 +326,6 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     const getSecureAvatar = (name) => {
         const url = profiles.find(pr => pr.full_name === name)?.profile_url;
         return url ? Boako.Util.cdn(url.replace(/^http:\/\//i, 'https://')) : null;
-    };
     };
 
     const safeGameLogo = Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
