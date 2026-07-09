@@ -270,6 +270,7 @@ Boako.Tournament = {
                         <div class="mb-4">
                             <label class="text-xs font-bold text-slate-600 block mb-1">실제 개설한 토너먼트 링크 (필수)</label>
                             <input type="url" id="tourney-input-url" required placeholder="https://boardgamearena.com/tournament?id=..." class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                            <p class="text-[10px] text-slate-400 font-bold mt-1">⚠️ boardgamearena.com 도메인의 실제 토너먼트 링크만 등록 가능합니다.</p>
                         </div>
                         ` : ''}
                         <button type="submit" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-3 rounded-xl transition-colors">
@@ -296,6 +297,10 @@ Boako.Tournament = {
         try {
             if (type === 'ANNOUNCEMENT') {
                 const sourceUrl = document.getElementById('tourney-input-url').value.trim();
+                if (!/^https?:\/\/(www\.)?boardgamearena\.com\//i.test(sourceUrl)) {
+                    Boako.Util.toast('❌ 보드게임아레나(BGA)에서 실제로 개설한 토너먼트 링크를 입력해주세요.');
+                    return;
+                }
                 const { error } = await Boako.db.rpc('create_tournament_announcement', {
                     p_title: title, p_game_name: gameName, p_content: content,
                     p_scheduled_date: scheduledDate, p_max_participants: maxParticipants, p_source_url: sourceUrl
