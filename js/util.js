@@ -64,7 +64,9 @@ Boako.Util = {
     // 저장은 원본 슈파베이스 주소 그대로 두고, 화면에 그릴 때만 여기를 거쳐서 캐싱 혜택을 받음
     cdn: (url) => {
         if (!url || typeof url !== 'string') return url;
-        return url.replace('qrredwrxdnvqwdxzanba.supabase.co', 'cdn.boakoarchive.co.kr');
+        return url
+            .replace(/^http:\/\//i, 'https://')
+            .replace('qrredwrxdnvqwdxzanba.supabase.co', 'cdn.boakoarchive.co.kr');
     },
 
     // 🎨 6. [신규] 네이티브 <select> 대체용 공용 커스텀 드롭다운
