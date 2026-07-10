@@ -69,6 +69,46 @@ Boako.Util = {
             .replace('qrredwrxdnvqwdxzanba.supabase.co', 'cdn.boakoarchive.co.kr');
     },
 
+    // 🌟 [신규] 실시간 이슈/소식지/전광판 공통 이동 라우터
+    // link_type + link_id만 주면 알맞은 화면으로 이동시켜줌
+    navigateToLink: async (linkType, linkId) => {
+        try {
+            switch (linkType) {
+                case 'BOARD_POST':
+                    await Boako.View.render('board');
+                    setTimeout(() => {
+                        if (Boako.Board && typeof Boako.Board.openDetail === 'function') {
+                            Boako.Board.openDetail(Number(linkId));
+                        }
+                    }, 150);
+                    break;
+                case 'TOURNAMENT':
+                    await Boako.View.render('tournament');
+                    break;
+                case 'TOGETHER_POST':
+                    await Boako.View.render('together');
+                    break;
+                case 'RIVAL_MATCH':
+                    await Boako.View.render('rival');
+                    break;
+                case 'TEAM':
+                    await Boako.View.render('team_list');
+                    break;
+                case 'SEASON_RANKING':
+                    await Boako.View.render('ranking');
+                    break;
+                case 'CHALLENGE':
+                case 'GRANDPRIX':
+                    await Boako.View.render('league');
+                    break;
+                default:
+                    console.warn('알 수 없는 link_type:', linkType);
+            }
+        } catch (err) {
+            console.error('링크 이동 실패:', err);
+        }
+    },
+
     // 🎨 6. [신규] 네이티브 <select> 대체용 공용 커스텀 드롭다운
     //    options: [{ value, label }], onSelectFn: 문자열로 된 전역 함수 경로 (예: 'Boako.Match.Chat.changeFixedTime')
     renderCSelect: (id, options, selectedValue, buttonClass, onSelectFn) => {
