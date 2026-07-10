@@ -29,7 +29,11 @@ Boako.Auth = {
 
         // 🌟 같이하자 모집중인 글 개수 — 로그인 여부 무관하게 항상 표시
         Boako.Auth.checkTogetherBadge();
-        Boako.Auth.subscribeTogetherBadge(); 
+        Boako.Auth.subscribeTogetherBadge();
+
+        // 🌟 게시판 요청 미답변 개수 — 로그인 여부 무관하게 항상 표시
+        Boako.Auth.checkBoardRequestBadge();
+        Boako.Auth.subscribeBoardRequestBadge(); 
 
         // 2. 상태 변화 감지 (탭 복귀 시)
         Boako.db.auth.onAuthStateChange(async (e, s) => {
@@ -287,6 +291,53 @@ Boako.Auth = {
         Boako.Auth._tournamentBadgeChannel = Boako.db.channel('tournament-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
                 Boako.Auth.checkTournamentBadge();
+            })
+            .subscribe();
+    },
+
+    // 🌟 [추가] 요청 게시판 중 아직 답변(댓글) 안 달린 글 개수 뱃지
+    checkBoardRequestBadge: async function() {
+        try {
+            const { data: posts } = await Boako.db.from('board_posts')
+                .select('id')
+                .eq('category', '요청')
+                .eq('is_deleted', false)
+                .eq('is_draft', false);
+
+            const postIds = (posts || []).map(p => p.id);
+            if (postIds.length === 0) {
+                const badge = document.getElementById('menu-board-badge');
+                if (badge) badge.style.display = 'none';
+                return;
+            }
+
+            const { data: comments } = await Boako.db.from('board_comments')
+                .select('post_id')
+                .eq('is_deleted', false)
+                .in('post_id', postIds);
+
+            const answeredIds = new Set((comments || []).map(c => c.post_id));
+            const unansweredCount = postIds.filter(id => !answeredIds.has(id)).length;
+
+            const badge = document.getElementById('menu-board-badge');
+            if (!badge) return;
+            if (unansweredCount > 0) {
+                badge.textContent = unansweredCount;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch (err) { console.error("게시판 요청 뱃지 갱신 실패:", err); }
+    },
+
+    subscribeBoardRequestBadge: function() {
+        if (Boako.Auth._boardRequestBadgeChannel) return;
+        Boako.Auth._boardRequestBadgeChannel = Boako.db.channel('board-request-badge-global')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
+                Boako.Auth.checkBoardRequestBadge();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => {
+                Boako.Auth.checkBoardRequestBadge();
             })
             .subscribe();
     },
