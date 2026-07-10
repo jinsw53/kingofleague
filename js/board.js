@@ -13,6 +13,7 @@ Boako.Board = {
         comments: [],
         badgeMap: {},
         pendingImages: [], // [{url, key}]
+        selectedGameName: null,
         isAdmin: false
     },
 
@@ -220,6 +221,7 @@ Boako.Board = {
             <div onclick="Boako.Board.openDetail(${p.id})" class="flex items-center justify-between gap-4 bg-white border ${p.is_notice ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'} rounded-xl px-5 py-4 cursor-pointer hover:shadow-md transition-shadow">
                 <div class="flex items-center gap-3 min-w-0 flex-1">
                     ${p.is_notice ? `<span class="text-[10px] font-black bg-amber-500 text-white px-2 py-1 rounded-md shrink-0">공지</span>` : `<span class="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-md shrink-0">${p.category}</span>`}
+                    ${p.game_name ? `<span class="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md shrink-0">🎲 ${Boako.Board.escapeHtml(p.game_name)}</span>` : ''}
                     <span class="font-bold text-slate-800 truncate">${Boako.Board.escapeHtml(p.title)}</span>
                     ${commentCountMap[p.id] ? `<span class="text-teal-600 text-xs font-black shrink-0">[${commentCountMap[p.id]}]</span>` : ''}
                 </div>
@@ -241,47 +243,56 @@ Boako.Board = {
         }
 
         Boako.Board.State.pendingImages = [];
+        Boako.Board.State.selectedGameName = null;
 
         const { data: profile } = await Boako.db.from('profiles').select('is_admin').eq('id', Boako.state.user.id).single();
         Boako.Board.State.isAdmin = !!(profile && profile.is_admin);
 
-        const modalHtml = `
-            <div id="board-write-modal-overlay" class="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
-                <div class="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[92vh] overflow-y-auto">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-black text-lg">📝 글쓰기</h3>
-                        <button onclick="document.getElementById('board-write-modal-overlay').remove()" class="text-slate-400 font-black text-xl">×</button>
+        const root = document.getElementById(Boako.Board.rootId);
+        if (!root) return;
+
+        root.innerHTML = `
+            <div class="max-w-3xl mx-auto">
+                <button onclick="Boako.Board.renderList()" class="text-sm font-bold text-slate-400 hover:text-slate-600 mb-4">← 목록으로</button>
+
+                <section class="section-card">
+                    <div class="card-header">📝 글쓰기</div>
+                    <div class="card-body">
+                        <div class="flex gap-2 mb-3">
+                            <select id="board-input-category" onchange="Boako.Board.onCategoryChange()" class="border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold">
+                                ${Boako.Board.CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            </select>
+                            ${Boako.Board.State.isAdmin ? `
+                            <label class="flex items-center gap-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3">
+                                <input type="checkbox" id="board-input-notice"> 공지글로 등록
+                            </label>` : ''}
+                        </div>
+
+                        <div id="board-game-search-wrap" class="hidden mb-3 relative">
+                            <label class="text-xs font-bold text-slate-600 block mb-1">다루는 게임 검색</label>
+                            <input type="text" id="board-input-game-search" autocomplete="off" placeholder="게임명을 입력해 검색하세요" oninput="Boako.Board.searchGames(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                            <div id="board-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
+                        </div>
+
+                        <input type="text" id="board-input-title" placeholder="제목을 입력하세요" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold mb-3">
+
+                        <div class="bg-sky-50 border border-sky-200 rounded-lg p-2.5 mb-2 text-[11px] font-bold text-sky-700">
+                            💡 스크린샷을 Ctrl+V로 붙여넣거나, 이미지 파일을 아래 편집창에 드래그해서 넣을 수 있어요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)
+                        </div>
+
+                        <div id="board-input-content" contenteditable="true"
+                             class="w-full min-h-[400px] border border-slate-200 rounded-lg px-3 py-3 text-sm leading-relaxed focus:outline-none focus:border-teal-500"
+                             style="overflow-y:auto;" data-placeholder="내용을 입력하세요...">
+                        </div>
+                        <div id="board-upload-indicator" class="hidden text-xs text-teal-600 font-bold mt-2">이미지 업로드 중...</div>
+
+                        <button onclick="Boako.Board.submitPost()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-3 rounded-xl mt-4 transition-colors">
+                            등록하기
+                        </button>
                     </div>
-
-                    <div class="flex gap-2 mb-3">
-                        <select id="board-input-category" class="border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold">
-                            ${Boako.Board.CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
-                        </select>
-                        ${Boako.Board.State.isAdmin ? `
-                        <label class="flex items-center gap-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3">
-                            <input type="checkbox" id="board-input-notice"> 공지글로 등록
-                        </label>` : ''}
-                    </div>
-
-                    <input type="text" id="board-input-title" placeholder="제목을 입력하세요" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold mb-3">
-
-                    <div class="bg-sky-50 border border-sky-200 rounded-lg p-2.5 mb-2 text-[11px] font-bold text-sky-700">
-                        💡 스크린샷을 Ctrl+V로 붙여넣거나, 이미지 파일을 아래 편집창에 드래그해서 넣을 수 있어요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)
-                    </div>
-
-                    <div id="board-input-content" contenteditable="true"
-                         class="w-full min-h-[240px] border border-slate-200 rounded-lg px-3 py-3 text-sm leading-relaxed focus:outline-none focus:border-teal-500"
-                         style="overflow-y:auto;" data-placeholder="내용을 입력하세요...">
-                    </div>
-                    <div id="board-upload-indicator" class="hidden text-xs text-teal-600 font-bold mt-2">이미지 업로드 중...</div>
-
-                    <button onclick="Boako.Board.submitPost()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-3 rounded-xl mt-4 transition-colors">
-                        등록하기
-                    </button>
-                </div>
+                </section>
             </div>
         `;
-        document.getElementById('board-modal-root').innerHTML = modalHtml;
 
         const editor = document.getElementById('board-input-content');
 
@@ -308,6 +319,48 @@ Boako.Board = {
         });
     },
 
+    onCategoryChange: () => {
+        const cat = document.getElementById('board-input-category').value;
+        const wrap = document.getElementById('board-game-search-wrap');
+        if (!wrap) return;
+        wrap.classList.toggle('hidden', cat !== '공략');
+        if (cat !== '공략') Boako.Board.State.selectedGameName = null;
+    },
+
+    searchGames: async (query) => {
+        const resultsBox = document.getElementById('board-game-search-results');
+        if (!resultsBox) return;
+        if (!query || query.trim().length === 0) {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+            return;
+        }
+
+        const { data } = await Boako.db.from('games').select('game_name, image_url').ilike('game_name', `%${query.trim()}%`).limit(8);
+
+        if (!data || data.length === 0) {
+            resultsBox.innerHTML = `<div class="p-3 text-xs text-slate-400 font-bold">검색 결과가 없습니다.</div>`;
+            resultsBox.classList.remove('hidden');
+            return;
+        }
+
+        resultsBox.innerHTML = data.map(g => `
+            <div class="flex items-center gap-2 p-2 hover:bg-teal-50 cursor-pointer transition-colors" onclick="Boako.Board.selectGame('${g.game_name.replace(/'/g, "\\'")}')">
+                <img src="${Boako.Util.cdn(g.image_url) || ''}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
+                <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
+            </div>
+        `).join('');
+        resultsBox.classList.remove('hidden');
+    },
+
+    selectGame: (name) => {
+        Boako.Board.State.selectedGameName = name;
+        const input = document.getElementById('board-input-game-search');
+        if (input) input.value = name;
+        const resultsBox = document.getElementById('board-game-search-results');
+        if (resultsBox) resultsBox.classList.add('hidden');
+    },
+
     handleImageInsert: async (file, editor) => {
         const indicator = document.getElementById('board-upload-indicator');
         if (indicator) indicator.classList.remove('hidden');
@@ -331,6 +384,7 @@ Boako.Board = {
         const title = document.getElementById('board-input-title').value.trim();
         const editor = document.getElementById('board-input-content');
         const isNotice = document.getElementById('board-input-notice')?.checked || false;
+        const gameName = category === '공략' ? (Boako.Board.State.selectedGameName || null) : null;
 
         if (!title) { Boako.Util.toast('제목을 입력해주세요.'); return; }
         if (!editor.innerText.trim() && Boako.Board.State.pendingImages.length === 0) { Boako.Util.toast('내용을 입력해주세요.'); return; }
@@ -343,13 +397,13 @@ Boako.Board = {
                 p_title: title,
                 p_content: content,
                 p_is_notice: isNotice,
-                p_image_urls: Boako.Board.State.pendingImages
+                p_image_urls: Boako.Board.State.pendingImages,
+                p_game_name: gameName
             });
             if (error) throw error;
 
             if (window.sfx) window.sfx.success();
             Boako.Util.toast('✅ 게시글이 등록되었습니다!');
-            document.getElementById('board-write-modal-overlay').remove();
             await Boako.Board.openDetail(postId);
         } catch (err) {
             console.error(err);
@@ -463,6 +517,7 @@ Boako.Board = {
                     <div class="card-body">
                         <div class="flex items-center gap-2 mb-2">
                             ${post.is_notice ? `<span class="text-[11px] font-black bg-amber-500 text-white px-2.5 py-1 rounded-md">공지</span>` : `<span class="text-[11px] font-black bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md">${post.category}</span>`}
+                            ${post.game_name ? `<span class="text-[11px] font-bold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-md">🎲 ${Boako.Board.escapeHtml(post.game_name)}</span>` : ''}
                         </div>
                         <h1 class="text-2xl font-black text-slate-900 mb-3">${Boako.Board.escapeHtml(post.title)}</h1>
                         <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
