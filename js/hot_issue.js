@@ -36,7 +36,9 @@ Boako.HotIssue = {
                     items.push({
                         icon: '⚡',
                         text: `${profileMap[m.challenger_id] || '누군가'}님이 ${profileMap[m.defender_id] || '누군가'}님에게 [${m.game_name}] 라이벌 도전장!`,
-                        time: m.created_at
+                        time: m.created_at,
+                        linkType: 'RIVAL_MATCH',
+                        linkId: m.id
                     });
                 });
             }
@@ -55,7 +57,9 @@ Boako.HotIssue = {
                 items.push({
                     icon: '🏅',
                     text: `[${p.game_name || '종목미정'}] ${p.title} 토너먼트가 개최됐어요!`,
-                    time: p.created_at
+                    time: p.created_at,
+                    linkType: 'TOURNAMENT',
+                    linkId: p.id
                 });
             });
         } catch (e) { console.error("토너먼트 이슈 로드 실패:", e); }
@@ -73,7 +77,9 @@ Boako.HotIssue = {
                 items.push({
                     icon: '🤝',
                     text: `[${p.game_name || '종목미정'}] 같이하자 모임 확정! (${p.current_count}/${p.max_participants}명)`,
-                    time: p.created_at
+                    time: p.created_at,
+                    linkType: 'TOGETHER_POST',
+                    linkId: p.id
                 });
             });
         } catch (e) { console.error("같이하자 이슈 로드 실패:", e); }
@@ -93,7 +99,9 @@ Boako.HotIssue = {
                 items.push({
                     icon: '❓',
                     text: `[질문] ${p.title}`,
-                    time: p.created_at
+                    time: p.created_at,
+                    linkType: 'BOARD_POST',
+                    linkId: p.id
                 });
             });
         } catch (e) { console.error("질문 게시글 이슈 로드 실패:", e); }
@@ -114,8 +122,9 @@ Boako.HotIssue = {
         const nowMs = Date.now();
         container.innerHTML = items.map(item => {
             const isNew = (nowMs - new Date(item.time).getTime()) < 24 * 60 * 60 * 1000;
+            const clickable = item.linkType ? `onclick="Boako.Util.navigateToLink('${item.linkType}', '${item.linkId}')" style="display:flex; justify-content:space-between; align-items:center; gap:8px; list-style:none; cursor:pointer;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color=''"` : `style="display:flex; justify-content:space-between; align-items:center; gap:8px; list-style:none;"`;
             return `
-                <li style="display:flex; justify-content:space-between; align-items:center; gap:8px; list-style:none;">
+                <li ${clickable}>
                     <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.icon} ${item.text}</span>
                     ${isNew ? `<span style="flex-shrink:0; color:var(--primary); font-size:12px; font-weight:900;">NEW</span>` : ''}
                 </li>
