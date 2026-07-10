@@ -108,7 +108,9 @@ Boako.Schedule = {
                     scheduled_time: p.scheduled_date,
                     title: p.title,
                     subtitle: p.game_name || '종목 미정',
-                    linkUrl: p.source_url || null
+                    linkUrl: p.source_url || null,
+                    sourceType: 'TOURNAMENT',
+                    sourceId: String(p.id)
                 });
             });
         } catch (err) {
@@ -126,8 +128,8 @@ Boako.Schedule = {
                 const startMs = new Date(season.start_date).getTime();
                 const DAY = 24 * 60 * 60 * 1000;
 
-                const banDeadline = new Date(startMs + 50 * DAY).toISOString();
-                const entryDeadline = new Date(startMs + 58 * DAY).toISOString();
+                const banDeadline = new Date(startMs + 52 * DAY).toISOString();
+                const entryDeadline = new Date(startMs + 59 * DAY).toISOString();
 
                 items.push({
                     id: `season_start_${season.season_no}`,
@@ -135,7 +137,9 @@ Boako.Schedule = {
                     scheduled_time: season.start_date,
                     title: `시즌 ${season.season_no} 시작`,
                     subtitle: season.title || '',
-                    linkUrl: null
+                    linkUrl: null,
+                    sourceType: 'SEASON_START',
+                    sourceId: String(season.season_no)
                 });
 
                 const banStart = new Date(startMs + 45 * DAY).toISOString();
@@ -223,6 +227,9 @@ Boako.Schedule = {
             const timeStr = dateObj.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true });
             const typeBadge = `<span style="background:${meta.color}; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:bold; white-space:nowrap;">${meta.icon} ${meta.label}</span>`;
             const linkBtn = item.linkUrl ? `<a href="${item.linkUrl}" target="_blank" style="font-size:12px; font-weight:800; color:${meta.color}; text-decoration:underline; white-space:nowrap;">바로가기 🔗</a>` : '';
+            const isFuture = new Date(item.scheduled_time).getTime() > Date.now();
+            const kakaoBtn = isFuture ? `<button onclick='Boako.Schedule.addToKakaoCalendar(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="font-size:11px; font-weight:800; color:#3c1e1e; background:#FEE500; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔔 톡캘린더</button>` : '';
+            const rejectBtn = (item.sourceType && isFuture) ? `<button onclick="Boako.Schedule.rejectBroadcastEvent('${item.sourceType}', '${item.sourceId}')" style="font-size:11px; font-weight:800; color:#64748b; background:#f1f5f9; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔕 알림 취소</button>` : '';
 
             return `
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition:all 0.2s;">
@@ -235,10 +242,59 @@ Boako.Schedule = {
                     </div>
                     <div style="flex-shrink:0; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
                         ${item.subtitle ? `<span style="font-size:14px; font-weight:bold; color:#334155; background:#f1f5f9; padding:6px 14px; border-radius:8px;">${item.subtitle}</span>` : ''}
-                        ${linkBtn}
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            ${item.sourceType ? rejectBtn : kakaoBtn}
+                            ${linkBtn}
+                        </div>
                     </div>
                 </div>
             `;
+        },
+
+        addToKakaoCalendar: async (item) => {
+            if (!Boako.state.user) { Boako.Util.toast('로그인 후 이용해주세요.'); return; }
+            try {
+                const startDate = new Date(item.scheduled_time);
+                const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+                const { data: sessionData } = await Boako.db.auth.getSession();
+                const token = sessionData?.session?.access_token;
+                if (!token) { Boako.Util.toast('❌ 로그인 정보를 확인할 수 없습니다.'); return; }
+
+                const res = await fetch('https://qrredwrxdnvqwdxzanba.supabase.co/functions/v1/kakao-calendar-add-event', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: `[BOAKO] ${item.title}`,
+                        startAt: startDate.toISOString(),
+                        endAt: endDate.toISOString(),
+                        reminderMinutes: 60
+                    })
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || '등록 실패');
+
+                if (window.sfx) window.sfx.success();
+                Boako.Util.toast('🔔 톡캘린더에 등록되었습니다!');
+            } catch (err) {
+                console.error(err);
+                Boako.Util.toast('❌ ' + (err.message || '톡캘린더 등록에 실패했습니다.'));
+            }
+        },
+
+        rejectBroadcastEvent: async (sourceType, sourceId) => {
+            if (!Boako.state.user) { Boako.Util.toast('로그인 후 이용해주세요.'); return; }
+            if (!confirm('이 일정의 톡캘린더 알림을 취소하시겠어요?')) return;
+            try {
+                const { error } = await Boako.db.rpc('fn_cancel_broadcast_kakao_event', {
+                    p_source_type: sourceType,
+                    p_source_id: sourceId
+                });
+                if (error) throw error;
+                Boako.Util.toast('🔕 알림이 취소되었습니다.');
+            } catch (err) {
+                Boako.Util.toast('❌ ' + (err.message || '취소에 실패했습니다.'));
+            }
         },
 
         renderUI: () => {
