@@ -720,7 +720,10 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                         <p>수정이 필요한 데이터를 검토하고 승인합니다.</p>
                     </div>
                     <section class="section-card">
-                        <div class="card-header">데이터 검수 대기 리스트</div>
+                        <div class="card-header flex justify-between items-center">
+                            <span>데이터 검수 대기 리스트</span>
+                            <button onclick="Boako.Sponsor.openManageModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">🎫 후원 배너 관리</button>
+                        </div>
                         <div class="card-body" style="min-height: 400px; background: #f8fafc;">
                             <div id="review-container">
                                 <div style="text-align:center; padding:50px; color:#94a3b8;">데이터를 불러오는 중...</div>
