@@ -2,7 +2,7 @@
  * [BOARD] 공략 게시판 — 글쓰기/이미지/유튜브삽입/댓글/대댓글/공지/임시저장/추천수/인기순
  */
 Boako.Board = {
-    CATEGORIES: ['자유', '공략', '질문', '기타'],
+    CATEGORIES: ['자유', '공략', '질문', '요청'],
     R2_UPLOAD_URL_ENDPOINT: 'https://qrredwrxdnvqwdxzanba.supabase.co/functions/v1/r2-upload-url',
     MAX_IMAGES: 15,
 
