@@ -138,6 +138,19 @@ Boako.Schedule = {
                     linkUrl: null
                 });
 
+                const banStart = new Date(startMs + 45 * DAY).toISOString();
+                if (banStart <= season.end_date) {
+                    items.push({
+                        id: `season_ban_start_${season.season_no}`,
+                        typeKey: 'GRANDPRIX',
+                        scheduled_time: banStart,
+                        title: `시즌 ${season.season_no} 밴투표 시작`,
+                        subtitle: season.title || '',
+                        linkUrl: null,
+                        sourceType: 'SEASON_BAN_START',
+                        sourceId: String(season.season_no)
+                    });
+                }
                 if (banDeadline <= season.end_date) {
                     items.push({
                         id: `season_ban_${season.season_no}`,
@@ -145,7 +158,9 @@ Boako.Schedule = {
                         scheduled_time: banDeadline,
                         title: `시즌 ${season.season_no} 밴투표 마감`,
                         subtitle: season.title || '',
-                        linkUrl: null
+                        linkUrl: null,
+                        sourceType: 'SEASON_BAN_END',
+                        sourceId: String(season.season_no)
                     });
                 }
                 if (entryDeadline <= season.end_date) {
@@ -155,7 +170,9 @@ Boako.Schedule = {
                         scheduled_time: entryDeadline,
                         title: `시즌 ${season.season_no} 엔트리 마감`,
                         subtitle: season.title || '',
-                        linkUrl: null
+                        linkUrl: null,
+                        sourceType: 'SEASON_ENTRY_END',
+                        sourceId: String(season.season_no)
                     });
                 }
                 items.push({
@@ -164,7 +181,9 @@ Boako.Schedule = {
                     scheduled_time: season.end_date,
                     title: `시즌 ${season.season_no} 종료`,
                     subtitle: season.title || '',
-                    linkUrl: null
+                    linkUrl: null,
+                    sourceType: 'SEASON_END',
+                    sourceId: String(season.season_no)
                 });
             });
         } catch (err) {
