@@ -313,8 +313,9 @@ Boako.Board = {
                     const isUnspecified = key === Boako.Board.GUIDE_UNSPECIFIED;
                     const displayName = isUnspecified ? '기타 (게임 미지정)' : key;
                     const logo = !isUnspecified ? Boako.Util.cdn(logoMap[key]) : null;
+                    const clickArg = isUnspecified ? `'${Boako.Board.GUIDE_UNSPECIFIED}'` : `'${key.replace(/'/g, "\\'")}'`;
                     return `
-                        <div onclick="Boako.Board.selectGuideGame(${isUnspecified ? "Boako.Board.GUIDE_UNSPECIFIED ? '" + Boako.Board.GUIDE_UNSPECIFIED + "' : null" : `'${key.replace(/'/g, "\\'")}'`})"
+                        <div onclick="Boako.Board.selectGuideGame(${clickArg})"
                              class="flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-teal-300 transition-all">
                             <div class="w-16 h-16 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
                                 ${logo ? `<img src="${logo}" class="w-full h-full object-contain p-1">` : `<span class="text-3xl">🎲</span>`}
