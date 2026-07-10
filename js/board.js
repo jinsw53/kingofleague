@@ -298,14 +298,22 @@ Boako.Board = {
 
         editor.addEventListener('paste', async (e) => {
             const items = e.clipboardData?.items;
-            if (!items) return;
-            for (const item of items) {
-                if (item.type.startsWith('image/')) {
-                    e.preventDefault();
-                    const file = item.getAsFile();
-                    await Boako.Board.handleImageInsert(file, editor);
-                    return;
+            if (items) {
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        e.preventDefault();
+                        const file = item.getAsFile();
+                        await Boako.Board.handleImageInsert(file, editor);
+                        return;
+                    }
                 }
+            }
+
+            // 🌟 raw 이미지 아이템이 아니라 HTML(웹페이지 등에서 복사한 data:image 임베드)로 붙여넣기 되는 경우 처리
+            const html = e.clipboardData?.getData('text/html');
+            if (html && /<img[^>]+src=["']data:image\//i.test(html)) {
+                e.preventDefault();
+                await Boako.Board.handlePastedHtmlImages(html, editor);
             }
         });
 
@@ -359,6 +367,32 @@ Boako.Board = {
         if (input) input.value = name;
         const resultsBox = document.getElementById('board-game-search-results');
         if (resultsBox) resultsBox.classList.add('hidden');
+    },
+
+    handlePastedHtmlImages: async (html, editor) => {
+        const indicator = document.getElementById('board-upload-indicator');
+        if (indicator) indicator.classList.remove('hidden');
+
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const imgs = temp.querySelectorAll('img[src^="data:image/"]');
+
+        for (const imgEl of imgs) {
+            try {
+                const res = await fetch(imgEl.src);
+                const blob = await res.blob();
+                const file = new File([blob], 'pasted.png', { type: blob.type || 'image/png' });
+                const url = await Boako.Board.uploadImage(file);
+                if (url) imgEl.src = url;
+                else imgEl.remove();
+            } catch (err) {
+                console.error('붙여넣은 이미지 처리 실패:', err);
+                imgEl.remove();
+            }
+        }
+
+        if (indicator) indicator.classList.add('hidden');
+        editor.innerHTML += Boako.Board.sanitizeContent(temp.innerHTML);
     },
 
     handleImageInsert: async (file, editor) => {
