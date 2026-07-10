@@ -350,10 +350,7 @@ Boako.Board = {
             return;
         }
 
-        let query = Boako.db.from('board_posts').select('*').eq('is_deleted', false).eq('is_draft', false);
-        if (Boako.Board.State.currentCategory !== 'all') {
-            query = query.eq('category', Boako.Board.State.currentCategory);
-        }
+        let query = Boako.db.from('board_posts').select('*').eq('is_deleted', false).eq('is_draft', false).eq('category', Boako.Board.State.currentCategory);
         if (Boako.Board.State.currentCategory === '공략' && Boako.Board.State.selectedGuideGame) {
             if (Boako.Board.State.selectedGuideGame === Boako.Board.GUIDE_UNSPECIFIED) {
                 query = query.is('game_name', null);
