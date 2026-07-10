@@ -15,10 +15,13 @@ Boako.Board = {
         badgeMap: {},
         pendingImages: [], // [{url, key}]
         selectedGameName: null,
+        selectedGuideGame: null, // 공략 탭에서 선택된 게임 (null이면 게임 그리드 표시)
         currentDraftId: null,
         myLiked: false,
         isAdmin: false
     },
+
+    GUIDE_UNSPECIFIED: '__UNSPECIFIED__',
 
     init: async (containerId) => {
         const root = document.getElementById(containerId);
@@ -248,6 +251,7 @@ Boako.Board = {
 
     switchCategory: (cat) => {
         Boako.Board.State.currentCategory = cat;
+        Boako.Board.State.selectedGuideGame = null;
         document.querySelectorAll('.board-cat-btn').forEach(btn => {
             const isActive = btn.dataset.cat === cat;
             btn.classList.toggle('bg-teal-700', isActive);
@@ -256,6 +260,72 @@ Boako.Board = {
             btn.classList.toggle('text-slate-500', !isActive);
         });
         Boako.Board.loadPosts();
+    },
+
+    selectGuideGame: (name) => {
+        Boako.Board.State.selectedGuideGame = name;
+        Boako.Board.loadPosts();
+    },
+
+    backToGuideGrid: () => {
+        Boako.Board.State.selectedGuideGame = null;
+        Boako.Board.loadPosts();
+    },
+
+    loadGuideGameGrid: async () => {
+        const container = document.getElementById('board-list-container');
+        if (!container) return;
+
+        const { data: posts, error } = await Boako.db.from('board_posts')
+            .select('game_name')
+            .eq('category', '공략')
+            .eq('is_deleted', false)
+            .eq('is_draft', false);
+
+        if (error) {
+            container.innerHTML = `<div class="text-center py-16 text-rose-400 font-bold">게시글을 불러오지 못했습니다.</div>`;
+            return;
+        }
+
+        if (!posts || posts.length === 0) {
+            container.innerHTML = `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">아직 공략글이 없습니다. 첫 공략글을 남겨보세요!</div>`;
+            return;
+        }
+
+        const countMap = {};
+        posts.forEach(p => {
+            const key = p.game_name || Boako.Board.GUIDE_UNSPECIFIED;
+            countMap[key] = (countMap[key] || 0) + 1;
+        });
+
+        const gameNames = Object.keys(countMap).filter(k => k !== Boako.Board.GUIDE_UNSPECIFIED);
+        let logoMap = {};
+        if (gameNames.length > 0) {
+            const { data: games } = await Boako.db.from('games').select('game_name, image_url').in('game_name', gameNames);
+            logoMap = Object.fromEntries((games || []).map(g => [g.game_name, g.image_url]));
+        }
+
+        const sortedKeys = Object.keys(countMap).sort((a, b) => countMap[b] - countMap[a]);
+
+        container.innerHTML = `
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                ${sortedKeys.map(key => {
+                    const isUnspecified = key === Boako.Board.GUIDE_UNSPECIFIED;
+                    const displayName = isUnspecified ? '기타 (게임 미지정)' : key;
+                    const logo = !isUnspecified ? Boako.Util.cdn(logoMap[key]) : null;
+                    return `
+                        <div onclick="Boako.Board.selectGuideGame(${isUnspecified ? "Boako.Board.GUIDE_UNSPECIFIED ? '" + Boako.Board.GUIDE_UNSPECIFIED + "' : null" : `'${key.replace(/'/g, "\\'")}'`})"
+                             class="flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-teal-300 transition-all">
+                            <div class="w-16 h-16 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
+                                ${logo ? `<img src="${logo}" class="w-full h-full object-contain p-1">` : `<span class="text-3xl">🎲</span>`}
+                            </div>
+                            <span class="text-xs font-bold text-slate-700 text-center truncate w-full">${Boako.Board.escapeHtml(displayName)}</span>
+                            <span class="text-[10px] font-black text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">${countMap[key]}개</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
     },
 
     switchSort: (mode) => {
@@ -274,9 +344,21 @@ Boako.Board = {
         const container = document.getElementById('board-list-container');
         if (!container) return;
 
+        if (Boako.Board.State.currentCategory === '공략' && !Boako.Board.State.selectedGuideGame) {
+            await Boako.Board.loadGuideGameGrid();
+            return;
+        }
+
         let query = Boako.db.from('board_posts').select('*').eq('is_deleted', false).eq('is_draft', false);
         if (Boako.Board.State.currentCategory !== 'all') {
             query = query.eq('category', Boako.Board.State.currentCategory);
+        }
+        if (Boako.Board.State.currentCategory === '공략' && Boako.Board.State.selectedGuideGame) {
+            if (Boako.Board.State.selectedGuideGame === Boako.Board.GUIDE_UNSPECIFIED) {
+                query = query.is('game_name', null);
+            } else {
+                query = query.eq('game_name', Boako.Board.State.selectedGuideGame);
+            }
         }
         query = query.order('is_notice', { ascending: false });
         query = Boako.Board.State.sortMode === 'popular'
@@ -310,7 +392,11 @@ Boako.Board = {
         const commentCountMap = {};
         (comments || []).forEach(c => { commentCountMap[c.post_id] = (commentCountMap[c.post_id] || 0) + 1; });
 
-        container.innerHTML = posts.map(p => `
+        const backBtnHtml = (Boako.Board.State.currentCategory === '공략' && Boako.Board.State.selectedGuideGame)
+            ? `<button onclick="Boako.Board.backToGuideGrid()" class="text-sm font-bold text-teal-600 hover:text-teal-700 mb-3">← 게임 목록으로</button>`
+            : '';
+
+        container.innerHTML = backBtnHtml + posts.map(p => `
             <div onclick="Boako.Board.openDetail(${p.id})" class="flex items-center justify-between gap-4 bg-white border ${p.is_notice ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'} rounded-xl px-5 py-4 cursor-pointer hover:shadow-md transition-shadow">
                 <div class="flex items-center gap-3 min-w-0 flex-1">
                     ${p.is_notice ? `<span class="text-[10px] font-black bg-amber-500 text-white px-2 py-1 rounded-md shrink-0">공지</span>` : `<span class="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-md shrink-0">${p.category}</span>`}
