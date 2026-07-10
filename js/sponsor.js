@@ -39,11 +39,7 @@ Boako.Sponsor = {
             </a>
         ` : '';
 
-        const adminBtn = Boako.Sponsor.isAdmin
-            ? `<button onclick="Boako.Sponsor.openManageModal()" style="font-size:11px; font-weight:800; color:#94a3b8; background:#f1f5f9; padding:4px 10px; border-radius:8px; margin-left:8px;">⚙ 배너 관리</button>`
-            : '';
-
-        area.innerHTML = `<div style="display:flex; align-items:center;">${bannerHtml}${adminBtn}</div>`;
+        area.innerHTML = `<div style="display:flex; align-items:center;">${bannerHtml}</div>`;
     },
 
     openManageModal: async function() {
