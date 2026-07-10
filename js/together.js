@@ -161,6 +161,16 @@ Boako.Together = {
             Boako.Together.State.participantsMap = {};
         }
 
+        // 🌟 시간도달로 확정 조건(예정시각 경과 + 2명 이상)을 만족했는데
+        // 아직 DB엔 RECRUITING으로 남아있는 글이 있으면, 조용히 승격시켜서
+        // 트리거가 자동 톡캘린더 등록을 하도록 함 (참가자가 이 페이지를 열 때마다 체크됨)
+        const nowMs = Date.now();
+        allPosts.forEach(p => {
+            if (p.status === 'RECRUITING' && new Date(p.scheduled_date).getTime() <= nowMs && p.current_count >= 2) {
+                Boako.db.rpc('fn_finalize_together_status', { p_post_id: p.id }).then(() => {}).catch(() => {});
+            }
+        });
+
         Boako.Together.renderList();
     },
 
