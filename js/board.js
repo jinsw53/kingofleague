@@ -91,9 +91,11 @@ Boako.Board = {
         });
     },
 
-    // R2 업로드 전체 흐름: 압축 → 서명URL 발급 → 직접 업로드
+    // R2 업로드 전체 흐름: 압축 → Edge Function에 이미지 자체를 바로 전송(서버가 R2에 대신 업로드)
     uploadImage: async (file) => {
-        if (!file.type.startsWith('image/')) {
+        // 🌟 일부 모바일 카메라/갤러리 앱은 file.type이 비어있게 넘어오는 경우가 있어서,
+        // 타입이 명확히 다른 종류일 때만 거르고, 비어있으면 일단 통과시킴
+        if (file.type && !file.type.startsWith('image/')) {
             Boako.Util.toast('❌ 이미지 파일만 업로드 가능합니다.');
             return null;
         }
@@ -111,23 +113,16 @@ Boako.Board = {
                 return null;
             }
 
-            const signRes = await fetch(Boako.Board.R2_UPLOAD_URL_ENDPOINT, {
+            const uploadRes = await fetch(Boako.Board.R2_UPLOAD_URL_ENDPOINT, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileName: 'image.webp', fileType: 'image/webp' })
-            });
-            const signData = await signRes.json();
-            if (!signRes.ok) throw new Error(signData.error || '업로드 URL 발급 실패');
-
-            const putRes = await fetch(signData.uploadUrl, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'image/webp' },
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'image/webp' },
                 body: blob
             });
-            if (!putRes.ok) throw new Error('이미지 업로드 실패');
+            const result = await uploadRes.json();
+            if (!uploadRes.ok) throw new Error(result.error || '이미지 업로드 실패');
 
-            Boako.Board.State.pendingImages.push({ url: signData.publicUrl, key: signData.key });
-            return signData.publicUrl;
+            Boako.Board.State.pendingImages.push({ url: result.publicUrl, key: result.key });
+            return result.publicUrl;
         } catch (err) {
             console.error(err);
             Boako.Util.toast('❌ ' + (err.message || '이미지 업로드에 실패했습니다.'));
