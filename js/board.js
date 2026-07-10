@@ -2,12 +2,12 @@
  * [BOARD] 공략 게시판 — 글쓰기/이미지/유튜브삽입/댓글/대댓글/공지/임시저장/추천수/인기순
  */
 Boako.Board = {
-    CATEGORIES: ['자유', '공략', '질문', '요청'],
+    CATEGORIES: ['공략', '자유', '질문', '요청'],
     R2_UPLOAD_URL_ENDPOINT: 'https://qrredwrxdnvqwdxzanba.supabase.co/functions/v1/r2-upload-url',
     MAX_IMAGES: 15,
 
     State: {
-        currentCategory: 'all',
+        currentCategory: '공략',
         sortMode: 'latest', // 'latest' | 'popular'
         posts: [],
         currentPost: null,
@@ -189,9 +189,9 @@ Boako.Board = {
             <section class="section-card">
                 <div class="card-header flex justify-between items-center flex-wrap gap-3">
                     <div class="flex gap-2 flex-wrap" id="board-category-tabs">
-                        ${['all', ...Boako.Board.CATEGORIES].map(cat => `
+                        ${Boako.Board.CATEGORIES.map(cat => `
                             <button onclick="Boako.Board.switchCategory('${cat}')" data-cat="${cat}" class="board-cat-btn px-4 py-2 rounded-lg text-sm font-bold transition-all relative ${Boako.Board.State.currentCategory === cat ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-500'}">
-                                ${cat === 'all' ? '전체' : cat}
+                                ${cat}
                                 ${cat === '요청' ? `<span id="board-request-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:#f43f5e; color:#fff; font-size:10px; font-weight:900; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; line-height:1;">0</span>` : ''}
                             </button>
                         `).join('')}
