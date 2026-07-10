@@ -776,9 +776,10 @@ Boako.Board = {
                         <div class="prose max-w-none text-slate-800 leading-relaxed">${post.content}</div>
 
                         <div class="flex justify-center mt-6 pt-4 border-t border-slate-100">
-                            <button onclick="Boako.Board.toggleLike()" class="flex items-center gap-2 text-sm font-black px-6 py-2.5 rounded-xl transition-colors ${Boako.Board.State.myLiked ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}">
-                                ${Boako.Board.State.myLiked ? '❤️' : '🤍'} 추천 ${post.like_count || 0}
-                            </button>
+                            ${isAuthor
+                                ? `<div class="flex items-center gap-2 text-sm font-black px-6 py-2.5 rounded-xl bg-slate-50 text-slate-400 border border-slate-200">🤍 추천 ${post.like_count || 0} <span class="text-[10px] font-bold">(본인 글)</span></div>`
+                                : `<button onclick="Boako.Board.toggleLike()" class="flex items-center gap-2 text-sm font-black px-6 py-2.5 rounded-xl transition-colors ${Boako.Board.State.myLiked ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}">${Boako.Board.State.myLiked ? '❤️' : '🤍'} 추천 ${post.like_count || 0}</button>`
+                            }
                         </div>
                     </div>
                 </section>
