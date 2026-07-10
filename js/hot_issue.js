@@ -78,6 +78,26 @@ Boako.HotIssue = {
             });
         } catch (e) { console.error("같이하자 이슈 로드 실패:", e); }
 
+        // 4. 게시판 — 새 질문 게시글
+        try {
+            const { data } = await Boako.db
+                .from('board_posts')
+                .select('*')
+                .eq('category', '질문')
+                .eq('is_deleted', false)
+                .eq('is_draft', false)
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            (data || []).forEach(p => {
+                items.push({
+                    icon: '❓',
+                    text: `[질문] ${p.title}`,
+                    time: p.created_at
+                });
+            });
+        } catch (e) { console.error("질문 게시글 이슈 로드 실패:", e); }
+
         items.sort((a, b) => new Date(b.time) - new Date(a.time));
         return items.slice(0, 5);
     },
