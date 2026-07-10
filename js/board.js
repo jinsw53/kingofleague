@@ -187,8 +187,9 @@ Boako.Board = {
                 <div class="card-header flex justify-between items-center flex-wrap gap-3">
                     <div class="flex gap-2 flex-wrap" id="board-category-tabs">
                         ${['all', ...Boako.Board.CATEGORIES].map(cat => `
-                            <button onclick="Boako.Board.switchCategory('${cat}')" data-cat="${cat}" class="board-cat-btn px-4 py-2 rounded-lg text-sm font-bold transition-all ${Boako.Board.State.currentCategory === cat ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-500'}">
+                            <button onclick="Boako.Board.switchCategory('${cat}')" data-cat="${cat}" class="board-cat-btn px-4 py-2 rounded-lg text-sm font-bold transition-all relative ${Boako.Board.State.currentCategory === cat ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-500'}">
                                 ${cat === 'all' ? '전체' : cat}
+                                ${cat === '요청' ? `<span id="board-request-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:#f43f5e; color:#fff; font-size:10px; font-weight:900; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; line-height:1;">0</span>` : ''}
                             </button>
                         `).join('')}
                     </div>
@@ -211,6 +212,38 @@ Boako.Board = {
         `;
 
         await Boako.Board.loadPosts();
+        Boako.Board.loadRequestBadge();
+    },
+
+    loadRequestBadge: async () => {
+        try {
+            const { data: posts } = await Boako.db.from('board_posts')
+                .select('id')
+                .eq('category', '요청')
+                .eq('is_deleted', false)
+                .eq('is_draft', false);
+
+            const postIds = (posts || []).map(p => p.id);
+            const badge = document.getElementById('board-request-badge');
+            if (!badge) return;
+
+            if (postIds.length === 0) { badge.style.display = 'none'; return; }
+
+            const { data: comments } = await Boako.db.from('board_comments')
+                .select('post_id')
+                .eq('is_deleted', false)
+                .in('post_id', postIds);
+
+            const answeredIds = new Set((comments || []).map(c => c.post_id));
+            const unansweredCount = postIds.filter(id => !answeredIds.has(id)).length;
+
+            if (unansweredCount > 0) {
+                badge.textContent = unansweredCount;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch (err) { console.error("요청 배지 갱신 실패:", err); }
     },
 
     switchCategory: (cat) => {
