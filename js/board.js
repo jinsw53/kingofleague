@@ -276,8 +276,12 @@ Boako.Board = {
 
                         <input type="text" id="board-input-title" placeholder="제목을 입력하세요" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold mb-3">
 
-                        <div class="bg-sky-50 border border-sky-200 rounded-lg p-2.5 mb-2 text-[11px] font-bold text-sky-700">
-                            💡 스크린샷을 Ctrl+V로 붙여넣거나, 이미지 파일을 아래 편집창에 드래그해서 넣을 수 있어요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)
+                        <div class="bg-sky-50 border border-sky-200 rounded-lg p-2.5 mb-2 text-[11px] font-bold text-sky-700 flex items-center justify-between flex-wrap gap-2">
+                            <span>💡 PC에서는 스크린샷을 Ctrl+V로 붙여넣거나 드래그해서 넣을 수 있어요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)</span>
+                            <label class="bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg cursor-pointer transition-colors shrink-0">
+                                📷 사진 선택
+                                <input type="file" accept="image/*" multiple id="board-file-picker" style="display:none;">
+                            </label>
                         </div>
 
                         <div id="board-input-content" contenteditable="true"
@@ -324,6 +328,15 @@ Boako.Board = {
             for (const file of files) {
                 await Boako.Board.handleImageInsert(file, editor);
             }
+        });
+
+        // 🌟 모바일/파일선택 버튼용 — 사진첩·카메라에서 고른 파일도 동일 파이프라인으로 업로드
+        document.getElementById('board-file-picker').addEventListener('change', async (e) => {
+            const files = [...(e.target.files || [])];
+            for (const file of files) {
+                await Boako.Board.handleImageInsert(file, editor);
+            }
+            e.target.value = ''; // 같은 파일 다시 선택 가능하게 초기화
         });
     },
 
