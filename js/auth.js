@@ -9,6 +9,7 @@ Boako.Auth = {
         const { data: { session } } = await Boako.db.auth.getSession();
         if (session?.user) {
             Boako.state.user = session.user;
+            Boako.Auth.saveKakaoToken(session);
             if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
             await Boako.Team.syncStatus();
             await Boako.Auth.checkAdminMenu();
@@ -35,11 +36,12 @@ Boako.Auth = {
             if (e === 'INITIAL_SESSION') return;
 
             if (s?.user) {
-                if (e === 'TOKEN_REFRESHED' || (e === 'SIGNED_IN' && Boako.state.user?.id === s.user.id)) {
+                if (e === 'SIGNED_IN' && Boako.state.user?.id === s.user.id) {
                     return; 
                 }
 
                 Boako.state.user = s.user;
+                Boako.Auth.saveKakaoToken(s);
                 if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
                 await Boako.Team.syncStatus();
                 await Boako.Auth.checkAdminMenu();
@@ -64,7 +66,21 @@ Boako.Auth = {
         });
     },
 
-    login: () => Boako.db.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname } }),
+    login: () => Boako.db.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname, scopes: 'talk_calendar' } }),
+
+    // 🌟 카카오 액세스/리프레시 토큰을 DB에 저장 (톡캘린더 API 호출용)
+    saveKakaoToken: async (session) => {
+        if (!session?.provider_token) return;
+        try {
+            await Boako.db.rpc('fn_save_kakao_token', {
+                p_access_token: session.provider_token,
+                p_refresh_token: session.provider_refresh_token || null,
+                p_expires_in: 21600 // 카카오 액세스 토큰 기본 유효시간(6시간), 초 단위
+            });
+        } catch (err) {
+            console.error('카카오 토큰 저장 실패:', err);
+        }
+    },
     
     logout: async () => { await Boako.db.auth.signOut(); location.reload(); },
 
