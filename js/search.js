@@ -9,10 +9,12 @@ Boako.Search = {
         const container = document.getElementById(containerId);
         if (!container) return;
 
+        // 🌟 큰 배너 박스 대신 간단한 텍스트 헤더 + 보라색 밑줄 하나만
         container.innerHTML = `
-            <div class="main-banner" style="flex-direction:column; gap:6px;">
-                <h1>🔍 통합 검색</h1>
-                <div style="font-size:14px; font-weight:700; opacity:0.9;">"${Boako.Search.escapeHtml(query)}" 검색 결과</div>
+            <div style="margin-bottom:20px;">
+                <div style="font-size:20px; font-weight:900; color:#1e293b;">🔍 통합 검색</div>
+                <div style="font-size:14px; font-weight:700; color:#64748b; margin-top:4px;">"${Boako.Search.escapeHtml(query)}" 검색 결과</div>
+                <div style="height:3px; background:linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-radius:3px; margin-top:14px;"></div>
             </div>
             <div id="search-results-body">
                 <div style="text-align:center; padding:60px; color:#94a3b8; font-weight:700;">검색 중...</div>
