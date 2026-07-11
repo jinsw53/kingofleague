@@ -12,7 +12,8 @@ window.Boako = {
     config: {
         url: 'https://qrredwrxdnvqwdxzanba.supabase.co',
         key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY',
-        discordInviteUrl: 'https://discord.gg/UvFjxv3msy' // 🌟 추가: 같이하자 채팅방(messenger.js)에서 참조
+        discordInviteUrl: 'https://discord.gg/UvFjxv3msy', // 🌟 추가: 같이하자 채팅방(messenger.js)에서 참조
+        kakaoRestApiKey: '64f3697f9d0cba8fc65c47a6f7912bd4' // 🌟 추가: 카카오 로그아웃 리다이렉트용
     },
 // 💡 [추가] 전역 권한 검증 메서드
     // 시스템 어디서든 Boako.isMyTeamLeader() 로 호출하여 즉시 확인
