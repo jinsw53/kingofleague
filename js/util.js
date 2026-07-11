@@ -69,7 +69,19 @@ Boako.Util = {
             .replace('qrredwrxdnvqwdxzanba.supabase.co', 'cdn.boakoarchive.co.kr');
     },
 
-    // 🌟 [신규] 실시간 이슈/소식지/전광판 공통 이동 라우터
+    // 🌟 [신규] 헤더 통합 검색바 실행 — 입력값을 읽어서 검색 결과 페이지로 이동
+    executeSearch: () => {
+        const inputEl = document.getElementById('main-search');
+        if (!inputEl) return;
+        const query = inputEl.value.trim();
+        if (!query) {
+            Boako.Util.toast('검색어를 입력해주세요!');
+            return;
+        }
+        Boako.View.render('search', query);
+    },
+
+    // 🌟 [신규] 실시간 이슈/소식지/전광판/검색결과 공통 이동 라우터
     // link_type + link_id만 주면 알맞은 화면으로 이동시켜줌
     navigateToLink: async (linkType, linkId) => {
         try {
@@ -100,6 +112,14 @@ Boako.Util = {
                 case 'CHALLENGE':
                 case 'GRANDPRIX':
                     await Boako.View.render('league');
+                    break;
+                case 'GAME':
+                    // 🌟 [신규] 검색결과의 '게임' 항목 클릭 시 리그 콘텐츠 허브로 이동
+                    await Boako.View.render('league');
+                    break;
+                case 'USER':
+                    // 🌟 [신규] 검색결과의 '유저' 항목 클릭 시 팀 목록에서 소속 팀을 찾아보도록 안내
+                    await Boako.View.render('team_list');
                     break;
                 default:
                     console.warn('알 수 없는 link_type:', linkType);
