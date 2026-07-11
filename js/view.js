@@ -47,7 +47,7 @@ Boako.View = {
         }
     },
 
-    render: async (pageId) => {
+    render: async (pageId, payload) => {
         const area = document.getElementById('main-content-area');
         let html = '';
         
@@ -73,7 +73,7 @@ Boako.View = {
             targetMenuId = menuIdOverrides[pageId];
         }
 
-        // 버튼 불 켜고 그 위치로 스르륵 이동!
+        // 버튼 불 켜고 그 위치로 스르륵 이동! (검색 결과 페이지는 메뉴에 없어서 매칭 안 되는 게 정상)
         const navBtn = document.getElementById(targetMenuId);
         if (navBtn) {
             navBtn.classList.add('active');
@@ -81,6 +81,20 @@ Boako.View = {
         }
 
         switch(pageId) {
+            case 'search':
+                // 🌟 [신규] 헤더 통합검색 결과 페이지 (팀/유저/게시글/게임 전체 검색)
+                if (!Boako.Search || !Boako.Search.init) {
+                    await Boako.Util.loadScript('js/search.js');
+                }
+                html = `<div id="search-master-container" class="w-full"></div>`;
+
+                setTimeout(() => {
+                    if (Boako.Search && typeof Boako.Search.init === 'function') {
+                        Boako.Search.init('search-master-container', payload || '');
+                    }
+                }, 0);
+                break;
+
             case 'ranking':
                 if (!Boako.Ranking || !Boako.Ranking.init) {
                     await Boako.Util.loadScript('js/ranking.js');
