@@ -323,6 +323,8 @@ Boako.Messenger = {
             lucide.createIcons();
         }
         await Boako.Messenger.fetchUnreadCount();
+        // 🌟 방 나가기(읽음 처리)로 안 읽은 쪽지 수가 바뀌므로 로그인 위젯 배지도 즉시 갱신
+        if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget();
         Boako.Messenger.View.refreshRoomList();
     },
 
@@ -335,6 +337,8 @@ Boako.Messenger = {
                 const myId = Boako.state.user.id;
                 if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
                     await Boako.Messenger.fetchUnreadCount();
+                    // 🌟 새 쪽지가 오면 로그인 위젯의 안 읽은 쪽지 배지도 실시간으로 갱신
+                    if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget();
                     await Boako.Messenger.View.refreshRoomList();
                     const roomId = newMsg.match_id || (newMsg.sender_id === myId ? newMsg.receiver_id : newMsg.sender_id);
                     if (Boako.Messenger.currentRoomId === roomId) Boako.Messenger.View.openRoom(roomId);
@@ -644,7 +648,11 @@ Boako.Messenger = {
                 localStorage.setItem('boako_together_read', JSON.stringify(togetherRead));
                 room.unread = 0;
             } else {
-                Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`).then(() => Boako.Messenger.fetchUnreadCount());
+                Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`).then(async () => {
+                    await Boako.Messenger.fetchUnreadCount();
+                    // 🌟 쪽지를 읽으면 로그인 위젯의 배지 숫자도 즉시 줄어들도록 갱신
+                    if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget();
+                });
             }
 
             let bannerHtml = '';
@@ -876,7 +884,7 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
                     Boako.Util.toast("🎉 일정이 수락되어 캘린더에 공식 등록되었습니다!");
                 }
             }
-            await Boako.Messenger.fetchUnreadCount(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+            await Boako.Messenger.fetchUnreadCount(); if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
         },
 
         replyChallenge: async (messageId, matchId, status) => {
@@ -886,7 +894,7 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
                 if (error) throw new Error("처리 실패");
                 if (status === 'ACCEPTED' && window.sfx) window.sfx.rosterLock();
                 Boako.Util.toast(`✅ 라이벌 도전을 처리했습니다!`);
-                await Boako.Messenger.fetchUnreadCount(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+                await Boako.Messenger.fetchUnreadCount(); if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
             } catch (err) { alert(err.message); }
         },
 
@@ -896,7 +904,7 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
                 const { error } = await Boako.db.rpc('respond_to_team_join', { p_message_id: messageId, p_action: status });
                 if (error) throw new Error("처리 실패");
                 Boako.Util.toast(`✅ 가입 신청을 처리했습니다!`);
-                await Boako.Messenger.fetchUnreadCount(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+                await Boako.Messenger.fetchUnreadCount(); if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
             } catch (err) { alert(err.message); }
         },
 
@@ -906,7 +914,7 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
                 const { error } = await Boako.db.rpc('respond_to_team_invite', { p_message_id: messageId, p_action: status });
                 if (error) throw new Error("처리 실패");
                 Boako.Util.toast(`✅ 영입 제안을 처리했습니다!`);
-                await Boako.Messenger.fetchUnreadCount(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
+                await Boako.Messenger.fetchUnreadCount(); if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
             } catch (err) { alert(err.message); }
         }
     }
