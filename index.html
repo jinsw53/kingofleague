@@ -50,6 +50,30 @@
         .ticker-empty { color: #94a3b8; font-weight: 600; cursor: default; }
         @keyframes boako-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
+        /* 🌟 [신규] 소식지 — 헤드라인급 소식이 없을 때 그 자리를 대신하는 명예 회장 헌정 카드 + 필러 슬롯 */
+        .nf-tribute { position:relative; overflow:hidden; border-radius:18px; background:linear-gradient(135deg,#1e293b 0%,#0f172a 60%,#1e1b4b 100%); padding:36px; display:flex; align-items:center; gap:32px; box-shadow:0 15px 30px rgba(15,23,42,0.3); }
+        .nf-tribute::before { content:''; position:absolute; top:-60px; right:-60px; width:220px; height:220px; background:radial-gradient(circle, rgba(251,191,36,0.18) 0%, transparent 70%); }
+        .nf-tribute-photo { flex-shrink:0; width:130px; height:130px; border-radius:50%; padding:5px; background:linear-gradient(135deg,#fbbf24,#f59e0b,#fbbf24); box-shadow:0 0 0 3px rgba(251,191,36,0.15), 0 12px 24px rgba(0,0,0,0.35); position:relative; z-index:1; }
+        .nf-tribute-photo img { width:100%; height:100%; object-fit:cover; border-radius:50%; border:3px solid #0f172a; display:block; }
+        .nf-tribute-body { position:relative; z-index:1; min-width:0; }
+        .nf-tribute-eyebrow { display:inline-flex; align-items:center; gap:8px; background:rgba(251,191,36,0.12); border:1px solid rgba(251,191,36,0.35); color:#fbbf24; font-size:11px; font-weight:900; letter-spacing:0.06em; padding:5px 12px; border-radius:999px; margin-bottom:12px; }
+        .nf-tribute-name { font-size:26px; font-weight:900; color:#fff; margin:0 0 6px; line-height:1.2; }
+        .nf-tribute-name span { color:#fbbf24; }
+        .nf-tribute-quote { font-size:13px; color:#cbd5e1; font-weight:600; line-height:1.6; max-width:440px; }
+
+        .nf-filler-card { background:#fff; border-radius:10px; overflow:hidden; border:1px solid var(--border-color); box-shadow:0 2px 4px rgba(0,0,0,0.04); display:flex; flex-direction:column; height:100%; position:relative; }
+        .nf-filler-card .thumb { height:70%; min-height:64px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0; overflow:hidden; }
+        .nf-filler-card .thumb img { width:100%; height:100%; object-fit:cover; }
+        .nf-filler-card .txt { padding:8px 10px; display:flex; align-items:center; flex:0 0 auto; min-width:0; }
+        .nf-filler-card h4 { font-size:12.5px; font-weight:800; color:#1e293b; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .nf-filler-card.is-example { border:1px dashed #d8b4fe; background:#faf5ff; }
+        .nf-filler-card.is-example::after { content:'예시'; position:absolute; top:5px; right:6px; font-size:8px; font-weight:900; color:#a78bfa; background:#fff; padding:1px 5px; border-radius:5px; z-index:2; }
+        .nf-filler-card .menu-slot { height:70%; min-height:64px; background:#f3e8ff; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px; font-weight:900; color:#7c3aed; letter-spacing:0.02em; text-align:center; padding:0 8px; }
+
+        .nf-pad-example { border-color:#d8b4fe !important; border-style:dashed !important; background:#faf5ff !important; }
+        .nf-pad-example::after { content:'예시'; position:absolute; top:4px; right:6px; font-size:8px; font-weight:900; color:#a78bfa; background:#fff; padding:1px 5px; border-radius:5px; }
+        .nf-pad-thumb { height:96px; display:flex; align-items:center; justify-content:center; background:#f3e8ff; color:#7c3aed; font-weight:900; font-size:13px; text-align:center; padding:0 8px; }
+
         /* Layout */
         /* 🌟 이름을 변경하여 테일윈드의 강제 왼쪽 정렬 레이아웃을 완전히 무력화합니다 */
 .main-container-wrap { padding: 30px 0 120px 0; }
