@@ -5,7 +5,7 @@ Boako.NewsFeed = {
     items: [],
 
     // 헤드라인급 소식이 없을 때 그 자리를 대신하는 명예 회장 헌정 카드에 쓰는 이미지
-    TRIBUTE_IMAGE: '/%EB%B6%80%EC%9E%90-%EB%8D%94%EC%8A%A4%ED%8B%B4%EB%B0%A4.png',
+    TRIBUTE_IMAGE: 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/dustin.png',
 
     // 헌정 카드 옆 필러 슬롯 / 아래쪽 그리드 마지막 줄을 채울 실제 소식이 부족할 때 쓰는 예시 카드
     EXAMPLE_FILLERS: [
@@ -136,7 +136,7 @@ Boako.NewsFeed = {
             <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
                 <div class="col-span-4 md:col-span-3 md:row-span-2 nf-tribute">
                     <div class="nf-tribute-photo">
-                        <img src="${Boako.NewsFeed.TRIBUTE_IMAGE}" alt="더스틴밤">
+                        <img src="${Boako.Util.cdn(Boako.NewsFeed.TRIBUTE_IMAGE)}" alt="더스틴밤">
                     </div>
                     <div class="nf-tribute-body">
                         <div class="nf-tribute-eyebrow">👑 BOAKO ARCHIVE 명예 회장</div>
