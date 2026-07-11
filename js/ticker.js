@@ -1,6 +1,6 @@
 /**
  * [TICKER] 전광판 롤링 바 — 헤더 검색창 바로 아래(사이트 본문과 동일한 .inner 컴럼 안)에서
- * 최근 소식을 좌측으로 끓임없이 흘려보내는 실시간 티커
+ * 최근 소식을 위로 끓임없이 흘려보내는 실시간 세로 티커
  * 데이터 소스: news_feed_items(소식지) + 실시간이슈와 동일한 라이브 소스 테이블(라이벌매치/토너먼트/같이하자/게시판) 을 합쳐서 노출
  */
 Boako.Ticker = {
@@ -8,8 +8,10 @@ Boako.Ticker = {
     WINDOW_HOURS: 48,
     // 안전장치용 상한 (최근 N시간 내 물량이 비정상적으로 많을 때 쿼리 폭주 방지)
     MAX_ITEMS: 50,
-    // 흐르는 속도 (초당 픽셀) — 소식 개수와 무관하게 항상 이 속도로 일정하게 흘름
-    PIXELS_PER_SECOND: 70,
+    // 🌟 세로 티커 한 줄 높이(px) — CSS의 .ticker-item / .ticker-viewport height와 반드시 일치시킬 것
+    ITEM_HEIGHT: 42,
+    // 흐르는 속도 (초당 픽셀) — 소식 개수와 무관하게 항상 이 속도로 일정하게 흘름 (세로는 가로보다 느리게)
+    PIXELS_PER_SECOND: 24,
 
     _channel: null,
 
@@ -172,26 +174,15 @@ Boako.Ticker = {
 
         const oneSetHtml = items.map(renderChip).join('');
 
-        // 🌟 소식 개수가 적어서 화면 폭을 못 채우면 왼쪽에만 뻔쳐 보이므로,
-        // 뷰포트 폭을 채울 때까지 세트를 반복해서 하나의 "블록"을 만듭니다.
+        // 🌟 세로 티커는 항목마다 높이가 고정(ITEM_HEIGHT)이라, 가로처럼 폭을 채우는 반복 로직이 필요 없습니다.
+        // 이음매 없는 무한 루프를 위해 한 세트를 두 번 이어붙입니다.
         track.style.animation = 'none';
-        track.innerHTML = oneSetHtml;
-        const viewportWidth = viewport.clientWidth || 0;
-        let blockHtml = oneSetHtml;
-        let blockWidth = track.scrollWidth;
-        let guard = 0;
-        while (blockWidth < viewportWidth && guard < 30) {
-            blockHtml += oneSetHtml;
-            track.innerHTML = blockHtml;
-            blockWidth = track.scrollWidth;
-            guard++;
-        }
+        track.innerHTML = oneSetHtml + oneSetHtml;
 
-        // 이음매 없는 무한 루프를 위해 채워진 블록을 두 번 이어붙입니다.
-        track.innerHTML = blockHtml + blockHtml;
+        const blockHeight = items.length * Boako.Ticker.ITEM_HEIGHT;
 
-        // 🌟 소식 개수와 무관하게 항상 동일한 속도(px/s)로 흐르도록 재생시간을 폭에서 역산
-        const duration = Math.max(10, blockWidth / Boako.Ticker.PIXELS_PER_SECOND);
+        // 🌟 소식 개수와 무관하게 항상 동일한 속도(px/s)로 흐르도록 재생시간을 높이에서 역산
+        const duration = Math.max(6, blockHeight / Boako.Ticker.PIXELS_PER_SECOND);
         track.style.animation = `boako-ticker-scroll ${duration}s linear infinite`;
     },
 
