@@ -40,7 +40,9 @@
         .menu-item.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
 
         /* 🌟 [신규] 전광판 롤링 바 — 검색바 바로 아래, 최근 소식이 좌측으로 끓임없이 흘르는 티커 */
-        .ticker-bar { background-color: #fff; border-bottom: 1px solid var(--border-color); overflow: hidden; white-space: nowrap; padding: 10px 0; }
+        /* 🌟 [수정] 헤더/본문과 동일한 .inner 컴럼(1130px, 중앙 정렬) 안에서만 흘르도록 통일감 맞춤 */
+        .ticker-bar { background-color: #fff; border-bottom: 1px solid var(--border-color); padding: 10px 0; }
+        .ticker-viewport { overflow: hidden; white-space: nowrap; }
         .ticker-track { display: inline-flex; gap: 36px; will-change: transform; }
         .ticker-bar:hover .ticker-track { animation-play-state: paused; }
         .ticker-item { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; color: #475569; cursor: pointer; padding: 0 4px; }
@@ -111,10 +113,12 @@
             </div>
         </header>
 
-        <!-- 🌟 [신규] 전광판 롤링 바 — 검색바 바로 아래, 사이트 전체 공통으로 노출 -->
+        <!-- 🌟 [신규] 전광판 롤링 바 — 검색바 바로 아래, 헤더/본문과 동일한 .inner 컴럼 폭에 맞춰 노출 -->
         <div id="boako-ticker-bar" class="ticker-bar">
-            <div class="ticker-track" id="boako-ticker-track">
-                <span class="ticker-item ticker-empty">📡 소식을 불러오는 중...</span>
+            <div class="inner ticker-viewport">
+                <div class="ticker-track" id="boako-ticker-track">
+                    <span class="ticker-item ticker-empty">📡 소식을 불러오는 중...</span>
+                </div>
             </div>
         </div>
 
