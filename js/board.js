@@ -5,6 +5,7 @@ Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
     R2_UPLOAD_URL_ENDPOINT: 'https://qrredwrxdnvqwdxzanba.supabase.co/functions/v1/r2-upload-url',
     MAX_IMAGES: 15,
+    PAGE_SIZE: 10, // 🌟 [신규] 한 페이지에 보여줄 게시글 수
 
     State: {
         currentCategory: '공략',
@@ -18,7 +19,9 @@ Boako.Board = {
         selectedGuideGame: null, // 공략 탭에서 선택된 게임 (null이면 게임 그리드 표시)
         currentDraftId: null,
         myLiked: false,
-        isAdmin: false
+        isAdmin: false,
+        currentPage: 1,   // 🌟 [신규] 현재 페이지 번호
+        totalCount: 0     // 🌟 [신규] 현재 필터 기준 전체 게시글 수
     },
 
     GUIDE_UNSPECIFIED: '__UNSPECIFIED__',
@@ -34,6 +37,7 @@ Boako.Board = {
     openGuideForGame: async (gameName) => {
         Boako.Board.State.currentCategory = '공략';
         Boako.Board.State.selectedGuideGame = gameName || null;
+        Boako.Board.State.currentPage = 1;
         await Boako.Board.renderList();
     },
 
@@ -216,6 +220,7 @@ Boako.Board = {
                     <div id="board-list-container" class="flex flex-col gap-2">
                         <div class="text-center py-16 text-slate-400 font-bold">불러오는 중...</div>
                     </div>
+                    <div id="board-pagination-container" class="flex justify-center items-center gap-1.5 mt-5"></div>
                 </div>
             </section>
             <div id="board-modal-root"></div>
@@ -259,6 +264,7 @@ Boako.Board = {
     switchCategory: (cat) => {
         Boako.Board.State.currentCategory = cat;
         Boako.Board.State.selectedGuideGame = null;
+        Boako.Board.State.currentPage = 1;
         document.querySelectorAll('.board-cat-btn').forEach(btn => {
             const isActive = btn.dataset.cat === cat;
             btn.classList.toggle('bg-teal-700', isActive);
@@ -271,17 +277,21 @@ Boako.Board = {
 
     selectGuideGame: (name) => {
         Boako.Board.State.selectedGuideGame = name;
+        Boako.Board.State.currentPage = 1;
         Boako.Board.loadPosts();
     },
 
     backToGuideGrid: () => {
         Boako.Board.State.selectedGuideGame = null;
+        Boako.Board.State.currentPage = 1;
         Boako.Board.loadPosts();
     },
 
     loadGuideGameGrid: async () => {
         const container = document.getElementById('board-list-container');
+        const paginationContainer = document.getElementById('board-pagination-container');
         if (!container) return;
+        if (paginationContainer) paginationContainer.innerHTML = ''; // 게임 그리드에는 페이지네이션 없음
 
         const { data: posts, error } = await Boako.db.from('board_posts')
             .select('game_name')
@@ -338,6 +348,7 @@ Boako.Board = {
 
     switchSort: (mode) => {
         Boako.Board.State.sortMode = mode;
+        Boako.Board.State.currentPage = 1;
         document.querySelectorAll('.board-sort-btn').forEach(btn => {
             const isActive = btn.dataset.sort === mode;
             btn.classList.toggle('bg-white', isActive);
@@ -346,6 +357,46 @@ Boako.Board = {
             btn.classList.toggle('text-slate-500', !isActive);
         });
         Boako.Board.loadPosts();
+    },
+
+    // 🌟 [신규] 페이지 이동
+    goToPage: (page) => {
+        Boako.Board.State.currentPage = page;
+        Boako.Board.loadPosts();
+        const listContainer = document.getElementById('board-list-container');
+        if (listContainer) listContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+
+    // 🌟 [신규] 페이지네이션 버튼 렌더링 (이전/다음 + 페이지 번호, 현재 페이지 기준 앞뒤 2개씩)
+    renderPagination: (totalCount) => {
+        const container = document.getElementById('board-pagination-container');
+        if (!container) return;
+
+        const totalPages = Math.ceil(totalCount / Boako.Board.PAGE_SIZE);
+        if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+        const current = Boako.Board.State.currentPage;
+        const pageBtn = (p, label, isActive, disabled) => `
+            <button
+                ${disabled ? 'disabled' : `onclick="Boako.Board.goToPage(${p})"`}
+                class="min-w-[34px] h-[34px] px-2 rounded-lg text-xs font-bold transition-colors ${
+                    isActive ? 'bg-teal-700 text-white' :
+                    disabled ? 'text-slate-300 cursor-not-allowed' :
+                    'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                }">${label}</button>
+        `;
+
+        let startPage = Math.max(1, current - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        startPage = Math.max(1, endPage - 4);
+
+        let html = pageBtn(current - 1, '‹', false, current === 1);
+        for (let p = startPage; p <= endPage; p++) {
+            html += pageBtn(p, String(p), p === current, false);
+        }
+        html += pageBtn(current + 1, '›', false, current === totalPages);
+
+        container.innerHTML = html;
     },
 
     loadPosts: async () => {
@@ -357,7 +408,7 @@ Boako.Board = {
             return;
         }
 
-        let query = Boako.db.from('board_posts').select('*').eq('is_deleted', false).eq('is_draft', false).eq('category', Boako.Board.State.currentCategory);
+        let query = Boako.db.from('board_posts').select('*', { count: 'exact' }).eq('is_deleted', false).eq('is_draft', false).eq('category', Boako.Board.State.currentCategory);
         if (Boako.Board.State.currentCategory === '공략' && Boako.Board.State.selectedGuideGame) {
             if (Boako.Board.State.selectedGuideGame === Boako.Board.GUIDE_UNSPECIFIED) {
                 query = query.is('game_name', null);
@@ -370,18 +421,30 @@ Boako.Board = {
             ? query.order('like_count', { ascending: false })
             : query.order('created_at', { ascending: false });
 
-        const { data: posts, error } = await query.limit(50);
+        // 🌟 [신규] limit(50) 대신 페이지 단위 range()로 조회
+        const page = Boako.Board.State.currentPage;
+        const from = (page - 1) * Boako.Board.PAGE_SIZE;
+        const to = from + Boako.Board.PAGE_SIZE - 1;
+
+        const { data: posts, error, count } = await query.range(from, to);
 
         if (error) {
             console.error('게시글 로드 실패:', error);
             container.innerHTML = `<div class="text-center py-16 text-rose-400 font-bold">게시글을 불러오지 못했습니다.</div>`;
+            const paginationContainer = document.getElementById('board-pagination-container');
+            if (paginationContainer) paginationContainer.innerHTML = '';
             return;
         }
 
         Boako.Board.State.posts = posts || [];
+        Boako.Board.State.totalCount = count || 0;
 
         if (posts.length === 0) {
-            container.innerHTML = `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">아직 게시글이 없습니다. 첫 글을 남겨보세요!</div>`;
+            const isFirstPage = page === 1;
+            container.innerHTML = isFirstPage
+                ? `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">아직 게시글이 없습니다. 첫 글을 남겨보세요!</div>`
+                : `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">해당 페이지에 게시글이 없습니다.</div>`;
+            Boako.Board.renderPagination(count || 0);
             return;
         }
 
@@ -417,6 +480,8 @@ Boako.Board = {
                 </div>
             </div>
         `).join('');
+
+        Boako.Board.renderPagination(count || 0);
     },
 
     // ========== 임시글함 ==========
