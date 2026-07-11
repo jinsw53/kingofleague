@@ -7,35 +7,93 @@ Boako.NewsFeed = {
     // 헤드라인급 소식이 없을 때 그 자리를 대신하는 명예 회장 헌정 카드에 쓰는 이미지
     TRIBUTE_IMAGE: 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/dustin.png',
 
-    // 헌정 카드 옆 필러 슬롯 / 아래쪽 그리드 마지막 줄을 채울 실제 소식이 부족할 때 쓰는 예시 카드
-    EXAMPLE_FILLERS: [
-        { menu: '🛡️ 팀 목록', detail: '쿨한 전략가들 · 시즌12 우승' },
-        { menu: '🏆 실시간 랭킹', detail: '강알리 — 리그 1위' },
-        { menu: '📝 최근 게시글', detail: '신규 회원 가입 인사드립니다' },
-        { menu: '🎲 추천 보드게임', detail: '이번 주 추천 — 윙스팬' },
-    ],
 
-    init: async (containerId) => {
+   init: async (containerId) => {
         Boako.NewsFeed.rootId = containerId;
         const root = document.getElementById(containerId);
         if (!root) return;
 
         root.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">소식을 불러오는 중...</div>`;
 
-        const { data, error } = await Boako.db
-            .from('news_feed_items')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(80);
+        const [feedResult, fillerPool] = await Promise.all([
+            Boako.db.from('news_feed_items').select('*').order('created_at', { ascending: false }).limit(80),
+            Boako.NewsFeed.buildFillerPool(),
+        ]);
 
-        if (error) {
-            console.error('소식지 로드 실패:', error);
+        if (feedResult.error) {
+            console.error('소식지 로드 실패:', feedResult.error);
             root.innerHTML = `<div class="text-center py-20 text-rose-400 font-bold">소식을 불러오지 못했습니다.</div>`;
             return;
         }
 
-        Boako.NewsFeed.items = data || [];
+        Boako.NewsFeed.items = feedResult.data || [];
+        Boako.NewsFeed.fillerPool = fillerPool;
         Boako.NewsFeed.render();
+    },
+
+    // 팀 목록 / 실시간 랭킹 / 최근 게시글 / 랜덤 보드게임에서 실제 데이터 하나씩 가져와 필러 후보 풀을 만든다.
+    // 개별 쿼리가 실패해도 나머지는 계속 진행되도록 각각 try/catch로 감싼다.
+    buildFillerPool: async () => {
+        const pool = [];
+
+        try {
+            const { data } = await Boako.db
+                .from('view_team_list_sorted')
+                .select('team_name, member_count, logo_url')
+                .limit(1);
+            if (data && data[0]) {
+                const t = data[0];
+                pool.push({ title: `🛡️ ${t.team_name} · ${t.member_count}명`, image: t.logo_url, icon: '🛡️' });
+            }
+        } catch (e) { console.error('필러(팀 목록) 로드 실패:', e); }
+
+        try {
+            const { data } = await Boako.db
+                .from('v_season_current_ranking')
+                .select('season_no, team_name, total_lp, logo_url')
+                .order('season_no', { ascending: false })
+                .order('total_lp', { ascending: false })
+                .limit(1);
+            if (data && data[0]) {
+                const r = data[0];
+                pool.push({ title: `🏆 ${r.team_name} — 시즌${r.season_no} 1위 (LP ${r.total_lp})`, image: r.logo_url, icon: '🏆' });
+            }
+        } catch (e) { console.error('필러(랭킹) 로드 실패:', e); }
+
+        try {
+            const { data } = await Boako.db
+                .from('board_posts')
+                .select('title, category')
+                .eq('is_deleted', false)
+                .eq('is_draft', false)
+                .order('created_at', { ascending: false })
+                .limit(1);
+            if (data && data[0]) {
+                const p = data[0];
+                pool.push({ title: `📝 [${p.category}] ${p.title}`, image: null, icon: '📝' });
+            }
+        } catch (e) { console.error('필러(게시글) 로드 실패:', e); }
+
+        try {
+            const { count } = await Boako.db.from('games').select('id', { count: 'exact', head: true });
+            if (count) {
+                const offset = Math.floor(Math.random() * count);
+                const { data } = await Boako.db
+                    .from('games')
+                    .select('game_name, min_players, max_players, playtime, image_url')
+                    .range(offset, offset);
+                if (data && data[0]) {
+                    const g = data[0];
+                    pool.push({ title: `🎲 ${g.game_name} · ${g.min_players}-${g.max_players}인 · ${g.playtime}분`, image: g.image_url, icon: '🎲' });
+                }
+            }
+        } catch (e) { console.error('필러(보드게임) 로드 실패:', e); }
+
+        if (pool.length === 0) {
+            pool.push({ title: '🎮 BOAKO ARCHIVE', image: null, icon: '🎮' });
+        }
+
+        return pool;
     },
 
     // 중요도 × 시간감쇠(반감기 = 중요도 × 24시간)로 점수 계산
@@ -109,13 +167,14 @@ Boako.NewsFeed = {
         const fillerReal = mediumItems.slice(0, 2);
         const leftoverMedium = mediumItems.slice(2);
 
+        const pool = Boako.NewsFeed.fillerPool.length ? Boako.NewsFeed.fillerPool : [{ title: '🎮 BOAKO ARCHIVE', image: null, icon: '🎮' }];
+
         let fillerHtml = '';
         for (let i = 0; i < 2; i++) {
             if (fillerReal[i]) {
                 fillerHtml += Boako.NewsFeed.renderFillerReal(fillerReal[i]);
             } else {
-                const ex = Boako.NewsFeed.EXAMPLE_FILLERS[i % Boako.NewsFeed.EXAMPLE_FILLERS.length];
-                fillerHtml += Boako.NewsFeed.renderFillerExample(ex);
+                fillerHtml += Boako.NewsFeed.renderSupplementFiller(pool[i % pool.length]);
             }
         }
 
@@ -128,8 +187,7 @@ Boako.NewsFeed = {
         const padCount = remainder === 0 ? 0 : (4 - remainder);
         let padHtml = '';
         for (let i = 0; i < padCount; i++) {
-            const ex = Boako.NewsFeed.EXAMPLE_FILLERS[i % Boako.NewsFeed.EXAMPLE_FILLERS.length];
-            padHtml += Boako.NewsFeed.renderPadCard(ex);
+            padHtml += Boako.NewsFeed.renderSupplementPadCard(pool[i % pool.length]);
         }
 
         return `
@@ -164,21 +222,27 @@ Boako.NewsFeed = {
         `;
     },
 
-    renderFillerExample: (ex) => `
-        <div class="nf-filler-card is-example">
-            <div class="menu-slot">${ex.menu}</div>
-            <div class="txt"><h4>${Boako.NewsFeed.escapeHtml(ex.detail)}</h4></div>
-        </div>
-    `,
-
-    renderPadCard: (ex) => `
-        <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden border nf-pad-example flex flex-col" style="position:relative;">
-            <div class="nf-pad-thumb">${ex.menu}</div>
-            <div class="p-3">
-                <h4 class="text-xs font-black text-slate-800 leading-snug truncate">${Boako.NewsFeed.escapeHtml(ex.detail)}</h4>
+    renderSupplementFiller: (filler) => {
+        const img = filler.image ? Boako.Util.cdn(filler.image) : null;
+        return `
+            <div class="nf-filler-card">
+                <div class="thumb">${img ? `<img src="${img}">` : filler.icon}</div>
+                <div class="txt"><h4>${Boako.NewsFeed.escapeHtml(filler.title)}</h4></div>
             </div>
-        </div>
-    `,
+        `;
+    },
+
+    renderSupplementPadCard: (filler) => {
+        const img = filler.image ? Boako.Util.cdn(filler.image) : null;
+        return `
+            <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow">
+                ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
+                <div class="p-3">
+                    <h4 class="text-xs font-black text-slate-800 leading-snug truncate">${Boako.NewsFeed.escapeHtml(filler.title)}</h4>
+                </div>
+            </div>
+        `;
+    },
 
     renderCard: (item) => {
         const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
