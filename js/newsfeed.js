@@ -7,8 +7,10 @@ Boako.NewsFeed = {
     // 헤드라인급 소식이 없을 때 그 자리를 대신하는 명예 회장 헌정 카드에 쓰는 이미지
     TRIBUTE_IMAGE: 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/dustin.png',
 
+    // 헌정 카드 옆 필러 슬롯 / 아래쪽 그리드 마지막 줄을 채울, 실제 소식이 부족할 때 대신 보여줄 사이트의 다른 진짜 데이터
+    fillerPool: [],
 
-   init: async (containerId) => {
+    init: async (containerId) => {
         Boako.NewsFeed.rootId = containerId;
         const root = document.getElementById(containerId);
         if (!root) return;
@@ -89,6 +91,7 @@ Boako.NewsFeed = {
             }
         } catch (e) { console.error('필러(보드게임) 로드 실패:', e); }
 
+        // 위 4개 쿼리가 전부 실패하는 극단적인 경우를 대비한 최소한의 안전장치
         if (pool.length === 0) {
             pool.push({ title: '🎮 BOAKO ARCHIVE', image: null, icon: '🎮' });
         }
@@ -158,8 +161,8 @@ Boako.NewsFeed = {
         `;
     },
 
-    // 헤드라인이 없을 때: 헌정 카드(헤드라인 자리) + 필러 슬롯 2칸(미디엄 실제 소식 우선, 부족하면 예시)
-    // + 남는 소식(라지/스몰/필러에 못 들어간 미디엄) + 마지막 줄이 4칸을 못 채우면 예시 카드로 채움
+    // 헤드라인이 없을 때: 헌정 카드(헤드라인 자리) + 필러 슬롯 2칸(미디엄 실제 소식 우선, 부족하면 사이트의 다른 실제 데이터)
+    // + 남는 소식(라지/스몰/필러에 못 들어간 미디엄) + 마지막 줄이 4칸을 못 채우면 실제 데이터로 채움
     renderTributeGrid: (scored) => {
         const mediumItems = scored.filter(item => item._tier === 'medium');
         const otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
@@ -181,7 +184,7 @@ Boako.NewsFeed = {
         const belowItems = [...otherItems, ...leftoverMedium].sort((a, b) => b._score - a._score);
         const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
 
-        // 아래쪽 그리드 마지막 줄이 4칸을 못 채우면, 남는 칸만큼 예시 카드로 채워 줄을 완성한다.
+        // 아래쪽 그리드 마지막 줄이 4칸을 못 채우면, 남는 칸만큼 사이트의 다른 실제 데이터로 채워 줄을 완성한다.
         const usedCols = belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
         const remainder = usedCols % 4;
         const padCount = remainder === 0 ? 0 : (4 - remainder);
@@ -222,6 +225,7 @@ Boako.NewsFeed = {
         `;
     },
 
+    // 필러 슬롯을 채우는 사이트의 다른 실제 데이터 — 진짜 소식 카드와 똑같은 모양이라 자연스럽게 섞인다 (뱃지 없음)
     renderSupplementFiller: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         return `
@@ -232,6 +236,7 @@ Boako.NewsFeed = {
         `;
     },
 
+    // 아래쪽 그리드 마지막 줄을 채우는 사이트의 다른 실제 데이터 — production의 medium 카드와 동일한 마크업
     renderSupplementPadCard: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         return `
