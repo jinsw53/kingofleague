@@ -39,6 +39,15 @@
         .menu-item { font-size: 16px; font-weight: 800; color: #444; padding: 10px 0; border-bottom: 3px solid transparent; cursor: pointer; }
         .menu-item.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
 
+        /* 🌟 [신규] 전광판 롤링 바 — 검색바 바로 아래, 최근 소식이 좌측으로 끓임없이 흘르는 티커 */
+        .ticker-bar { background-color: #fff; border-bottom: 1px solid var(--border-color); overflow: hidden; white-space: nowrap; padding: 10px 0; }
+        .ticker-track { display: inline-flex; gap: 36px; will-change: transform; }
+        .ticker-bar:hover .ticker-track { animation-play-state: paused; }
+        .ticker-item { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; color: #475569; cursor: pointer; padding: 0 4px; }
+        .ticker-item:hover { color: var(--primary); }
+        .ticker-empty { color: #94a3b8; font-weight: 600; cursor: default; }
+        @keyframes boako-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
         /* Layout */
         /* 🌟 이름을 변경하여 테일윈드의 강제 왼쪽 정렬 레이아웃을 완전히 무력화합니다 */
 .main-container-wrap { padding: 30px 0 120px 0; }
@@ -68,8 +77,8 @@
         .role-tag { font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; color: white; text-transform: uppercase; }
         .role-leader { background: var(--primary); }
         .role-member { background: #94a3b8; }
-        /* [추가] 메뉴 클릭 씹힘 방지용 */
-        .menu-item i, 
+        /* [추가] 메뉴 클릭 씨힍 방지용 */
+        .menu-item i,
         .menu-item span {
                 pointer-events: none;
         }
@@ -102,19 +111,26 @@
             </div>
         </header>
 
+        <!-- 🌟 [신규] 전광판 롤링 바 — 검색바 바로 아래, 사이트 전체 공통으로 노출 -->
+        <div id="boako-ticker-bar" class="ticker-bar">
+            <div class="ticker-track" id="boako-ticker-track">
+                <span class="ticker-item ticker-empty">📡 소식을 불러오는 중...</span>
+            </div>
+        </div>
+
 <nav class="nav" style="position: sticky; top: 0; z-index: 900; background-color: #fff; border-bottom: 1px solid var(--border-color);">
     <div class="inner" style="display: flex; align-items: center; width: 100%; position: relative;">
-        
+
         <div id="nav-arrow-left" style="display: none; position: absolute; left: 0px; z-index: 950; font-size: 20px; color: rgba(0,0,0,0.2); cursor: pointer; transition: color 0.2s; user-select: none;" onmouseover="this.style.color='rgba(0,0,0,0.6)'" onmouseout="this.style.color='rgba(0,0,0,0.2)'">
             ◀
         </div>
 
         <ul class="menu-list" id="boako-main-nav-bar" style="
-            display: flex; 
-            align-items: center; 
-            flex-wrap: nowrap; 
-            overflow-x: auto; 
-            white-space: nowrap; 
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            white-space: nowrap;
             scroll-behavior: smooth;
             -ms-overflow-style: none;
             scrollbar-width: none;
@@ -125,7 +141,7 @@
             <style>
                 .menu-list::-webkit-scrollbar { display: none; }
                 .menu-item { flex-shrink: 0; }
-                
+
                 /* 🎯 소식지와 팀 목록 양 끝단에만 화살표 방어용 가변 마진 주입 */
                 #menu-first-item { margin-left: 0px; transition: margin 0.2s; }
                 #menu-last-item { margin-right: 35px; }
@@ -158,9 +174,9 @@
         </div>
 
         <div style="flex-shrink: 0; margin-left: auto; z-index: 960;">
-            <a href="https://chromewebstore.google.com/detail/boako-%ED%8C%80-%EB%A6%AC%EA%B7%B8-%EA%B8%B0%EB%A1%9D-%EC%A0%80%EC%9E%A5/ieeaooigcejnffgcmcaannlpkbejniil" 
-               target="_blank" 
-               rel="noopener noreferrer" 
+            <a href="https://chromewebstore.google.com/detail/boako-%ED%8C%80-%EB%A6%AC%EA%B7%B8-%EA%B8%B0%EB%A1%9D-%EC%A0%80%EC%9E%A5/ieeaooigcejnffgcmcaannlpkbejniil"
+               target="_blank"
+               rel="noopener noreferrer"
                style="display: flex; align-items: center; gap: 8px; background: var(--primary); color: white; padding: 10px 20px; border-radius: 12px; font-weight: 800; font-size: 15px; text-decoration: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.3); transition: all 0.2s;"
                onmouseover="this.style.transform='translateY(-2px)'; this.style.backgroundColor='var(--primary-dark)';"
                onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='var(--primary)';">🧩 기록기 설치</a>
@@ -206,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function startScroll(direction) {
         if (scrollInterval) clearInterval(scrollInterval);
         scrollInterval = setInterval(() => {
-            navBar.scrollLeft += direction * 4; 
+            navBar.scrollLeft += direction * 4;
         }, 8);
     }
 
@@ -243,8 +259,8 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
     <div id="boako-toast"></div>
 
-    <!-- 
-      [JS 파일 분할 로드] 
+    <!--
+      [JS 파일 분할 로드]
       주의: 객체를 생성하는 core.js가 무조건 제일 먼저 로드되어야 합니다!
     -->
     <script src="js/core.js"></script>
@@ -254,6 +270,7 @@ document.addEventListener("DOMContentLoaded", function() {
     <script src="js/shop.js"></script>
     <script src="js/view.js"></script>
     <script src="js/hot_issue.js"></script>
+    <script src="js/ticker.js"></script>
     <script src="js/sponsor.js"></script>
     <script src="js/main.js"></script>
 

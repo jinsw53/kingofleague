@@ -13,7 +13,11 @@ window.onload = () => {
         Boako.HotIssue.init();
     }
 
-    // 탭 복귀 시 토큰 갱신만 조용히 요청 (화면 버벅임 없음)
+    if (Boako.Ticker && Boako.Ticker.init) {
+        Boako.Ticker.init();
+    }
+
+    // 탭 복귀 시 토큰 갱신만 조용히 요청 (화면 버베임 없음)
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible') {
             try {
