@@ -86,7 +86,12 @@ Boako.Auth = {
         }
     },
     
-    logout: async () => { await Boako.db.auth.signOut(); location.reload(); },
+    logout: async () => {
+        await Boako.db.auth.signOut();
+        // 🌟 카카오 세션도 같이 로그아웃 (다음 로그인 시 계정 전환/재동의 가능하게)
+        const logoutRedirectUri = encodeURIComponent(window.location.origin + '/');
+        window.location.href = `https://kauth.kakao.com/oauth/logout?client_id=${Boako.config.kakaoRestApiKey}&logout_redirect_uri=${logoutRedirectUri}`;
+    },
 
     // 🌟 [수정됨] 로그인 위젯 렌더링 + 팀 멤버 뱃지 + 인벤토리 배지 영역 추가
     renderWidget: () => {
