@@ -67,6 +67,13 @@
         .nf-filler-card .txt { padding:8px 10px; display:flex; align-items:center; flex:0 0 auto; min-width:0; }
         .nf-filler-card h4 { font-size:12.5px; font-weight:800; color:#1e293b; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
+        /* 🌟 [신규] 통합검색 결과 페이지 카드 */
+        .search-result-item { display:flex; align-items:center; gap:16px; padding:16px 20px; background:#fff; border:1px solid var(--border-color); border-radius:12px; margin-bottom:10px; cursor:pointer; transition:0.2s; }
+        .search-result-item:hover { border-color:var(--primary); box-shadow:0 4px 10px rgba(124,58,237,0.08); transform:translateY(-1px); }
+        .search-result-item .thumb { width:48px; height:48px; border-radius:10px; object-fit:cover; background:#f1f5f9; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:22px; }
+        .search-result-item .title { font-size:15px; font-weight:800; color:#1e293b; }
+        .search-result-item .desc { font-size:12.5px; color:#94a3b8; font-weight:600; margin-top:2px; }
+
         /* Layout */
         /* 🌟 이름을 변경하여 테일윈드의 강제 왼쪽 정렬 레이아웃을 완전히 무력화합니다 */
 .main-container-wrap { padding: 30px 0 120px 0; }
@@ -122,8 +129,8 @@
                 <div onclick="Boako.View.render('main')" class="logo">BOAKO</div>
                 <div class="search-area">
                     <div class="search-box">
-                        <input type="text" id="main-search" placeholder="통합 검색 (팀, 유저, 전적, 게시글)">
-                        <button type="button" class="btn-search">🔍</button>
+                        <input type="text" id="main-search" placeholder="통합 검색 (팀, 유저, 전적, 게시글)" onkeydown="if(event.key==='Enter'){event.preventDefault(); Boako.Util.executeSearch();}">
+                        <button type="button" class="btn-search" onclick="Boako.Util.executeSearch()">🔍</button>
                     </div>
                 </div>
                 <div id="sponsor-banner-area" style="flex-shrink:0; margin-left:auto;"></div>
