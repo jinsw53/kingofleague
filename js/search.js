@@ -140,12 +140,14 @@ Boako.Search = {
             </div>
         `).join('');
 
+        // 🌟 게임 클릭 시 board.js의 openGuideForGame이 game_name으로 필터링하므로,
+        // id가 아니라 game_name 문자열을 link_id로 넘긴다.
         const gamesHtml = games.map(g => `
-            <div class="search-result-item" onclick="Boako.Util.navigateToLink('GAME', '${g.id}')">
+            <div class="search-result-item" onclick="Boako.Util.navigateToLink('GAME', ${JSON.stringify(g.game_name)})">
                 <div class="thumb">${g.image_url ? `<img src="${Boako.Util.cdn(g.image_url)}" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">` : '🎲'}</div>
                 <div>
                     <div class="title">${Boako.Search.escapeHtml(g.game_name)}</div>
-                    <div class="desc">게임</div>
+                    <div class="desc">게임 · 공략 게시판 보기</div>
                 </div>
             </div>
         `).join('');
