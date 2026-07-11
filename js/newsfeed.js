@@ -41,11 +41,11 @@ Boako.NewsFeed = {
         try {
             const { data } = await Boako.db
                 .from('view_team_list_sorted')
-                .select('team_name, member_count, logo_url')
+                .select('id, team_name, member_count, logo_url')
                 .limit(1);
             if (data && data[0]) {
                 const t = data[0];
-                pool.push({ title: `🛡️ ${t.team_name} · ${t.member_count}명`, image: t.logo_url, icon: '🛡️' });
+                pool.push({ title: `🛡️ ${t.team_name} · ${t.member_count}명`, image: t.logo_url, icon: '🛡️', linkType: 'TEAM', linkId: t.id });
             }
         } catch (e) { console.error('필러(팀 목록) 로드 실패:', e); }
 
@@ -58,21 +58,21 @@ Boako.NewsFeed = {
                 .limit(1);
             if (data && data[0]) {
                 const r = data[0];
-                pool.push({ title: `🏆 ${r.team_name} — 시즌${r.season_no} 1위 (LP ${r.total_lp})`, image: r.logo_url, icon: '🏆' });
+                pool.push({ title: `🏆 ${r.team_name} — 시즌${r.season_no} 1위 (LP ${r.total_lp})`, image: r.logo_url, icon: '🏆', linkType: 'SEASON_RANKING', linkId: r.team_name });
             }
         } catch (e) { console.error('필러(랭킹) 로드 실패:', e); }
 
         try {
             const { data } = await Boako.db
                 .from('board_posts')
-                .select('title, category')
+                .select('id, title, category')
                 .eq('is_deleted', false)
                 .eq('is_draft', false)
                 .order('created_at', { ascending: false })
                 .limit(1);
             if (data && data[0]) {
                 const p = data[0];
-                pool.push({ title: `📝 [${p.category}] ${p.title}`, image: null, icon: '📝' });
+                pool.push({ title: `📝 [${p.category}] ${p.title}`, image: null, icon: '📝', linkType: 'BOARD_POST', linkId: p.id });
             }
         } catch (e) { console.error('필러(게시글) 로드 실패:', e); }
 
@@ -228,8 +228,9 @@ Boako.NewsFeed = {
     // 필러 슬롯을 채우는 사이트의 다른 실제 데이터 — 진짜 소식 카드와 똑같은 모양이라 자연스럽게 섞인다 (뱃지 없음)
     renderSupplementFiller: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
+        const clickable = filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '';
         return `
-            <div class="nf-filler-card">
+            <div class="nf-filler-card" ${clickable}>
                 <div class="thumb">${img ? `<img src="${img}">` : filler.icon}</div>
                 <div class="txt"><h4>${Boako.NewsFeed.escapeHtml(filler.title)}</h4></div>
             </div>
@@ -239,8 +240,9 @@ Boako.NewsFeed = {
     // 아래쪽 그리드 마지막 줄을 채우는 사이트의 다른 실제 데이터 — production의 medium 카드와 동일한 마크업
     renderSupplementPadCard: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
+        const clickable = filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '';
         return `
-            <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow">
+            <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                 ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
                 <div class="p-3">
                     <h4 class="text-xs font-black text-slate-800 leading-snug truncate">${Boako.NewsFeed.escapeHtml(filler.title)}</h4>
