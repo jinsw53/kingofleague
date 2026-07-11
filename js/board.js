@@ -50,34 +50,59 @@ Boako.Board = {
     },
 
     // 🌟 [신규 - 공용] 여러 유저의 "장착 중인 배지"를 한 번에 조회 (목록/상세/댓글 공용)
-    // 서포터즈 배지(item_supporter_badge_*)는 제외하고, 일반 배지만 { userId: [{item_id, name, icon}, ...] } 형태로 반환
+    // 일반 배지(shop_items)뿐 아니라 서포터즈 배지(item_supporter_badge_*, 팀 로고)도 함께 포함해서
+    // { userId: [{name, icon}, ...] } 형태로 반환 (isSupporter: true인 항목은 팀 로고 표시용)
     fetchBadgeMap: async (userIds) => {
         const uniqueIds = [...new Set(userIds)].filter(Boolean);
         if (uniqueIds.length === 0) return {};
 
         const { data: equipped } = await Boako.db.from('inventory').select('user_id, item_id').eq('is_equipped', true).in('user_id', uniqueIds);
 
-        const normalItemIds = [...new Set((equipped || []).filter(r => !r.item_id.startsWith('item_supporter_badge_')).map(r => r.item_id))];
+        const normalRows = (equipped || []).filter(r => !r.item_id.startsWith('item_supporter_badge_'));
+        const supporterRows = (equipped || []).filter(r => r.item_id.startsWith('item_supporter_badge_'));
+
+        const normalItemIds = [...new Set(normalRows.map(r => r.item_id))];
         let shopMap = {};
         if (normalItemIds.length > 0) {
             const { data: shopRows } = await Boako.db.from('shop_items').select('item_id, name, icon').in('item_id', normalItemIds);
             shopMap = Object.fromEntries((shopRows || []).map(s => [s.item_id, s]));
         }
 
+        // 서포터즈 배지는 item_id 끝의 팀 id로 teams 테이블을 조인해서 팀 로고를 가져온다
+        const supporterTeamIds = [...new Set(supporterRows.map(r => Number(r.item_id.split('_').pop())))];
+        let teamsMap = {};
+        if (supporterTeamIds.length > 0) {
+            const { data: teamsData } = await Boako.db.from('teams').select('id, team_name, logo_url').in('id', supporterTeamIds);
+            teamsMap = Object.fromEntries((teamsData || []).map(t => [t.id, t]));
+        }
+
         const badgeMap = {};
-        (equipped || []).forEach(row => {
+        normalRows.forEach(row => {
             if (!badgeMap[row.user_id]) badgeMap[row.user_id] = [];
-            if (!row.item_id.startsWith('item_supporter_badge_')) {
-                const s = shopMap[row.item_id];
-                if (s) badgeMap[row.user_id].push(s);
-            }
+            const s = shopMap[row.item_id];
+            if (s) badgeMap[row.user_id].push(s);
+        });
+        supporterRows.forEach(row => {
+            if (!badgeMap[row.user_id]) badgeMap[row.user_id] = [];
+            const teamId = Number(row.item_id.split('_').pop());
+            const team = teamsMap[teamId];
+            badgeMap[row.user_id].push({
+                isSupporter: true,
+                icon: team?.logo_url || null,
+                name: team ? `${team.team_name} 서포터즈` : '서포터즈'
+            });
         });
         return badgeMap;
     },
 
-    // 🌟 [신규 - 공용] 배지 배열을 작은 아이콘 목록 HTML로 변환
+    // 🌟 [신규 - 공용] 배지 배열을 작은 아이콘 목록 HTML로 변환 (일반 배지 + 서포터즈 배지 둘 다 처리)
     renderBadgeIcons: (badges) => {
         return (badges || []).map(b => {
+            if (b.isSupporter) {
+                return b.icon
+                    ? `<img src="${Boako.Util.cdn(b.icon)}" class="w-4 h-4 rounded-full object-cover inline-block border border-slate-200" title="${b.name}">`
+                    : `<span title="${b.name}">🛡️</span>`;
+            }
             return (b.icon && b.icon.startsWith('http'))
                 ? `<img src="${Boako.Util.cdn(b.icon)}" class="w-4 h-4 rounded-full object-cover inline-block" title="${b.name}">`
                 : `<span title="${b.name}">${b.icon || '🏅'}</span>`;
