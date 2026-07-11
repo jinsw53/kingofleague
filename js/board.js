@@ -49,6 +49,41 @@ Boako.Board = {
         return div.innerHTML;
     },
 
+    // 🌟 [신규 - 공용] 여러 유저의 "장착 중인 배지"를 한 번에 조회 (목록/상세/댓글 공용)
+    // 서포터즈 배지(item_supporter_badge_*)는 제외하고, 일반 배지만 { userId: [{item_id, name, icon}, ...] } 형태로 반환
+    fetchBadgeMap: async (userIds) => {
+        const uniqueIds = [...new Set(userIds)].filter(Boolean);
+        if (uniqueIds.length === 0) return {};
+
+        const { data: equipped } = await Boako.db.from('inventory').select('user_id, item_id').eq('is_equipped', true).in('user_id', uniqueIds);
+
+        const normalItemIds = [...new Set((equipped || []).filter(r => !r.item_id.startsWith('item_supporter_badge_')).map(r => r.item_id))];
+        let shopMap = {};
+        if (normalItemIds.length > 0) {
+            const { data: shopRows } = await Boako.db.from('shop_items').select('item_id, name, icon').in('item_id', normalItemIds);
+            shopMap = Object.fromEntries((shopRows || []).map(s => [s.item_id, s]));
+        }
+
+        const badgeMap = {};
+        (equipped || []).forEach(row => {
+            if (!badgeMap[row.user_id]) badgeMap[row.user_id] = [];
+            if (!row.item_id.startsWith('item_supporter_badge_')) {
+                const s = shopMap[row.item_id];
+                if (s) badgeMap[row.user_id].push(s);
+            }
+        });
+        return badgeMap;
+    },
+
+    // 🌟 [신규 - 공용] 배지 배열을 작은 아이콘 목록 HTML로 변환
+    renderBadgeIcons: (badges) => {
+        return (badges || []).map(b => {
+            return (b.icon && b.icon.startsWith('http'))
+                ? `<img src="${Boako.Util.cdn(b.icon)}" class="w-4 h-4 rounded-full object-cover inline-block" title="${b.name}">`
+                : `<span title="${b.name}">${b.icon || '🏅'}</span>`;
+        }).join('');
+    },
+
     // 붙여넣기/드래그로 들어온 리치 HTML에서 위험 요소 제거
     // (script/style 태그, on* 속성, javascript: 링크, 유튜브 외 iframe)
     sanitizeContent: (html) => {
@@ -451,9 +486,11 @@ Boako.Board = {
         const authorIds = [...new Set(posts.map(p => p.author_id))];
         const postIds = posts.map(p => p.id);
 
-        const [{ data: profiles }, { data: comments }] = await Promise.all([
+        // 🌟 [수정] 작성자 이름 + 댓글 수와 함께, 작성자의 장착 배지도 같이 조회
+        const [{ data: profiles }, { data: comments }, badgeMap] = await Promise.all([
             Boako.db.from('profiles').select('id, full_name').in('id', authorIds),
-            Boako.db.from('board_comments').select('post_id').eq('is_deleted', false).in('post_id', postIds)
+            Boako.db.from('board_comments').select('post_id').eq('is_deleted', false).in('post_id', postIds),
+            Boako.Board.fetchBadgeMap(authorIds)
         ]);
 
         const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
@@ -464,7 +501,9 @@ Boako.Board = {
             ? `<button onclick="Boako.Board.backToGuideGrid()" class="text-sm font-bold text-teal-600 hover:text-teal-700 mb-3">← 게임 목록으로</button>`
             : '';
 
-        container.innerHTML = backBtnHtml + posts.map(p => `
+        container.innerHTML = backBtnHtml + posts.map(p => {
+            const badgesHtml = Boako.Board.renderBadgeIcons(badgeMap[p.author_id]);
+            return `
             <div onclick="Boako.Board.openDetail(${p.id})" class="flex items-center justify-between gap-4 bg-white border ${p.is_notice ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'} rounded-xl px-5 py-4 cursor-pointer hover:shadow-md transition-shadow">
                 <div class="flex items-center gap-3 min-w-0 flex-1">
                     ${p.is_notice ? `<span class="text-[10px] font-black bg-amber-500 text-white px-2 py-1 rounded-md shrink-0">공지</span>` : `<span class="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-md shrink-0">${p.category}</span>`}
@@ -473,13 +512,14 @@ Boako.Board = {
                     ${commentCountMap[p.id] ? `<span class="text-teal-600 text-xs font-black shrink-0">[${commentCountMap[p.id]}]</span>` : ''}
                 </div>
                 <div class="flex items-center gap-4 text-xs text-slate-400 font-bold shrink-0">
-                    <span>${profileMap[p.author_id] || '익명'}</span>
+                    <span class="inline-flex items-center gap-1">${profileMap[p.author_id] || '익명'}${badgesHtml ? ` <span class="inline-flex items-center gap-0.5">${badgesHtml}</span>` : ''}</span>
                     <span>${Boako.Board.timeAgo(p.created_at)}</span>
                     ${p.like_count > 0 ? `<span class="text-rose-400">❤️ ${p.like_count}</span>` : ''}
                     <span>👁 ${p.view_count}</span>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         Boako.Board.renderPagination(count || 0);
     },
@@ -851,28 +891,13 @@ Boako.Board = {
         Boako.Board.State.comments = comments || [];
 
         const allAuthorIds = [...new Set([post.author_id, ...(comments || []).map(c => c.author_id)])];
-        const [{ data: profiles }, { data: equipped }] = await Promise.all([
+        const [{ data: profiles }, badgeMap] = await Promise.all([
             Boako.db.from('profiles').select('id, full_name').in('id', allAuthorIds),
-            Boako.db.from('inventory').select('user_id, item_id').eq('is_equipped', true).in('user_id', allAuthorIds)
+            Boako.Board.fetchBadgeMap(allAuthorIds)
         ]);
 
         const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
 
-        const normalItemIds = [...new Set((equipped || []).filter(r => !r.item_id.startsWith('item_supporter_badge_')).map(r => r.item_id))];
-        let shopMap = {};
-        if (normalItemIds.length > 0) {
-            const { data: shopRows } = await Boako.db.from('shop_items').select('item_id, name, icon').in('item_id', normalItemIds);
-            shopMap = Object.fromEntries((shopRows || []).map(s => [s.item_id, s]));
-        }
-
-        const badgeMap = {};
-        (equipped || []).forEach(row => {
-            if (!badgeMap[row.user_id]) badgeMap[row.user_id] = [];
-            if (!row.item_id.startsWith('item_supporter_badge_')) {
-                const s = shopMap[row.item_id];
-                if (s) badgeMap[row.user_id].push(s);
-            }
-        });
         Boako.Board.State.badgeMap = badgeMap;
         Boako.Board.State.profileMap = profileMap;
 
@@ -895,12 +920,7 @@ Boako.Board = {
         const name = Boako.Board.State.profileMap?.[authorId] || '익명';
         const badges = Boako.Board.State.badgeMap[authorId] || [];
         const isMe = Boako.state.user && authorId === Boako.state.user.id;
-        const badgeHtml = badges.map(b => {
-            const iconHtml = (b.icon && b.icon.startsWith('http'))
-                ? `<img src="${Boako.Util.cdn(b.icon)}" class="w-4 h-4 rounded-full object-cover" title="${b.name}">`
-                : `<span title="${b.name}">${b.icon || '🏅'}</span>`;
-            return iconHtml;
-        }).join('');
+        const badgeHtml = Boako.Board.renderBadgeIcons(badges);
 
         return `
             <span class="font-bold text-slate-700 ${isMe ? '' : 'cursor-pointer hover:text-teal-600 hover:underline'}"
