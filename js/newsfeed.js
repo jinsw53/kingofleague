@@ -4,6 +4,17 @@
 Boako.NewsFeed = {
     items: [],
 
+    // 헤드라인급 소식이 없을 때 그 자리를 대신하는 명예 회장 헌정 카드에 쓰는 이미지
+    TRIBUTE_IMAGE: '/%EB%B6%80%EC%9E%90-%EB%8D%94%EC%8A%A4%ED%8B%B4%EB%B0%A4.png',
+
+    // 헌정 카드 옆 필러 슬롯 / 아래쪽 그리드 마지막 줄을 채울 실제 소식이 부족할 때 쓰는 예시 카드
+    EXAMPLE_FILLERS: [
+        { menu: '🛡️ 팀 목록', detail: '쿨한 전략가들 · 시즌12 우승' },
+        { menu: '🏆 실시간 랭킹', detail: '강알리 — 리그 1위' },
+        { menu: '📝 최근 게시글', detail: '신규 회원 가입 인사드립니다' },
+        { menu: '🎲 추천 보드게임', detail: '이번 주 추천 — 윙스팬' },
+    ],
+
     init: async (containerId) => {
         Boako.NewsFeed.rootId = containerId;
         const root = document.getElementById(containerId);
@@ -63,20 +74,23 @@ Boako.NewsFeed = {
             </div>
         `;
 
-        if (Boako.NewsFeed.items.length === 0) {
-            root.innerHTML = `
-                ${bannerHtml}
-                <div class="text-center py-20 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">아직 소식이 없습니다.</div>
-            `;
-            return;
-        }
-
         const scored = Boako.NewsFeed.items.map(item => ({
             ...item,
             _score: Boako.NewsFeed.computeScore(item),
         }));
         scored.sort((a, b) => b._score - a._score);
         scored.forEach(item => { item._tier = Boako.NewsFeed.getTier(item._score); });
+
+        const hasHeadline = scored.some(item => item._tier === 'headline');
+
+        // 헤드라인급 소식이 하나도 없으면(소식이 0개인 경우 포함) 헌정 카드가 그 자리를 대신한다.
+        if (!hasHeadline) {
+            root.innerHTML = `
+                ${bannerHtml}
+                ${Boako.NewsFeed.renderTributeGrid(scored)}
+            `;
+            return;
+        }
 
         root.innerHTML = `
             ${bannerHtml}
@@ -85,6 +99,86 @@ Boako.NewsFeed = {
             </div>
         `;
     },
+
+    // 헤드라인이 없을 때: 헌정 카드(헤드라인 자리) + 필러 슬롯 2칸(미디엄 실제 소식 우선, 부족하면 예시)
+    // + 남는 소식(라지/스몰/필러에 못 들어간 미디엄) + 마지막 줄이 4칸을 못 채우면 예시 카드로 채움
+    renderTributeGrid: (scored) => {
+        const mediumItems = scored.filter(item => item._tier === 'medium');
+        const otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
+
+        const fillerReal = mediumItems.slice(0, 2);
+        const leftoverMedium = mediumItems.slice(2);
+
+        let fillerHtml = '';
+        for (let i = 0; i < 2; i++) {
+            if (fillerReal[i]) {
+                fillerHtml += Boako.NewsFeed.renderFillerReal(fillerReal[i]);
+            } else {
+                const ex = Boako.NewsFeed.EXAMPLE_FILLERS[i % Boako.NewsFeed.EXAMPLE_FILLERS.length];
+                fillerHtml += Boako.NewsFeed.renderFillerExample(ex);
+            }
+        }
+
+        const belowItems = [...otherItems, ...leftoverMedium].sort((a, b) => b._score - a._score);
+        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
+
+        // 아래쪽 그리드 마지막 줄이 4칸을 못 채우면, 남는 칸만큼 예시 카드로 채워 줄을 완성한다.
+        const usedCols = belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
+        const remainder = usedCols % 4;
+        const padCount = remainder === 0 ? 0 : (4 - remainder);
+        let padHtml = '';
+        for (let i = 0; i < padCount; i++) {
+            const ex = Boako.NewsFeed.EXAMPLE_FILLERS[i % Boako.NewsFeed.EXAMPLE_FILLERS.length];
+            padHtml += Boako.NewsFeed.renderPadCard(ex);
+        }
+
+        return `
+            <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
+                <div class="col-span-4 md:col-span-3 md:row-span-2 nf-tribute">
+                    <div class="nf-tribute-photo">
+                        <img src="${Boako.NewsFeed.TRIBUTE_IMAGE}" alt="더스틴밤">
+                    </div>
+                    <div class="nf-tribute-body">
+                        <div class="nf-tribute-eyebrow">👑 BOAKO ARCHIVE 명예 회장</div>
+                        <h1 class="nf-tribute-name">더스틴밤 <span>님</span></h1>
+                        <p class="nf-tribute-quote">헤드라인이 될 만한 큰 소식은 없지만, 명예 회장님의 존재감만으로 이 자리는 결코 비어있지 않습니다.</p>
+                    </div>
+                </div>
+                <div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">
+                    ${fillerHtml}
+                </div>
+                ${belowCardsHtml}
+                ${padHtml}
+            </div>
+        `;
+    },
+
+    renderFillerReal: (item) => {
+        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
+        const img = item.thumbnail_url ? Boako.Util.cdn(item.thumbnail_url) : null;
+        return `
+            <div class="nf-filler-card" ${clickable}>
+                <div class="thumb">${img ? `<img src="${img}">` : '📰'}</div>
+                <div class="txt"><h4>${Boako.NewsFeed.escapeHtml(item.title)}</h4></div>
+            </div>
+        `;
+    },
+
+    renderFillerExample: (ex) => `
+        <div class="nf-filler-card is-example">
+            <div class="menu-slot">${ex.menu}</div>
+            <div class="txt"><h4>${Boako.NewsFeed.escapeHtml(ex.detail)}</h4></div>
+        </div>
+    `,
+
+    renderPadCard: (ex) => `
+        <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden border nf-pad-example flex flex-col" style="position:relative;">
+            <div class="nf-pad-thumb">${ex.menu}</div>
+            <div class="p-3">
+                <h4 class="text-xs font-black text-slate-800 leading-snug truncate">${Boako.NewsFeed.escapeHtml(ex.detail)}</h4>
+            </div>
+        </div>
+    `,
 
     renderCard: (item) => {
         const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
