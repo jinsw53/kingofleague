@@ -64,6 +64,7 @@ Boako.View = {
         // 🌟 pageId와 실제 메뉴 HTML id 표기가 다른 것들 전부 매핑 (카페는 별도 작업 예정이라 제외)
         const menuIdOverrides = {
             'boardgame': 'menu-first-item',
+            'main': 'menu-first-item',
             'team_list': 'menu-team-list',
             'admin_review': 'menu-admin-review',
             'record_verify': 'menu-record-verify'
@@ -785,6 +786,9 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                 break;
 
             case 'boardgame':
+            case 'main':
+            default:
+                // 🌟 사이트 첫 화면(로고 클릭 포함)은 소식지(NewsFeed)를 보여줍니다.
                 if (!Boako.NewsFeed || !Boako.NewsFeed.init) {
                     await Boako.Util.loadScript('js/newsfeed.js');
                 }
@@ -795,10 +799,6 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                         Boako.NewsFeed.init('newsfeed-master-container');
                     }
                 }, 0);
-                break;
-
-            case 'main': default:
-                html = `<div class="main-banner"><h1>BOAKO ARCHIVE</h1><p>데이터로 기록되는 보드게임 성지</p></div><div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;"><section class="section-card"><div class="card-header">공지사항</div><div class="card-body" style="min-height:180px;">BTL 시즌 정산 안내</div></section><section class="section-card"><div class="card-header">커뮤니티</div><div class="card-body" style="min-height:180px;">이달의 우수 팀 인터뷰</div></section></div>`;
         }
         area.innerHTML = html;
     }
