@@ -17,6 +17,8 @@ Boako.Auth = {
 
             if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
             if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
+            // 🌟 로그인 즉시 실시간 쪽지 감지 시작 (메신저 페이지를 안 열어도 위젯 배지가 실시간으로 갱신되도록)
+            if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
             await Boako.Auth.requireBgaNickname();
         }
@@ -53,6 +55,8 @@ Boako.Auth = {
                 
                 if (Object.keys(Boako.Messenger).length === 0) await Boako.Util.loadScript('js/messenger.js');
                 if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
+                // 🌟 로그인 즉시 실시간 쪽지 감지 시작
+                if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
                 Boako.Auth.renderWidget();
                 await Boako.Auth.requireBgaNickname();
