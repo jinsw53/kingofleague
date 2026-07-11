@@ -114,8 +114,14 @@ Boako.Util = {
                     await Boako.View.render('league');
                     break;
                 case 'GAME':
-                    // 🌟 [신규] 검색결과의 '게임' 항목 클릭 시 리그 콘텐츠 허브로 이동
-                    await Boako.View.render('league');
+                    // 🌟 [수정] 검색결과의 '게임' 항목 클릭 시 리그 콘텐츠가 아니라
+                    // 그 게임의 공략 게시판으로 바로 진입 (linkId = 게임명 문자열)
+                    await Boako.View.render('board');
+                    setTimeout(() => {
+                        if (Boako.Board && typeof Boako.Board.openGuideForGame === 'function') {
+                            Boako.Board.openGuideForGame(linkId);
+                        }
+                    }, 150);
                     break;
                 case 'USER':
                     // 🌟 [신규] 검색결과의 '유저' 항목 클릭 시 팀 목록에서 소속 팀을 찾아보도록 안내
