@@ -30,6 +30,13 @@ Boako.Board = {
         await Boako.Board.renderList();
     },
 
+    // 🌟 [신규] 외부(검색결과 등)에서 "이 게임의 공략글로 바로 이동" 요청 시 사용
+    openGuideForGame: async (gameName) => {
+        Boako.Board.State.currentCategory = '공략';
+        Boako.Board.State.selectedGuideGame = gameName || null;
+        await Boako.Board.renderList();
+    },
+
     // ========== 유틸 ==========
 
     escapeHtml: (str) => {
