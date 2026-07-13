@@ -573,6 +573,16 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 50);
 };
 
+// 🌟 [신규] 챌린지 로스터 전체 그룹채팅방으로 이동 (메신저의 challenge_<id> 방을 바로 염)
+Boako.League.openChallengeChat = async function(challengeId) {
+    await Boako.View.render('messenger');
+    setTimeout(() => {
+        if (Boako.Messenger && Boako.Messenger.View) {
+            Boako.Messenger.View.openRoom(`challenge_${challengeId}`);
+        }
+    }, 800);
+};
+
 Boako.League.renderChallenges = function() {
     const container = document.getElementById('challenge-list');
     if (!container) return; container.innerHTML = '';
@@ -608,6 +618,12 @@ Boako.League.renderChallenges = function() {
 
         let actionHtml = '';
         let statusBadgeHtml = '';
+
+        // 🌟 [신규] 상대가 매칭된(취소/공개모집중 제외) 챌린지는 로스터 전체 그룹채팅방 입장 버튼 노출
+        const hasChatRoom = p.defender_team_id && currentStatus !== 'PENDING' && !currentStatus.startsWith('CANCELED');
+        const chatButtonHtml = hasChatRoom
+            ? `<button onclick="Boako.League.openChallengeChat(${p.id})" class="w-full mt-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-black text-[11px] py-2 rounded-lg border border-rose-200 transition-colors flex items-center justify-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> 채팅방 입장</button>`
+            : '';
 
         switch (currentStatus) {
             case 'PENDING': 
@@ -776,6 +792,7 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
             </div>
             <div class="flex items-center justify-end md:flex-col md:justify-center shrink-0 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5 min-w-[150px]">
                 ${actionHtml}
+                ${chatButtonHtml}
             </div>
         `;
         container.appendChild(card);
