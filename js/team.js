@@ -136,7 +136,7 @@ Boako.Team = {
         try {
             const { data: users, error } = await Boako.db
                 .from('profiles')
-                .select('id, full_name, profile_url')
+                .select('id, full_name, profile_url, custom_avatar_url')
                 .ilike('full_name', `%${keyword}%`)
                 .limit(10);
 
@@ -151,8 +151,9 @@ Boako.Team = {
             users.forEach(u => {
                 if (u.id === Boako.state.user.id) return;
                 
-                // 보안 연결 처리 방어 코드 적용
-                const secureProfileUrl = u.profile_url ? u.profile_url.replace(/^http:\/\//i, 'https://') : null;
+                // 🌟 커스텀 프사 우선 + 보안 연결 처리 방어 코드 적용
+                const avatarUrl = u.custom_avatar_url || u.profile_url;
+                const secureProfileUrl = avatarUrl ? avatarUrl.replace(/^http:\/\//i, 'https://') : null;
                 
                 listHtml += `
                     <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-indigo-100 transition-all group">
@@ -730,7 +731,7 @@ Boako.Team = {
         }
     },
 
- openMatchRoom: async function(roomId) {
+openMatchRoom: async function(roomId) {
         await Boako.View.render('messenger');
         setTimeout(() => {
             if (Boako.Messenger && Boako.Messenger.View) {
