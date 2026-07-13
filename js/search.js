@@ -56,7 +56,7 @@ Boako.Search = {
     searchUsers: async (query) => {
         const { data, error } = await Boako.db
             .from('profiles')
-            .select('id, full_name, profile_url')
+            .select('id, full_name, profile_url, custom_avatar_url')
             .ilike('full_name', `%${query}%`)
             .limit(20);
         if (error) { console.error('유저 검색 실패:', error); return []; }
@@ -122,15 +122,18 @@ Boako.Search = {
             </div>
         `).join('');
 
-        const usersHtml = users.map(u => `
+        const usersHtml = users.map(u => {
+            const avatarUrl = u.custom_avatar_url || u.profile_url;
+            return `
             <div class="search-result-item" onclick="Boako.Util.navigateToLink('USER', '${u.id}')">
-                <div class="thumb">${u.profile_url ? `<img src="${Boako.Util.cdn(u.profile_url)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : '👤'}</div>
+                <div class="thumb">${avatarUrl ? `<img src="${Boako.Util.cdn(avatarUrl)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : '👤'}</div>
                 <div>
                     <div class="title">${Boako.Search.escapeHtml(u.full_name)}</div>
                     <div class="desc">유저</div>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         const postsHtml = posts.map(p => `
             <div class="search-result-item" onclick="Boako.Util.navigateToLink('BOARD_POST', '${p.id}')">
