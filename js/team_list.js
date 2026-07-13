@@ -88,12 +88,12 @@ Boako.TeamList = {
                 return;
             }
 
-            // 🌟 3. 화면에 표시될 팀장들의 아바타만 따로 가져오기
+            // 🌟 3. 화면에 표시될 팀장들의 아바타만 따로 가져오기 (커스텀 프사 우선)
             const ownerIds = [...new Set(paginatedTeams.map(t => t.owner_id).filter(id => id))]; 
             const avatarMap = {};
             if (ownerIds.length > 0) {
-                const { data: profiles } = await Boako.db.from('profiles').select('id, profile_url').in('id', ownerIds);
-                if (profiles) profiles.forEach(p => avatarMap[p.id] = p.profile_url?.replace('http://', 'https://'));
+                const { data: profiles } = await Boako.db.from('profiles').select('id, profile_url, custom_avatar_url').in('id', ownerIds);
+                if (profiles) profiles.forEach(p => avatarMap[p.id] = (p.custom_avatar_url || p.profile_url)?.replace('http://', 'https://'));
             }
 
             // 🌟 4. HTML 렌더링 (숫자 표기 제거 & HOT 배지 추가)
