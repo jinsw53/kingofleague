@@ -147,7 +147,7 @@ Boako.Together = {
             const userIds = [...new Set((participantsData || []).map(r => r.user_id))];
             let profilesMap = {};
             if (userIds.length > 0) {
-                const { data: profilesData } = await Boako.db.from('profiles').select('id, full_name, profile_url').in('id', userIds);
+                const { data: profilesData } = await Boako.db.from('profiles').select('id, full_name, profile_url, custom_avatar_url').in('id', userIds);
                 profilesMap = Object.fromEntries((profilesData || []).map(p => [p.id, p]));
             }
 
@@ -220,7 +220,7 @@ Boako.Together = {
         else statusBadge = `<span class="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 text-sky-600 bg-sky-50">🙋 모집중</span>`;
 
         const avatarsHtml = participants.slice(0, 6).map(u => `
-            <img src="${Boako.Util.cdn(u.profile_url || TOGETHER_DEFAULT_AVATAR)}" title="${u.full_name || '익명'}" class="w-6 h-6 rounded-full object-cover border-2 border-white -ml-2 first:ml-0 bg-slate-200">
+            <img src="${Boako.Util.cdn(u.custom_avatar_url || u.profile_url || TOGETHER_DEFAULT_AVATAR)}" title="${u.full_name || '익명'}" class="w-6 h-6 rounded-full object-cover border-2 border-white -ml-2 first:ml-0 bg-slate-200">
         `).join('');
 
         const namesText = participants.map(u => u.full_name || '익명').join(', ');
