@@ -1,8 +1,9 @@
 /**
- * [MESSENGER - V3.4] 아카이브 통신망
+ * [MESSENGER - V3.6] 아카이브 통신망
  * - 대항전 소통채널 우측 패널 통합 렌더링 (모달 완전 제거)
  * - grandprix_match_chats 테이블 & messages 테이블 이원화 처리 완료
  * - 🌟 [V3.5 업데이트] 일정 조율 투표(POLL) 데이터 통합 렌더링 시스템 탑재
+ * - 🌟 [V3.6 업데이트] 챌린지(4대4 로스터전) 전용 그룹채팅방 추가 — 챌린지 1건당 방 1개, 양 팀 로스터 전원 참여
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -135,6 +136,61 @@ Boako.Messenger = {
                 }
             }
         } catch (e) { console.error("소통채널 로드 실패:", e); }
+
+        // 1-2. [챌린지] 우리 팀이 도전(공격) 또는 응전(수비)으로 매칭된 챌린지 그룹채팅방 로드
+        // 🌟 챌린지 1건 = 방 1개, 양 팀 로스터 전원이 참여 (엔트리 대 엔트리 1:1이 아니라 팀 전체 그룹채팅)
+        try {
+            const myTeamId = Boako.state?.team?.info?.id;
+            if (myTeamId) {
+                const { data: myChallenges } = await Boako.db
+                    .from('challenges')
+                    .select('id, attacker_team_id, attacker_team_name, defender_team_id, defender_team_name, game_name, status')
+                    .or(`attacker_team_id.eq.${myTeamId},defender_team_id.eq.${myTeamId}`)
+                    .not('defender_team_id', 'is', null) // 상대가 매칭된 챌린지만 (공개 모집 중인 PENDING은 제외)
+                    .not('status', 'ilike', 'CANCELED%'); // 취소된 챌린지는 목록에서 제외
+
+                if (myChallenges && myChallenges.length > 0) {
+                    const challengeReadStorage = JSON.parse(localStorage.getItem('boako_challenge_read') || '{}');
+                    const challengeIds = myChallenges.map(c => c.id);
+
+                    myChallenges.forEach(c => {
+                        const uiRoomId = `challenge_${c.id}`;
+                        Boako.Messenger.chatRooms[uiRoomId] = {
+                            id: uiRoomId,
+                            isChallengeChat: true,
+                            challengeId: c.id,
+                            gameName: c.game_name,
+                            title: `${c.attacker_team_name} vs ${c.defender_team_name} 챌린지`,
+                            badge: `<span class="bg-rose-100 text-rose-600 text-[10px] px-2 py-0.5 rounded font-black ml-2">챌린지</span>`,
+                            lastMessage: '방이 개설되었습니다. 팀원들과 자유롭게 소통하세요.',
+                            lastTime: new Date(0).toISOString(),
+                            unread: 0,
+                            messages: []
+                        };
+                    });
+
+                    const { data: challengeMsgs } = await Boako.db.from('challenge_chats')
+                        .select('*, profiles(full_name)')
+                        .in('challenge_id', challengeIds)
+                        .order('created_at', { ascending: true });
+
+                    (challengeMsgs || []).forEach(m => {
+                        const uiRoomId = `challenge_${m.challenge_id}`;
+                        const room = Boako.Messenger.chatRooms[uiRoomId];
+                        if (!room) return;
+                        room.messages.push({ ...m, type: 'CHALLENGE_CHAT' });
+                        if (new Date(m.created_at) >= new Date(room.lastTime)) {
+                            room.lastTime = m.created_at;
+                            room.lastMessage = m.content;
+                        }
+                        const lastRead = challengeReadStorage[uiRoomId] || 0;
+                        if (m.sender_id !== myId && new Date(m.created_at).getTime() > lastRead) {
+                            room.unread++;
+                        }
+                    });
+                }
+            }
+        } catch (e) { console.error("챌린지 채팅방 로드 실패:", e); }
 
         // 3. [같이하자] 확정된 모임 채팅방 로드
         try {
@@ -301,11 +357,25 @@ Boako.Messenger = {
         } catch (err) { console.error(err); return false; }
     },
 
+    // 🌟 [신규] 챌린지 그룹채팅 전송
+    sendChallengeChat: async (challengeId, content) => {
+        try {
+            const payload = {
+                challenge_id: challengeId,
+                sender_id: Boako.state.user.id,
+                content: content
+            };
+            const { error } = await Boako.db.from('challenge_chats').insert([payload]);
+            if (error) throw error;
+            return true;
+        } catch (err) { console.error(err); return false; }
+    },
+
     hideRoom: async (roomId) => {
         const room = Boako.Messenger.chatRooms[roomId];
         if(!room || !confirm("이 대화방을 나가시겠습니까?\n(새로운 쪽지가 도착하면 다시 나타납니다.)")) return;
 
-        if (!room.isMatchChannel && !room.isTogether) {
+        if (!room.isMatchChannel && !room.isTogether && !room.isChallengeChat) {
             await Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`);
         }
         
@@ -385,7 +455,25 @@ Boako.Messenger = {
                 await Boako.Messenger.View.refreshRoomList();
             }).subscribe();
 
-        Boako.Messenger.realtimeChannels.push(msgChannel, matchChannel, pollChannel, togetherChannel, togetherPostsChannel);
+        // 🌟 [신규] 챌린지 그룹채팅 리얼타임 감지
+        const challengeChatChannel = Boako.db.channel('challenge-chats-changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chats' }, async (payload) => {
+                const newMsg = payload.new;
+                const uiRoomId = `challenge_${newMsg.challenge_id}`;
+                if (Boako.Messenger.chatRooms[uiRoomId]) {
+                    await Boako.Messenger.View.refreshRoomList();
+                    if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
+                    else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`🔥 [챌린지] 채팅방에 새 메시지가 도착했습니다!`);
+                }
+            }).subscribe();
+
+        // 🌟 [신규] 챌린지 매칭 상태 변화 감지 → 방 목록 자체가 새로 생기거나 사라짐
+        const challengesChannel = Boako.db.channel('challenges-status-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, async () => {
+                await Boako.Messenger.View.refreshRoomList();
+            }).subscribe();
+
+        Boako.Messenger.realtimeChannels.push(msgChannel, matchChannel, pollChannel, togetherChannel, togetherPostsChannel, challengeChatChannel, challengesChannel);
     },
 
     // 🌟 [신규] 라이벌/승자연전 1:1 일정 제안용 달력 모달 (다중 날짜 선택)
@@ -614,7 +702,7 @@ Boako.Messenger = {
             roomArray.forEach(room => {
                 const unreadBadge = room.unread > 0 ? `<div class="bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full">${room.unread}</div>` : '';
                 const activeClass = Boako.Messenger.currentRoomId === room.id ? 'bg-white shadow-sm border-indigo-200' : 'border-transparent hover:bg-white/60';
-                const icon = room.isMatchChannel ? '📣' : (room.isMatch ? '⚔️' : (room.isTogether ? '🎲' : room.title.charAt(0)));
+                const icon = room.isMatchChannel ? '📣' : (room.isChallengeChat ? '🔥' : (room.isMatch ? '⚔️' : (room.isTogether ? '🎲' : room.title.charAt(0))));
                 listHtml += `
                     <div onclick="Boako.Messenger.View.openRoom('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
                         <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center text-slate-500 font-black">${icon}</div>
@@ -647,6 +735,11 @@ Boako.Messenger = {
                 togetherRead[roomId] = Date.now();
                 localStorage.setItem('boako_together_read', JSON.stringify(togetherRead));
                 room.unread = 0;
+            } else if (room.isChallengeChat) {
+                let challengeRead = JSON.parse(localStorage.getItem('boako_challenge_read') || '{}');
+                challengeRead[roomId] = Date.now();
+                localStorage.setItem('boako_challenge_read', JSON.stringify(challengeRead));
+                room.unread = 0;
             } else {
                 Boako.db.from('messages').update({ is_read: true }).eq('receiver_id', Boako.state.user.id).or(`match_id.eq.${roomId},sender_id.eq.${roomId}`).then(async () => {
                     await Boako.Messenger.fetchUnreadCount();
@@ -668,6 +761,14 @@ Boako.Messenger = {
                         <div class="flex gap-2">
                             <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                             ${actionBtn}
+                        </div>
+                    </div>`;
+            } else if (room.isChallengeChat) {
+                bannerHtml = `
+                    <div class="bg-rose-900 border-b border-rose-800 p-3 px-5 flex items-center justify-between shadow-sm z-10">
+                        <div class="font-black text-white text-sm flex items-center gap-2"><span class="animate-pulse">🔥</span> ${room.title}</div>
+                        <div class="flex gap-2">
+                            <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                         </div>
                     </div>`;
             } else if (room.isTogether) {
@@ -700,7 +801,7 @@ Boako.Messenger = {
             room.messages.forEach(msg => {
                 const isMe = msg.sender_id === Boako.state.user.id;
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-                const senderName = (room.isMatchChannel || room.isTogether) ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override;
+                const senderName = (room.isMatchChannel || room.isTogether || room.isChallengeChat) ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override;
 
                 if (msg.type === 'POLL') {
                     const poll = msg;
@@ -798,7 +899,7 @@ Boako.Messenger = {
                     else if (status === 'ACCEPTED') btnHtml = `<div class="mt-3 text-xs text-blue-600 text-center bg-blue-50 py-1.5 rounded-lg">✅ 승인됨</div>`;
                     else btnHtml = `<div class="mt-3 text-xs text-red-500 text-center bg-red-50 py-1.5 rounded-lg">❌ 거절됨</div>`;
                     messagesHtml += `<div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${senderName}</div>` : ''}<div class="flex items-end gap-2">${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}<div class="bg-white border border-blue-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800"><div class="font-black text-blue-600 text-xs mb-2">${isJoin ? '🛡️ 입단 지원' : '💌 스카웃 제안'}</div><div class="text-sm font-bold bg-slate-50 p-2.5 rounded-lg text-center border">[${pData.team_name}] 합류</div>${btnHtml}</div>${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}</div></div>`;
-                } else if (msg.type === 'TOGETHER_CHAT') {
+                } else if (msg.type === 'TOGETHER_CHAT' || msg.type === 'CHALLENGE_CHAT') {
                     if (isMe) {
                         messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%]"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-sky-600 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${msg.content.replace(/\n/g, '<br>')}</div></div>`;
                     } else {
@@ -853,6 +954,8 @@ Boako.Messenger = {
                 success = await Boako.Messenger.sendMatchChannel(room.seasonNo, room.gameName, content);
             } else if (room.isTogether) {
                 success = await Boako.Messenger.sendTogetherChat(room.postId, content);
+            } else if (room.isChallengeChat) {
+                success = await Boako.Messenger.sendChallengeChat(room.challengeId, content);
             } else {
                 const matchId = room.isMatch ? room.id : null;
 const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.gameName } : {};
