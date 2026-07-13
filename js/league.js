@@ -1692,8 +1692,8 @@ Boako.League.getBingoHTML = function() {
             <div class="p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-violet-200/60 pb-4">
                     <div>
-                        <h3 class="font-black text-slate-800 text-base flex items-center gap-2">🎲 BTL 영토 빙고전</h3>
-                        <p class="text-xs text-slate-500 font-bold mt-1">팀원들의 누적 전적 통계가 난이도 충족 조건에 매칭되면 자동으로 영토 소유권이 마킹됩니다.</p>
+                        <h3 class="font-black text-slate-800 text-base flex items-center gap-2">🎲 팀 빙고 쟁탈전</h3>
+                        <p class="text-xs text-slate-500 font-bold mt-1">25개의 선정된 게임을 해당 칸의 조건(특정 팀원수)를 충족하면 해당 칸을 차지하는 콘텐츠입니다.</p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <div id="bingo-season-dropdown-container" class="relative w-[180px] z-30">
