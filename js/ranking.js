@@ -370,7 +370,7 @@ Boako.Ranking.loadHofTab = async function() {
             .eq('season_no', seasonNo)
             .order('game_popularity_rank', { ascending: true });
 
-        // 🌟 게임 로고 / 팀 로고 / MVP 프로필 사진 별도 조회 후 병합
+        // 🌟 게임 로고 / 팀 로고 / MVP 프로필 사진 별도 조회 후 병합 (MVP 프사는 커스텀 프사 우선)
         const gameNames = [...new Set((championGames || []).map(g => g.game_name).filter(Boolean))];
         const teamNames = [...new Set((championGames || []).map(g => g.team_name).filter(Boolean))];
         const mvpNicknames = [...new Set((championGames || []).map(g => g.mvp_nickname).filter(Boolean))];
@@ -378,12 +378,12 @@ Boako.Ranking.loadHofTab = async function() {
         const [{ data: gameImgs }, { data: teamLogos }, { data: mvpProfiles }] = await Promise.all([
             gameNames.length ? Boako.db.from('games').select('game_name, image_url').in('game_name', gameNames) : { data: [] },
             teamNames.length ? Boako.db.from('teams').select('team_name, logo_url').in('team_name', teamNames) : { data: [] },
-            mvpNicknames.length ? Boako.db.from('profiles').select('full_name, profile_url').in('full_name', mvpNicknames) : { data: [] }
+            mvpNicknames.length ? Boako.db.from('profiles').select('full_name, profile_url, custom_avatar_url').in('full_name', mvpNicknames) : { data: [] }
         ]);
 
         const gameImgMap = Object.fromEntries((gameImgs || []).map(g => [g.game_name, g.image_url]));
         const teamLogoMap = Object.fromEntries((teamLogos || []).map(t => [t.team_name, t.logo_url]));
-        const mvpProfileMap = Object.fromEntries((mvpProfiles || []).map(p => [p.full_name, p.profile_url]));
+        const mvpProfileMap = Object.fromEntries((mvpProfiles || []).map(p => [p.full_name, p.custom_avatar_url || p.profile_url]));
 
         const championGamesEnriched = (championGames || []).map(g => ({
             ...g,
