@@ -1,5 +1,5 @@
 /**
- * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이)
+ * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이 + 🌟커스텀 프로필 사진)
  */
 Boako.Auth = {
     init: async () => {
@@ -22,7 +22,7 @@ Boako.Auth = {
 
             await Boako.Auth.requireBgaNickname();
         }
-        Boako.Auth.renderWidget();
+        await Boako.Auth.renderWidget();
         Boako.View.render('main'); 
 
         // 🌟 토너먼트 개최 요청 미해결 건수 — 로그인 여부 무관하게 항상 표시
@@ -58,7 +58,7 @@ Boako.Auth = {
                 // 🌟 로그인 즉시 실시간 쪽지 감지 시작
                 if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
-                Boako.Auth.renderWidget();
+                await Boako.Auth.renderWidget();
                 await Boako.Auth.requireBgaNickname();
                 
             } else {
@@ -97,14 +97,29 @@ Boako.Auth = {
         window.location.href = `https://kauth.kakao.com/oauth/logout?client_id=${Boako.config.kakaoRestApiKey}&logout_redirect_uri=${logoutRedirectUri}`;
     },
 
-    // 🌟 [수정됨] 로그인 위젯 렌더링 + 팀 멤버 뱃지 + 인벤토리 배지 영역 추가
-    renderWidget: () => {
+    // 🌟 [수정됨] 로그인 위젯 렌더링 + 팀 멤버 뱃지 + 인벤토리 배지 영역 + 커스텀 프사 클릭 변경
+    renderWidget: async () => {
         const area = document.getElementById('login-widget-area');
         const user = Boako.state.user;
         if (!user) {
             area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
         } else {
-            const avatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://');
+            const kakaoAvatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://') || null;
+
+            // 🌟 커스텀 프사가 있으면 그걸 우선 표시 (카톡 프사는 profiles.profile_url에 로그인마다 자동 동기화되므로 여긴 안 건드림)
+            let customAvatarUrl = null;
+            try {
+                const { data: profileRow } = await Boako.db.from('profiles').select('custom_avatar_url').eq('id', user.id).single();
+                customAvatarUrl = profileRow?.custom_avatar_url || null;
+            } catch (err) {
+                console.error('커스텀 프사 조회 실패:', err);
+            }
+
+            // 팝업에서 재사용할 수 있게 상태에 캐시
+            Boako.state.kakaoAvatarUrl = kakaoAvatarUrl;
+            Boako.state.customAvatarUrl = customAvatarUrl;
+
+            const displayAvatarUrl = customAvatarUrl || kakaoAvatarUrl;
             
             const unreadBadge = (Boako.Messenger && Boako.Messenger.unreadCount > 0) 
                 ? `<span style="background:#ef4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; margin-left:4px; font-weight:bold;">${Boako.Messenger.unreadCount}</span>` 
@@ -124,8 +139,9 @@ Boako.Auth = {
             }
 
             area.innerHTML = `
-            <div class="user-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0">
-                ${avatarUrl ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
+            <div class="user-avatar" onclick="Boako.Auth.openAvatarModal()" title="클릭해서 프로필 사진 변경" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0; cursor:pointer; position:relative;">
+                ${displayAvatarUrl ? `<img src="${displayAvatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
+                <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.45); color:#fff; font-size:9px; font-weight:800; text-align:center; padding:2px 0; opacity:0; transition:opacity .15s;" class="avatar-hover-hint">사진 변경</div>
             </div>
             <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
                 <strong>${user.nickname || '사용자'}</strong>
@@ -152,9 +168,159 @@ Boako.Auth = {
                 </div>
 
             <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
+
+            // 아바타 hover 시 "사진 변경" 힌트 보이게
+            if (!document.getElementById('avatar-hover-hint-style')) {
+                const style = document.createElement('style');
+                style.id = 'avatar-hover-hint-style';
+                style.innerHTML = `.user-avatar:hover .avatar-hover-hint { opacity: 1 !important; }`;
+                document.head.appendChild(style);
+            }
             
             // 🌟 HTML 렌더링 직후 DB에서 장착 중인 배지를 비동기로 불러오기
             Boako.Auth.loadWidgetBadges();
+        }
+    },
+
+    // ========== 🌟 [신규] 커스텀 프로필 사진 변경 팝업 ==========
+
+    openAvatarModal: () => {
+        if (!Boako.state.user) return;
+        const kakaoAvatarUrl = Boako.state.kakaoAvatarUrl;
+        const customAvatarUrl = Boako.state.customAvatarUrl;
+        const currentAvatar = customAvatarUrl || kakaoAvatarUrl;
+
+        document.getElementById('avatar-modal-root')?.remove();
+
+        const modalHtml = `
+            <div id="avatar-modal-root">
+                <div id="avatar-modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onclick="if(event.target===this) Boako.Auth.closeAvatarModal()">
+                    <div class="bg-white rounded-2xl w-full max-w-xs shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
+                        <div class="p-5 flex items-center justify-between border-b border-slate-100">
+                            <h3 class="font-black text-slate-800 text-sm">프로필 사진</h3>
+                            <button onclick="Boako.Auth.closeAvatarModal()" class="text-slate-400 hover:text-slate-600 font-black text-lg leading-none">×</button>
+                        </div>
+                        <div class="p-6 flex flex-col items-center gap-4">
+                            <div class="w-24 h-24 rounded-full overflow-hidden border-2 border-slate-100 shadow-inner bg-slate-50 flex items-center justify-center">
+                                ${currentAvatar ? `<img id="avatar-modal-preview" src="${currentAvatar}" class="w-full h-full object-cover">` : `<span id="avatar-modal-preview" class="text-4xl">👤</span>`}
+                            </div>
+                            <div id="avatar-modal-status" class="text-[11px] font-bold text-slate-400 -mt-1">${customAvatarUrl ? '커스텀 사진 사용 중' : '카카오 프로필 사진 사용 중'}</div>
+
+                            <label class="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-xs py-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                                📷 새 사진 업로드
+                                <input type="file" accept="image/*" id="avatar-file-input" style="display:none;" onchange="Boako.Auth.handleAvatarFileSelect(this)">
+                            </label>
+
+                            ${customAvatarUrl ? `
+                                <button onclick="Boako.Auth.resetToKakaoAvatar()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-xs py-2.5 rounded-xl transition-colors">
+                                    카카오 프로필 사진으로 되돌리기
+                                </button>
+                            ` : ''}
+
+                            <div id="avatar-upload-indicator" class="hidden text-xs font-bold text-indigo-500">업로드 중...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    closeAvatarModal: () => {
+        document.getElementById('avatar-modal-root')?.remove();
+    },
+
+    handleAvatarFileSelect: async (inputEl) => {
+        const file = inputEl.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            Boako.Util.toast('❌ 이미지 파일만 업로드할 수 있어요.');
+            return;
+        }
+
+        const indicator = document.getElementById('avatar-upload-indicator');
+        if (indicator) indicator.classList.remove('hidden');
+
+        try {
+            // 🌟 아바타는 작게(정사각형 400px)로 압축해서 용량을 최소화
+            const compressedBlob = await Boako.Auth.compressAvatarImage(file);
+
+            const { data: sessionData } = await Boako.db.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (!token) throw new Error('로그인 세션이 만료되었습니다.');
+
+            const uploadRes = await fetch('https://qrredwrxdnvqwdxzanba.supabase.co/functions/v1/r2-upload-url?purpose=profile', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'image/webp' },
+                body: compressedBlob
+            });
+            const result = await uploadRes.json();
+            if (!uploadRes.ok) throw new Error(result.error || '업로드 실패');
+
+            const { error: updateErr } = await Boako.db.from('profiles')
+                .update({ custom_avatar_url: result.publicUrl })
+                .eq('id', Boako.state.user.id);
+            if (updateErr) throw updateErr;
+
+            Boako.state.customAvatarUrl = result.publicUrl;
+            Boako.Util.toast('✅ 프로필 사진이 변경되었습니다!');
+            Boako.Auth.closeAvatarModal();
+            await Boako.Auth.renderWidget();
+
+        } catch (err) {
+            console.error(err);
+            Boako.Util.toast('❌ ' + (err.message || '업로드에 실패했습니다.'));
+        } finally {
+            if (indicator) indicator.classList.add('hidden');
+        }
+    },
+
+    // 아바타 전용 압축: 정사각형으로 크롭 후 400x400으로 축소 (게시판 이미지보다 훨씬 가볍게)
+    compressAvatarImage: (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const size = 400;
+                    const minSide = Math.min(img.width, img.height);
+                    const sx = (img.width - minSide) / 2;
+                    const sy = (img.height - minSide) / 2;
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+
+                    canvas.toBlob((blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('이미지 압축 실패'));
+                    }, 'image/webp', 0.85);
+                };
+                img.onerror = () => reject(new Error('이미지 로드 실패'));
+                img.src = e.target.result;
+            };
+            reader.onerror = () => reject(new Error('파일 읽기 실패'));
+            reader.readAsDataURL(file);
+        });
+    },
+
+    resetToKakaoAvatar: async () => {
+        if (!confirm('카카오 프로필 사진으로 되돌리시겠습니까?')) return;
+        try {
+            const { error } = await Boako.db.from('profiles')
+                .update({ custom_avatar_url: null })
+                .eq('id', Boako.state.user.id);
+            if (error) throw error;
+
+            Boako.state.customAvatarUrl = null;
+            Boako.Util.toast('카카오 프로필 사진으로 되돌렸습니다.');
+            Boako.Auth.closeAvatarModal();
+            await Boako.Auth.renderWidget();
+        } catch (err) {
+            Boako.Util.toast('❌ ' + (err.message || '되돌리기에 실패했습니다.'));
         }
     },
 
