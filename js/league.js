@@ -318,13 +318,14 @@ Boako.League.viewMatchLineup = async function(challengeId) {
     let profiles = [];
     try {
         if (Boako.db) {
-            const { data } = await Boako.db.from('profiles').select('full_name, profile_url');
+            const { data } = await Boako.db.from('profiles').select('full_name, profile_url, custom_avatar_url');
             profiles = data || [];
         }
     } catch (e) { console.error("프로필 조회 실패", e); }
 
     const getSecureAvatar = (name) => {
-        const url = profiles.find(pr => pr.full_name === name)?.profile_url;
+        const pr = profiles.find(pr => pr.full_name === name);
+        const url = pr?.custom_avatar_url || pr?.profile_url;
         return url ? Boako.Util.cdn(url.replace(/^http:\/\//i, 'https://')) : null;
     };
 
@@ -1377,10 +1378,10 @@ Boako.League.showRosterModal = async function(challengeId) {
         if (allErr) throw allErr;
         const assignedPlayerNames = (allActiveMembers || []).map(row => row.player_name);
 
-        // 3. 프로필 전체 조회 부분
+        // 3. 프로필 전체 조회 부분 (커스텀 프사 컬럼 포함)
         const { data: allProfiles, error: pErr } = await Boako.db
             .from('profiles')
-            .select('id, full_name, profile_url'); 
+            .select('id, full_name, profile_url, custom_avatar_url'); 
             
         if (pErr) throw pErr;
 
@@ -1399,16 +1400,16 @@ Boako.League.showRosterModal = async function(challengeId) {
             if (p.attacker_4) opposingRosterNames.push(p.attacker_4);
         }
 
-        // 팀원 매핑 시 avatar 데이터 포함
+        // 팀원 매핑 시 avatar 데이터 포함 (커스텀 프사 우선)
         Boako.League.State.rosterTeamMembers = allProfiles
             .filter(p => myTeamPlayerNames.includes(p.full_name))
-            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url })); 
+            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.custom_avatar_url || p.profile_url })); 
 
-        // 용병 매핑 (🚨 상대팀 명단 필터링 추가)
+        // 용병 매핑 (🚨 상대팀 명단 필터링 추가, 커스텀 프사 우선)
         Boako.League.State.rosterMercenaries = allProfiles
             .filter(p => !assignedPlayerNames.includes(p.full_name))
             .filter(p => !opposingRosterNames.includes(p.full_name)) // 🌟 여기서 양다리 완벽 차단
-            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.profile_url }));
+            .map(p => ({ id: p.id, nickname: p.full_name, avatar: p.custom_avatar_url || p.profile_url }));
 
     } catch (err) {
         console.error("로스터 데이터 바인딩 실패:", err);
@@ -1522,7 +1523,7 @@ Boako.League.renderRosterList = function() {
             ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50" 
             : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-sm cursor-pointer";
 
-        // 🚨 HTTP -> HTTPS 변환 로직 추가
+        // 🚨 HTTP -> HTTPS 변환 로직 추가 (avatar 필드는 이미 커스텀 프사 우선순위가 적용된 값)
         const secureAvatar = m.avatar ? Boako.Util.cdn(m.avatar.replace(/^http:\/\//i, 'https://')) : null;
 
         const avatarHtml = secureAvatar 
@@ -1692,8 +1693,8 @@ Boako.League.getBingoHTML = function() {
             <div class="p-6 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-violet-200/60 pb-4">
                     <div>
-                        <h3 class="font-black text-slate-800 text-base flex items-center gap-2">🎲 팀 빙고 쟁탈전</h3>
-                        <p class="text-xs text-slate-500 font-bold mt-1">25개의 선정된 게임을 해당 칸의 조건(특정 팀원수)를 충족하면 해당 칸을 차지하는 콘텐츠입니다.</p>
+                        <h3 class="font-black text-slate-800 text-base flex items-center gap-2">🎲 BTL 영토 빙고전</h3>
+                        <p class="text-xs text-slate-500 font-bold mt-1">팀원들의 누적 전적 통계가 난이도 충족 조건에 매칭되면 자동으로 영토 소유권이 마킹됩니다.</p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <div id="bingo-season-dropdown-container" class="relative w-[180px] z-30">
