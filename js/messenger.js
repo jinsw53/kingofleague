@@ -666,6 +666,7 @@ Boako.Messenger = {
                     <div class="bg-indigo-900 border-b border-indigo-800 p-3 px-5 flex items-center justify-between shadow-sm z-10">
                         <div class="font-black text-white text-sm flex items-center gap-2"><span class="animate-pulse">📣</span> [대항전] ${room.gameName} 채널</div>
                         <div class="flex gap-2">
+                            <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                             ${actionBtn}
                         </div>
                     </div>`;
@@ -682,6 +683,7 @@ Boako.Messenger = {
                     <div class="bg-indigo-50 border-b border-indigo-100 p-3 px-5 flex items-center justify-between shadow-sm z-10">
                         <div class="font-black text-indigo-900 text-sm flex items-center gap-2"><span class="animate-pulse">🔴</span> 이 대화방은 ${room.title} 전용 공간입니다.</div>
                         <div class="flex gap-2">
+                            <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                             <button onclick="Boako.Messenger.hideRoom('${roomId}')" class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-100">나가기</button>
                             <button onclick="Boako.Messenger.View.promptScheduleProposal('${roomId}')" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">📅 일정 제안</button>
                         </div>
