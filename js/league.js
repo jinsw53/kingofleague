@@ -1,5 +1,6 @@
 /*** * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
  * 🛠️ 2026 최신화 패치: 용병 프사 보안 에러 픽스, 라인업 함수 누락 해결, 프로필&챌린지 실시간 다중 감지(Realtime) 적용, UI 용어 변경(도전/응전/Opponent)
+ * 🛠️ [킹 오브 리그 폴백] 진행 중인 시즌이 없을 때(스토브리그) 최근 종료 시즌의 최종 기록을 읽기전용으로 표시
  * 관리 책임자: 소장님 MASTER 
  */
 
@@ -2094,9 +2095,12 @@ Boako.League.filterChampions = function() {
 
 // ====================================================================
 // 🏅 8. 킹 오브 리그 (원형 아레나 + 실시간 공격 애니메이션)
+// 🌟 스토브리그(비시즌) 폴백: 현재 진행 중인 시즌이 없으면 가장 최근에 종료된 시즌의
+//    최종 상태(아레나 배치/하트/이벤트로그/정산내역)를 읽기전용으로 대신 보여준다.
 // ====================================================================
 Boako.League.KOL = Boako.League.KOL || {
     season_no: null,
+    isHistorical: false,
     teams: [],
     events: [],
     settlements: [],
@@ -2131,6 +2135,15 @@ Boako.League.injectKolStyle = function() {
         inset 0 0 40px 15px rgba(255,255,255,0.55),
         inset 0 0 80px 40px rgba(255,255,255,0.35);
     pointer-events: none;
+}
+.kol-arena-wrapper.kol-historical { filter: grayscale(0.35); }
+.kol-arena-wrapper.kol-historical::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(30,27,75,0.08);
+    pointer-events: none;
+    z-index: 1;
 }
         .kol-arena-stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; }
 .kol-arena-center { position: absolute; left:50%; top:50%; width: 34%; height: 34%; transform: translate(-50%,-50%); border-radius: 9999px; background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%); display:flex; align-items:center; justify-content:center; transition: box-shadow .3s ease; z-index:6; }
@@ -2176,8 +2189,27 @@ Boako.League.loadKingOfLeagueData = async function() {
             .gte('end_date', now)
             .single();
 
-        const seasonNo = currentSeason ? currentSeason.season_no : null;
+        let seasonRow = currentSeason || null;
+        let isHistorical = false;
+
+        // 🌟 [스토브리그 폴백] 진행 중인 시즌이 없으면, 가장 최근에 종료된 시즌 기록을 대신 보여준다
+        if (!seasonRow) {
+            const { data: lastSeason } = await Boako.db
+                .from('seasons')
+                .select('season_no, title, season_logo_url')
+                .lt('end_date', now)
+                .order('end_date', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (lastSeason) {
+                seasonRow = lastSeason;
+                isHistorical = true;
+            }
+        }
+
+        const seasonNo = seasonRow ? seasonRow.season_no : null;
         Boako.League.KOL.season_no = seasonNo;
+        Boako.League.KOL.isHistorical = isHistorical;
 
         if (!seasonNo) {
             container.innerHTML = Boako.League.getKingOfLeagueHTML();
@@ -2258,13 +2290,16 @@ Boako.League.loadKingOfLeagueData = async function() {
         Boako.League.KOL.events = eventsData || [];
         Boako.League.KOL.settlements = settlementsData || [];
         Boako.League.KOL.teamsMap = allTeamsMap;
-        Boako.League.KOL.seasonTitle = `시즌 ${currentSeason.season_no}`;
-        Boako.League.KOL.seasonLogoUrl = currentSeason.season_logo_url;
+        Boako.League.KOL.seasonTitle = `시즌 ${seasonRow.season_no}`;
+        Boako.League.KOL.seasonLogoUrl = seasonRow.season_logo_url;
 
         container.innerHTML = Boako.League.getKingOfLeagueHTML();
         if (window.lucide) window.lucide.createIcons();
 
-        Boako.League.KOL.subscribeRealtime();
+        // 🌟 지난 시즌 기록(읽기전용)일 땐 실시간 구독을 걸지 않는다
+        if (!isHistorical) {
+            Boako.League.KOL.subscribeRealtime();
+        }
 
     } catch (err) {
         console.error("킹 오브 리그 데이터 로드 실패:", err);
@@ -2290,7 +2325,8 @@ Boako.League.getKingOfLeagueHTML = function() {
         return `
             <div class="flex flex-col items-center justify-center py-20 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
                 <span class="text-3xl mb-2">🏅</span>
-                <h3 class="font-black text-slate-600 text-sm">현재 진행 중인 시즌이 없습니다.</h3>
+                <h3 class="font-black text-slate-600 text-sm">아직 킹 오브 리그 기록이 없습니다.</h3>
+                <p class="text-xs text-slate-400 font-bold mt-1">첫 시즌이 시작되면 이곳에 아레나가 표시됩니다.</p>
             </div>
         `;
     }
@@ -2324,9 +2360,9 @@ Boako.League.getKingOfLeagueHTML = function() {
         : `<div class="kol-arena-center-label">ARENA</div>`;
 
     const arenaHtml = total === 0
-        ? `<div class="text-center py-10 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">아직 이번 시즌 킹 오브 리그에 참여한 팀이 없습니다.</div>`
+        ? `<div class="text-center py-10 text-slate-400 font-bold text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">${state.isHistorical ? '해당 시즌엔 킹 오브 리그에 참여한 팀이 없었습니다.' : '아직 이번 시즌 킹 오브 리그에 참여한 팀이 없습니다.'}</div>`
         : `
-            <div class="kol-arena-wrapper">
+            <div class="kol-arena-wrapper${state.isHistorical ? ' kol-historical' : ''}">
             <div class="kol-arena-stage">
                 <div id="kol-arena-center" class="kol-arena-center">
                     <div class="kol-arena-center-ring"></div>
@@ -2376,12 +2412,22 @@ Boako.League.getKingOfLeagueHTML = function() {
         `;
     }).join('');
 
+    // 🌟 진행중/지난 시즌 여부에 따른 상단 상태 배지
+    const statusBadgeHtml = state.isHistorical
+        ? `<span class="bg-slate-200 text-slate-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider ml-2">📁 시즌 종료 · 최종 기록</span>`
+        : `<span class="bg-rose-100 text-rose-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider ml-2 animate-pulse">🔴 실시간 진행 중</span>`;
+
+    const descText = state.isHistorical
+        ? '이 시즌은 종료되어 최종 상태만 열람할 수 있습니다. (읽기 전용)'
+        : '팀 전원이 같은 종목을 기록하면 다른 팀을 공격합니다. 하트는 최대 7개, 30일마다 🏆 LP가 정산됩니다.';
+
     return `
         <div class="space-y-8">
             <div class="text-center py-2 border-b border-slate-100">
                 <span class="bg-violet-100 text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">${state.seasonTitle || ''}</span>
+                ${statusBadgeHtml}
                 <h4 class="font-black text-slate-800 text-lg mt-2">🏅 킹 오브 리그 아레나</h4>
-                <p class="text-xs text-slate-400 font-bold mt-1">팀 전원이 같은 종목을 기록하면 다른 팀을 공격합니다. 하트는 최대 7개, 30일마다 🏆 LP가 정산됩니다.</p>
+                <p class="text-xs text-slate-400 font-bold mt-1">${descText}</p>
             </div>
 
             <div class="space-y-3">
@@ -2389,7 +2435,7 @@ Boako.League.getKingOfLeagueHTML = function() {
             </div>
 
             <div class="space-y-3">
-                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="scroll-text" class="w-4 h-4 text-orange-500"></i> 최근 공격/회복 로그</h5>
+                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="scroll-text" class="w-4 h-4 text-orange-500"></i> ${state.isHistorical ? '해당 시즌 공격/회복 로그' : '최근 공격/회복 로그'}</h5>
                 <div id="kol-event-log-list" class="space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-1">
                     ${eventLogHtml}
                 </div>
@@ -2442,8 +2488,11 @@ Boako.League.KOL.renderEventLogHtml = function() {
             badgeClass = 'bg-orange-50 border-orange-100';
         }
 
+        const canReplay = !Boako.League.KOL.isHistorical;
+        const clickAttr = canReplay ? `onclick="Boako.League.KOL.replayEvent(${e.id})" title="클릭하면 아레나에서 이 장면을 다시 재생합니다"` : '';
+
         return `
-            <div class="flex items-center gap-3 p-3 rounded-xl border ${badgeClass} cursor-pointer hover:brightness-95 active:scale-[0.98] transition-all" onclick="Boako.League.KOL.replayEvent(${e.id})" title="클릭하면 아레나에서 이 장면을 다시 재생합니다">
+            <div class="flex items-center gap-3 p-3 rounded-xl border ${badgeClass} ${canReplay ? 'cursor-pointer hover:brightness-95 active:scale-[0.98] transition-all' : ''}" ${clickAttr}>
                 <div class="text-lg shrink-0">${iconHtml}</div>
                 <div class="flex-1 text-[11px] leading-snug">${textHtml}</div>
                 <div class="text-[9px] font-bold text-slate-400 shrink-0">${formatEventTime(e.created_at)}</div>
@@ -2593,6 +2642,7 @@ Boako.League.KOL.enqueueAttackSequence = function(events, isReplay) {
 };
 
 Boako.League.KOL.replayEvent = function(eventId) {
+    if (Boako.League.KOL.isHistorical) return; // 🌟 지난 시즌 기록은 재생 비활성화
     const ev = Boako.League.KOL.events.find(e => e.id === eventId);
     if (!ev) return;
     if (ev.event_type === 'RECOVERY') {
