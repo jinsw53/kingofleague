@@ -554,7 +554,7 @@ Boako.Match = {
             `<option value="${s}" ${s === Boako.Match.currentSeasonNo ? 'selected' : ''}>🏆 시즌 ${s}</option>`
         ).join('');
 
-        // HTML 조립 (고급형 커스텀 드롭다운 + 분리된 통계 뱃지)
+        // HTML 조립 (고급형 커스텀 드롭다운 + 분리된 통계 배지)
         let html = `
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 px-4 gap-4">
                 
