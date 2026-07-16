@@ -750,7 +750,7 @@ Boako.Messenger = {
 
             let bannerHtml = '';
             if (room.isMatchChannel) {
-                // 🌟 [핵심 변경] 확정된 방이면 파란 투표 버튼을 없애고 초록색 '완료' 뱃지로 렌더링
+                // 🌟 [핵심 변경] 확정된 방이면 파란 투표 버튼을 없애고 초록색 '완료' 배지로 렌더링
                 const actionBtn = room.isConfirmed 
                     ? `<div class="text-xs bg-emerald-800/80 text-emerald-100 px-3 py-1.5 rounded-lg font-black border border-emerald-700 shadow-inner cursor-not-allowed">✅ 일정 확정 완료</div>`
                     : `<button onclick="Boako.Messenger.openMatchPoll('${roomId}')" class="text-xs bg-white text-indigo-900 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 shadow-sm transition-colors">📅 일정 투표/조율</button>`;
