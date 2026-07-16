@@ -97,7 +97,7 @@ Boako.Auth = {
         window.location.href = `https://kauth.kakao.com/oauth/logout?client_id=${Boako.config.kakaoRestApiKey}&logout_redirect_uri=${logoutRedirectUri}`;
     },
 
-    // 🌟 [수정됨] 로그인 위젯 렌더링 + 팀 멤버 뱃지 + 인벤토리 배지 영역 + 커스텀 프사 클릭 변경
+    // 🌟 [수정됨] 로그인 위젯 렌더링 + 팀 멤버 배지 + 인벤토리 배지 영역 + 커스텀 프사 클릭 변경
     renderWidget: async () => {
         const area = document.getElementById('login-widget-area');
         const user = Boako.state.user;
@@ -125,7 +125,7 @@ Boako.Auth = {
                 ? `<span style="background:#ef4444; color:white; border-radius:50%; padding:2px 6px; font-size:11px; margin-left:4px; font-weight:bold;">${Boako.Messenger.unreadCount}</span>` 
                 : '';
 
-            // 소속 여부에 따른 팀 뱃지 동적 생성
+            // 소속 여부에 따른 팀 배지 동적 생성
             let membershipBadgeHtml = `<span class="badge-premium" style="display:inline-flex; align-items:center; justify-content:center; gap:4px; margin-top:12px; padding:4px 8px; background:#f1f5f9; border-radius:6px; font-size:11px; font-weight:700; color:#64748b;">🛡️ 아카이브 멤버</span>`;
             
             if (Boako.state.team && Boako.state.team.info) {
@@ -408,7 +408,7 @@ Boako.Auth = {
                         const teamId = Number(item.item_id.split('_').pop());
                         const team = teamsMap[teamId];
                         const season = seasonsMap[item.season_no];
-                        const name = team ? `${team.team_name} 서포터즈` : '서포터즈 뱃지';
+                        const name = team ? `${team.team_name} 서포터즈` : '서포터즈 배지';
                         return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}">${buildUniformHtml(team?.logo_url, season?.uniform_image_url, '26px')}</div>`;
                     }
 
@@ -458,7 +458,7 @@ Boako.Auth = {
             } else {
                 badge.style.display = 'none';
             }
-        } catch (err) { console.error("토너먼트 뱃지 갱신 실패:", err); }
+        } catch (err) { console.error("토너먼트 배지 갱신 실패:", err); }
     },
 
     subscribeTournamentBadge: function() {
@@ -470,7 +470,7 @@ Boako.Auth = {
             .subscribe();
     },
 
-    // 🌟 [추가] 요청 게시판 중 아직 답변(댓글) 안 달린 글 개수 뱃지
+    // 🌟 [추가] 요청 게시판 중 아직 답변(댓글) 안 달린 글 개수 배지
     checkBoardRequestBadge: async function() {
         try {
             const { data: posts } = await Boako.db.from('board_posts')
@@ -502,7 +502,7 @@ Boako.Auth = {
             } else {
                 badge.style.display = 'none';
             }
-        } catch (err) { console.error("게시판 요청 뱃지 갱신 실패:", err); }
+        } catch (err) { console.error("게시판 요청 배지 갱신 실패:", err); }
     },
 
     subscribeBoardRequestBadge: function() {
@@ -517,7 +517,7 @@ Boako.Auth = {
             .subscribe();
     },
 
-    // 🌟 [추가] 같이하자 모집중인 글 개수 뱃지
+    // 🌟 [추가] 같이하자 모집중인 글 개수 배지
     checkTogetherBadge: async function() {
         try {
             const { count } = await Boako.db.from('together_posts')
@@ -532,7 +532,7 @@ Boako.Auth = {
             } else {
                 badge.style.display = 'none';
             }
-        } catch (err) { console.error("같이하자 뱃지 갱신 실패:", err); }
+        } catch (err) { console.error("같이하자 배지 갱신 실패:", err); }
     },
 
     subscribeTogetherBadge: function() {
