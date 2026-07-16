@@ -17,7 +17,7 @@ Boako.Shop = {
 if (itemErr || !targetItem) return Boako.Util.toast("판매하지 않는 아이템입니다.");
             if (!targetItem.is_active) return Boako.Util.toast("현재 판매가 중단된 아이템입니다.");
 
-            // 서포터즈 뱃지는 완전히 다른 흐름(팀 선택 모달)으로 분기
+            // 서포터즈 배지는 완전히 다른 흐름(팀 선택 모달)으로 분기
             if (targetItem.item_type === 'SUPPORTER') {
                 return Boako.Shop.openSupporterModal(targetItem);
             }
@@ -122,7 +122,7 @@ if (window.sfx) window.sfx.buy();
         }
     },
 
-    // 서포터즈 팀 선택/금액 입력 모달 (검색형 카드 그리드 + 실시간 뱃지 미리보기)
+    // 서포터즈 팀 선택/금액 입력 모달 (검색형 카드 그리드 + 실시간 배지 미리보기)
     openSupporterModal: async (targetItem) => {
         const user = Boako.state.user;
 
@@ -189,7 +189,7 @@ if (window.sfx) window.sfx.buy();
                             <p class="text-[10px] text-slate-400 font-bold mt-1.5">내 보유 포인트: ${myPoints.toLocaleString()} P</p>
                         </div>
                         <div id="supporter-preview" class="bg-violet-50 border border-violet-100 rounded-xl p-3 text-xs font-bold text-violet-700">
-                            1000P 후원 시 <span class="text-violet-900">30일</span>간 유효한 뱃지를 받습니다.
+                            1000P 후원 시 <span class="text-violet-900">30일</span>간 유효한 배지를 받습니다.
                         </div>
                         <button onclick="Boako.Shop.confirmSupporterPurchase()" class="w-full bg-slate-900 hover:bg-black text-white font-black text-sm py-3.5 rounded-xl shadow-lg transition-all">
                             📣 서포터즈 되기
@@ -275,7 +275,7 @@ if (window.sfx) window.sfx.buy();
         const rankEl = document.getElementById('supporter-preview-rank');
 
         if (badgeEl && team) badgeEl.innerHTML = Boako.Shop.getUniformPreviewHTML(team.logo_url, state.uniformImage, '80px');
-        if (nameEl && team) nameEl.innerHTML = `<span class="text-violet-700">${team.team_name}</span> 서포터즈 뱃지`;
+        if (nameEl && team) nameEl.innerHTML = `<span class="text-violet-700">${team.team_name}</span> 서포터즈 배지`;
         if (rankEl) rankEl.innerText = rank ? `현재 시즌 실시간 순위 🏅 ${rank}위` : '이번 시즌 아직 순위 집계 전';
 
         if (window.sfx) window.sfx.click();
@@ -386,7 +386,7 @@ if (window.sfx) window.sfx.buy();
             return;
         }
         const days = (amount / 1000) * 30;
-        preview.innerHTML = `${amount.toLocaleString()}P 후원 시 <span class="text-violet-900">${days}일</span>간 유효한 뱃지를 받습니다.`;
+        preview.innerHTML = `${amount.toLocaleString()}P 후원 시 <span class="text-violet-900">${days}일</span>간 유효한 배지를 받습니다.`;
     },
 
     confirmSupporterPurchase: async () => {
