@@ -30,7 +30,7 @@ Boako.Inventory = {
     },
 
     /**
-     * [함수] 서포터즈 유니폼 뱃지 HTML 생성기
+     * [함수] 서포터즈 유니폼 배지 HTML 생성기
      * 시즌 유니폼 이미지(있으면) 또는 코드로 그린 기본 실루엣 위에 팀 로고를 겹쳐 보여줍니다.
      */
     getUniformBadgeHTML: function(item, size) {
@@ -133,7 +133,7 @@ Boako.Inventory = {
             }
             (myItems || []).forEach(row => { row.shop_items = shopItemsMap[row.item_id] || null; });
 
-            // --- 2-1단계: 서포터즈 뱃지 팀/시즌 정보 미리 조회 ---
+            // --- 2-1단계: 서포터즈 배지 팀/시즌 정보 미리 조회 ---
             const supporterRows = (myItems || []).filter(row => row.item_id && row.item_id.startsWith('item_supporter_badge_'));
             const supporterTeamIds = [...new Set(supporterRows.map(row => Number(row.item_id.split('_').pop())))];
             const supporterSeasonNos = [...new Set(supporterRows.map(row => row.season_no).filter(Boolean))];
@@ -167,7 +167,7 @@ Boako.Inventory = {
 
                     itemData = {
                         inv_id: String(row.id),
-                        name: team ? `${team.team_name} 서포터즈` : '서포터즈 뱃지',
+                        name: team ? `${team.team_name} 서포터즈` : '서포터즈 배지',
                         type: 'SUPPORTER',
                         quantity: row.quantity,
                         isSupporter: true,
