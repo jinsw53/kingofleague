@@ -5,9 +5,9 @@
  * 디자인: Tailwind CSS 기반 프리미엄 디자인 및 프로필 보안 부적 완벽 장착
  * 🌟 시즌 필터: 전체(올타임 통합, is_alltime=true) / 비시즌(season_no NULL) / 시즌 N
  * 🌟 기본 진입 시: 검증완료 기록 중 최근 시즌을 자동 감지해서 기본 필터로 설정, 없으면 '전체' 유지
- * 🌟 기록실 탭 전용: "무소속 포함" 체크박스 — 기본 OFF(팀 리그만), ON이면 무소속(Free Agent) 기록도 같이 표시.
+ * 🌟 기록실 탭 전용: "무소속 포함" 토글 스위치(검색창 옆 배치) — 기본 OFF(팀 리그만), ON이면 무소속(Free Agent) 기록도 같이 표시.
  *    무소속 기록은 RP를 취소선 + "미집계" 라벨로 표시(계산 자체는 정상이지만 팀 리그 집계에는 반영 안 됨을 명시).
- *    랭킹보드/게임별통계는 항상 팀 리그 기준만 유지(체크박스 영향 없음).
+ *    랭킹보드/게임별통계는 항상 팀 리그 기준만 유지(토글 영향 없음).
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -24,7 +24,7 @@ Boako.Archive = {
     availableSeasons: [],
     availableRounds: [],
     _defaultSeasonApplied: false, // 🌟 최근 시즌 자동 감지는 최초 1회만
-    includeFreeAgents: false, // 🌟 [신규] 기록실 탭 전용 "무소속 포함" 체크박스 상태
+    includeFreeAgents: false, // 🌟 기록실 탭 전용 "무소속 포함" 토글 상태
 
     // 🌟 지난 시즌 MVP 강조용
     prevMvpNickname: null,
@@ -95,19 +95,25 @@ Boako.Archive = {
                         <p id="archive-page-subdesc" class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 relative z-30">
-                        <label id="free-agent-filter-wrapper" style="display:none;" class="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl shadow-sm border border-slate-200 text-xs font-black text-slate-600 cursor-pointer select-none hover:border-indigo-400 transition-colors">
-                            <input type="checkbox" id="free-agent-checkbox" onchange="Boako.Archive.toggleIncludeFreeAgents(this.checked)" class="w-3.5 h-3.5 accent-indigo-600">
-                            무소속 포함
-                        </label>
                         <div id="season-filter-container" class="relative w-[130px]"></div>
                         <div id="round-filter-wrapper" class="relative w-[130px]"></div>
                     </div>
                 </div>
 
-                <div class="relative mb-8">
-                    <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5"></i>
-                    <input type="text" id="archive-search" oninput="Boako.Archive.filterData()" placeholder="닉네임이나 게임 종목 검색..."
-                        class="w-full pl-12 pr-6 py-4 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500 bg-white text-lg font-medium outline-none transition-all">
+                <div class="relative mb-8 flex items-center gap-3">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5"></i>
+                        <input type="text" id="archive-search" oninput="Boako.Archive.filterData()" placeholder="닉네임이나 게임 종목 검색..."
+                            class="w-full pl-12 pr-6 py-4 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500 bg-white text-lg font-medium outline-none transition-all">
+                    </div>
+                    <label id="free-agent-filter-wrapper" style="display:flex;" class="items-center gap-2.5 bg-white px-4 py-4 rounded-2xl shadow-sm border border-slate-200 cursor-pointer select-none shrink-0 hover:border-indigo-300 transition-colors">
+                        <span class="text-xs font-black text-slate-600 whitespace-nowrap">무소속 포함</span>
+                        <span class="relative inline-flex items-center">
+                            <input type="checkbox" id="free-agent-checkbox" onchange="Boako.Archive.toggleIncludeFreeAgents(this.checked)" class="sr-only peer">
+                            <span class="w-9 h-5 bg-slate-200 peer-checked:bg-indigo-600 rounded-full transition-colors duration-200 inline-block"></span>
+                            <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 peer-checked:translate-x-4"></span>
+                        </span>
+                    </label>
                 </div>
 
                 <div id="archive-content-area">
@@ -214,7 +220,7 @@ Boako.Archive = {
         this.filterData(); // 선택 즉시 데이터 갱신
     },
 
-    // 🌟 [신규] "무소속 포함" 체크박스 토글 (기록실 탭 전용)
+    // 🌟 "무소속 포함" 토글 (기록실 탭 전용)
     toggleIncludeFreeAgents: function(checked) {
         this.includeFreeAgents = !!checked;
         this.currentPage = 1;
@@ -340,8 +346,8 @@ Boako.Archive = {
             query = query.or(`nickname.ilike.%${searchVal}%,game_name.ilike.%${searchVal}%`);
         }
 
-        // 🌟 랭킹보드는 항상 팀 리그 기준만 (무소속 절대 포함 안 함, 체크박스 영향 없음)
-        // 🌟 기록실은 "무소속 포함" 체크박스가 켜져 있지 않으면 팀 소속 기록만
+        // 🌟 랭킹보드는 항상 팀 리그 기준만 (무소속 절대 포함 안 함, 토글 영향 없음)
+        // 🌟 기록실은 "무소속 포함" 토글이 켜져 있지 않으면 팀 소속 기록만
         if (this.currentTab === 'rankings') {
             query = query.eq('is_verified', 0).not('b_all_team', 'is', null);
         } else if (this.currentTab === 'records' && !this.includeFreeAgents) {
