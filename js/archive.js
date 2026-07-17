@@ -5,6 +5,9 @@
  * 디자인: Tailwind CSS 기반 프리미엄 디자인 및 프로필 보안 부적 완벽 장착
  * 🌟 시즌 필터: 전체(올타임 통합, is_alltime=true) / 비시즌(season_no NULL) / 시즌 N
  * 🌟 기본 진입 시: 검증완료 기록 중 최근 시즌을 자동 감지해서 기본 필터로 설정, 없으면 '전체' 유지
+ * 🌟 기록실 탭 전용: "무소속 포함" 체크박스 — 기본 OFF(팀 리그만), ON이면 무소속(Free Agent) 기록도 같이 표시.
+ *    무소속 기록은 RP를 취소선 + "미집계" 라벨로 표시(계산 자체는 정상이지만 팀 리그 집계에는 반영 안 됨을 명시).
+ *    랭킹보드/게임별통계는 항상 팀 리그 기준만 유지(체크박스 영향 없음).
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -21,6 +24,7 @@ Boako.Archive = {
     availableSeasons: [],
     availableRounds: [],
     _defaultSeasonApplied: false, // 🌟 최근 시즌 자동 감지는 최초 1회만
+    includeFreeAgents: false, // 🌟 [신규] 기록실 탭 전용 "무소속 포함" 체크박스 상태
 
     // 🌟 지난 시즌 MVP 강조용
     prevMvpNickname: null,
@@ -90,7 +94,11 @@ Boako.Archive = {
                         <p id="archive-page-desc" class="text-slate-400 mt-2 font-medium text-sm">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
                         <p id="archive-page-subdesc" class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )</p>
                     </div>
-                    <div class="flex gap-2 relative z-30">
+                    <div class="flex flex-wrap items-center gap-2 relative z-30">
+                        <label id="free-agent-filter-wrapper" style="display:none;" class="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl shadow-sm border border-slate-200 text-xs font-black text-slate-600 cursor-pointer select-none hover:border-indigo-400 transition-colors">
+                            <input type="checkbox" id="free-agent-checkbox" onchange="Boako.Archive.toggleIncludeFreeAgents(this.checked)" class="w-3.5 h-3.5 accent-indigo-600">
+                            무소속 포함
+                        </label>
                         <div id="season-filter-container" class="relative w-[130px]"></div>
                         <div id="round-filter-wrapper" class="relative w-[130px]"></div>
                     </div>
@@ -206,6 +214,13 @@ Boako.Archive = {
         this.filterData(); // 선택 즉시 데이터 갱신
     },
 
+    // 🌟 [신규] "무소속 포함" 체크박스 토글 (기록실 탭 전용)
+    toggleIncludeFreeAgents: function(checked) {
+        this.includeFreeAgents = !!checked;
+        this.currentPage = 1;
+        this.fetchAndRender();
+    },
+
     updateSeasonOptions: function(records) {
         const seasons = [...new Set(records.map(rec => rec.season_no).filter(Boolean))];
         seasons.sort((a, b) => a - b);
@@ -282,7 +297,7 @@ Boako.Archive = {
         const from = (this.currentPage - 1) * limit;
         const to = from + limit - 1;
 
-        // 💡 [분기 1] 게임별 통계 탭 — v_game_popularity_all_players는 시즌별(is_alltime=false) + 전체올타임(is_alltime=true) 행을 함께 제공
+        // 💡 [분기 1] 게임별 통계 탭 — v_game_popularity_all_players는 이미 b_all_team IS NOT NULL로 고정되어 있어 항상 팀 리그 기준만 나옴
         if (this.currentTab === 'games') {
             let query = Boako.db.from('v_game_popularity_all_players').select('*', { count: 'exact' });
 
@@ -325,9 +340,12 @@ Boako.Archive = {
             query = query.or(`nickname.ilike.%${searchVal}%,game_name.ilike.%${searchVal}%`);
         }
 
-        // 🌟 랭킹보드는 검증 완료(is_verified=0)된 기록만 RP 집계에 반영 (기록실은 검증대기 상태도 일부러 같이 보여주므로 필터하지 않음)
+        // 🌟 랭킹보드는 항상 팀 리그 기준만 (무소속 절대 포함 안 함, 체크박스 영향 없음)
+        // 🌟 기록실은 "무소속 포함" 체크박스가 켜져 있지 않으면 팀 소속 기록만
         if (this.currentTab === 'rankings') {
-            query = query.eq('is_verified', 0);
+            query = query.eq('is_verified', 0).not('b_all_team', 'is', null);
+        } else if (this.currentTab === 'records' && !this.includeFreeAgents) {
+            query = query.not('b_all_team', 'is', null);
         }
 
         if (this.currentTab === 'records') {
@@ -379,22 +397,26 @@ Boako.Archive = {
         const descEl = document.getElementById('archive-page-desc');
         const subDescEl = document.getElementById('archive-page-subdesc');
         const roundFilter = document.getElementById('round-filter-wrapper');
+        const freeAgentFilter = document.getElementById('free-agent-filter-wrapper');
 
         if (tabName === 'records') {
             titleEl.innerText = '시즌 경기 기록실';
             descEl.innerText = '시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.';
             if (subDescEl) subDescEl.style.display = 'block';
             if (roundFilter) roundFilter.style.display = 'block';
+            if (freeAgentFilter) freeAgentFilter.style.display = 'flex';
         } else if (tabName === 'rankings') {
             titleEl.innerText = '리그 개인 순위표';
             descEl.innerText = '누적 RP 기준 전체 유저들의 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'block';
+            if (freeAgentFilter) freeAgentFilter.style.display = 'none';
         } else if (tabName === 'games') {
             titleEl.innerText = '시즌 대세 게임 & 게임별 순위';
             descEl.innerText = '가장 핫한 보드게임 종목 순위와 게임별 모든 유저의 기록 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'none';
+            if (freeAgentFilter) freeAgentFilter.style.display = 'none';
         }
         
         this.fetchAndRender();
@@ -466,6 +488,15 @@ Boako.Archive = {
                 `;
             }
 
+            // 🌟 무소속(Free Agent) 기록: RP는 취소선 + "미집계" 라벨 (계산은 정상이지만 팀 리그 집계엔 반영 안 됨을 명시)
+            const isFreeAgent = !rec.b_all_team;
+            const rpCellHTML = isFreeAgent
+                ? `<div class="flex flex-col items-end leading-tight">
+                       <span class="text-slate-300 text-lg font-black tracking-tighter line-through">${Math.floor(rec.rp || 0)}</span>
+                       <span class="text-[8px] font-black text-slate-400 uppercase tracking-wider">미집계</span>
+                   </div>`
+                : `<span class="font-black text-indigo-600 text-lg tracking-tighter">${Math.floor(rec.rp || 0)}</span>`;
+
             return `
                 <tr class="hover:bg-indigo-50/20 transition-all group text-sm">
                     <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
@@ -487,8 +518,8 @@ Boako.Archive = {
                             <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
                                 S${rec.season_no || 0} R${rec.round_no || 0} · ${
                                     (function(type) {
-                                        if (!type) return '일반';
-                                        const typeMap = { 'TOURNAMENT': '토너먼트', 'INDIVIDUAL': '개인전', 'TEAM': '팀전' };
+                                        if (!type) return '무소속';
+                                        const typeMap = { 'TOURNAMENT': '토너먼트', 'INDIVIDUAL': '개인전', 'TEAM': '팀전', 'FRIENDLY': '팀 내 친선전' };
                                         return typeMap[type.toUpperCase()] || type;
                                     })(rec.match_type)
                                 }
@@ -504,7 +535,7 @@ Boako.Archive = {
                             <div class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[11px] font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
                         </div>
                     </td>
-                    <td class="px-4 py-4 text-right font-black text-indigo-600 text-lg tracking-tighter">${Math.floor(rec.rp || 0)}</td>
+                    <td class="px-4 py-4 text-right">${rpCellHTML}</td>
                     <td class="px-4 py-4 text-center">
                         ${rec.is_verified == 0 ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-4 h-4 mx-auto"></i>' : '<i data-lucide="help-circle" class="text-slate-300 w-4 h-4 mx-auto opacity-30"></i>'}
                     </td>
