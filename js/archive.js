@@ -8,7 +8,8 @@
  * 🌟 "무소속 포함" 토글(검색창 옆) — 기록실/랭킹보드/게임별통계 3개 탭 전부 동일하게 지원. 기본 OFF(팀 리그만).
  *    무소속 기록은 기록실에서 RP를 빨간 취소선 + "미집계" 라벨로 표시.
  *    챔피언 시스템(v_game_popularity_mvp)은 항상 team_only=true 고정이라 이 토글과 무관하게 절대 오염되지 않음.
- * 🌟 랭킹보드 카드: 닉네임/팀명이 길면 평소엔 말줄임표로 잘리고, 마우스 올리면 글씨가 확대되며 카드 위로 튀어나와 전체가 보임(archive-nick-hover).
+ * 🌟 랭킹보드 카드: 닉네임/팀명이 안 잘리도록 우선 폰트 크기를 자동으로 줄여서 맞추고(autoFitRankingNames),
+ *    그래도 최소 크기에서 못 맞추면 말줄임표로 처리. 마우스 올리면 살짝 확대되며 전체가 다시 또렷하게 보임(archive-nick-hover).
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -65,7 +66,8 @@ Boako.Archive = {
                 border-top: 2px solid #ef4444;
                 transform: translateY(-50%) rotate(-4deg);
             }
-            /* 🌟 랭킹보드 닉네임/팀명: 평소엔 말줄임표, 호버 시 글씨가 살짝 확대되며 카드 위로 튀어나와 전체가 보임 */
+            /* 🌟 랭킹보드 닉네임/팀명: JS가 폰트 크기를 먼저 줄여서 최대한 안 잘리게 맞추고(autoFitRankingNames),
+               그래도 넘치면 말줄임표. 호버 시 살짝 확대되며 배경이 깔려 또렷하게 보임 */
             .archive-nick-hover {
                 display: inline-block;
                 max-width: 100%;
@@ -95,6 +97,35 @@ Boako.Archive = {
             }
         `;
         document.head.appendChild(style);
+    },
+
+    // 🌟 랭킹보드 닉네임/팀명이 최대한 잘리지 않도록, 실제 렌더링 후 폭을 재서 폰트 크기를 점진적으로 축소
+    autoFitRankingNames: function() {
+        document.querySelectorAll('#archive-content-area .archive-nick-hover').forEach(el => {
+            const availWidth = el.clientWidth;
+            if (!availWidth) return;
+
+            const clone = el.cloneNode(true);
+            clone.style.position = 'absolute';
+            clone.style.visibility = 'hidden';
+            clone.style.whiteSpace = 'nowrap';
+            clone.style.maxWidth = 'none';
+            clone.style.overflow = 'visible';
+            clone.style.left = '-9999px';
+            clone.style.top = '0';
+            document.body.appendChild(clone);
+
+            let size = parseFloat(getComputedStyle(el).fontSize);
+            const minSize = size * 0.62; // 너무 작아지지 않게 최소 62%까지만 축소
+            let guard = 0;
+            while (clone.offsetWidth > availWidth && size > minSize && guard < 24) {
+                size -= 0.5;
+                clone.style.fontSize = size + 'px';
+                guard++;
+            }
+            el.style.fontSize = size + 'px';
+            document.body.removeChild(clone);
+        });
     },
 
     // 1. view.js가 호출하는 최초 진입점
@@ -726,6 +757,9 @@ Boako.Archive = {
         html += `</div>`;
         html += this.renderPagination();
         area.innerHTML = html;
+
+        // 🌟 렌더링 직후, 카드 안 닉네임/팀명 폰트 크기를 실제 폭에 맞춰 자동 축소
+        this.autoFitRankingNames();
         
         // 🎯 [매칭 완치] 하위 fixed 툴팁 요소 존재 유무 및 예외 가드 완벽 구현
         area.querySelectorAll('[data-handler="ranking-tooltip"]').forEach(handler => {
