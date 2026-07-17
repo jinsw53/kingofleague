@@ -8,6 +8,7 @@
  * 🌟 "무소속 포함" 토글(검색창 옆) — 기록실/랭킹보드/게임별통계 3개 탭 전부 동일하게 지원. 기본 OFF(팀 리그만).
  *    무소속 기록은 기록실에서 RP를 빨간 취소선 + "미집계" 라벨로 표시.
  *    챔피언 시스템(v_game_popularity_mvp)은 항상 team_only=true 고정이라 이 토글과 무관하게 절대 오염되지 않음.
+ * 🌟 랭킹보드 카드: 닉네임/팀명이 길면 카드가 안 깨지도록 truncate(말줄임표) 처리, title 속성으로 전체 텍스트 hover 확인 가능.
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -639,7 +640,7 @@ Boako.Archive = {
             
             if (p.logo_url && p.team !== 'Free Agent') {
                 logoHTML = `
-                    <img src="${Boako.Util.cdn(p.logo_url)}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${p.team}">
+                    <img src="${Boako.Util.cdn(p.logo_url)}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm shrink-0" alt="${p.team}">
                     <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
                          style="display: none; opacity: 0; transform: translate(-50%, -100%);">
                         <img src="${Boako.Util.cdn(p.logo_url)}" class="w-full h-full object-contain" alt="Large Logo">
@@ -663,11 +664,11 @@ Boako.Archive = {
                                  onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
                                  alt="${p.name}">
                         </div>
-                        <div>
-                            <h3 class="mvp-name text-xl font-black text-slate-900 leading-none">${p.name}</h3>
-                            <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer overflow-visible" data-handler="ranking-tooltip">
+                        <div class="min-w-0 flex-1">
+                            <h3 class="mvp-name text-xl font-black text-slate-900 leading-none truncate" title="${p.name}">${p.name}</h3>
+                            <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer" data-handler="ranking-tooltip">
                                 ${logoHTML}
-                                <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">${p.team || 'Free Agent'}</span>
+                                <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate" title="${p.team || 'Free Agent'}">${p.team || 'Free Agent'}</span>
                             </div>
                         </div>
                     </div>
