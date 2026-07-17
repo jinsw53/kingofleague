@@ -5,9 +5,9 @@
  * 디자인: Tailwind CSS 기반 프리미엄 디자인 및 프로필 보안 부적 완벽 장착
  * 🌟 시즌 필터: 전체(올타임 통합, is_alltime=true) / 비시즌(season_no NULL) / 시즌 N
  * 🌟 기본 진입 시: 검증완료 기록 중 최근 시즌을 자동 감지해서 기본 필터로 설정, 없으면 '전체' 유지
- * 🌟 기록실 탭 전용: "무소속 포함" 토글 스위치(검색창 옆 배치) — 기본 OFF(팀 리그만), ON이면 무소속(Free Agent) 기록도 같이 표시.
- *    무소속 기록은 RP를 취소선 + "미집계" 라벨로 표시(계산 자체는 정상이지만 팀 리그 집계에는 반영 안 됨을 명시).
- *    랭킹보드/게임별통계는 항상 팀 리그 기준만 유지(토글 영향 없음).
+ * 🌟 "무소속 포함" 토글(검색창 옆) — 기록실/랭킹보드/게임별통계 3개 탭 전부 동일하게 지원. 기본 OFF(팀 리그만).
+ *    무소속 기록은 기록실에서 RP를 취소선 + "미집계" 라벨로 표시.
+ *    챔피언 시스템(v_game_popularity_mvp)은 항상 team_only=true 고정이라 이 토글과 무관하게 절대 오염되지 않음.
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -24,7 +24,7 @@ Boako.Archive = {
     availableSeasons: [],
     availableRounds: [],
     _defaultSeasonApplied: false, // 🌟 최근 시즌 자동 감지는 최초 1회만
-    includeFreeAgents: false, // 🌟 기록실 탭 전용 "무소속 포함" 토글 상태
+    includeFreeAgents: false, // 🌟 "무소속 포함" 토글 상태 (3개 탭 공통)
 
     // 🌟 지난 시즌 MVP 강조용
     prevMvpNickname: null,
@@ -220,7 +220,7 @@ Boako.Archive = {
         this.filterData(); // 선택 즉시 데이터 갱신
     },
 
-    // 🌟 "무소속 포함" 토글 (기록실 탭 전용)
+    // 🌟 "무소속 포함" 토글 (기록실/랭킹보드/게임별통계 공통)
     toggleIncludeFreeAgents: function(checked) {
         this.includeFreeAgents = !!checked;
         this.currentPage = 1;
@@ -303,9 +303,11 @@ Boako.Archive = {
         const from = (this.currentPage - 1) * limit;
         const to = from + limit - 1;
 
-        // 💡 [분기 1] 게임별 통계 탭 — v_game_popularity_all_players는 이미 b_all_team IS NOT NULL로 고정되어 있어 항상 팀 리그 기준만 나옴
+        // 💡 [분기 1] 게임별 통계 탭 — v_game_popularity_all_players는 team_only 차원으로 팀만/무소속포함을 둘 다 제공
         if (this.currentTab === 'games') {
             let query = Boako.db.from('v_game_popularity_all_players').select('*', { count: 'exact' });
+
+            query = query.eq('team_only', !this.includeFreeAgents);
 
             if (seasonVal === 'all') {
                 query = query.eq('is_alltime', true);
@@ -346,11 +348,13 @@ Boako.Archive = {
             query = query.or(`nickname.ilike.%${searchVal}%,game_name.ilike.%${searchVal}%`);
         }
 
-        // 🌟 랭킹보드는 항상 팀 리그 기준만 (무소속 절대 포함 안 함, 토글 영향 없음)
-        // 🌟 기록실은 "무소속 포함" 토글이 켜져 있지 않으면 팀 소속 기록만
+        // 🌟 랭킹보드는 검증 완료(is_verified=0) 기록만 집계 (기록실은 검증대기 상태도 일부러 같이 보여주므로 필터하지 않음)
         if (this.currentTab === 'rankings') {
-            query = query.eq('is_verified', 0).not('b_all_team', 'is', null);
-        } else if (this.currentTab === 'records' && !this.includeFreeAgents) {
+            query = query.eq('is_verified', 0);
+        }
+
+        // 🌟 "무소속 포함" 토글이 꺼져 있으면 팀 소속 기록만 (기록실/랭킹보드 공통)
+        if (!this.includeFreeAgents) {
             query = query.not('b_all_team', 'is', null);
         }
 
@@ -403,27 +407,24 @@ Boako.Archive = {
         const descEl = document.getElementById('archive-page-desc');
         const subDescEl = document.getElementById('archive-page-subdesc');
         const roundFilter = document.getElementById('round-filter-wrapper');
-        const freeAgentFilter = document.getElementById('free-agent-filter-wrapper');
 
         if (tabName === 'records') {
             titleEl.innerText = '시즌 경기 기록실';
             descEl.innerText = '시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.';
             if (subDescEl) subDescEl.style.display = 'block';
             if (roundFilter) roundFilter.style.display = 'block';
-            if (freeAgentFilter) freeAgentFilter.style.display = 'flex';
         } else if (tabName === 'rankings') {
             titleEl.innerText = '리그 개인 순위표';
             descEl.innerText = '누적 RP 기준 전체 유저들의 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'block';
-            if (freeAgentFilter) freeAgentFilter.style.display = 'none';
         } else if (tabName === 'games') {
             titleEl.innerText = '시즌 대세 게임 & 게임별 순위';
             descEl.innerText = '가장 핫한 보드게임 종목 순위와 게임별 모든 유저의 기록 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'none';
-            if (freeAgentFilter) freeAgentFilter.style.display = 'none';
         }
+        // 🌟 "무소속 포함" 토글은 이제 3개 탭 전부에서 동일하게 노출 (탭별로 숨기지 않음)
         
         this.fetchAndRender();
     },
