@@ -1,5 +1,6 @@
 /**
  * [RECORD VERIFY] 타 팀 경기 기록 교차 검증 및 승인 센터 (최종 최적화본)
+ * 🌟 무소속(Free Agent, b_all_team IS NULL) 기록도 "내 팀이 아닌 기록"에 포함해서 같이 검증 대상으로 노출
  */
 Boako.RecordVerify = {
     pendingList: [],
@@ -13,7 +14,7 @@ Boako.RecordVerify = {
         await this.loadPendingData();
     },
 
-    // 2. 수파베이스에서 '타 팀의 미인증 데이터'만 싹 긁어오기
+    // 2. 수파베이스에서 '타 팀(+무소속)의 미인증 데이터'만 싹 긁어오기
     loadPendingData: async function() {
         const container = document.getElementById('team-verify-list-container');
         if (container) container.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">결재 서류(데이터)를 불러오는 중...</div>`;
@@ -21,10 +22,12 @@ Boako.RecordVerify = {
         try {
             const myTeamName = Boako.state.team.info.team_name;
 
+            // 🌟 b_all_team이 NULL(무소속)인 경우 .neq()만으로는 걸러지지 않으므로(NULL 비교는 항상 거짓),
+            // "내 팀이 아니거나(neq) 무소속(is null)"을 or 조건으로 명시
             const { data, error } = await Boako.db
                 .from('v_boako_total_records')
                 .select('*')
-                .neq('b_all_team', myTeamName) // 내 팀 전적 제외 (상호 교차 감시)
+                .or(`b_all_team.neq.${myTeamName},b_all_team.is.null`) // 내 팀만 제외, 무소속은 포함
                 .eq('is_verified', 1)          // 미인증 상태(1)만 타격
                 .order('created_at', { ascending: false });
 
@@ -45,7 +48,7 @@ Boako.RecordVerify = {
         if (!container) return;
 
         if (this.pendingList.length === 0) {
-            container.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">현재 인증 대기 중인 타 팀 전적이 없습니다.</div>`;
+            container.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">현재 인증 대기 중인 타 팀/무소속 전적이 없습니다.</div>`;
             return;
         }
 
@@ -66,7 +69,7 @@ Boako.RecordVerify = {
                      class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center cursor-pointer hover:border-indigo-400 hover:shadow transition-all group">
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="text-xs font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">${item.b_all_team}</span>
+                            <span class="text-xs font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">${item.b_all_team || '무소속'}</span>
                             <h4 class="font-black text-slate-800 group-hover:text-indigo-600 transition-colors">${item.nickname} - ${item.game_name}</h4>
                         </div>
                         <p class="text-sm font-bold text-indigo-600 mt-1">${Math.floor(item.rp)} RP</p>
