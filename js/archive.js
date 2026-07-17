@@ -3,7 +3,8 @@
  * DB: v_boako_total_records 및 v_game_popularity_all_players 가상 뷰 완벽 연동
  * 구조: 100% 서버사이드 페이징 & 실시간 백엔드 서치 엔진 통합 (3대장 체제)
  * 디자인: Tailwind CSS 기반 프리미엄 디자인 및 프로필 보안 부적 완벽 장착
- * 🌟 시즌 필터: 전체(시즌 무관) / 비시즌(season_no NULL) / 시즌 N
+ * 🌟 시즌 필터: 전체(올타임 통합, is_alltime=true) / 비시즌(season_no NULL) / 시즌 N
+ * 🌟 기본 진입 시: 검증완료 기록 중 최근 시즌을 자동 감지해서 기본 필터로 설정, 없으면 '전체' 유지
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -19,6 +20,7 @@ Boako.Archive = {
     currentRoundFilter: 'all',
     availableSeasons: [],
     availableRounds: [],
+    _defaultSeasonApplied: false, // 🌟 최근 시즌 자동 감지는 최초 1회만
 
     // 🌟 지난 시즌 MVP 강조용
     prevMvpNickname: null,
@@ -154,12 +156,25 @@ Boako.Archive = {
         try {
             const { data, error } = await Boako.db
                 .from('v_boako_total_records')
-                .select('season_no, round_no');
+                .select('season_no, round_no, is_verified');
 
             if (error) throw error;
             
             this.updateSeasonOptions(data || []);
             this.updateRoundOptions(data || []);
+
+            // 🌟 [최초 1회만] 검증완료(is_verified=0) 기록 중 가장 최근 시즌을 기본 필터로 자동 설정.
+            // 그런 시즌이 하나도 없으면(전부 비시즌/미검증) '전체'를 그대로 유지.
+            if (!this._defaultSeasonApplied) {
+                this._defaultSeasonApplied = true;
+                const verifiedSeasons = (data || [])
+                    .filter(rec => rec.is_verified === 0 && rec.season_no !== null && rec.season_no !== undefined)
+                    .map(rec => rec.season_no);
+                if (verifiedSeasons.length > 0) {
+                    this.currentSeasonFilter = Math.max(...verifiedSeasons);
+                    this.renderSeasonDropdown();
+                }
+            }
 
             this.fetchAndRender(); 
         } catch (err) {
@@ -202,7 +217,7 @@ Boako.Archive = {
         const container = document.getElementById('season-filter-container');
         if (!container) return;
 
-        // 🌟 'all' = 시즌 무관 전체, 'none' = 비시즌(season_no NULL)만, 그 외 = 특정 시즌 번호
+        // 🌟 'all' = 전체(올타임 통합), 'none' = 비시즌(season_no NULL)만, 그 외 = 특정 시즌 번호
         const currentText = this.currentSeasonFilter === 'all' ? '전체'
             : this.currentSeasonFilter === 'none' ? '비시즌'
             : `시즌 ${this.currentSeasonFilter}`;
@@ -259,7 +274,7 @@ Boako.Archive = {
         if (area) area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">데이터 요청 중...</div>`;
 
         const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
-        // 🌟 커스텀 상태 변수에서 필터값 읽기 ('all' | 'none'(비시즌) | 시즌 번호)
+        // 🌟 커스텀 상태 변수에서 필터값 읽기 ('all'(전체=올타임) | 'none'(비시즌) | 시즌 번호)
         const seasonVal = this.currentSeasonFilter;
         const roundVal = this.currentRoundFilter;
         const limit = this.getLimit();
@@ -267,12 +282,17 @@ Boako.Archive = {
         const from = (this.currentPage - 1) * limit;
         const to = from + limit - 1;
 
-        // 💡 [분기 1] 게임별 통계 탭
+        // 💡 [분기 1] 게임별 통계 탭 — v_game_popularity_all_players는 시즌별(is_alltime=false) + 전체올타임(is_alltime=true) 행을 함께 제공
         if (this.currentTab === 'games') {
             let query = Boako.db.from('v_game_popularity_all_players').select('*', { count: 'exact' });
 
-            if (seasonVal === 'none') query = query.is('season_no', null);
-            else if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
+            if (seasonVal === 'all') {
+                query = query.eq('is_alltime', true);
+            } else if (seasonVal === 'none') {
+                query = query.eq('is_alltime', false).is('season_no', null);
+            } else {
+                query = query.eq('is_alltime', false).eq('season_no', seasonVal);
+            }
 
             if (searchVal) {
                 query = query.or(`game_name.ilike.%${searchVal}%,player_nickname.ilike.%${searchVal}%`);
