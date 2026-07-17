@@ -3,6 +3,7 @@
  * DB: v_boako_total_records 및 v_game_popularity_all_players 가상 뷰 완벽 연동
  * 구조: 100% 서버사이드 페이징 & 실시간 백엔드 서치 엔진 통합 (3대장 체제)
  * 디자인: Tailwind CSS 기반 프리미엄 디자인 및 프로필 보안 부적 완벽 장착
+ * 🌟 시즌 필터: 전체(시즌 무관) / 비시즌(season_no NULL) / 시즌 N
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -200,8 +201,11 @@ Boako.Archive = {
     renderSeasonDropdown: function() {
         const container = document.getElementById('season-filter-container');
         if (!container) return;
-        
-        const currentText = this.currentSeasonFilter === 'all' ? '전체 시즌' : `시즌 ${this.currentSeasonFilter}`;
+
+        // 🌟 'all' = 시즌 무관 전체, 'none' = 비시즌(season_no NULL)만, 그 외 = 특정 시즌 번호
+        const currentText = this.currentSeasonFilter === 'all' ? '전체'
+            : this.currentSeasonFilter === 'none' ? '비시즌'
+            : `시즌 ${this.currentSeasonFilter}`;
         
         container.innerHTML = `
             <button onclick="Boako.Archive.toggleDropdown('season')" class="w-full bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
@@ -210,7 +214,8 @@ Boako.Archive = {
             </button>
             <div id="archive-season-overlay" onclick="Boako.Archive.toggleDropdown('season')" class="hidden fixed inset-0 z-40"></div>
             <div id="archive-season-menu" class="hidden absolute top-full left-0 mt-2 w-full bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div onclick="Boako.Archive.selectFilter('season', 'all')" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentSeasonFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">전체 시즌</div>
+                <div onclick="Boako.Archive.selectFilter('season', 'all')" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentSeasonFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">전체</div>
+                <div onclick="Boako.Archive.selectFilter('season', 'none')" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentSeasonFilter === 'none' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">비시즌</div>
                 ${this.availableSeasons.map(s => `
                     <div onclick="Boako.Archive.selectFilter('season', ${s})" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${this.currentSeasonFilter === s ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">시즌 ${s}</div>
                 `).join('')}
@@ -254,7 +259,7 @@ Boako.Archive = {
         if (area) area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">데이터 요청 중...</div>`;
 
         const searchVal = (document.getElementById('archive-search')?.value || '').toLowerCase();
-        // 🌟 커스텀 상태 변수에서 필터값 읽기
+        // 🌟 커스텀 상태 변수에서 필터값 읽기 ('all' | 'none'(비시즌) | 시즌 번호)
         const seasonVal = this.currentSeasonFilter;
         const roundVal = this.currentRoundFilter;
         const limit = this.getLimit();
@@ -265,8 +270,10 @@ Boako.Archive = {
         // 💡 [분기 1] 게임별 통계 탭
         if (this.currentTab === 'games') {
             let query = Boako.db.from('v_game_popularity_all_players').select('*', { count: 'exact' });
-            
-            if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
+
+            if (seasonVal === 'none') query = query.is('season_no', null);
+            else if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
+
             if (searchVal) {
                 query = query.or(`game_name.ilike.%${searchVal}%,player_nickname.ilike.%${searchVal}%`);
             }
@@ -291,10 +298,16 @@ Boako.Archive = {
         // 💡 [분기 2 & 3] 기록실 및 랭킹보드 공통 베이스
         let query = Boako.db.from('v_boako_total_records').select('*', { count: 'exact' });
 
-        if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
+        if (seasonVal === 'none') query = query.is('season_no', null);
+        else if (seasonVal !== 'all') query = query.eq('season_no', seasonVal);
         if (roundVal !== 'all') query = query.eq('round_no', roundVal);
         if (searchVal) {
             query = query.or(`nickname.ilike.%${searchVal}%,game_name.ilike.%${searchVal}%`);
+        }
+
+        // 🌟 랭킹보드는 검증 완료(is_verified=0)된 기록만 RP 집계에 반영 (기록실은 검증대기 상태도 일부러 같이 보여주므로 필터하지 않음)
+        if (this.currentTab === 'rankings') {
+            query = query.eq('is_verified', 0);
         }
 
         if (this.currentTab === 'records') {
