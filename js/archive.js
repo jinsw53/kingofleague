@@ -700,6 +700,7 @@ Boako.Archive = {
                 rank: row.player_rank,
                 name: row.player_nickname,
                 team: row.player_team_name,
+                teamLogo: row.player_team_logo,
                 rp: row.player_total_rp
             });
         });
@@ -743,7 +744,11 @@ Boako.Archive = {
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100/60 bg-white">
-                                    ${game.playersList.map(p => `
+                                    ${game.playersList.map(p => {
+                                        const teamLogoHtml = (p.teamLogo && p.team !== 'Free Agent')
+                                            ? `<img src="${Boako.Util.cdn(p.teamLogo)}" class="w-4 h-4 rounded-sm object-contain shadow-sm shrink-0" alt="${p.team}">`
+                                            : `<span class="text-[10px] shrink-0">👤</span>`;
+                                        return `
                                         <tr class="hover:bg-slate-50 transition-colors font-medium">
                                             <td class="px-5 py-3.5 font-black text-xs">
                                                 ${
@@ -752,11 +757,16 @@ Boako.Archive = {
                                                     p.rank === 3 ? '<span class="text-amber-700">🥉 3위</span>' : `<span class="text-slate-400 pl-1">${p.rank}위</span>`
                                                 }
                                             </td>
-                                            <td class="px-5 py-3.5 text-xs font-black text-slate-400 uppercase tracking-tight">${p.team || 'Free Agent'}</td>
+                                            <td class="px-5 py-3.5 text-xs font-black text-slate-400 uppercase tracking-tight">
+                                                <div class="flex items-center gap-1.5">
+                                                    ${teamLogoHtml}
+                                                    <span>${p.team || 'Free Agent'}</span>
+                                                </div>
+                                            </td>
                                             <td class="px-5 py-3.5 font-black text-slate-800">${p.name}</td>
                                             <td class="px-5 py-3.5 text-right font-mono font-black text-indigo-600">${Math.floor(p.rp).toLocaleString()} P</td>
                                         </tr>
-                                    `).join('')}
+                                    `}).join('')}
                                 </tbody>
                             </table>
                         </div>
