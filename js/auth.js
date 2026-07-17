@@ -587,9 +587,14 @@ Boako.Auth = {
                         <p class="text-indigo-100 text-xs mt-2 font-bold">리그 기록 연동을 위해 꼭 필요합니다!</p>
                     </div>
                     <div class="p-6">
-                        <p class="text-slate-600 text-sm mb-5 font-bold text-center leading-relaxed">
+                        <p class="text-slate-600 text-sm mb-3 font-bold text-center leading-relaxed">
                             현재 보드게임 아레나에서 사용 중인<br><span class="text-red-500 underline decoration-red-200 underline-offset-4">정확한 닉네임</span>을 입력해 주세요.
                         </p>
+
+                        <a href="https://boardgamearena.com/" target="_blank" rel="noopener" class="flex items-center justify-center gap-1.5 text-indigo-600 text-xs font-black mb-5 hover:text-indigo-700 hover:underline">
+                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i> BGA에서 내 닉네임 확인하러 가기
+                        </a>
+
                         <input type="text" id="bga-nick-input" value="${Boako.state.user.nickname || ''}" placeholder="대소문자 구별하여 정확히 입력" class="w-full border-2 border-slate-200 rounded-xl p-3.5 text-center font-black text-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all mb-5 placeholder:text-sm placeholder:font-normal">
                         
                         <button onclick="Boako.Auth.saveInitialNick()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-4 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
