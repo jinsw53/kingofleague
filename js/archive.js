@@ -8,7 +8,7 @@
  * 🌟 "무소속 포함" 토글(검색창 옆) — 기록실/랭킹보드/게임별통계 3개 탭 전부 동일하게 지원. 기본 OFF(팀 리그만).
  *    무소속 기록은 기록실에서 RP를 빨간 취소선 + "미집계" 라벨로 표시.
  *    챔피언 시스템(v_game_popularity_mvp)은 항상 team_only=true 고정이라 이 토글과 무관하게 절대 오염되지 않음.
- * 🌟 랭킹보드 카드: 닉네임/팀명이 길면 카드가 안 깨지도록 truncate(말줄임표) 처리, title 속성으로 전체 텍스트 hover 확인 가능.
+ * 🌟 랭킹보드 카드: 닉네임/팀명이 길면 평소엔 말줄임표로 잘리고, 마우스 올리면 글씨가 확대되며 카드 위로 튀어나와 전체가 보임(archive-nick-hover).
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -64,6 +64,28 @@ Boako.Archive = {
                 left: -2px; right: -2px; top: 50%;
                 border-top: 2px solid #ef4444;
                 transform: translateY(-50%) rotate(-4deg);
+            }
+            /* 🌟 랭킹보드 닉네임/팀명: 평소엔 말줄임표, 호버 시 글씨가 확대되며 카드 위로 튀어나와 전체가 보임 */
+            .archive-nick-hover {
+                display: inline-block;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                vertical-align: bottom;
+                transform-origin: left center;
+                transition: transform .15s ease;
+                position: relative;
+            }
+            .archive-nick-hover:hover {
+                overflow: visible;
+                transform: scale(1.18);
+                background: #ffffff;
+                color: #1e293b !important;
+                padding: 1px 6px;
+                border-radius: 6px;
+                box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+                z-index: 30;
             }
         `;
         document.head.appendChild(style);
@@ -665,10 +687,10 @@ Boako.Archive = {
                                  alt="${p.name}">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <h3 class="mvp-name text-xl font-black text-slate-900 leading-none truncate" title="${p.name}">${p.name}</h3>
+                            <h3 class="mvp-name text-xl font-black text-slate-900 leading-none"><span class="archive-nick-hover">${p.name}</span></h3>
                             <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer" data-handler="ranking-tooltip">
                                 ${logoHTML}
-                                <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate" title="${p.team || 'Free Agent'}">${p.team || 'Free Agent'}</span>
+                                <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none"><span class="archive-nick-hover">${p.team || 'Free Agent'}</span></span>
                             </div>
                         </div>
                     </div>
