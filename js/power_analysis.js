@@ -2,7 +2,7 @@
  * [POWER ANALYSIS] 전력분석실 — 마이페이지 개인 통계 카드
  * 1. 활동량: 내 기록 수 ÷ 아카이브 전체 기록 수
  * 2. 탐험도: 플레이한 게임 종류 ÷ 전체 등록 게임 종류
- * 3. 전력 분석: 첫승 업적 횟수 / 가장 많이 우승한 게임 Top3 / 평균 RP 높은 게임 Top3
+ * 3. 전력 분석: 첫승 업적 횟수 / 가장 많이 기록한 게임 Top3 / 가장 많이 참여한 토너먼트 Top3
  * 4. 소속 히스토리: 어느 팀에 언제 있었는지 타임라인
  *
  * 🌟 개인 기록 자체는 팀 소속 여부와 무관하게 "내 활동 전체"를 보여주는 게 목적이므로
@@ -42,12 +42,14 @@ Boako.PowerAnalysis = {
                 { data: myRows, error: myRowsErr },
                 { count: totalRecordCount },
                 { count: totalGameCount },
-                { data: teamHistory }
+                { data: teamHistory },
+                { data: tournamentRows }
             ] = await Promise.all([
                 Boako.db.from('v_boako_total_records').select('game_name, is_first, rp').eq('nickname', myNick),
                 Boako.db.from('v_boako_total_records').select('id', { count: 'exact', head: true }),
                 Boako.db.from('games').select('id', { count: 'exact', head: true }),
-                Boako.db.from('team_members').select('team_name, joined_at, left_at, is_active').eq('player_name', myNick).order('joined_at', { ascending: true })
+                Boako.db.from('team_members').select('team_name, joined_at, left_at, is_active').eq('player_name', myNick).order('joined_at', { ascending: true }),
+                Boako.db.from('boako_tournaments').select('tournament_name, players')
             ]);
 
             if (myRowsErr) throw myRowsErr;
@@ -69,19 +71,27 @@ Boako.PowerAnalysis = {
 
             const firstWinCount = rows.filter(r => r.is_first == 1).length;
 
-            const topWinGames = Object.entries(gameStats)
+            const topRecordedGames = Object.entries(gameStats)
                 .sort((a, b) => b[1].count - a[1].count)
                 .slice(0, 3);
 
-            const topRpGames = Object.entries(gameStats)
-                .map(([name, s]) => ({ name, avgRp: s.rpSum / s.count, count: s.count }))
-                .sort((a, b) => b.avgRp - a.avgRp)
+            // 🌟 [신규] 가장 많이 참여한 토너먼트: boako_tournaments.players(jsonb)에 내 닉네임이 참가자로 포함된 행을 tournament_name별로 집계
+            const tournamentStats = {}; // tournament_name -> count
+            (tournamentRows || []).forEach(t => {
+                const players = Array.isArray(t.players) ? t.players : [];
+                const isParticipant = players.some(p => p && p.name === myNick);
+                if (!isParticipant || !t.tournament_name) return;
+                tournamentStats[t.tournament_name] = (tournamentStats[t.tournament_name] || 0) + 1;
+            });
+
+            const topTournaments = Object.entries(tournamentStats)
+                .sort((a, b) => b[1] - a[1])
                 .slice(0, 3);
 
             this.render({
                 myRecordCount, totalRecordCount: totalRecordCount || 0, activityPct,
                 distinctGameCount, totalGameCount: totalGameCount || 0, explorePct,
-                firstWinCount, topWinGames, topRpGames,
+                firstWinCount, topRecordedGames, topTournaments,
                 teamHistory: teamHistory || []
             });
 
@@ -104,7 +114,7 @@ Boako.PowerAnalysis = {
         const {
             myRecordCount, totalRecordCount, activityPct,
             distinctGameCount, totalGameCount, explorePct,
-            firstWinCount, topWinGames, topRpGames,
+            firstWinCount, topRecordedGames, topTournaments,
             teamHistory
         } = stats;
 
@@ -139,27 +149,27 @@ Boako.PowerAnalysis = {
         `;
 
         // ===== 3. 전력 분석 =====
-        const winGamesHtml = topWinGames.length === 0
+        const recordedGamesHtml = topRecordedGames.length === 0
             ? `<div class="text-center text-slate-400 font-bold py-6 text-sm">아직 기록이 없습니다.</div>`
-            : topWinGames.map(([name, s], idx) => `
+            : topRecordedGames.map(([name, s], idx) => `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#f8fafc; border-radius:10px; margin-bottom:8px;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-size:16px;">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
                         <span style="font-weight:800; color:#1e293b;">${name}</span>
                     </div>
-                    <span style="font-weight:900; color:#4338ca; font-size:13px;">${s.count}승</span>
+                    <span style="font-weight:900; color:#4338ca; font-size:13px;">${s.count}회</span>
                 </div>
             `).join('');
 
-        const rpGamesHtml = topRpGames.length === 0
-            ? `<div class="text-center text-slate-400 font-bold py-6 text-sm">아직 기록이 없습니다.</div>`
-            : topRpGames.map((g, idx) => `
+        const tournamentsHtml = topTournaments.length === 0
+            ? `<div class="text-center text-slate-400 font-bold py-6 text-sm">참여한 토너먼트가 없습니다.</div>`
+            : topTournaments.map(([name, count], idx) => `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#fffbeb; border-radius:10px; margin-bottom:8px;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-size:16px;">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
-                        <span style="font-weight:800; color:#1e293b;">${g.name}</span>
+                        <span style="font-weight:800; color:#1e293b;">${name}</span>
                     </div>
-                    <span style="font-weight:900; color:#d97706; font-size:13px;">평균 ${Math.floor(g.avgRp)} RP</span>
+                    <span style="font-weight:900; color:#d97706; font-size:13px;">${count}회 참여</span>
                 </div>
             `).join('');
 
@@ -177,12 +187,12 @@ Boako.PowerAnalysis = {
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <h4 style="font-weight:900; font-size:14px; margin-bottom:12px; color:#1e293b;">🎲 가장 많이 우승한 게임</h4>
-                            ${winGamesHtml}
+                            <h4 style="font-weight:900; font-size:14px; margin-bottom:12px; color:#1e293b;">🎲 가장 많이 기록한 게임</h4>
+                            ${recordedGamesHtml}
                         </div>
                         <div>
-                            <h4 style="font-weight:900; font-size:14px; margin-bottom:12px; color:#1e293b;">💪 평균 RP가 높은 게임</h4>
-                            ${rpGamesHtml}
+                            <h4 style="font-weight:900; font-size:14px; margin-bottom:12px; color:#1e293b;">🏆 가장 많이 참여한 토너먼트</h4>
+                            ${tournamentsHtml}
                         </div>
                     </div>
                 </div>
