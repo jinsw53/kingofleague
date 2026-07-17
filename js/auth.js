@@ -1,5 +1,6 @@
 /**
  * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이 + 🌟커스텀 프로필 사진 + 🌟기록기 설치 가이드 + 🌟공지사항 모달)
+ * 온보딩 노출 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
  */
 Boako.Auth = {
     init: async () => {
@@ -20,9 +21,10 @@ Boako.Auth = {
             // 🌟 로그인 즉시 실시간 쪽지 감지 시작 (메신저 페이지를 안 열어도 위젯 배지가 실시간으로 갱신되도록)
             if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
+            // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
             await Boako.Auth.requireBgaNickname();
-            await Boako.Auth.requireNoticeModal();
             Boako.Auth.requireExtensionGuide();
+            Boako.Auth.requireNoticeModal();
         } else {
             // 🌟 로그인 안 한 방문객은 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준으로만 판단
             Boako.Auth.requireExtensionGuideAnonymous();
@@ -64,9 +66,10 @@ Boako.Auth = {
                 if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
                 await Boako.Auth.renderWidget();
+                // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
                 await Boako.Auth.requireBgaNickname();
-                await Boako.Auth.requireNoticeModal();
                 Boako.Auth.requireExtensionGuide();
+                Boako.Auth.requireNoticeModal();
                 
             } else {
                 Boako.state.user = null;
@@ -650,7 +653,148 @@ Boako.Auth = {
         }
     },
 
-    // ========== 🌟 [신규] 로그인 시 미확인 공지사항 모달 ==========
+    // ========== 🌟 [신규] 첫 방문자용 "기록기 설치" 스포트라이트 가이드 ==========
+    // CSS(.ext-guide-*, @keyframes)는 index.html의 <style> 블록에 정의되어 있음
+
+    // 실제 오버레이(스포트라이트 + 말풍선)를 만드는 공용 함수. onDismiss는 "확인 처리" 완료 시 호출됨
+    showExtensionGuideOverlay: (onDismiss) => {
+        if (document.getElementById('ext-guide-overlay')) return;
+        const btn = document.getElementById('btn-extension-install');
+        if (!btn) return;
+
+        let resizeHandler = null;
+
+        function positionGuide() {
+            const rect = btn.getBoundingClientRect();
+            const padding = 6;
+            const highlight = document.getElementById('ext-guide-highlight');
+            const tooltip = document.getElementById('ext-guide-tooltip');
+            if (!highlight || !tooltip) return;
+
+            highlight.style.top = (rect.top - padding) + 'px';
+            highlight.style.left = (rect.left - padding) + 'px';
+            highlight.style.width = (rect.width + padding * 2) + 'px';
+            highlight.style.height = (rect.height + padding * 2) + 'px';
+
+            const tooltipTop = rect.bottom + 14;
+            const tooltipRight = Math.max(16, window.innerWidth - rect.right);
+            tooltip.style.top = tooltipTop + 'px';
+            tooltip.style.right = tooltipRight + 'px';
+            tooltip.style.left = '';
+        }
+
+        function dismiss() {
+            document.getElementById('ext-guide-overlay')?.remove();
+            document.getElementById('ext-guide-highlight')?.remove();
+            document.getElementById('ext-guide-tooltip')?.remove();
+            if (resizeHandler) {
+                window.removeEventListener('resize', resizeHandler);
+                window.removeEventListener('scroll', resizeHandler);
+            }
+            btn.style.position = '';
+            btn.style.zIndex = '';
+            if (onDismiss) onDismiss();
+        }
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ext-guide-overlay';
+        overlay.onclick = dismiss;
+
+        const highlight = document.createElement('div');
+        highlight.id = 'ext-guide-highlight';
+
+        const tooltip = document.createElement('div');
+        tooltip.id = 'ext-guide-tooltip';
+        tooltip.innerHTML = `
+            <div style="font-weight:900; font-size:14px; color:#1e293b; margin-bottom:6px;">👋 처음 오셨네요!</div>
+            <div style="font-size:12.5px; color:#64748b; font-weight:600; line-height:1.6; margin-bottom:14px;">
+                보드게임아레나(BGA) 전적을 자동으로 기록하려면 먼저 <b style="color:#7c3aed;">기록기 확장 프로그램</b>을 설치해주세요!
+            </div>
+            <button id="ext-guide-dismiss" style="width:100%; background:#1e293b; color:white; font-weight:800; font-size:12.5px; padding:10px; border-radius:10px; cursor:pointer;">확인했어요</button>
+        `;
+
+        document.body.appendChild(overlay);
+        document.body.appendChild(highlight);
+        document.body.appendChild(tooltip);
+
+        // 실제 버튼을 오버레이보다 위로 끌어올려서 스포트라이트 안에서 계속 클릭 가능하게
+        btn.style.position = 'relative';
+        btn.style.zIndex = '99999';
+
+        positionGuide();
+
+        resizeHandler = positionGuide;
+        window.addEventListener('resize', resizeHandler);
+        window.addEventListener('scroll', resizeHandler, { passive: true });
+
+        document.getElementById('ext-guide-dismiss').addEventListener('click', (e) => {
+            e.stopPropagation();
+            dismiss();
+        });
+        btn.addEventListener('click', dismiss, { once: true });
+    },
+
+    // 🌟 [신규] 기록기 가이드가 (표시할지 판단 중 or 실제로 떠 있는) 진행 상태를 나타내는 플래그.
+    // 공지사항 모달이 이 플래그를 보고 순서를 기다린다.
+    _extGuidePending: false,
+
+    // 🌟 로그인 사용자: profiles.tutorial_status(JSONB)에 ext_guide_seen 플래그로 계정 기준 판별
+    requireExtensionGuide: async () => {
+        if (!Boako.state.user) return;
+        Boako.Auth._extGuidePending = true;
+
+        // BGA 닉네임 모달이 떠 있으면 겹치지 않도록, 닫힐 때까지 대기했다가 다시 시도
+        if (document.getElementById('bga-nick-modal')) {
+            setTimeout(() => Boako.Auth.requireExtensionGuide(), 400);
+            return;
+        }
+        if (document.getElementById('ext-guide-overlay')) return; // 이미 떠 있음 (pending 유지)
+
+        try {
+            const { data: profile } = await Boako.db.from('profiles')
+                .select('tutorial_status')
+                .eq('id', Boako.state.user.id)
+                .single();
+
+            const status = profile?.tutorial_status || {};
+            if (status.ext_guide_seen) { Boako.Auth._extGuidePending = false; return; } // 이미 확인한 사람 — 다시 안 띄움
+
+            Boako.Auth.showExtensionGuideOverlay(async () => {
+                try {
+                    const { data: freshProfile } = await Boako.db.from('profiles')
+                        .select('tutorial_status')
+                        .eq('id', Boako.state.user.id)
+                        .single();
+                    let newStatus = freshProfile?.tutorial_status || {};
+                    newStatus.ext_guide_seen = true;
+                    await Boako.db.from('profiles').update({ tutorial_status: newStatus }).eq('id', Boako.state.user.id);
+                } catch (err) {
+                    console.error('기록기 가이드 확인 상태 저장 실패:', err);
+                } finally {
+                    Boako.Auth._extGuidePending = false;
+                }
+            });
+        } catch (err) {
+            console.error('기록기 가이드 확인 상태 조회 실패:', err);
+            Boako.Auth._extGuidePending = false;
+        }
+    },
+
+    // 🌟 비로그인 방문객: 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준(localStorage)으로만 판별
+    requireExtensionGuideAnonymous: () => {
+        const STORAGE_KEY = 'boako_ext_guide_seen_anon';
+        if (localStorage.getItem(STORAGE_KEY)) return;
+        if (document.getElementById('ext-guide-overlay')) return;
+
+        // 다른 초기화 스크립트가 레이아웃을 잡을 시간을 살짝 준 뒤 노출
+        setTimeout(() => {
+            Boako.Auth.showExtensionGuideOverlay(() => {
+                localStorage.setItem(STORAGE_KEY, '1');
+            });
+        }, 900);
+    },
+
+    // ========== 🌟 [신규] 로그인 시 미확인 공지사항 모달 (닉네임 모달 → 기록기 가이드 다음 순서) ==========
     // board_posts.is_notice = true 인 글 중, profiles.tutorial_status.confirmed_notice_ids에
     // 없는(=아직 확인 안 한) 것들을 오래된 순으로 하나씩 모달로 띄운다.
 
@@ -659,6 +803,12 @@ Boako.Auth = {
     requireNoticeModal: async () => {
         if (!Boako.state.user) return;
         if (document.getElementById('notice-modal')) return;
+
+        // 닉네임 모달이나 기록기 설치 가이드가 아직 진행 중이면, 끝난 뒤에 순서대로 노출
+        if (document.getElementById('bga-nick-modal') || Boako.Auth._extGuidePending || document.getElementById('ext-guide-overlay')) {
+            setTimeout(() => Boako.Auth.requireNoticeModal(), 400);
+            return;
+        }
 
         try {
             const { data: notices } = await Boako.db.from('board_posts')
@@ -742,138 +892,5 @@ Boako.Auth = {
         if (Boako.Auth._noticeQueue.length > 0) {
             Boako.Auth.showNextNoticeModal();
         }
-    },
-
-    // ========== 🌟 [신규] 첫 방문자용 "기록기 설치" 스포트라이트 가이드 ==========
-    // CSS(.ext-guide-*, @keyframes)는 index.html의 <style> 블록에 정의되어 있음
-
-    // 실제 오버레이(스포트라이트 + 말풍선)를 만드는 공용 함수. onDismiss는 "확인 처리" 완료 시 호출됨
-    showExtensionGuideOverlay: (onDismiss) => {
-        if (document.getElementById('ext-guide-overlay')) return;
-        const btn = document.getElementById('btn-extension-install');
-        if (!btn) return;
-
-        let resizeHandler = null;
-
-        function positionGuide() {
-            const rect = btn.getBoundingClientRect();
-            const padding = 6;
-            const highlight = document.getElementById('ext-guide-highlight');
-            const tooltip = document.getElementById('ext-guide-tooltip');
-            if (!highlight || !tooltip) return;
-
-            highlight.style.top = (rect.top - padding) + 'px';
-            highlight.style.left = (rect.left - padding) + 'px';
-            highlight.style.width = (rect.width + padding * 2) + 'px';
-            highlight.style.height = (rect.height + padding * 2) + 'px';
-
-            const tooltipTop = rect.bottom + 14;
-            const tooltipRight = Math.max(16, window.innerWidth - rect.right);
-            tooltip.style.top = tooltipTop + 'px';
-            tooltip.style.right = tooltipRight + 'px';
-            tooltip.style.left = '';
-        }
-
-        function dismiss() {
-            document.getElementById('ext-guide-overlay')?.remove();
-            document.getElementById('ext-guide-highlight')?.remove();
-            document.getElementById('ext-guide-tooltip')?.remove();
-            if (resizeHandler) {
-                window.removeEventListener('resize', resizeHandler);
-                window.removeEventListener('scroll', resizeHandler);
-            }
-            btn.style.position = '';
-            btn.style.zIndex = '';
-            if (onDismiss) onDismiss();
-        }
-
-        const overlay = document.createElement('div');
-        overlay.id = 'ext-guide-overlay';
-        overlay.onclick = dismiss;
-
-        const highlight = document.createElement('div');
-        highlight.id = 'ext-guide-highlight';
-
-        const tooltip = document.createElement('div');
-        tooltip.id = 'ext-guide-tooltip';
-        tooltip.innerHTML = `
-            <div style="font-weight:900; font-size:14px; color:#1e293b; margin-bottom:6px;">👋 처음 오셨네요!</div>
-            <div style="font-size:12.5px; color:#64748b; font-weight:600; line-height:1.6; margin-bottom:14px;">
-                보드게임아레나(BGA) 전적을 자동으로 기록하려면 먼저 <b style="color:#7c3aed;">기록기 확장 프로그램</b>을 설치해주세요!
-            </div>
-            <button id="ext-guide-dismiss" style="width:100%; background:#1e293b; color:white; font-weight:800; font-size:12.5px; padding:10px; border-radius:10px; cursor:pointer;">확인했어요</button>
-        `;
-
-        document.body.appendChild(overlay);
-        document.body.appendChild(highlight);
-        document.body.appendChild(tooltip);
-
-        // 실제 버튼을 오버레이보다 위로 끌어올려서 스포트라이트 안에서 계속 클릭 가능하게
-        btn.style.position = 'relative';
-        btn.style.zIndex = '99999';
-
-        positionGuide();
-
-        resizeHandler = positionGuide;
-        window.addEventListener('resize', resizeHandler);
-        window.addEventListener('scroll', resizeHandler, { passive: true });
-
-        document.getElementById('ext-guide-dismiss').addEventListener('click', (e) => {
-            e.stopPropagation();
-            dismiss();
-        });
-        btn.addEventListener('click', dismiss, { once: true });
-    },
-
-    // 🌟 로그인 사용자: profiles.tutorial_status(JSONB)에 ext_guide_seen 플래그로 계정 기준 판별
-    requireExtensionGuide: async () => {
-        if (!Boako.state.user) return;
-
-        // BGA 닉네임 모달이나 공지사항 모달이 떠 있으면 겹치지 않도록, 닫힐 때까지 대기했다가 다시 시도
-        if (document.getElementById('bga-nick-modal') || document.getElementById('notice-modal')) {
-            setTimeout(() => Boako.Auth.requireExtensionGuide(), 400);
-            return;
-        }
-        if (document.getElementById('ext-guide-overlay')) return;
-
-        try {
-            const { data: profile } = await Boako.db.from('profiles')
-                .select('tutorial_status')
-                .eq('id', Boako.state.user.id)
-                .single();
-
-            const status = profile?.tutorial_status || {};
-            if (status.ext_guide_seen) return; // 이미 확인한 사람 — 다시 안 띄움
-
-            Boako.Auth.showExtensionGuideOverlay(async () => {
-                try {
-                    const { data: freshProfile } = await Boako.db.from('profiles')
-                        .select('tutorial_status')
-                        .eq('id', Boako.state.user.id)
-                        .single();
-                    let newStatus = freshProfile?.tutorial_status || {};
-                    newStatus.ext_guide_seen = true;
-                    await Boako.db.from('profiles').update({ tutorial_status: newStatus }).eq('id', Boako.state.user.id);
-                } catch (err) {
-                    console.error('기록기 가이드 확인 상태 저장 실패:', err);
-                }
-            });
-        } catch (err) {
-            console.error('기록기 가이드 확인 상태 조회 실패:', err);
-        }
-    },
-
-    // 🌟 비로그인 방문객: 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준(localStorage)으로만 판별
-    requireExtensionGuideAnonymous: () => {
-        const STORAGE_KEY = 'boako_ext_guide_seen_anon';
-        if (localStorage.getItem(STORAGE_KEY)) return;
-        if (document.getElementById('ext-guide-overlay')) return;
-
-        // 다른 초기화 스크립트가 레이아웃을 잡을 시간을 살짝 준 뒤 노출
-        setTimeout(() => {
-            Boako.Auth.showExtensionGuideOverlay(() => {
-                localStorage.setItem(STORAGE_KEY, '1');
-            });
-        }, 900);
     }
 };
