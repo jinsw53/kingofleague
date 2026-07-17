@@ -1,6 +1,6 @@
 /**
  * [VIEW] 화면 렌더링 및 페이지 템플릿 관리 (인덱스 다이어트 최종 최적화본)
- * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) + 일정표(스케줄) 확장 + 🌟 팀 탭 분리 적용
+ * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) + 일정표(스케줄) 확장 + 🌟 팀 탭 분리 적용 + 🌟 전력분석실 라우팅
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -73,7 +73,7 @@ Boako.View = {
             targetMenuId = menuIdOverrides[pageId];
         }
 
-        // 버튼 불 켜고 그 위치로 스르륵 이동! (검색 결과 페이지는 메뉴에 없어서 매칭 안 되는 게 정상)
+        // 버튼 불 켜고 그 위치로 스르륵 이동! (검색 결과 페이지/전력분석실 등은 메뉴에 없어서 매칭 안 되는 게 정상)
         const navBtn = document.getElementById(targetMenuId);
         if (navBtn) {
             navBtn.classList.add('active');
@@ -91,6 +91,24 @@ Boako.View = {
                 setTimeout(() => {
                     if (Boako.Search && typeof Boako.Search.init === 'function') {
                         Boako.Search.init('search-master-container', payload || '');
+                    }
+                }, 0);
+                break;
+
+            case 'power_analysis':
+                // 🌟 [신규] 마이페이지 전력분석실 — 활동량/탐험도/전력분석/소속 히스토리
+                if (!Boako.state.user) {
+                    html = `<div class="main-banner"><h1>🔬 전력분석실</h1></div><div style="text-align:center; padding:100px 0;"><h3 style="color:#94a3b8;">카카오 로그인을 먼저 진행해 주세요.</h3></div>`;
+                    break;
+                }
+                if (!Boako.PowerAnalysis || !Boako.PowerAnalysis.buildUI) {
+                    await Boako.Util.loadScript('js/power_analysis.js');
+                }
+                html = `<div id="power-analysis-master-container" class="w-full"></div>`;
+
+                setTimeout(() => {
+                    if (Boako.PowerAnalysis && typeof Boako.PowerAnalysis.buildUI === 'function') {
+                        Boako.PowerAnalysis.buildUI('power-analysis-master-container');
                     }
                 }, 0);
                 break;
