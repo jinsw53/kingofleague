@@ -1,5 +1,5 @@
 /**
- * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이 + 🌟커스텀 프로필 사진 + 🌟기록기 설치 가이드)
+ * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이 + 🌟커스텀 프로필 사진 + 🌟기록기 설치 가이드 + 🌟공지사항 모달)
  */
 Boako.Auth = {
     init: async () => {
@@ -21,6 +21,7 @@ Boako.Auth = {
             if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
             await Boako.Auth.requireBgaNickname();
+            await Boako.Auth.requireNoticeModal();
             Boako.Auth.requireExtensionGuide();
         } else {
             // 🌟 로그인 안 한 방문객은 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준으로만 판단
@@ -64,6 +65,7 @@ Boako.Auth = {
 
                 await Boako.Auth.renderWidget();
                 await Boako.Auth.requireBgaNickname();
+                await Boako.Auth.requireNoticeModal();
                 Boako.Auth.requireExtensionGuide();
                 
             } else {
@@ -648,6 +650,100 @@ Boako.Auth = {
         }
     },
 
+    // ========== 🌟 [신규] 로그인 시 미확인 공지사항 모달 ==========
+    // board_posts.is_notice = true 인 글 중, profiles.tutorial_status.confirmed_notice_ids에
+    // 없는(=아직 확인 안 한) 것들을 오래된 순으로 하나씩 모달로 띄운다.
+
+    _noticeQueue: [],
+
+    requireNoticeModal: async () => {
+        if (!Boako.state.user) return;
+        if (document.getElementById('notice-modal')) return;
+
+        try {
+            const { data: notices } = await Boako.db.from('board_posts')
+                .select('id, title, content, created_at')
+                .eq('is_notice', true)
+                .eq('is_deleted', false)
+                .eq('is_draft', false)
+                .order('created_at', { ascending: true });
+
+            if (!notices || notices.length === 0) return;
+
+            const { data: profile } = await Boako.db.from('profiles')
+                .select('tutorial_status')
+                .eq('id', Boako.state.user.id)
+                .single();
+
+            const status = profile?.tutorial_status || {};
+            const confirmedIds = new Set(status.confirmed_notice_ids || []);
+
+            const unconfirmed = notices.filter(n => !confirmedIds.has(n.id));
+            if (unconfirmed.length === 0) return;
+
+            Boako.Auth._noticeQueue = unconfirmed;
+            Boako.Auth.showNextNoticeModal();
+        } catch (err) {
+            console.error('공지사항 확인 상태 조회 실패:', err);
+        }
+    },
+
+    showNextNoticeModal: () => {
+        const queue = Boako.Auth._noticeQueue;
+        if (!queue || queue.length === 0) return;
+        const notice = queue[0];
+
+        const escapeHtml = (str) => {
+            const div = document.createElement('div');
+            div.innerText = str || '';
+            return div.innerHTML;
+        };
+
+        const modalHtml = `
+            <div id="notice-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden max-h-[85vh] flex flex-col">
+                    <div class="bg-amber-500 p-5 flex items-center gap-3 shrink-0">
+                        <span class="text-2xl">📢</span>
+                        <div class="min-w-0">
+                            <div class="text-[10px] font-black text-amber-100 uppercase tracking-widest">공지사항</div>
+                            <h3 class="text-lg font-black text-white leading-tight truncate">${escapeHtml(notice.title)}</h3>
+                        </div>
+                    </div>
+                    <div class="p-6 overflow-y-auto text-sm text-slate-700 leading-relaxed prose max-w-none">${notice.content}</div>
+                    <div class="p-5 border-t border-slate-100 shrink-0">
+                        <button onclick="Boako.Auth.confirmNotice(${notice.id})" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-3.5 rounded-xl transition-all shadow-lg active:scale-95">
+                            확인했습니다${queue.length > 1 ? ` (${queue.length}개 중 1번째)` : ''}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    confirmNotice: async (noticeId) => {
+        try {
+            const { data: profile } = await Boako.db.from('profiles')
+                .select('tutorial_status')
+                .eq('id', Boako.state.user.id)
+                .single();
+            let status = profile?.tutorial_status || {};
+            const confirmedIds = new Set(status.confirmed_notice_ids || []);
+            confirmedIds.add(noticeId);
+            status.confirmed_notice_ids = [...confirmedIds];
+            await Boako.db.from('profiles').update({ tutorial_status: status }).eq('id', Boako.state.user.id);
+        } catch (err) {
+            console.error('공지사항 확인 상태 저장 실패:', err);
+        }
+
+        document.getElementById('notice-modal')?.remove();
+        Boako.Auth._noticeQueue = (Boako.Auth._noticeQueue || []).filter(n => n.id !== noticeId);
+
+        if (Boako.Auth._noticeQueue.length > 0) {
+            Boako.Auth.showNextNoticeModal();
+        }
+    },
+
     // ========== 🌟 [신규] 첫 방문자용 "기록기 설치" 스포트라이트 가이드 ==========
     // CSS(.ext-guide-*, @keyframes)는 index.html의 <style> 블록에 정의되어 있음
 
@@ -733,8 +829,8 @@ Boako.Auth = {
     requireExtensionGuide: async () => {
         if (!Boako.state.user) return;
 
-        // BGA 닉네임 모달이 떠 있으면 겹치지 않도록, 닫힐 때까지 대기했다가 다시 시도
-        if (document.getElementById('bga-nick-modal')) {
+        // BGA 닉네임 모달이나 공지사항 모달이 떠 있으면 겹치지 않도록, 닫힐 때까지 대기했다가 다시 시도
+        if (document.getElementById('bga-nick-modal') || document.getElementById('notice-modal')) {
             setTimeout(() => Boako.Auth.requireExtensionGuide(), 400);
             return;
         }
