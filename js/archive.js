@@ -65,7 +65,7 @@ Boako.Archive = {
                 border-top: 2px solid #ef4444;
                 transform: translateY(-50%) rotate(-4deg);
             }
-            /* 🌟 랭킹보드 닉네임/팀명: 평소엔 말줄임표, 호버 시 글씨가 확대되며 카드 위로 튀어나와 전체가 보임 */
+            /* 🌟 랭킹보드 닉네임/팀명: 평소엔 말줄임표, 호버 시 글씨가 살짝 확대되며 카드 위로 튀어나와 전체가 보임 */
             .archive-nick-hover {
                 display: inline-block;
                 max-width: 100%;
@@ -73,16 +73,22 @@ Boako.Archive = {
                 text-overflow: ellipsis;
                 white-space: nowrap;
                 vertical-align: bottom;
+                line-height: 1.3;
+                padding: 2px 0;
+                margin: -2px 0;
                 transform-origin: left center;
                 transition: transform .15s ease;
                 position: relative;
             }
             .archive-nick-hover:hover {
                 overflow: visible;
-                transform: scale(1.18);
+                max-width: none;
+                width: auto;
+                transform: scale(1.08);
                 background: #ffffff;
                 color: #1e293b !important;
-                padding: 1px 6px;
+                padding: 2px 6px;
+                margin: -2px 0;
                 border-radius: 6px;
                 box-shadow: 0 6px 16px rgba(0,0,0,0.2);
                 z-index: 30;
@@ -687,10 +693,10 @@ Boako.Archive = {
                                  alt="${p.name}">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <h3 class="mvp-name text-xl font-black text-slate-900 leading-none"><span class="archive-nick-hover">${p.name}</span></h3>
+                            <h3 class="mvp-name text-xl font-black text-slate-900"><span class="archive-nick-hover">${p.name}</span></h3>
                             <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer" data-handler="ranking-tooltip">
                                 ${logoHTML}
-                                <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none"><span class="archive-nick-hover">${p.team || 'Free Agent'}</span></span>
+                                <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest"><span class="archive-nick-hover">${p.team || 'Free Agent'}</span></span>
                             </div>
                         </div>
                     </div>
