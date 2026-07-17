@@ -13,7 +13,8 @@ Boako.Ranking.State = {
     expandedTeam: null,
     hofSeasons: [],
     hofSelectedSeason: null,
-    hofData: null
+    hofData: null,
+    nextSeasonInfo: null // 🌟 [신규] 진행 중인 시즌이 없을 때, 다음 시즌 정보(있다면)
 };
 
 Boako.Ranking.init = async function() {
@@ -42,6 +43,19 @@ Boako.Ranking.init = async function() {
         Boako.Ranking.State.selectedSeason = currentSeason
             ? currentSeason.season_no
             : (Boako.Ranking.State.seasons[0]?.season_no || null);
+
+        // 🌟 [신규] 진행/과거 시즌이 아예 없으면(스토브리그 or 서비스 초기), 다음 시즌 시작일 미리 조회
+        Boako.Ranking.State.nextSeasonInfo = null;
+        if (!Boako.Ranking.State.selectedSeason) {
+            const { data: nextSeason } = await Boako.db
+                .from('seasons')
+                .select('season_no, start_date')
+                .gt('start_date', now)
+                .order('start_date', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+            Boako.Ranking.State.nextSeasonInfo = nextSeason || null;
+        }
 
         const { data: finalizedSeasons } = await Boako.db
             .from('season_final_rankings')
@@ -130,6 +144,22 @@ Boako.Ranking.switchTab = async function(tabId) {
     }
 };
 
+// 🌟 [신규] 다음 시즌 안내 문구 생성 (nextSeasonInfo 유무에 따라)
+Boako.Ranking.getNoSeasonMessageHtml = function() {
+    const next = Boako.Ranking.State.nextSeasonInfo;
+    if (next && next.start_date) {
+        const dateStr = new Date(next.start_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+        return `
+            <div class="flex flex-col items-center gap-2 py-16 text-center">
+                <span class="text-3xl">🏆</span>
+                <div class="text-slate-500 font-bold">현재 진행 중인 시즌이 없습니다.</div>
+                <div class="text-indigo-600 font-black text-sm">다음 시즌(시즌 ${next.season_no})은 ${dateStr}부터 시작됩니다.</div>
+            </div>
+        `;
+    }
+    return `<div class="text-center py-16 text-slate-400 font-bold">현재 진행 중인 시즌이 없습니다.</div>`;
+};
+
 Boako.Ranking.loadRankingTab = async function() {
     const content = document.getElementById('rk-content');
     if (!content) return;
@@ -139,7 +169,7 @@ Boako.Ranking.loadRankingTab = async function() {
         const seasonNo = Boako.Ranking.State.selectedSeason;
         const seasonInfo = Boako.Ranking.State.seasons.find(s => s.season_no === seasonNo);
         if (!seasonNo) {
-            content.innerHTML = `<div class="text-center py-16 text-slate-400 font-bold">시즌 정보가 없습니다.</div>`;
+            content.innerHTML = Boako.Ranking.getNoSeasonMessageHtml();
             return;
         }
 
@@ -616,7 +646,13 @@ Boako.Ranking.loadPrizeBanner = async function() {
         if (error) throw error;
 
         if (!data || !data.active) {
-            el.innerHTML = `진행 중인 시즌이 없습니다.`;
+            // 🌟 [수정] 진행 중인 시즌이 없으면, 다음 시즌 시작일이 있는 경우 같이 안내
+            if (data && data.next_start_date) {
+                const dateStr = new Date(data.next_start_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+                el.innerHTML = `진행 중인 시즌이 없습니다. 다음 시즌(시즌 ${data.next_season_no})은 ${dateStr}부터 시작됩니다.`;
+            } else {
+                el.innerHTML = `진행 중인 시즌이 없습니다.`;
+            }
             return;
         }
 
