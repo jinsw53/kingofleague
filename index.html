@@ -357,8 +357,17 @@ document.addEventListener("DOMContentLoaded", function() {
         btn.addEventListener("click", dismissGuide, { once: true });
     }
 
-    // 페이지의 다른 초기화 스크립트(로그인 위젯 등)가 레이아웃을 잡을 시간을 살짝 준 뒤 노출
-    setTimeout(showGuide, 900);
+    // 🌟 [수정] BGA 닉네임 모달(auth.js)이 떠 있으면 겹치지 않도록, 닫힐 때까지 대기했다가 노출
+    function tryShowGuide() {
+        if (document.getElementById("bga-nick-modal")) {
+            setTimeout(tryShowGuide, 400);
+            return;
+        }
+        showGuide();
+    }
+
+    // 페이지의 다른 초기화 스크립트(로그인 위젯, 닉네임 모달 등)가 렌더링할 시간을 살짝 준 뒤 체크 시작
+    setTimeout(tryShowGuide, 900);
 });
 </script>
 
