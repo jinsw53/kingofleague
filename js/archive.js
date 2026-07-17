@@ -6,7 +6,7 @@
  * 🌟 시즌 필터: 전체(올타임 통합, is_alltime=true) / 비시즌(season_no NULL) / 시즌 N
  * 🌟 기본 진입 시: 검증완료 기록 중 최근 시즌을 자동 감지해서 기본 필터로 설정, 없으면 '전체' 유지
  * 🌟 "무소속 포함" 토글(검색창 옆) — 기록실/랭킹보드/게임별통계 3개 탭 전부 동일하게 지원. 기본 OFF(팀 리그만).
- *    무소속 기록은 기록실에서 RP를 취소선 + "미집계" 라벨로 표시.
+ *    무소속 기록은 기록실에서 RP를 빨간 취소선 + "미집계" 라벨로 표시.
  *    챔피언 시스템(v_game_popularity_mvp)은 항상 team_only=true 고정이라 이 토글과 무관하게 절대 오염되지 않음.
  */
 Boako.Archive = {
@@ -56,6 +56,14 @@ Boako.Archive = {
             .mvp-card-navy .mvp-fwb-label { color: #a5b4fc !important; }
             .mvp-card-navy .mvp-fwb-badge { background: rgba(251,191,36,.15) !important; color: #fbbf24 !important; border-color: rgba(251,191,36,.3) !important; }
             .mvp-card-navy .mvp-progress-track { background: rgba(255,255,255,0.15) !important; }
+            .archive-rp-freeagent { position: relative; display: inline-block; color: #94a3b8; }
+            .archive-rp-freeagent::after {
+                content: '';
+                position: absolute;
+                left: -2px; right: -2px; top: 50%;
+                border-top: 2px solid #ef4444;
+                transform: translateY(-50%) rotate(-4deg);
+            }
         `;
         document.head.appendChild(style);
     },
@@ -495,12 +503,12 @@ Boako.Archive = {
                 `;
             }
 
-            // 🌟 무소속(Free Agent) 기록: RP는 취소선 + "미집계" 라벨 (계산은 정상이지만 팀 리그 집계엔 반영 안 됨을 명시)
+            // 🌟 무소속(Free Agent) 기록: RP는 빨간 취소선 + "미집계" 라벨 (계산은 정상이지만 팀 리그 집계엔 반영 안 됨을 명시)
             const isFreeAgent = !rec.b_all_team;
             const rpCellHTML = isFreeAgent
                 ? `<div class="flex flex-col items-end leading-tight">
-                       <span class="text-slate-300 text-lg font-black tracking-tighter line-through">${Math.floor(rec.rp || 0)}</span>
-                       <span class="text-[8px] font-black text-slate-400 uppercase tracking-wider">미집계</span>
+                       <span class="archive-rp-freeagent text-lg font-black tracking-tighter">${Math.floor(rec.rp || 0)}</span>
+                       <span class="text-[8px] font-black text-red-500 uppercase tracking-wider mt-0.5">미집계</span>
                    </div>`
                 : `<span class="font-black text-indigo-600 text-lg tracking-tighter">${Math.floor(rec.rp || 0)}</span>`;
 
