@@ -2,7 +2,7 @@
  * [POWER ANALYSIS] 전력분석실 — 마이페이지 개인 통계 카드
  * 1. 활동량: 내 기록 수 ÷ 아카이브 전체 기록 수
  * 2. 탐험도: 플레이한 게임 종류 ÷ 전체 등록 게임 종류
- * 3. 전력 분석: 첫승 업적 횟수 / 가장 많이 기록한 게임 Top3 / 가장 많이 참여한 토너먼트 Top3
+ * 3. 전력 분석: 첫승 업적 횟수 / 가장 많이 기록한 게임 Top3 / 가장 많이 참여한 토너먼트 종목 Top3
  * 4. 소속 히스토리: 어느 팀에 언제 있었는지 타임라인
  *
  * 🌟 개인 기록 자체는 팀 소속 여부와 무관하게 "내 활동 전체"를 보여주는 게 목적이므로
@@ -49,7 +49,7 @@ Boako.PowerAnalysis = {
                 Boako.db.from('v_boako_total_records').select('id', { count: 'exact', head: true }),
                 Boako.db.from('games').select('id', { count: 'exact', head: true }),
                 Boako.db.from('team_members').select('team_name, joined_at, left_at, is_active').eq('player_name', myNick).order('joined_at', { ascending: true }),
-                Boako.db.from('boako_tournaments').select('tournament_name, players')
+                Boako.db.from('boako_tournaments').select('game_name, players')
             ]);
 
             if (myRowsErr) throw myRowsErr;
@@ -75,23 +75,24 @@ Boako.PowerAnalysis = {
                 .sort((a, b) => b[1].count - a[1].count)
                 .slice(0, 3);
 
-            // 🌟 [신규] 가장 많이 참여한 토너먼트: boako_tournaments.players(jsonb)에 내 닉네임이 참가자로 포함된 행을 tournament_name별로 집계
-            const tournamentStats = {}; // tournament_name -> count
+            // 🌟 [수정] 가장 많이 참여한 토너먼트 "종목": 토너먼트 명칭(tournament_name)은 전부 "BOAKO..."로 시작해 변별력이 없으므로,
+            // boako_tournaments.players(jsonb)에 내 닉네임이 참가자로 포함된 행을 game_name(어떤 게임의 토너먼트였는지)별로 집계
+            const tournamentGameStats = {}; // game_name -> count
             (tournamentRows || []).forEach(t => {
                 const players = Array.isArray(t.players) ? t.players : [];
                 const isParticipant = players.some(p => p && p.name === myNick);
-                if (!isParticipant || !t.tournament_name) return;
-                tournamentStats[t.tournament_name] = (tournamentStats[t.tournament_name] || 0) + 1;
+                if (!isParticipant || !t.game_name) return;
+                tournamentGameStats[t.game_name] = (tournamentGameStats[t.game_name] || 0) + 1;
             });
 
-            const topTournaments = Object.entries(tournamentStats)
+            const topTournamentGames = Object.entries(tournamentGameStats)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 3);
 
             this.render({
                 myRecordCount, totalRecordCount: totalRecordCount || 0, activityPct,
                 distinctGameCount, totalGameCount: totalGameCount || 0, explorePct,
-                firstWinCount, topRecordedGames, topTournaments,
+                firstWinCount, topRecordedGames, topTournamentGames,
                 teamHistory: teamHistory || []
             });
 
@@ -114,7 +115,7 @@ Boako.PowerAnalysis = {
         const {
             myRecordCount, totalRecordCount, activityPct,
             distinctGameCount, totalGameCount, explorePct,
-            firstWinCount, topRecordedGames, topTournaments,
+            firstWinCount, topRecordedGames, topTournamentGames,
             teamHistory
         } = stats;
 
@@ -161,9 +162,9 @@ Boako.PowerAnalysis = {
                 </div>
             `).join('');
 
-        const tournamentsHtml = topTournaments.length === 0
+        const tournamentGamesHtml = topTournamentGames.length === 0
             ? `<div class="text-center text-slate-400 font-bold py-6 text-sm">참여한 토너먼트가 없습니다.</div>`
-            : topTournaments.map(([name, count], idx) => `
+            : topTournamentGames.map(([name, count], idx) => `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#fffbeb; border-radius:10px; margin-bottom:8px;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-size:16px;">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
@@ -191,8 +192,8 @@ Boako.PowerAnalysis = {
                             ${recordedGamesHtml}
                         </div>
                         <div>
-                            <h4 style="font-weight:900; font-size:14px; margin-bottom:12px; color:#1e293b;">🏆 가장 많이 참여한 토너먼트</h4>
-                            ${tournamentsHtml}
+                            <h4 style="font-weight:900; font-size:14px; margin-bottom:12px; color:#1e293b;">🏆 가장 많이 참여한 토너먼트 종목</h4>
+                            ${tournamentGamesHtml}
                         </div>
                     </div>
                 </div>
