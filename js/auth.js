@@ -1,5 +1,5 @@
 /**
- * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이 + 🌟커스텀 프로필 사진 + 🌟기록기 설치 가이드 + 🌟공지사항 모달)
+ * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이 + 🌟커스텀 프로필 사진 + 🌟기록기 설치 가이드 + 🌟공지사항 모달 + 🌟전력분석실 진입 버튼)
  * 온보딩 노출 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
  */
 Boako.Auth = {
@@ -157,7 +157,7 @@ Boako.Auth = {
                 <strong>${user.nickname || '사용자'}</strong>
                 <button class="btn-edit-small" onclick="(async () => { if (!window.Boako.Shop) await Boako.Util.loadScript('js/shop.js'); Boako.Shop.buyItem('item_ticket_nick'); })()">수정</button>
             </div>
-            <div style="margin-top: 8px; display: flex; justify-content: center; gap: 5px;">
+            <div style="margin-top: 8px; display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
                 <button class="btn-inventory" onclick="Boako.View.render('inventory')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">🎒 인벤토리</button>
                 <button class="btn-messenger" onclick="Boako.View.render('messenger')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 12px;">📬 쪽지${unreadBadge}</button>
 
@@ -170,6 +170,8 @@ Boako.Auth = {
                         N
                     </div>
                 </div>
+
+                <button class="btn-power-analysis" onclick="Boako.View.render('power_analysis')" style="cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; font-size: 12px; font-weight: 800; transition: all 0.2s;">🔬 전력분석실</button>
             </div>
             
             ${membershipBadgeHtml}
