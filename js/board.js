@@ -4,7 +4,7 @@
  * 🌟 이미지 삽입: 붙여넣기/드래그/파일선택 전부 커서(또는 드롭 지점) 위치에 정확히 삽입되도록 Range API 기반으로 변경.
  *    강제 줄바꿈(<br>) 제거하고 인라인 여백만 줘서 본문 텍스트와 같은 줄에서 자연스럽게 어울리도록 처리.
  * 🌟 게시글 등록 시 하루 1회 주사위(1~6) 굴려서 나온 눈만큼 포인트 지급 + 화면 오버레이 애니메이션 (fn_roll_daily_dice RPC)
- *    오버레이는 자동으로 안 사라지고 클릭해야 닫힘.
+ *    오버레이는 자동으로 안 사라지고 클릭해야 닫힘. 사운드는 util.js의 window.sfx.diceRoll (애니메이션과 타이밍 동기화).
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -378,7 +378,7 @@ Boako.Board = {
             const { data, error } = await Boako.db.rpc('fn_roll_daily_dice');
             if (error) throw error;
             if (data && data.rolled) {
-                if (window.sfx) window.sfx.success();
+                if (window.sfx && window.sfx.diceRoll) window.sfx.diceRoll();
                 Boako.Board.showDiceRollOverlay(data.dice);
             }
         } catch (err) {
