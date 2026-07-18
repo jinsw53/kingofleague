@@ -3,6 +3,7 @@
  * 🌟 글쓰기 기본 카테고리: 목록에서 보고 있던 탭(currentCategory) 기준으로 자동 선택 (항상 '공략'으로 뜨던 문제 해결)
  * 🌟 이미지 삽입: 붙여넣기/드래그/파일선택 전부 커서(또는 드롭 지점) 위치에 정확히 삽입되도록 Range API 기반으로 변경.
  *    강제 줄바꿈(<br>) 제거하고 인라인 여백만 줘서 본문 텍스트와 같은 줄에서 자연스럽게 어울리도록 처리.
+ * 🌟 게시글 등록 시 하루 1회 주사위(1~6) 굴려서 나온 눈만큼 포인트 지급 + 화면 오버레이 애니메이션 (fn_roll_daily_dice RPC)
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -307,6 +308,77 @@ Boako.Board = {
         selection.addRange(r);
 
         Boako.Board.State.lastEditorRange = r.cloneRange();
+    },
+
+    // ========== 🌟 [신규] 게시글 등록 시 오늘의 주사위 오버레이 ==========
+
+    // 화면 밖에서 주사위가 굴러들어와 착지하는 연출 (dice: 1~6)
+    showDiceRollOverlay: (dice) => {
+        if (document.getElementById('board-dice-overlay')) return;
+
+        if (!document.getElementById('board-dice-style')) {
+            const style = document.createElement('style');
+            style.id = 'board-dice-style';
+            style.innerHTML = `
+                @keyframes board-dice-roll-in {
+                    0%   { transform: translateX(-140vw) translateY(-30px) rotate(0deg); opacity: 0; }
+                    8%   { opacity: 1; }
+                    62%  { transform: translateX(0) translateY(0) rotate(900deg); }
+                    78%  { transform: translateX(0) translateY(-16px) rotate(945deg); }
+                    100% { transform: translateX(0) translateY(0) rotate(960deg); }
+                }
+                @keyframes board-dice-caption-in {
+                    from { opacity: 0; transform: translateY(10px) scale(0.9); }
+                    to   { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes board-dice-fade-out {
+                    from { opacity: 1; }
+                    to   { opacity: 0; }
+                }
+                .board-dice-face { animation: board-dice-roll-in 0.85s cubic-bezier(.21,.9,.32,1) forwards; }
+                .board-dice-caption { animation: board-dice-caption-in 0.35s ease-out 0.8s both; }
+                .board-dice-overlay-exit { animation: board-dice-fade-out 0.35s ease-in forwards; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        const faces = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+        const overlay = document.createElement('div');
+        overlay.id = 'board-dice-overlay';
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); cursor:pointer;';
+        overlay.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+                <div class="board-dice-face" style="font-size:130px; line-height:1; color:#fff; filter:drop-shadow(0 14px 22px rgba(0,0,0,0.4));">${faces[dice] || '🎲'}</div>
+                <div class="board-dice-caption" style="background:#ffffff; color:#0f766e; font-weight:900; font-size:17px; padding:12px 26px; border-radius:999px; box-shadow:0 10px 24px rgba(0,0,0,0.25); text-align:center;">
+                    🎉 오늘의 주사위: ${dice}눈 · <span style="color:#d97706;">+${dice}P</span> 획득!
+                </div>
+            </div>
+        `;
+        overlay.addEventListener('click', () => Boako.Board.dismissDiceOverlay());
+        document.body.appendChild(overlay);
+
+        setTimeout(() => Boako.Board.dismissDiceOverlay(), 2800);
+    },
+
+    dismissDiceOverlay: () => {
+        const overlay = document.getElementById('board-dice-overlay');
+        if (!overlay) return;
+        overlay.classList.add('board-dice-overlay-exit');
+        setTimeout(() => overlay.remove(), 350);
+    },
+
+    // 게시글 등록 성공 후 호출: 하루 1회만 실제로 지급되고, 이미 오늘 굴렸으면 조용히 무시됨
+    tryRollDailyDice: async () => {
+        try {
+            const { data, error } = await Boako.db.rpc('fn_roll_daily_dice');
+            if (error) throw error;
+            if (data && data.rolled) {
+                if (window.sfx) window.sfx.success();
+                Boako.Board.showDiceRollOverlay(data.dice);
+            }
+        } catch (err) {
+            console.error('주사위 굴림 처리 실패:', err);
+        }
     },
 
     // ========== 목록 ==========
@@ -982,6 +1054,9 @@ Boako.Board = {
             Boako.Util.toast('✅ 게시글이 등록되었습니다!');
             Boako.Board.State.currentDraftId = null;
             await Boako.Board.openDetail(postId);
+
+            // 🌟 등록 성공 후 오늘의 주사위 시도 (하루 1회만 실제로 지급됨, 이미 굴렸으면 조용히 무시)
+            Boako.Board.tryRollDailyDice();
         } catch (err) {
             console.error(err);
             Boako.Util.toast('❌ ' + (err.message || '등록에 실패했습니다.'));
