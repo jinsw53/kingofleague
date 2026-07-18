@@ -3,8 +3,9 @@
  * 🌟 카드 등급 문턱값 재조정 (headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 피드에서 완전히 숨김)
  *    기존엔 headline≥7이었는데 importance=7짜리(팀창단/공략글)는 등록 직후 시간이 조금만 지나도
  *    감쇠 때문에 바로 7 밑으로 떨어져서 헤드라인이 사실상 유지가 안 됐음. 여유를 두도록 낮춤.
- * 🌟 랭킹보드에서 쓰던 "호버하면 글씨 확대되며 끝까지 보이는" 효과(nf-hover-title)를 제목/부제목에 동일 적용.
- *    평소엔 말줄임표로 잘리고, 마우스 올리면 살짝 확대+흰 배경으로 카드 위에 떠서 전체 텍스트가 보임.
+ * 🌟 제목/부제목 호버 확대: 카드 자체가 overflow-hidden(썸네일 둥근 모서리 자르기용)이라
+ *    CSS transform만으로는 카드 밖으로 못 튀어나오고 잘렸음. position:fixed 팝업 방식으로 변경해서
+ *    어떤 카드에 있든 overflow 제약 없이 화면 위에 그대로 확대 표시되도록 수정.
  */
 Boako.NewsFeed = {
     items: [],
@@ -43,45 +44,94 @@ Boako.NewsFeed = {
         Boako.NewsFeed.render();
     },
 
-    // 🌟 [신규] 제목/부제목 호버 확대 효과 스타일 (archive.js의 랭킹보드 카드에서 쓰는 것과 동일한 패턴). 한 번만 주입
+    // 🌟 [수정] 제목/부제목 호버 확대 — position:fixed 팝업 방식.
+    // 카드의 overflow-hidden(썸네일 모서리 자르기)에 안 걸리도록 화면 좌표 기준으로 직접 띄운다.
+    // 스타일 + 이벤트 위임(delegation)은 한 번만 등록.
     injectHoverStyle: () => {
         if (document.getElementById('newsfeed-hover-style')) return;
         const style = document.createElement('style');
         style.id = 'newsfeed-hover-style';
         style.innerHTML = `
-            .nf-hover-title {
+            .nf-hover-title-wrap {
+                position: relative;
                 display: inline-block;
+                max-width: 100%;
+                vertical-align: bottom;
+            }
+            .nf-hover-title-base {
+                display: block;
                 max-width: 100%;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-                vertical-align: bottom;
-                line-height: 1.3;
-                padding: 2px 0;
-                margin: -2px 0;
-                transform-origin: left center;
-                transition: transform .15s ease;
-                position: relative;
             }
-            .nf-hover-title:hover {
-                overflow: visible;
-                max-width: none;
-                width: auto;
-                transform: scale(1.08);
+            #nf-hover-popup {
+                position: fixed;
+                display: none;
+                white-space: nowrap;
                 background: #ffffff;
-                color: #1e293b !important;
-                padding: 2px 6px;
-                margin: -2px 0;
-                border-radius: 6px;
-                box-shadow: 0 6px 16px rgba(0,0,0,0.2);
-                z-index: 30;
+                color: #1e293b;
+                padding: 6px 14px;
+                border-radius: 8px;
+                box-shadow: 0 10px 24px rgba(0,0,0,0.28);
+                font-weight: 900;
+                z-index: 99999;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity .12s ease;
+                max-width: 90vw;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
+            #nf-hover-popup.show { display: block; opacity: 1; }
         `;
         document.head.appendChild(style);
+
+        // 화면 어디에나 하나만 존재하는 공용 팝업 요소
+        if (!document.getElementById('nf-hover-popup')) {
+            const popup = document.createElement('div');
+            popup.id = 'nf-hover-popup';
+            document.body.appendChild(popup);
+        }
+
+        // 이벤트 위임: 카드가 매번 새로 그려져도(innerHTML 갱신) 계속 작동하도록 document에 한 번만 등록
+        if (!Boako.NewsFeed._hoverBound) {
+            Boako.NewsFeed._hoverBound = true;
+            const popup = document.getElementById('nf-hover-popup');
+
+            document.addEventListener('mouseover', (e) => {
+                const wrap = e.target.closest('.nf-hover-title-wrap');
+                if (!wrap) return;
+                const baseEl = wrap.querySelector('.nf-hover-title-base');
+                if (!baseEl) return;
+
+                const rect = wrap.getBoundingClientRect();
+                const fontSize = parseFloat(getComputedStyle(baseEl).fontSize) || 14;
+                const fontWeight = getComputedStyle(baseEl).fontWeight;
+
+                popup.textContent = baseEl.textContent;
+                popup.style.fontSize = (fontSize * 1.15) + 'px';
+                popup.style.fontWeight = fontWeight;
+                popup.style.left = Math.max(8, rect.left - 4) + 'px';
+                popup.style.top = Math.max(8, rect.top - 6) + 'px';
+                popup.classList.add('show');
+            });
+
+            document.addEventListener('mouseout', (e) => {
+                const wrap = e.target.closest('.nf-hover-title-wrap');
+                if (!wrap) return;
+                // 같은 wrap 안에서(자식 요소 사이) 이동한 거면 무시
+                if (wrap.contains(e.relatedTarget)) return;
+                popup.classList.remove('show');
+            });
+        }
     },
 
-    // 🌟 [신규] 잘림 대상 텍스트를 호버 확대 span으로 감싸는 헬퍼
-    hoverTitle: (text) => `<span class="nf-hover-title">${Boako.NewsFeed.escapeHtml(text)}</span>`,
+    // 🌟 [수정] 잘림 대상 텍스트를 감싸는 헬퍼 — 화면표시용 얇은 span + fixed 팝업(nf-hover-popup)에 쓸 원본 텍스트를 함께 준비
+    hoverTitle: (text) => {
+        const escaped = Boako.NewsFeed.escapeHtml(text);
+        return `<span class="nf-hover-title-wrap"><span class="nf-hover-title-base">${escaped}</span></span>`;
+    },
 
     // 🌟 [수정] 팀 목록 / 실시간 랭킹 / 최근 게시글 / 랜덤 보드게임에서 각각 여러 개씩 가져와
     // 필러 후보 풀을 넉넉하게 만든다 (반복 사용을 피하기 위해 데이터 개수를 늘림).
