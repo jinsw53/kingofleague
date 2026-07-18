@@ -1,8 +1,11 @@
 /**
  * [UTIL] 공통 유틸리티 (토스트, 프리뷰 + 동적 파일 배달원 + 자동 스크롤)
- * 🌟 sfx.diceRoll: 게시판 주사위 연출(던지기→포물선→착지→굴러가며 통통 튐(점점 감소)→정지, 총 3초)과
- *    정확히 타이밍을 맞춘 합성 효과음. board.js의 keyframe 퍼센트/시간을 바꾸면 여기 숫자도 같이 바꿔야 함.
+ * 🌟 sfx.diceRoll: 오늘의 주사위 연출(던지기→포물선→착지→굴러가며 통통 튐(점점 감소)→정지, 총 3초)과
+ *    정확히 타이밍을 맞춘 합성 효과음. showDiceRollOverlay의 keyframe 퍼센트/시간을 바꾸면 여기 숫자도 같이 바꿔야 함.
  *    최종 정지(3.0초) 타이밍에는 buy.mp3(실제 음원)를 추가로 재생해서 "보상 획득" 느낌을 강조함.
+ * 🌟 [이전] 오늘의 주사위(showDiceRollOverlay/dismissDiceOverlay/tryRollDailyDice)를 board.js에서 이곳으로 이전.
+ *    모든 페이지에서 항상 로드되는 파일이라, 게시글 작성뿐 아니라 라이벌전/토너먼트/같이하자 등
+ *    "팀 리그 외" 활동 어디서든 하루 1회 무료 주사위를 발동시킬 수 있게 하기 위함 (결제 없는 순수 보상 연출).
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -179,6 +182,106 @@ Boako.Util = {
             const fn = onSelectFn.split('.').reduce((o, k) => (o ? o[k] : undefined), window);
             if (typeof fn === 'function') fn(value);
         }
+    },
+
+    // ========== 🌟 [이전됨: board.js → util.js] 오늘의 주사위 (하루 1회 무료 보상 연출) ==========
+    // 옆에서 툭 던져짐(포물선) → 착지 → 데구르르 굴러가며 통통 튐(점점 잦아듦) → 정지 (dice: 1~6). 총 3초.
+    // 굴러가는 동안 눈이 실제로 랜덤하게 계속 바뀌다가 착지 직전(2.85초)에 진짜 결과값으로 고정됨.
+    // 자동으로 안 사라지고 클릭해야 닫힘. 결제 없는 순수 활동 보상이라 게시글/라이벌전/토너먼트/같이하자 등
+    // "팀 리그 외" 활동 어디서든 호출 가능 (fn_roll_daily_dice가 유저+날짜 기준으로 하루 1회만 보장).
+    showDiceRollOverlay: (dice) => {
+        if (document.getElementById('board-dice-overlay')) return;
+
+        if (!document.getElementById('board-dice-style')) {
+            const style = document.createElement('style');
+            style.id = 'board-dice-style';
+            style.innerHTML = `
+                @keyframes board-dice-roll-in {
+                    0%   { transform: translateX(-160vw) translateY(-40px) rotate(0deg) scale(0.85); opacity: 0; }
+                    6%   { opacity: 1; }
+                    35%  { transform: translateX(-45vw) translateY(-160px) rotate(540deg) scale(1.05); }
+                    55%  { transform: translateX(0) translateY(0) rotate(1080deg) scale(1); }
+                    65%  { transform: translateX(0) translateY(-38px) rotate(1170deg); }
+                    75%  { transform: translateX(0) translateY(0) rotate(1260deg); }
+                    83%  { transform: translateX(0) translateY(-16px) rotate(1305deg); }
+                    90%  { transform: translateX(0) translateY(0) rotate(1350deg); }
+                    95%  { transform: translateX(0) translateY(-5px) rotate(1372deg); }
+                    100% { transform: translateX(0) translateY(0) rotate(1440deg) scale(1); }
+                }
+                @keyframes board-dice-caption-in {
+                    from { opacity: 0; transform: translateY(10px) scale(0.9); }
+                    to   { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes board-dice-hint-in {
+                    from { opacity: 0; }
+                    to   { opacity: 1; }
+                }
+                @keyframes board-dice-fade-out {
+                    from { opacity: 1; }
+                    to   { opacity: 0; }
+                }
+                .board-dice-face { animation: board-dice-roll-in 3s linear forwards; }
+                .board-dice-caption { animation: board-dice-caption-in 0.35s ease-out 2.95s both; }
+                .board-dice-hint { animation: board-dice-hint-in 0.4s ease-out 3.45s both; }
+                .board-dice-overlay-exit { animation: board-dice-fade-out 0.35s ease-in forwards; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        const faces = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+        const overlay = document.createElement('div');
+        overlay.id = 'board-dice-overlay';
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); cursor:pointer;';
+        overlay.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+                <div class="board-dice-face" style="font-size:130px; line-height:1; color:#fff; filter:drop-shadow(0 14px 22px rgba(0,0,0,0.4));">${faces[1 + Math.floor(Math.random() * 6)]}</div>
+                <div class="board-dice-caption" style="background:#ffffff; color:#0f766e; font-weight:900; font-size:17px; padding:12px 26px; border-radius:999px; box-shadow:0 10px 24px rgba(0,0,0,0.25); text-align:center;">
+                    🎉 오늘의 주사위: ${dice}눈 · <span style="color:#d97706;">+${dice}P</span> 획득!
+                </div>
+                <div class="board-dice-hint" style="color:rgba(255,255,255,0.75); font-size:12px; font-weight:700;">화면을 탭하면 닫혀요</div>
+            </div>
+        `;
+        overlay.addEventListener('click', () => Boako.Util.dismissDiceOverlay());
+        document.body.appendChild(overlay);
+
+        // 🌟 구르는 동안 눈이 실제로 랜덤하게 바뀌다가(점점 느려짐), 착지 직전(2.85초)에 진짜 결과값으로 고정
+        const faceEl = overlay.querySelector('.board-dice-face');
+        const cycleUntilMs = 2850; // CSS 애니메이션의 마지막 잔진동(95%=2.85초) 지점과 일치
+        const cycleStart = performance.now();
+        (function cycleFace() {
+            if (!document.body.contains(faceEl)) return; // 오버레이가 이미 닫혔으면 중단
+            const elapsed = performance.now() - cycleStart;
+            if (elapsed >= cycleUntilMs) {
+                faceEl.textContent = faces[dice] || '🎲';
+                return;
+            }
+            faceEl.textContent = faces[1 + Math.floor(Math.random() * 6)];
+            const progress = elapsed / cycleUntilMs;
+            const nextDelay = 45 + progress * 220; // 처음엔 빠르게 휙휙, 갈수록 느리게(구르는 속도가 잦아드는 것과 맞춤)
+            setTimeout(cycleFace, nextDelay);
+        })();
+    },
+
+    dismissDiceOverlay: () => {
+        const overlay = document.getElementById('board-dice-overlay');
+        if (!overlay) return;
+        overlay.classList.add('board-dice-overlay-exit');
+        setTimeout(() => overlay.remove(), 350);
+    },
+
+    // 활동(게시글 작성/라이벌전 제안·수락/토너먼트 개최 신청/같이하자 모집글 등) 성공 직후 호출.
+    // 하루 1회만 실제로 지급되고, 그날 이미 어떤 활동으로든 굴렸으면 조용히 무시됨.
+    tryRollDailyDice: async () => {
+        try {
+            const { data, error } = await Boako.db.rpc('fn_roll_daily_dice');
+            if (error) throw error;
+            if (data && data.rolled) {
+                if (window.sfx && window.sfx.diceRoll) window.sfx.diceRoll();
+                Boako.Util.showDiceRollOverlay(data.dice);
+            }
+        } catch (err) {
+            console.error('주사위 굴림 처리 실패:', err);
+        }
     }
 };
 
@@ -246,8 +349,8 @@ window.sfx = (function() {
             tone(523.25, 0.1, 'sine', 0.15);
             tone(783.99, 0.2, 'sine', 0.13, 0.08);
         },
-        // 🌟 게시판 "오늘의 주사위" 전용 — 던지기(휙) → 공중 스윕 → 착지 → 데구르르 굴러가며 통통 튐(점점 감소) → 정지(+buy) → 포인트 차임
-        // board.js의 showDiceRollOverlay CSS 애니메이션(총 3초, 55%=1.65초 첫 착지, 65/75/83/90/95%=바운스들, 100%=3.0초 정지)과
+        // 🌟 "오늘의 주사위" 전용 — 던지기(휙) → 공중 스윕 → 착지 → 데구르르 굴러가며 통통 튐(점점 감소) → 정지(+buy) → 포인트 차임
+        // showDiceRollOverlay의 CSS 애니메이션(총 3초, 55%=1.65초 첫 착지, 65/75/83/90/95%=바운스들, 100%=3.0초 정지)과
         // 정확히 같은 시간값을 사용해 싱크를 맞춤. 애니메이션 시간을 바꾸면 여기도 비례해서 같이 바꿔야 함.
         diceRoll: function() {
             // 1) 던지기(휙) — 0초, 살짝 높은 음에서 아래로 훑는 톱니파
