@@ -567,7 +567,9 @@ Boako.Auth = {
             if (!isLeader) { verifyMenu.style.display = 'none'; return; }
             verifyMenu.style.display = 'list-item';
 
-            const { count } = await Boako.db.from('v_boako_total_records').select('*', { count: 'exact', head: true }).neq('b_all_team', myTeamName).eq('is_verified', 1);
+            // 🌟 b_all_team이 NULL(무소속)인 경우 .neq()만으로는 걸러지지 않으므로(NULL 비교는 항상 거짓),
+            // "내 팀이 아니거나(neq) 무소속(is null)"을 or 조건으로 명시 (record_verify.js 실제 목록 쿼리와 동일하게 통일)
+            const { count } = await Boako.db.from('v_boako_total_records').select('*', { count: 'exact', head: true }).or(`b_all_team.neq.${myTeamName},b_all_team.is.null`).eq('is_verified', 1);
             if (count > 0) { verifyMenu.style.background = '#fff1f2'; verifyMenu.style.borderLeft = '4px solid #10b981'; verifyMenu.style.fontWeight = '800'; } 
             else { verifyMenu.style.background = 'transparent'; verifyMenu.style.borderLeft = 'none'; verifyMenu.style.fontWeight = 'normal'; }
         } catch (err) { console.error(err); }
