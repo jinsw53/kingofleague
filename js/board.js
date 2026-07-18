@@ -6,6 +6,7 @@
  * 🌟 게시글 등록 시 하루 1회 주사위(1~6) 굴려서 나온 눈만큼 포인트 지급 + 화면 오버레이 애니메이션 (fn_roll_daily_dice RPC)
  *    오버레이는 자동으로 안 사라지고 클릭해야 닫힘.
  *    연출: 옆에서 툭 던져짐(포물선) → 착지 → 데구르르 굴러가며 통통 튐(점점 잦아듦) → 정지, 총 3초.
+ *    🌟 구르는 동안 주사위 눈이 실제로 계속 랜덤하게 바뀌다가(점점 느려짐) 착지 직전(2.85초)에 진짜 결과값으로 고정됨.
  *    사운드는 util.js의 window.sfx.diceRoll (아래 keyframe 퍼센트/시간과 정확히 동기화됨 — 애니메이션 시간을 바꾸면 diceRoll의 시간값도 같이 바꿔야 함).
  */
 Boako.Board = {
@@ -316,6 +317,7 @@ Boako.Board = {
     // ========== 🌟 [신규] 게시글 등록 시 오늘의 주사위 오버레이 ==========
 
     // 옆에서 툭 던져짐(포물선) → 착지 → 데구르르 굴러가며 통통 튐(점점 잦아듦) → 정지 (dice: 1~6). 총 3초.
+    // 굴러가는 동안 눈이 실제로 랜덤하게 계속 바뀌다가 착지 직전(2.85초)에 진짜 값으로 고정됨.
     // 자동으로 안 사라지고 클릭해야 닫힘.
     showDiceRollOverlay: (dice) => {
         if (document.getElementById('board-dice-overlay')) return;
@@ -362,7 +364,7 @@ Boako.Board = {
         overlay.style.cssText = 'position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); cursor:pointer;';
         overlay.innerHTML = `
             <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
-                <div class="board-dice-face" style="font-size:130px; line-height:1; color:#fff; filter:drop-shadow(0 14px 22px rgba(0,0,0,0.4));">${faces[dice] || '🎲'}</div>
+                <div class="board-dice-face" style="font-size:130px; line-height:1; color:#fff; filter:drop-shadow(0 14px 22px rgba(0,0,0,0.4));">${faces[1 + Math.floor(Math.random() * 6)]}</div>
                 <div class="board-dice-caption" style="background:#ffffff; color:#0f766e; font-weight:900; font-size:17px; padding:12px 26px; border-radius:999px; box-shadow:0 10px 24px rgba(0,0,0,0.25); text-align:center;">
                     🎉 오늘의 주사위: ${dice}눈 · <span style="color:#d97706;">+${dice}P</span> 획득!
                 </div>
@@ -371,6 +373,23 @@ Boako.Board = {
         `;
         overlay.addEventListener('click', () => Boako.Board.dismissDiceOverlay());
         document.body.appendChild(overlay);
+
+        // 🌟 구르는 동안 눈이 실제로 랜덤하게 바뀌다가(점점 느려짐), 착지 직전(2.85초)에 진짜 결과값으로 고정
+        const faceEl = overlay.querySelector('.board-dice-face');
+        const cycleUntilMs = 2850; // CSS 애니메이션의 마지막 잔진동(95%=2.85초) 지점과 일치
+        const cycleStart = performance.now();
+        (function cycleFace() {
+            if (!document.body.contains(faceEl)) return; // 오버레이가 이미 닫혔으면 중단
+            const elapsed = performance.now() - cycleStart;
+            if (elapsed >= cycleUntilMs) {
+                faceEl.textContent = faces[dice] || '🎲';
+                return;
+            }
+            faceEl.textContent = faces[1 + Math.floor(Math.random() * 6)];
+            const progress = elapsed / cycleUntilMs;
+            const nextDelay = 45 + progress * 220; // 처음엔 빠르게 휙휙, 갈수록 느리게(구르는 속도가 잦아드는 것과 맞춤)
+            setTimeout(cycleFace, nextDelay);
+        })();
     },
 
     dismissDiceOverlay: () => {
