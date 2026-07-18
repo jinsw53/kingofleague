@@ -4,6 +4,7 @@
  * - grandprix_match_chats 테이블 & messages 테이블 이원화 처리 완료
  * - 🌟 [V3.5 업데이트] 일정 조율 투표(POLL) 데이터 통합 렌더링 시스템 탑재
  * - 🌟 [V3.6 업데이트] 챌린지(4대4 로스터전) 전용 그룹채팅방 추가 — 챌린지 1건당 방 1개, 양 팀 로스터 전원 참여
+ * - 🌟 [V3.7 업데이트] 라이벌전 수락 시 오늘의 주사위 시도 (팀 리그 외 활동, 하루 1회)
  */
 Boako.Messenger = {
     unreadCount: 0,
@@ -999,6 +1000,11 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
                 if (error) throw new Error("처리 실패");
                 if (status === 'ACCEPTED' && window.sfx) window.sfx.rosterLock();
                 Boako.Util.toast(`✅ 라이벌 도전을 처리했습니다!`);
+
+                // 🌟 팀 리그 외 활동(라이벌전 수락) 성공 시 오늘의 주사위 시도 (하루 1회, 이미 굴렸으면 조용히 무시)
+                // 거절(REJECTED)이 아니라 수락(ACCEPTED)했을 때만 발동
+                if (status === 'ACCEPTED') Boako.Util.tryRollDailyDice();
+
                 await Boako.Messenger.fetchUnreadCount(); if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget(); await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
             } catch (err) { alert(err.message); }
         },
