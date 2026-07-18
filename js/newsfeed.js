@@ -3,6 +3,8 @@
  * 🌟 카드 등급 문턱값 재조정 (headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 피드에서 완전히 숨김)
  *    기존엔 headline≥7이었는데 importance=7짜리(팀창단/공략글)는 등록 직후 시간이 조금만 지나도
  *    감쇠 때문에 바로 7 밑으로 떨어져서 헤드라인이 사실상 유지가 안 됐음. 여유를 두도록 낮춤.
+ * 🌟 랭킹보드에서 쓰던 "호버하면 글씨 확대되며 끝까지 보이는" 효과(nf-hover-title)를 제목/부제목에 동일 적용.
+ *    평소엔 말줄임표로 잘리고, 마우스 올리면 살짝 확대+흰 배경으로 카드 위에 떠서 전체 텍스트가 보임.
  */
 Boako.NewsFeed = {
     items: [],
@@ -19,6 +21,8 @@ Boako.NewsFeed = {
         Boako.NewsFeed.rootId = containerId;
         const root = document.getElementById(containerId);
         if (!root) return;
+
+        Boako.NewsFeed.injectHoverStyle();
 
         root.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">소식을 불러오는 중...</div>`;
 
@@ -38,6 +42,46 @@ Boako.NewsFeed = {
         Boako.NewsFeed.fillerCursor = 0;
         Boako.NewsFeed.render();
     },
+
+    // 🌟 [신규] 제목/부제목 호버 확대 효과 스타일 (archive.js의 랭킹보드 카드에서 쓰는 것과 동일한 패턴). 한 번만 주입
+    injectHoverStyle: () => {
+        if (document.getElementById('newsfeed-hover-style')) return;
+        const style = document.createElement('style');
+        style.id = 'newsfeed-hover-style';
+        style.innerHTML = `
+            .nf-hover-title {
+                display: inline-block;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                vertical-align: bottom;
+                line-height: 1.3;
+                padding: 2px 0;
+                margin: -2px 0;
+                transform-origin: left center;
+                transition: transform .15s ease;
+                position: relative;
+            }
+            .nf-hover-title:hover {
+                overflow: visible;
+                max-width: none;
+                width: auto;
+                transform: scale(1.08);
+                background: #ffffff;
+                color: #1e293b !important;
+                padding: 2px 6px;
+                margin: -2px 0;
+                border-radius: 6px;
+                box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+                z-index: 30;
+            }
+        `;
+        document.head.appendChild(style);
+    },
+
+    // 🌟 [신규] 잘림 대상 텍스트를 호버 확대 span으로 감싸는 헬퍼
+    hoverTitle: (text) => `<span class="nf-hover-title">${Boako.NewsFeed.escapeHtml(text)}</span>`,
 
     // 🌟 [수정] 팀 목록 / 실시간 랭킹 / 최근 게시글 / 랜덤 보드게임에서 각각 여러 개씩 가져와
     // 필러 후보 풀을 넉넉하게 만든다 (반복 사용을 피하기 위해 데이터 개수를 늘림).
@@ -251,7 +295,7 @@ Boako.NewsFeed = {
         return `
             <div class="nf-filler-card" ${clickable}>
                 <div class="thumb">${img ? `<img src="${img}">` : '📰'}</div>
-                <div class="txt"><h4>${Boako.NewsFeed.escapeHtml(item.title)}</h4></div>
+                <div class="txt"><h4>${Boako.NewsFeed.hoverTitle(item.title)}</h4></div>
             </div>
         `;
     },
@@ -263,7 +307,7 @@ Boako.NewsFeed = {
         return `
             <div class="nf-filler-card" ${clickable}>
                 <div class="thumb">${img ? `<img src="${img}">` : filler.icon}</div>
-                <div class="txt"><h4>${Boako.NewsFeed.escapeHtml(filler.title)}</h4></div>
+                <div class="txt"><h4>${Boako.NewsFeed.hoverTitle(filler.title)}</h4></div>
             </div>
         `;
     },
@@ -275,8 +319,8 @@ Boako.NewsFeed = {
         return `
             <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                 ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
-                <div class="p-3">
-                    <h4 class="text-xs font-black text-slate-800 leading-snug truncate">${Boako.NewsFeed.escapeHtml(filler.title)}</h4>
+                <div class="p-3 min-w-0">
+                    <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.hoverTitle(filler.title)}</h4>
                 </div>
             </div>
         `;
@@ -294,8 +338,8 @@ Boako.NewsFeed = {
                     ${img ? `<div class="w-2/5 shrink-0"><img src="${img}" class="w-full h-full object-cover"></div>` : `<div class="w-2/5 shrink-0 bg-slate-100 flex items-center justify-center text-6xl">📰</div>`}
                     <div class="p-8 flex-1 flex flex-col justify-center min-w-0">
                         <span class="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">HEADLINE</span>
-                        <h2 class="text-2xl font-black text-slate-900 leading-snug mb-2 truncate">${Boako.NewsFeed.escapeHtml(item.title)}</h2>
-                        ${item.subtitle ? `<p class="text-sm text-slate-500 font-bold truncate">${Boako.NewsFeed.escapeHtml(item.subtitle)}</p>` : ''}
+                        <h2 class="text-2xl font-black text-slate-900 leading-snug mb-2">${Boako.NewsFeed.hoverTitle(item.title)}</h2>
+                        ${item.subtitle ? `<p class="text-sm text-slate-500 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
                     </div>
                 </div>
             `;
@@ -306,8 +350,8 @@ Boako.NewsFeed = {
                 <div class="col-span-4 md:col-span-2 min-h-[112px] bg-white rounded-xl overflow-hidden shadow-md border border-slate-200 flex hover:shadow-lg transition-shadow" ${clickable}>
                     ${img ? `<div class="w-32 shrink-0"><img src="${img}" class="w-full h-full object-cover"></div>` : `<div class="w-32 shrink-0 bg-slate-100 flex items-center justify-center text-3xl">📰</div>`}
                     <div class="p-4 flex-1 flex flex-col justify-center min-w-0">
-                        <h3 class="text-base font-black text-slate-900 leading-snug mb-1 truncate">${Boako.NewsFeed.escapeHtml(item.title)}</h3>
-                        ${item.subtitle ? `<p class="text-xs text-slate-500 font-bold truncate">${Boako.NewsFeed.escapeHtml(item.subtitle)}</p>` : ''}
+                        <h3 class="text-base font-black text-slate-900 leading-snug mb-1">${Boako.NewsFeed.hoverTitle(item.title)}</h3>
+                        ${item.subtitle ? `<p class="text-xs text-slate-500 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
                     </div>
                 </div>
             `;
@@ -317,8 +361,8 @@ Boako.NewsFeed = {
             return `
                 <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                     ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
-                    <div class="p-3">
-                        <h4 class="text-xs font-black text-slate-800 leading-snug truncate">${Boako.NewsFeed.escapeHtml(item.title)}</h4>
+                    <div class="p-3 min-w-0">
+                        <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.hoverTitle(item.title)}</h4>
                     </div>
                 </div>
             `;
@@ -326,8 +370,8 @@ Boako.NewsFeed = {
 
         // small
         return `
-            <div class="col-span-2 md:col-span-1 min-h-[44px] bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 hover:bg-slate-100 transition-colors flex items-center" ${clickable}>
-                <span class="text-[11px] font-bold text-slate-500 truncate block">${Boako.NewsFeed.escapeHtml(item.title)}</span>
+            <div class="col-span-2 md:col-span-1 min-h-[44px] bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 hover:bg-slate-100 transition-colors flex items-center min-w-0" ${clickable}>
+                <span class="text-[11px] font-bold text-slate-500">${Boako.NewsFeed.hoverTitle(item.title)}</span>
             </div>
         `;
     },
