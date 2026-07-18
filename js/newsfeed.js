@@ -1,5 +1,8 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
+ * 🌟 카드 등급 문턱값 재조정 (headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 피드에서 완전히 숨김)
+ *    기존엔 headline≥7이었는데 importance=7짜리(팀창단/공략글)는 등록 직후 시간이 조금만 지나도
+ *    감쇠 때문에 바로 7 밑으로 떨어져서 헤드라인이 사실상 유지가 안 됐음. 여유를 두도록 낮춤.
  */
 Boako.NewsFeed = {
     items: [],
@@ -127,11 +130,13 @@ Boako.NewsFeed = {
         return item.importance * freshness;
     },
 
+    // 🌟 [수정] headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 null(피드에서 완전히 숨김)
     getTier: (score) => {
-        if (score >= 7) return 'headline';
-        if (score >= 4) return 'large';
+        if (score >= 5) return 'headline';
+        if (score >= 3) return 'large';
         if (score >= 2) return 'medium';
-        return 'small';
+        if (score >= 1) return 'small';
+        return null;
     },
 
     // 헤드라인의 좌/우 배치를 정하는 함수 — 랜덤이 아니라 항목 id로 결정되는 고정값.
@@ -155,12 +160,14 @@ Boako.NewsFeed = {
             </div>
         `;
 
-        const scored = Boako.NewsFeed.items.map(item => ({
+        let scored = Boako.NewsFeed.items.map(item => ({
             ...item,
             _score: Boako.NewsFeed.computeScore(item),
         }));
-        scored.sort((a, b) => b._score - a._score);
         scored.forEach(item => { item._tier = Boako.NewsFeed.getTier(item._score); });
+        // 🌟 1점 미만(너무 오래돼서 신선도가 다 떨어진 소식)은 피드에서 완전히 제외
+        scored = scored.filter(item => item._tier !== null);
+        scored.sort((a, b) => b._score - a._score);
 
         const hasHeadline = scored.some(item => item._tier === 'headline');
 
