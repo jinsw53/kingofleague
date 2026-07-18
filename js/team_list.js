@@ -1,6 +1,7 @@
 /**
  * [TEAM LIST] 생성된 팀 목록 및 현황 대시보드
  * - 정렬 알고리즘: 1순위(전원 활동 중) -> 2순위(결원 많은 팀) -> 3순위(최신 창단 팀)
+ * 🌟 가입 신청 쪽지에 sender_name_override/receiver_name_override 채우도록 수정 (안 채우면 대화방 제목이 "null 님과의 대화"로 표시되던 버그)
  */
 Boako.TeamList = {
     currentPage: 1,
@@ -212,7 +213,9 @@ Boako.TeamList = {
 
             const payload = {
                 sender_id: Boako.state.user.id,
+                sender_name_override: Boako.state.user.nickname, // 🌟 안 채우면 대화방 제목이 "null 님과의 대화"로 뜨는 원인이었음
                 receiver_id: leaderProfile.id,
+                receiver_name_override: leaderName, // 🌟 마찬가지로 필수
                 content: JSON.stringify({
                     text: `👋 안녕하세요! [${teamName}] 팀에 가입을 신청합니다!`,
                     team_id: teamId,
