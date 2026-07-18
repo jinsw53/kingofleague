@@ -4,6 +4,7 @@
  * 🌟 이미지 삽입: 붙여넣기/드래그/파일선택 전부 커서(또는 드롭 지점) 위치에 정확히 삽입되도록 Range API 기반으로 변경.
  *    강제 줄바꿈(<br>) 제거하고 인라인 여백만 줘서 본문 텍스트와 같은 줄에서 자연스럽게 어울리도록 처리.
  * 🌟 게시글 등록 시 하루 1회 주사위(1~6) 굴려서 나온 눈만큼 포인트 지급 + 화면 오버레이 애니메이션 (fn_roll_daily_dice RPC)
+ *    오버레이는 자동으로 안 사라지고 클릭해야 닫힘.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -312,7 +313,7 @@ Boako.Board = {
 
     // ========== 🌟 [신규] 게시글 등록 시 오늘의 주사위 오버레이 ==========
 
-    // 화면 밖에서 주사위가 굴러들어와 착지하는 연출 (dice: 1~6)
+    // 화면 밖에서 주사위가 굴러들어와 착지하는 연출 (dice: 1~6). 자동으로 안 사라지고 클릭해야 닫힘.
     showDiceRollOverlay: (dice) => {
         if (document.getElementById('board-dice-overlay')) return;
 
@@ -331,12 +332,17 @@ Boako.Board = {
                     from { opacity: 0; transform: translateY(10px) scale(0.9); }
                     to   { opacity: 1; transform: translateY(0) scale(1); }
                 }
+                @keyframes board-dice-hint-in {
+                    from { opacity: 0; }
+                    to   { opacity: 1; }
+                }
                 @keyframes board-dice-fade-out {
                     from { opacity: 1; }
                     to   { opacity: 0; }
                 }
                 .board-dice-face { animation: board-dice-roll-in 0.85s cubic-bezier(.21,.9,.32,1) forwards; }
                 .board-dice-caption { animation: board-dice-caption-in 0.35s ease-out 0.8s both; }
+                .board-dice-hint { animation: board-dice-hint-in 0.4s ease-out 1.2s both; }
                 .board-dice-overlay-exit { animation: board-dice-fade-out 0.35s ease-in forwards; }
             `;
             document.head.appendChild(style);
@@ -352,12 +358,11 @@ Boako.Board = {
                 <div class="board-dice-caption" style="background:#ffffff; color:#0f766e; font-weight:900; font-size:17px; padding:12px 26px; border-radius:999px; box-shadow:0 10px 24px rgba(0,0,0,0.25); text-align:center;">
                     🎉 오늘의 주사위: ${dice}눈 · <span style="color:#d97706;">+${dice}P</span> 획득!
                 </div>
+                <div class="board-dice-hint" style="color:rgba(255,255,255,0.75); font-size:12px; font-weight:700;">화면을 탭하면 닫혀요</div>
             </div>
         `;
         overlay.addEventListener('click', () => Boako.Board.dismissDiceOverlay());
         document.body.appendChild(overlay);
-
-        setTimeout(() => Boako.Board.dismissDiceOverlay(), 2800);
     },
 
     dismissDiceOverlay: () => {
