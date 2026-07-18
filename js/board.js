@@ -1,5 +1,8 @@
 /**
  * [BOARD] 공략 게시판 — 글쓰기/이미지/유튜브삽입/댓글/대댓글/공지/임시저장/추천수/인기순
+ * 🌟 글쓰기 기본 카테고리: 목록에서 보고 있던 탭(currentCategory) 기준으로 자동 선택 (항상 '공략'으로 뜨던 문제 해결)
+ * 🌟 이미지 삽입: 붙여넣기/드래그/파일선택 전부 커서(또는 드롭 지점) 위치에 정확히 삽입되도록 Range API 기반으로 변경.
+ *    강제 줄바꿈(<br>) 제거하고 인라인 여백만 줘서 본문 텍스트와 같은 줄에서 자연스럽게 어울리도록 처리.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -21,7 +24,8 @@ Boako.Board = {
         myLiked: false,
         isAdmin: false,
         currentPage: 1,   // 🌟 [신규] 현재 페이지 번호
-        totalCount: 0     // 🌟 [신규] 현재 필터 기준 전체 게시글 수
+        totalCount: 0,    // 🌟 [신규] 현재 필터 기준 전체 게시글 수
+        lastEditorRange: null // 🌟 [신규] 이미지 삽입 위치 기억용 (커서/드롭 지점)
     },
 
     GUIDE_UNSPECIFIED: '__UNSPECIFIED__',
@@ -242,8 +246,67 @@ Boako.Board = {
         wrapper.style.height = '0';
         wrapper.style.margin = '12px 0';
         wrapper.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}" style="position:absolute; top:0; left:0; width:100%; height:100%; border:0; border-radius:8px;" allowfullscreen></iframe>`;
-        editor.appendChild(wrapper);
-        editor.appendChild(document.createElement('br'));
+        Boako.Board.insertNodeAtCursor(editor, wrapper);
+    },
+
+    // ========== 🌟 [신규] 커서 위치 추적 & 삽입 유틸 ==========
+
+    // 편집창 안에서 현재 선택 영역(커서 위치)이 바뀔 때마다 계속 기억해둠 (paste 이벤트 등에서 재사용)
+    saveEditorSelection: (editor) => {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            if (editor.contains(range.startContainer)) {
+                Boako.Board.State.lastEditorRange = range.cloneRange();
+            }
+        }
+    },
+
+    // 마우스 좌표(드롭 지점)에서 정확한 삽입 위치를 계산 (지원 브라우저 우선, 없으면 null)
+    getRangeFromPoint: (x, y) => {
+        try {
+            if (document.caretRangeFromPoint) {
+                return document.caretRangeFromPoint(x, y);
+            }
+            if (document.caretPositionFromPoint) {
+                const pos = document.caretPositionFromPoint(x, y);
+                if (!pos) return null;
+                const range = document.createRange();
+                range.setStart(pos.offsetNode, pos.offset);
+                range.collapse(true);
+                return range;
+            }
+        } catch (e) { /* noop */ }
+        return null;
+    },
+
+    // 저장해둔(또는 전달받은) 위치에 노드를 정확히 끼워넣고, 커서를 그 바로 뒤로 이동
+    insertNodeAtCursor: (editor, node, range = null) => {
+        editor.focus();
+        const selection = window.getSelection();
+        let targetRange = range || Boako.Board.State.lastEditorRange;
+
+        if (!targetRange || !editor.contains(targetRange.startContainer)) {
+            // 기억해둔 위치가 없거나 더 이상 유효하지 않으면 맨 끝에 삽입
+            targetRange = document.createRange();
+            targetRange.selectNodeContents(editor);
+            targetRange.collapse(false);
+        }
+
+        selection.removeAllRanges();
+        selection.addRange(targetRange);
+
+        const r = selection.getRangeAt(0);
+        r.deleteContents();
+        r.insertNode(node);
+
+        // 삽입한 노드 바로 뒤로 커서 이동 (이어서 바로 타이핑 가능하게)
+        r.setStartAfter(node);
+        r.setEndAfter(node);
+        selection.removeAllRanges();
+        selection.addRange(r);
+
+        Boako.Board.State.lastEditorRange = r.cloneRange();
     },
 
     // ========== 목록 ==========
@@ -617,6 +680,11 @@ Boako.Board = {
 
         Boako.Board.State.selectedGameName = draft?.game_name || null;
         Boako.Board.State.currentDraftId = draft?.id || null;
+        Boako.Board.State.lastEditorRange = null;
+
+        // 🌟 임시글이면 그 글의 카테고리를, 아니면 지금 보고 있던 탭의 카테고리를 기본값으로 사용
+        // (기존에는 무조건 CATEGORIES[0]='공략'이 먼저 뜨는 문제가 있었음)
+        const defaultCategory = draft?.category || Boako.Board.State.currentCategory || '자유';
 
         const { data: profile } = await Boako.db.from('profiles').select('is_admin').eq('id', Boako.state.user.id).single();
         Boako.Board.State.isAdmin = !!(profile && profile.is_admin);
@@ -639,7 +707,7 @@ Boako.Board = {
                     <div class="card-body">
                         <div class="flex gap-2 mb-3">
                             <select id="board-input-category" onchange="Boako.Board.onCategoryChange()" class="border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold">
-                                ${Boako.Board.CATEGORIES.map(c => `<option value="${c}" ${draft?.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                ${Boako.Board.CATEGORIES.map(c => `<option value="${c}" ${defaultCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
                             </select>
                             ${Boako.Board.State.isAdmin ? `
                             <label class="flex items-center gap-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3">
@@ -647,7 +715,7 @@ Boako.Board = {
                             </label>` : ''}
                         </div>
 
-                        <div id="board-game-search-wrap" class="${draft?.category === '공략' ? '' : 'hidden'} mb-3 relative">
+                        <div id="board-game-search-wrap" class="${defaultCategory === '공략' ? '' : 'hidden'} mb-3 relative">
                             <label class="text-xs font-bold text-slate-600 block mb-1">다루는 게임 검색</label>
                             <input type="text" id="board-input-game-search" autocomplete="off" value="${Boako.Board.escapeHtml(draft?.game_name || '')}" placeholder="게임명을 입력해 검색하세요" oninput="Boako.Board.searchGames(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
                             <div id="board-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
@@ -656,10 +724,10 @@ Boako.Board = {
                         <input type="text" id="board-input-title" value="${Boako.Board.escapeHtml(draft?.title || '')}" placeholder="제목을 입력하세요" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold mb-3">
 
                         <div class="bg-sky-50 border border-sky-200 rounded-lg p-2.5 mb-2 text-[11px] font-bold text-sky-700 flex items-center justify-between flex-wrap gap-2">
-                            <span>💡 PC에서는 스크린샷을 Ctrl+V로 붙여넣거나 드래그해서 넣을 수 있어요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)</span>
+                            <span>💡 PC에서는 스크린샷을 Ctrl+V로 붙여넣거나 드래그해서 넣을 수 있어요. 커서가 있던 위치에 바로 삽입돼요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)</span>
                             <div class="flex gap-2 shrink-0">
                                 <button type="button" onclick="Boako.Board.promptVideoEmbed()" class="bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors">🎬 영상 추가</button>
-                                <label class="bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
+                                <label id="board-file-picker-label" class="bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
                                     📷 사진 선택
                                     <input type="file" accept="image/*" multiple id="board-file-picker" style="display:none;">
                                 </label>
@@ -684,7 +752,18 @@ Boako.Board = {
 
         const editor = document.getElementById('board-input-content');
 
+        // 🌟 편집창 안에서 커서가 움직일 때마다 위치를 계속 기억해둠 (이미지 삽입 시 사용)
+        ['keyup', 'mouseup', 'input', 'focus'].forEach(evt => {
+            editor.addEventListener(evt, () => Boako.Board.saveEditorSelection(editor));
+        });
+
         editor.addEventListener('paste', async (e) => {
+            // 🌟 붙여넣는 바로 그 순간의 커서 위치를 정확히 캡처 (비동기 업로드 전에 미리 저장)
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+                Boako.Board.State.lastEditorRange = sel.getRangeAt(0).cloneRange();
+            }
+
             const items = e.clipboardData?.items;
             if (items) {
                 for (const item of items) {
@@ -707,10 +786,19 @@ Boako.Board = {
         editor.addEventListener('dragover', (e) => e.preventDefault());
         editor.addEventListener('drop', async (e) => {
             e.preventDefault();
+            // 🌟 마우스를 놓은 정확한 지점에 삽입되도록 좌표 기반으로 위치 계산
+            const dropRange = Boako.Board.getRangeFromPoint(e.clientX, e.clientY);
+            if (dropRange) Boako.Board.State.lastEditorRange = dropRange;
+
             const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
             for (const file of files) {
                 await Boako.Board.handleImageInsert(file, editor);
             }
+        });
+
+        // 🌟 파일 선택 버튼을 누르는 순간(다이얼로그가 뜨기 전)의 커서 위치를 미리 저장
+        document.getElementById('board-file-picker-label').addEventListener('mousedown', () => {
+            Boako.Board.saveEditorSelection(editor);
         });
 
         document.getElementById('board-file-picker').addEventListener('change', async (e) => {
@@ -787,7 +875,18 @@ Boako.Board = {
         }
 
         if (indicator) indicator.classList.add('hidden');
-        editor.innerHTML += Boako.Board.sanitizeContent(temp.innerHTML);
+
+        // 🌟 편집창 맨 끝에 무조건 붙이던 것 → 기억해둔 커서 위치에 그대로 삽입
+        const sanitized = Boako.Board.sanitizeContent(temp.innerHTML);
+        const wrapper = document.createElement('span');
+        wrapper.innerHTML = sanitized;
+        const fragment = document.createDocumentFragment();
+        let lastNode = null;
+        while (wrapper.firstChild) {
+            lastNode = wrapper.firstChild;
+            fragment.appendChild(lastNode);
+        }
+        Boako.Board.insertNodeAtCursor(editor, fragment);
     },
 
     handleImageInsert: async (file, editor) => {
@@ -799,13 +898,14 @@ Boako.Board = {
         if (indicator) indicator.classList.add('hidden');
         if (!url) return;
 
+        // 🌟 강제 줄바꿈(<br>) 제거 + display:block 여백 제거 → 본문 텍스트와 같은 줄에 자연스럽게 어울리도록
         const img = document.createElement('img');
         img.src = url;
         img.style.maxWidth = '100%';
         img.style.borderRadius = '8px';
-        img.style.margin = '8px 0';
-        editor.appendChild(img);
-        editor.appendChild(document.createElement('br'));
+        img.style.margin = '2px 4px';
+        img.style.verticalAlign = 'middle';
+        Boako.Board.insertNodeAtCursor(editor, img);
     },
 
     saveDraft: async () => {
