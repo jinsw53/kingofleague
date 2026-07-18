@@ -1,5 +1,6 @@
 /**
  * [RIVAL SYSTEM] 기록 기반 자동 매칭 라이벌 탐색기 (아코디언 VS 레이아웃 버전)
+ * 🌟 라이벌전 도전장 발송(제안) 성공 시 오늘의 주사위 시도 (팀 리그 외 활동, 하루 1회)
  */
 Boako.Rival = {
     init: (containerId) => {
@@ -202,6 +203,9 @@ Boako.Rival = {
 
             if (window.sfx) window.sfx.rosterLock();
             Boako.Util.toast("🎉 매치 도전장이 성공적으로 발송되었습니다!");
+
+            // 🌟 팀 리그 외 활동(라이벌전 제안) 성공 시 오늘의 주사위 시도 (하루 1회, 이미 굴렸으면 조용히 무시)
+            Boako.Util.tryRollDailyDice();
 
         } catch (err) {
             console.error(err);
