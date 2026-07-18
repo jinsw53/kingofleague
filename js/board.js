@@ -4,7 +4,9 @@
  * 🌟 이미지 삽입: 붙여넣기/드래그/파일선택 전부 커서(또는 드롭 지점) 위치에 정확히 삽입되도록 Range API 기반으로 변경.
  *    강제 줄바꿈(<br>) 제거하고 인라인 여백만 줘서 본문 텍스트와 같은 줄에서 자연스럽게 어울리도록 처리.
  * 🌟 게시글 등록 시 하루 1회 주사위(1~6) 굴려서 나온 눈만큼 포인트 지급 + 화면 오버레이 애니메이션 (fn_roll_daily_dice RPC)
- *    오버레이는 자동으로 안 사라지고 클릭해야 닫힘. 사운드는 util.js의 window.sfx.diceRoll (애니메이션과 타이밍 동기화).
+ *    오버레이는 자동으로 안 사라지고 클릭해야 닫힘.
+ *    연출: 옆에서 툭 던져짐(포물선) → 착지 → 데구르르 굴러가며 통통 튐(점점 잦아듦) → 정지, 총 3초.
+ *    사운드는 util.js의 window.sfx.diceRoll (아래 keyframe 퍼센트/시간과 정확히 동기화됨 — 애니메이션 시간을 바꾸면 diceRoll의 시간값도 같이 바꿔야 함).
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -313,7 +315,8 @@ Boako.Board = {
 
     // ========== 🌟 [신규] 게시글 등록 시 오늘의 주사위 오버레이 ==========
 
-    // 화면 밖에서 주사위가 굴러들어와 착지하는 연출 (dice: 1~6). 자동으로 안 사라지고 클릭해야 닫힘.
+    // 옆에서 툭 던져짐(포물선) → 착지 → 데구르르 굴러가며 통통 튐(점점 잦아듦) → 정지 (dice: 1~6). 총 3초.
+    // 자동으로 안 사라지고 클릭해야 닫힘.
     showDiceRollOverlay: (dice) => {
         if (document.getElementById('board-dice-overlay')) return;
 
@@ -322,11 +325,16 @@ Boako.Board = {
             style.id = 'board-dice-style';
             style.innerHTML = `
                 @keyframes board-dice-roll-in {
-                    0%   { transform: translateX(-140vw) translateY(-30px) rotate(0deg); opacity: 0; }
-                    8%   { opacity: 1; }
-                    62%  { transform: translateX(0) translateY(0) rotate(900deg); }
-                    78%  { transform: translateX(0) translateY(-16px) rotate(945deg); }
-                    100% { transform: translateX(0) translateY(0) rotate(960deg); }
+                    0%   { transform: translateX(-160vw) translateY(-40px) rotate(0deg) scale(0.85); opacity: 0; }
+                    6%   { opacity: 1; }
+                    35%  { transform: translateX(-45vw) translateY(-160px) rotate(540deg) scale(1.05); }
+                    55%  { transform: translateX(0) translateY(0) rotate(1080deg) scale(1); }
+                    65%  { transform: translateX(0) translateY(-38px) rotate(1170deg); }
+                    75%  { transform: translateX(0) translateY(0) rotate(1260deg); }
+                    83%  { transform: translateX(0) translateY(-16px) rotate(1305deg); }
+                    90%  { transform: translateX(0) translateY(0) rotate(1350deg); }
+                    95%  { transform: translateX(0) translateY(-5px) rotate(1372deg); }
+                    100% { transform: translateX(0) translateY(0) rotate(1440deg) scale(1); }
                 }
                 @keyframes board-dice-caption-in {
                     from { opacity: 0; transform: translateY(10px) scale(0.9); }
@@ -340,9 +348,9 @@ Boako.Board = {
                     from { opacity: 1; }
                     to   { opacity: 0; }
                 }
-                .board-dice-face { animation: board-dice-roll-in 0.85s cubic-bezier(.21,.9,.32,1) forwards; }
-                .board-dice-caption { animation: board-dice-caption-in 0.35s ease-out 0.8s both; }
-                .board-dice-hint { animation: board-dice-hint-in 0.4s ease-out 1.2s both; }
+                .board-dice-face { animation: board-dice-roll-in 3s linear forwards; }
+                .board-dice-caption { animation: board-dice-caption-in 0.35s ease-out 2.95s both; }
+                .board-dice-hint { animation: board-dice-hint-in 0.4s ease-out 3.45s both; }
                 .board-dice-overlay-exit { animation: board-dice-fade-out 0.35s ease-in forwards; }
             `;
             document.head.appendChild(style);
