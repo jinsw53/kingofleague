@@ -2,6 +2,7 @@
  * [TOGETHER] 같이하자 — 실시간 매칭 모집 게시판
  * 참가 버튼 = 즉시 확정(선착순, 승인 단계 없음)
  * 정원 마감 or 예정 시각 도달 시 채팅방 오픈(2명 미만이면 자동 취소)
+ * 🌟 모집글 등록 성공 시 오늘의 주사위 시도 (팀 리그 외 활동, 하루 1회)
  */
 Boako.Together = {
     State: {
@@ -389,6 +390,9 @@ Boako.Together = {
             Boako.Util.toast('🎲 모집 글이 등록되었습니다! (+10P)');
             document.getElementById('together-write-modal-overlay').remove();
             await Boako.Together.loadPosts();
+
+            // 🌟 팀 리그 외 활동(같이하자 모집글 등록) 성공 시 오늘의 주사위 시도 (하루 1회, 이미 굴렸으면 조용히 무시)
+            Boako.Util.tryRollDailyDice();
         } catch (err) {
             console.error(err);
             Boako.Util.toast('❌ ' + (err.message || '등록에 실패했습니다.'));
