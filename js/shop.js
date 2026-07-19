@@ -4,6 +4,7 @@
  *    구매할수록 비싸지는 누진 가격(2000→2500→3000→3500→4000→5000)은 서버(purchase_slot_expansion RPC)가 계산.
  * 🌟 팀 리그 타이틀 스폰서(item_title_sponsor, TITLE_SPONSOR) 추가 — 경매식(최소 10,000P, 기존 최고가보다 높아야 갱신).
  *    밀려난 이전 입찰자는 자동 환불, 낙찰액은 시즌 상금풀에 적립 (bid_title_sponsor RPC).
+ *    모달 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹침 (view.js 상점카드와 동일 패턴).
  */
 Boako.Shop = {
     // 구매 로직
@@ -211,13 +212,14 @@ if (window.sfx) window.sfx.buy();
         }
     },
 
-    // 🌟 [신규] 팀 리그 타이틀 스폰서(네이밍권) 경매 모달 — 현재 최고 입찰가/입찰자를 보여주고 그보다 높은 금액으로 입찰
+    // 🌟 팀 리그 타이틀 스폰서(네이밍권) 경매 모달 — 현재 최고 입찰가/입찰자를 보여주고 그보다 높은 금액으로 입찰
+    // 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹쳐서, 몇 시즌 것인지 한눈에 보이게 함
     openTitleSponsorModal: async (targetItem) => {
         const MIN_BID = 10000;
         const now = new Date().toISOString();
         const { data: season } = await Boako.db
             .from('seasons')
-            .select('season_no, title_sponsor_name, title_sponsor_amount')
+            .select('season_no, title_sponsor_name, title_sponsor_amount, season_logo_url')
             .gte('end_date', now)
             .order('start_date', { ascending: true })
             .limit(1)
@@ -236,11 +238,17 @@ if (window.sfx) window.sfx.buy();
 
         Boako.Shop._titleSponsorState = { seasonNo: season.season_no, requiredMin };
 
+        const headerIconHtml = `
+            <span style="display:inline-block; width:26px; height:26px; position:relative; background-image:url('${Boako.Util.cdn(targetItem.icon)}'); background-size:contain; background-repeat:no-repeat; background-position:center; vertical-align:middle;">
+                ${season.season_logo_url ? `<img src="${Boako.Util.cdn(season.season_logo_url)}" style="position:absolute; top:50%; left:19%; width:32%; height:58%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">` : ''}
+            </span>
+        `;
+
         const modalHtml = `
             <div id="title-sponsor-modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4" onclick="if(event.target===this) Boako.Shop.closeTitleSponsorModal()">
                 <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                     <div class="bg-gradient-to-r from-violet-600 to-indigo-700 p-5 flex items-center justify-between">
-                        <h3 class="font-black text-white text-base flex items-center gap-2">🏷️ 팀 리그 타이틀 스폰서</h3>
+                        <h3 class="font-black text-white text-base flex items-center gap-2">${headerIconHtml} 팀 리그 타이틀 스폰서</h3>
                         <button onclick="Boako.Shop.closeTitleSponsorModal()" class="text-white/70 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div class="p-6 space-y-5">
