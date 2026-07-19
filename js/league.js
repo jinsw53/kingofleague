@@ -1,6 +1,7 @@
 /*** * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
  * 🛠️ 2026 최신화 패치: 용병 프사 보안 에러 픽스, 라인업 함수 누락 해결, 프로필&챌린지 실시간 다중 감지(Realtime) 적용, UI 용어 변경(도전/응전/Opponent)
  * 🛠️ [킹 오브 리그 폴백] 진행 중인 시즌이 없을 때(스토브리그) 최근 종료 시즌의 최종 기록을 읽기전용으로 표시
+ * 🌟 타이틀 스폰서(네이밍권) 뱃지를 상단(이미지 배너 위)에 표시 — h1 텍스트 제목이 없는 구조라 별도 줄로 추가
  * 관리 책임자: 소장님 MASTER 
  */
 
@@ -66,6 +67,7 @@ Boako.League.buildUI = function(containerId) {
 
     container.innerHTML = `
     <div class="w-full max-w-4xl mx-auto bg-white border border-slate-200/80 rounded-3xl premium-shadow overflow-hidden transition-all duration-300">
+        <div id="league-sponsor-badge" class="w-full text-center empty:hidden"></div>
         <div class="p-6 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50/50">
             <div id="league-header-img-container" class="flex-1 w-full h-20 rounded-2xl overflow-hidden border border-slate-200/60 shadow-inner bg-slate-100 p-1.5 flex items-center justify-center">
                 <img id="league-header-main-img" src="league_champion_belt_banner.png" alt="LEAGUE BANNER" style="width: 100%; height: 100%; object-fit: contain;">
@@ -92,6 +94,15 @@ Boako.League.buildUI = function(containerId) {
     `;
 
     this.switchTab('bingo');
+
+    // 🌟 타이틀 스폰서(네이밍권) 뱃지 — 이 화면은 텍스트 제목이 없는 이미지 배너 구조라 상단에 별도 줄로 표시
+    (async () => {
+        const sponsorName = await Boako.Util.getTitleSponsor();
+        const badgeEl = document.getElementById('league-sponsor-badge');
+        if (sponsorName && badgeEl) {
+            badgeEl.innerHTML = `<div class="inline-block bg-violet-600 text-white text-[11px] font-black px-4 py-1.5 rounded-b-xl shadow-sm mt-0">🏷️ ${sponsorName}배 보아코 팀 리그</div>`;
+        }
+    })();
 };
 
 Boako.League.switchTab = async function(tabId) {
