@@ -2,6 +2,8 @@
  * [VIEW] 화면 렌더링 및 페이지 템플릿 관리 (인덱스 다이어트 최종 최적화본)
  * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) + 일정표(스케줄) 확장 + 🌟 팀 탭 분리 적용 + 🌟 전력분석실 라우팅
  * 🌟 랭킹 배너에 팀 리그 타이틀 스폰서(네이밍권) 뱃지 연결 (Boako.Util.applyTitleSponsorPrefix)
+ * 🌟 포인트샵 "타이틀 스폰서" 카드 아이콘: naming.png 티켓 이미지를 배경으로 깔고, 그 위에 시즌 로고를
+ *    반시계 90도 회전시켜 주황 스텁 자리에 겹쳐 그림 (서포터즈 배지의 유니폼 합성과 동일한 패턴).
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -638,6 +640,21 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                     currentSeasonUniform = currentSeasonRow?.uniform_image_url || null;
                 }
 
+                // 🌟 타이틀 스폰서(네이밍권) 카드용: 대상 시즌(진행 중이거나 가장 가까운 다음 시즌)의 로고 조회
+                let titleSponsorSeasonLogo = null;
+                const hasTitleSponsorItem = (shopItems || []).some(i => i.item_type === 'TITLE_SPONSOR');
+                if (hasTitleSponsorItem) {
+                    const now = new Date().toISOString();
+                    const { data: sponsorSeasonRow } = await Boako.db
+                        .from('seasons')
+                        .select('season_logo_url')
+                        .gte('end_date', now)
+                        .order('start_date', { ascending: true })
+                        .limit(1)
+                        .maybeSingle();
+                    titleSponsorSeasonLogo = sponsorSeasonRow?.season_logo_url || null;
+                }
+
                 html = `
                 <div class="main-banner" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                     <h1>🛒 프리미엄 포인트 샵</h1>
@@ -658,15 +675,28 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                 ` : ''}
                             </div>
                         `;
+
+                        // 🌟 타이틀 스폰서 카드: naming.png(티켓)를 배경으로, 시즌 로고를 반시계 90도 회전시켜 주황 스텁 위에 겹침
+                        const isTitleSponsor = item.item_type === 'TITLE_SPONSOR';
+                        const titleSponsorIconHtml = `
+                            <div style="width:100%; height:100%; position:relative; background-image:url('${Boako.Util.cdn(item.icon)}'); background-size:contain; background-repeat:no-repeat; background-position:center;">
+                                ${titleSponsorSeasonLogo ? `
+                                    <img src="${Boako.Util.cdn(titleSponsorSeasonLogo)}" style="position:absolute; top:50%; left:19%; width:32%; height:58%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">
+                                ` : ''}
+                            </div>
+                        `;
+
                         return `
                         <div class="section-card" style="margin-bottom:0; display:flex; flex-direction:column; text-align:center; transition:0.3s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                             <div class="card-body" style="flex:1;">
                                 <div style="width: 80px; height: 80px; font-size: 60px; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
                                     ${isSupporter
                                         ? supporterIconHtml
-                                        : (item.icon && item.icon.startsWith('http')
-                                            ? `<img src="${Boako.Util.cdn(item.icon)}" style="width: 100%; height: 100%; object-fit: contain;">`
-                                            : (item.icon || '❓'))
+                                        : isTitleSponsor
+                                            ? titleSponsorIconHtml
+                                            : (item.icon && item.icon.startsWith('http')
+                                                ? `<img src="${Boako.Util.cdn(item.icon)}" style="width: 100%; height: 100%; object-fit: contain;">`
+                                                : (item.icon || '❓'))
                                     }
                                 </div>
                                 <h3 style="font-size:20px; font-weight:900; margin-bottom:10px;">${item.name}</h3>
