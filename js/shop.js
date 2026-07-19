@@ -4,7 +4,7 @@
  *    구매할수록 비싸지는 누진 가격(2000→2500→3000→3500→4000→5000)은 서버(purchase_slot_expansion RPC)가 계산.
  * 🌟 팀 리그 타이틀 스폰서(item_title_sponsor, TITLE_SPONSOR) 추가 — 경매식(최소 10,000P, 기존 최고가보다 높아야 갱신).
  *    밀려난 이전 입찰자는 자동 환불, 낙찰액은 시즌 상금풀에 적립 (bid_title_sponsor RPC).
- *    모달 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹침 (view.js 상점카드와 동일 패턴).
+ *    모달 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹침 (view.js 상점카드와 동일 패턴, 1.5배 확대).
  */
 Boako.Shop = {
     // 구매 로직
@@ -240,7 +240,7 @@ if (window.sfx) window.sfx.buy();
 
         const headerIconHtml = `
             <span style="display:inline-block; width:26px; height:26px; position:relative; background-image:url('${Boako.Util.cdn(targetItem.icon)}'); background-size:contain; background-repeat:no-repeat; background-position:center; vertical-align:middle;">
-                ${season.season_logo_url ? `<img src="${Boako.Util.cdn(season.season_logo_url)}" style="position:absolute; top:50%; left:19%; width:32%; height:58%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">` : ''}
+                ${season.season_logo_url ? `<img src="${Boako.Util.cdn(season.season_logo_url)}" style="position:absolute; top:50%; left:19%; width:48%; height:87%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">` : ''}
             </span>
         `;
 
