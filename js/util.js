@@ -6,8 +6,10 @@
  * 🌟 [이전] 오늘의 주사위(showDiceRollOverlay/dismissDiceOverlay/tryRollDailyDice)를 board.js에서 이곳으로 이전.
  *    모든 페이지에서 항상 로드되는 파일이라, 게시글 작성뿐 아니라 라이벌전/토너먼트/같이하자 등
  *    "팀 리그 외" 활동 어디서든 하루 1회 무료 주사위를 발동시킬 수 있게 하기 위함 (결제 없는 순수 보상 연출).
- * 🌟 [신규] getTitleSponsor / applyTitleSponsorPrefix: 팀 리그 타이틀 스폰서(네이밍권) 공용 조회+표시 함수.
- *    랭킹/대항전/리그콘텐츠/전적기록 4개 배너가 전부 이 함수만 공유해서 사용 (로직 한 곳 집중, 4곳 중복 방지).
+ * 🌟 [신규] getTitleSponsor / buildTitleSponsorBadgeHtml / applyTitleSponsorPrefix:
+ *    팀 리그 타이틀 스폰서(네이밍권) 공용 조회+표시 함수. 랭킹/대항전/리그콘텐츠/전적기록/명예의 전당이
+ *    전부 이 함수만 공유해서 사용 (로직 한 곳 집중, 중복 방지). 뱃지는 "티켓 절취선" 모양
+ *    (주황 스텁 안에 시즌 로고 90도 회전 + 점선 절취선 + 이름 박스)으로 통일.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -287,35 +289,68 @@ Boako.Util = {
     },
 
     // ========== 🌟 [신규] 팀 리그 타이틀 스폰서 (네이밍권) ==========
-    // 현재 진행 중이거나(없으면) 가장 가까운 다음 시즌의 title_sponsor_name을 조회.
-    // 랭킹/대항전/리그콘텐츠/전적기록 4개 배너가 전부 이 함수 하나만 공유해서 씀
-    // (한 군데만 고치면 4곳 다 동시에 반영되도록, 로직을 여기 한 곳에만 둠).
-    getTitleSponsor: async () => {
+    // 현재 진행 중이거나(없으면) 가장 가까운 다음 시즌의 title_sponsor_name + 시즌 로고를 조회.
+    // 랭킹/대항전/리그콘텐츠/전적기록/명예의전당이 전부 이 함수만 공유해서 씀 (한 곳만 고치면 전체 반영).
+    getTitleSponsor: async (seasonNo = null) => {
         try {
-            const nowIso = new Date().toISOString();
-            const { data } = await Boako.db.from('seasons')
-                .select('season_no, title_sponsor_name')
-                .gte('end_date', nowIso)
-                .order('start_date', { ascending: true })
-                .limit(1)
-                .maybeSingle();
-            return data?.title_sponsor_name || null;
+            let query = Boako.db.from('seasons').select('season_no, title_sponsor_name, title_sponsor_amount, season_logo_url');
+            if (seasonNo) {
+                query = query.eq('season_no', seasonNo);
+            } else {
+                const nowIso = new Date().toISOString();
+                query = query.gte('end_date', nowIso).order('start_date', { ascending: true }).limit(1);
+            }
+            const { data } = await query.maybeSingle();
+            if (!data || !data.title_sponsor_name) return null;
+            return {
+                seasonNo: data.season_no,
+                name: data.title_sponsor_name,
+                amount: data.title_sponsor_amount,
+                seasonLogoUrl: data.season_logo_url || null
+            };
         } catch (e) {
             console.error('타이틀 스폰서 조회 실패:', e);
             return null;
         }
     },
 
-    // 지정한 엘리먼트(보통 배너의 <h1>)의 맨 앞에 "🏷️ OO배" 뱃지를 붙임. 스폰서가 없으면 아무것도 안 함.
-    applyTitleSponsorPrefix: async (elementId) => {
-        const sponsorName = await Boako.Util.getTitleSponsor();
-        if (!sponsorName) return;
+    // 🌟 [신규] 티켓 절취선 모양 스폰서 뱃지 HTML 생성 (주황 스텁 안에 시즌 로고 90도 회전 + 점선 절취선 + 이름 박스)
+    // sponsorInfo가 null이면 빈 문자열 반환 (뱃지 자체를 안 그림)
+    buildTitleSponsorBadgeHtml: (sponsorInfo, height = 30) => {
+        if (!sponsorInfo) return '';
+        const stubWidth = Math.round(height * 1.05);
+        const logoSize = Math.round(height * 0.72);
+        const logoHtml = sponsorInfo.seasonLogoUrl
+            ? `<img src="${Boako.Util.cdn(sponsorInfo.seasonLogoUrl)}" style="width:${logoSize}px; height:${logoSize}px; object-fit:contain; transform:rotate(90deg); display:block;">`
+            : `<span style="font-size:${Math.round(height * 0.5)}px; transform:rotate(90deg); display:block;">🏆</span>`;
+        return `
+            <span style="display:inline-flex; align-items:stretch; height:${height}px; border-radius:6px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.18); margin-right:10px; vertical-align:middle;">
+                <span style="background:#f59e0b; width:${stubWidth}px; display:flex; align-items:center; justify-content:center; position:relative; border-right:2px dashed rgba(255,255,255,0.75);">
+                    ${logoHtml}
+                </span>
+                <span style="background:#eef2ff; padding:0 10px; display:flex; align-items:center;">
+                    <span style="font-size:${Math.round(height * 0.38)}px; font-weight:900; color:#4338ca; white-space:nowrap; letter-spacing:-0.3px;">🏷️ ${Boako.Util._escapeHtml(sponsorInfo.name)}배</span>
+                </span>
+            </span>
+        `;
+    },
+
+    // 내부용 간단 escape (스폰서명은 유저 입력값이라 표시 전 이스케이프 필수)
+    _escapeHtml: (str) => {
+        const div = document.createElement('div');
+        div.innerText = str || '';
+        return div.innerHTML;
+    },
+
+    // 지정한 엘리먼트(보통 배너의 <h1>)의 맨 앞에 티켓 모양 스폰서 뱃지를 붙임. 스폰서가 없으면 아무것도 안 함.
+    applyTitleSponsorPrefix: async (elementId, height = 30) => {
+        const sponsorInfo = await Boako.Util.getTitleSponsor();
+        if (!sponsorInfo) return;
         const el = document.getElementById(elementId);
         if (!el) return;
-        const badge = document.createElement('span');
-        badge.style.cssText = 'display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px;';
-        badge.textContent = `🏷️ ${sponsorName}배`;
-        el.prepend(badge, ' ');
+        const wrapper = document.createElement('span');
+        wrapper.innerHTML = Boako.Util.buildTitleSponsorBadgeHtml(sponsorInfo, height);
+        el.prepend(wrapper.firstElementChild, ' ');
     }
 };
 
