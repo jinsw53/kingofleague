@@ -525,7 +525,7 @@ Boako.Ranking.getHofHTML = function() {
             </div>
         `).join('');
 
-    // 🌟 타이틀 스폰서가 있으면 시즌 제목 앞에 뱃지로 표시
+    // 🌟 타이틀 스폰서가 있으면 시즌 제목 앞에 배지로 표시
     const sponsorBadgeHtml = d.titleSponsorName
         ? `<span class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle">🏷️ ${d.titleSponsorName}배</span>`
         : '';
