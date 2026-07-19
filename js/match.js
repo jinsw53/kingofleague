@@ -1,5 +1,6 @@
 /**
  * [MATCH] 대항전 메인 대시보드 관리
+ * 🌟 타이틀 스폰서(네이밍권) 뱃지를 시즌 로고/날짜 영역 위에 표시 (h1 타이틀은 원래 숨겨져 있는 구조라 여기가 실제 노출 지점)
  */
 Boako.Match = {
     // 🌟 [신규] 스코어보드 리얼타임 채널 보관용
@@ -211,8 +212,14 @@ Boako.Match = {
                 let dateHtml = `<div class="text-indigo-200 text-xs font-black bg-indigo-900/60 px-3 py-1.5 rounded-lg border border-indigo-500/30 w-max shadow-inner">
                                     📅 ${currentSeason?.start_date ? currentSeason.start_date.substring(0, 10) : '시작 미정'} ~ ${currentSeason?.end_date ? currentSeason.end_date.substring(0, 10) : '종료 미정'}
                                 </div>`;
+
+                // 🌟 타이틀 스폰서(네이밍권) 뱃지 — h1이 숨겨진 구조라 여기 로고 영역 위에 표시
+                const sponsorName = await Boako.Util.getTitleSponsor();
+                const sponsorBadgeHtml = sponsorName
+                    ? `<div class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner">🏷️ ${sponsorName}배 보아코 팀 리그</div>`
+                    : '';
                 
-                logoEl.innerHTML = logoHtml + dateHtml;
+                logoEl.innerHTML = sponsorBadgeHtml + logoHtml + dateHtml;
             }
 
             // 3. 해당 시즌의 게임, 엔트리, 스코어 데이터 로드
