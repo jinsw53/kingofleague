@@ -6,6 +6,8 @@
  * 🌟 [이전] 오늘의 주사위(showDiceRollOverlay/dismissDiceOverlay/tryRollDailyDice)를 board.js에서 이곳으로 이전.
  *    모든 페이지에서 항상 로드되는 파일이라, 게시글 작성뿐 아니라 라이벌전/토너먼트/같이하자 등
  *    "팀 리그 외" 활동 어디서든 하루 1회 무료 주사위를 발동시킬 수 있게 하기 위함 (결제 없는 순수 보상 연출).
+ * 🌟 [신규] getTitleSponsor / applyTitleSponsorPrefix: 팀 리그 타이틀 스폰서(네이밍권) 공용 조회+표시 함수.
+ *    랭킹/대항전/리그콘텐츠/전적기록 4개 배너가 전부 이 함수만 공유해서 사용 (로직 한 곳 집중, 4곳 중복 방지).
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -282,6 +284,38 @@ Boako.Util = {
         } catch (err) {
             console.error('주사위 굴림 처리 실패:', err);
         }
+    },
+
+    // ========== 🌟 [신규] 팀 리그 타이틀 스폰서 (네이밍권) ==========
+    // 현재 진행 중이거나(없으면) 가장 가까운 다음 시즌의 title_sponsor_name을 조회.
+    // 랭킹/대항전/리그콘텐츠/전적기록 4개 배너가 전부 이 함수 하나만 공유해서 씀
+    // (한 군데만 고치면 4곳 다 동시에 반영되도록, 로직을 여기 한 곳에만 둠).
+    getTitleSponsor: async () => {
+        try {
+            const nowIso = new Date().toISOString();
+            const { data } = await Boako.db.from('seasons')
+                .select('season_no, title_sponsor_name')
+                .gte('end_date', nowIso)
+                .order('start_date', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+            return data?.title_sponsor_name || null;
+        } catch (e) {
+            console.error('타이틀 스폰서 조회 실패:', e);
+            return null;
+        }
+    },
+
+    // 지정한 엘리먼트(보통 배너의 <h1>)의 맨 앞에 "🏷️ OO배" 뱃지를 붙임. 스폰서가 없으면 아무것도 안 함.
+    applyTitleSponsorPrefix: async (elementId) => {
+        const sponsorName = await Boako.Util.getTitleSponsor();
+        if (!sponsorName) return;
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        const badge = document.createElement('span');
+        badge.style.cssText = 'display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px;';
+        badge.textContent = `🏷️ ${sponsorName}배`;
+        el.prepend(badge, ' ');
     }
 };
 
