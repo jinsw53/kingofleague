@@ -3,7 +3,7 @@
  * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) + 일정표(스케줄) 확장 + 🌟 팀 탭 분리 적용 + 🌟 전력분석실 라우팅
  * 🌟 랭킹 배너에 팀 리그 타이틀 스폰서(네이밍권) 뱃지 연결 (Boako.Util.applyTitleSponsorPrefix)
  * 🌟 포인트샵 "타이틀 스폰서" 카드 아이콘: naming.png 티켓 이미지를 배경으로 깔고, 그 위에 시즌 로고를
- *    반시계 90도 회전시켜 주황 스텁 자리에 겹쳐 그림 (서포터즈 배지의 유니폼 합성과 동일한 패턴).
+ *    반시계 90도 회전시켜 주황 스텁 자리에 겹쳐 그림 (서포터즈 배지의 유니폼 합성과 동일한 패턴). 로고 크기 1.5배 확대.
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -676,12 +676,12 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                             </div>
                         `;
 
-                        // 🌟 타이틀 스폰서 카드: naming.png(티켓)를 배경으로, 시즌 로고를 반시계 90도 회전시켜 주황 스텁 위에 겹침
+                        // 🌟 타이틀 스폰서 카드: naming.png(티켓)를 배경으로, 시즌 로고를 반시계 90도 회전시켜 주황 스텁 위에 겹침 (1.5배 확대)
                         const isTitleSponsor = item.item_type === 'TITLE_SPONSOR';
                         const titleSponsorIconHtml = `
                             <div style="width:100%; height:100%; position:relative; background-image:url('${Boako.Util.cdn(item.icon)}'); background-size:contain; background-repeat:no-repeat; background-position:center;">
                                 ${titleSponsorSeasonLogo ? `
-                                    <img src="${Boako.Util.cdn(titleSponsorSeasonLogo)}" style="position:absolute; top:50%; left:19%; width:32%; height:58%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">
+                                    <img src="${Boako.Util.cdn(titleSponsorSeasonLogo)}" style="position:absolute; top:50%; left:19%; width:48%; height:87%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">
                                 ` : ''}
                             </div>
                         `;
