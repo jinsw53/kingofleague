@@ -1,7 +1,7 @@
 /*** * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
  * 🛠️ 2026 최신화 패치: 용병 프사 보안 에러 픽스, 라인업 함수 누락 해결, 프로필&챌린지 실시간 다중 감지(Realtime) 적용, UI 용어 변경(도전/응전/Opponent)
  * 🛠️ [킹 오브 리그 폴백] 진행 중인 시즌이 없을 때(스토브리그) 최근 종료 시즌의 최종 기록을 읽기전용으로 표시
- * 🌟 타이틀 스폰서(네이밍권) 뱃지를 상단(이미지 배너 위)에 표시 — h1 텍스트 제목이 없는 구조라 별도 줄로 추가
+ * 🌟 타이틀 스폰서(네이밍권) 배지를 상단(이미지 배너 위)에 표시 — h1 텍스트 제목이 없는 구조라 별도 줄로 추가
  * 관리 책임자: 소장님 MASTER 
  */
 
@@ -95,7 +95,7 @@ Boako.League.buildUI = function(containerId) {
 
     this.switchTab('bingo');
 
-    // 🌟 타이틀 스폰서(네이밍권) 뱃지 — 이 화면은 텍스트 제목이 없는 이미지 배너 구조라 상단에 별도 줄로 표시
+    // 🌟 타이틀 스폰서(네이밍권) 배지 — 이 화면은 텍스트 제목이 없는 이미지 배너 구조라 상단에 별도 줄로 표시
     (async () => {
         const sponsorName = await Boako.Util.getTitleSponsor();
         const badgeEl = document.getElementById('league-sponsor-badge');
