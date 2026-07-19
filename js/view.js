@@ -1,6 +1,7 @@
 /**
  * [VIEW] 화면 렌더링 및 페이지 템플릿 관리 (인덱스 다이어트 최종 최적화본)
  * 구조: 신설 6대장 메뉴 수송선 라인 + 통신망(메신저) + 일정표(스케줄) 확장 + 🌟 팀 탭 분리 적용 + 🌟 전력분석실 라우팅
+ * 🌟 랭킹 배너에 팀 리그 타이틀 스폰서(네이밍권) 뱃지 연결 (Boako.Util.applyTitleSponsorPrefix)
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -119,7 +120,7 @@ Boako.View = {
                 }
                 html = `
                     <div class="main-banner" style="flex-direction:column; gap:6px;">
-                        <h1>🏆 실시간 랭킹</h1>
+                        <h1 id="ranking-banner-title">🏆 실시간 랭킹</h1>
                         <div id="ranking-prize-banner" style="font-size:14px; font-weight:700; opacity:0.9;">상금 정보를 불러오는 중...</div>
                     </div>
                     <section class="section-card"><div class="card-body">집계 중...</div></section>
@@ -132,6 +133,7 @@ Boako.View = {
                     if (Boako.Ranking && typeof Boako.Ranking.loadPrizeBanner === 'function') {
                         Boako.Ranking.loadPrizeBanner();
                     }
+                    Boako.Util.applyTitleSponsorPrefix('ranking-banner-title');
                 }, 0);
                 break;
 
