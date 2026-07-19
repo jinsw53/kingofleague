@@ -240,7 +240,7 @@ if (window.sfx) window.sfx.buy();
 
         const headerIconHtml = `
             <span style="display:inline-block; width:26px; height:26px; position:relative; background-image:url('${Boako.Util.cdn(targetItem.icon)}'); background-size:contain; background-repeat:no-repeat; background-position:center; vertical-align:middle;">
-                ${season.season_logo_url ? `<img src="${Boako.Util.cdn(season.season_logo_url)}" style="position:absolute; top:50%; left:19%; width:48%; height:87%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">` : ''}
+                ${season.season_logo_url ? `<img src="${Boako.Util.cdn(season.season_logo_url)}" style="position:absolute; top:50%; left:14%; width:48%; height:87%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">` : ''}
             </span>
         `;
 
