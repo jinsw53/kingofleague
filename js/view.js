@@ -681,7 +681,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                         const titleSponsorIconHtml = `
                             <div style="width:100%; height:100%; position:relative; background-image:url('${Boako.Util.cdn(item.icon)}'); background-size:contain; background-repeat:no-repeat; background-position:center;">
                                 ${titleSponsorSeasonLogo ? `
-                                    <img src="${Boako.Util.cdn(titleSponsorSeasonLogo)}" style="position:absolute; top:50%; left:19%; width:48%; height:87%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">
+                                    <img src="${Boako.Util.cdn(titleSponsorSeasonLogo)}" style="position:absolute; top:50%; left:14%; width:48%; height:87%; object-fit:contain; transform:translate(-50%, -50%) rotate(-90deg);">
                                 ` : ''}
                             </div>
                         `;
