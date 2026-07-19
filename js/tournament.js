@@ -1,5 +1,6 @@
 /**
  * [TOURNAMENT] 보아코 토너먼트 공지 + 개최 요청 게시판
+ * 🌟 개최 요청(REQUEST) 등록 성공 시 오늘의 주사위 시도 (팀 리그 외 활동, 하루 1회)
  */
 Boako.Tournament = {
     State: {
@@ -318,6 +319,9 @@ Boako.Tournament = {
                 });
                 if (error) throw error;
                 Boako.Util.toast('🙋 개최 요청이 등록되었습니다!');
+
+                // 🌟 팀 리그 외 활동(토너먼트 개최 신청) 성공 시 오늘의 주사위 시도 (하루 1회, 이미 굴렸으면 조용히 무시)
+                Boako.Util.tryRollDailyDice();
             }
 
             document.getElementById('tourney-write-modal-overlay').remove();
