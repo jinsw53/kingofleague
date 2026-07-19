@@ -1,6 +1,7 @@
 /**
  * 🏆 [RANKING] 시즌 종합 랭킹 + 명예의 전당
  * v_season_current_ranking(진행중) / season_final_rankings(확정) 기반
+ * 🌟 명예의 전당에 시즌별 타이틀 스폰서(네이밍권) 표기 — 시즌마다 다를 수 있어 조회 시점마다 새로 가져옴
  */
 
 Boako.Ranking = Boako.Ranking || {};
@@ -378,6 +379,13 @@ Boako.Ranking.loadHofTab = async function() {
             .eq('final_rank', 1)
             .single();
 
+        // 🌟 [신규] 이 시즌의 타이틀 스폰서(네이밍권) 조회 — 시즌마다 다를 수 있으므로 선택된 시즌 기준으로 매번 새로 조회
+        const { data: seasonSponsorRow } = await Boako.db
+            .from('seasons')
+            .select('title_sponsor_name')
+            .eq('season_no', seasonNo)
+            .maybeSingle();
+
         const { data: mvpRecords } = await Boako.db
             .from('v_boako_total_records')
             .select('nickname, rp, b_all_team, team_logo_url')
@@ -424,6 +432,7 @@ Boako.Ranking.loadHofTab = async function() {
 
          Boako.Ranking.State.hofData = {
             seasonTitle: `시즌 ${seasonNo}`,
+            titleSponsorName: seasonSponsorRow?.title_sponsor_name || null,
             championTeam: championTeamRow,
             mvp,
             championGames: championGamesEnriched
@@ -516,9 +525,14 @@ Boako.Ranking.getHofHTML = function() {
             </div>
         `).join('');
 
+    // 🌟 타이틀 스폰서가 있으면 시즌 제목 앞에 뱃지로 표시
+    const sponsorBadgeHtml = d.titleSponsorName
+        ? `<span class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle">🏷️ ${d.titleSponsorName}배</span>`
+        : '';
+
     return `
         <div class="mb-5 flex items-center justify-between">
-            <h3 class="font-black text-slate-800 text-lg">${d.seasonTitle} 명예의 전당</h3>
+            <h3 class="font-black text-slate-800 text-lg">${sponsorBadgeHtml}${d.seasonTitle} 명예의 전당</h3>
 <div class="relative z-30">
                 <button onclick="Boako.Ranking.toggleHofSeasonDropdown()" class="bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:shadow-md transition-all duration-200 group">
                     <span>시즌 ${Boako.Ranking.State.hofSelectedSeason}</span>
