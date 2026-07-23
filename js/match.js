@@ -214,7 +214,8 @@ Boako.Match = {
                                 </div>`;
 
                 // 🌟 타이틀 스폰서(네이밍권) 배지 — h1이 숨겨진 구조라 여기 로고 영역 위에 표시
-                const sponsorName = await Boako.Util.getTitleSponsor();
+                // (선택된 시즌의 title_sponsor_name을 그대로 사용 — 위에서 이미 조회해둔 currentSeason과 동일 시즌 기준)
+                const sponsorName = currentSeason?.title_sponsor_name || null;
                 const sponsorBadgeHtml = sponsorName
                     ? `<div class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner">🏷️ ${sponsorName}배 보아코 팀 리그</div>`
                     : '';
