@@ -2,6 +2,7 @@
  * 🏆 [RANKING] 시즌 종합 랭킹 + 명예의 전당
  * v_season_current_ranking(진행중) / season_final_rankings(확정) 기반
  * 🌟 명예의 전당에 시즌별 타이틀 스폰서(네이밍권) 표기 — 시즌마다 다를 수 있어 조회 시점마다 새로 가져옴
+ * 🌟 랭킹 배너: 시즌 진행 중이면 스폰서 배지 + 시즌 로고를 타이틀 위에 표시 (loadPrizeBanner에서 처리)
  */
 
 Boako.Ranking = Boako.Ranking || {};
@@ -653,6 +654,7 @@ Boako.Ranking.changeHofSeason = async function(seasonNo) {
 // 🌟 [신규] 배너에 이번 시즌 예상 상금 표시 + 계산 방식 설명 토글
 Boako.Ranking.loadPrizeBanner = async function() {
     const el = document.getElementById('ranking-prize-banner');
+    const headerEl = document.getElementById('ranking-season-header');
     if (!el) return;
 
     try {
@@ -660,7 +662,8 @@ Boako.Ranking.loadPrizeBanner = async function() {
         if (error) throw error;
 
         if (!data || !data.active) {
-            // 🌟 [수정] 진행 중인 시즌이 없으면, 다음 시즌 시작일이 있는 경우 같이 안내
+            // 🌟 진행 중인 시즌이 없으면 로고/배지 헤더는 비우고, 다음 시즌 시작일이 있는 경우 같이 안내
+            if (headerEl) headerEl.innerHTML = '';
             if (data && data.next_start_date) {
                 const dateStr = new Date(data.next_start_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
                 el.innerHTML = `진행 중인 시즌이 없습니다. 다음 시즌(시즌 ${data.next_season_no})은 ${dateStr}부터 시작됩니다.`;
@@ -668,6 +671,19 @@ Boako.Ranking.loadPrizeBanner = async function() {
                 el.innerHTML = `진행 중인 시즌이 없습니다.`;
             }
             return;
+        }
+
+        // 🌟 [신규] 시즌 진행 중일 때: 스폰서 배지(있으면) + 시즌 로고(있으면)를 타이틀 위에 표시
+        if (headerEl) {
+            const badgeHtml = data.title_sponsor_name
+                ? `<span style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px;">🏷️ ${data.title_sponsor_name}배</span>`
+                : '';
+            const logoHtml = data.season_logo_url
+                ? `<img src="${Boako.Util.cdn(data.season_logo_url)}" style="width:56px; height:56px; object-fit:contain;">`
+                : '';
+            headerEl.innerHTML = (badgeHtml || logoHtml)
+                ? `<div style="display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:8px;">${badgeHtml}${logoHtml}</div>`
+                : '';
         }
 
         el.innerHTML = `
