@@ -10,6 +10,9 @@
  *    챔피언 시스템(v_game_popularity_mvp)은 항상 team_only=true 고정이라 이 토글과 무관하게 절대 오염되지 않음.
  * 🌟 랭킹보드 카드: 닉네임/팀명이 안 잘리도록 우선 폰트 크기를 자동으로 줄여서 맞추고(autoFitRankingNames),
  *    그래도 최소 크기에서 못 맞추면 말줄임표로 처리. 마우스 올리면 살짝 확대되며 전체가 다시 또렷하게 보임(archive-nick-hover).
+ * 🌟 타이틀 스폰서 배지: "Boako Team League" 브랜드 타이틀(id=archive-brand-title) 앞에 표시.
+ *    현재 선택된 시즌 필터(currentSeasonFilter)에 맞춰 Boako.Util.setTitleSponsorBadge로 갱신됨
+ *    (buildUI 최초 진입 / 자동 감지된 최근 시즌 적용 시 / 시즌 드롭다운 선택 시 3곳에서 호출).
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -141,7 +144,7 @@ Boako.Archive = {
                         <div class="bg-indigo-600 p-1.5 rounded-lg shadow-md">
                             <i data-lucide="trophy" class="text-white w-5 h-5"></i>
                         </div>
-                        <h1 class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Team League</h1>
+                        <h1 id="archive-brand-title" class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Team League</h1>
                     </div>
                     <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1 overflow-x-auto max-w-full">
                         <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap shrink-0">
@@ -192,6 +195,7 @@ Boako.Archive = {
 
         if(window.lucide) lucide.createIcons();
         this.init();
+        Boako.Util.setTitleSponsorBadge('archive-brand-title', this.currentSeasonFilter);
     },
 
    // 2. DB 초기화 및 메타데이터 로드
@@ -255,6 +259,7 @@ Boako.Archive = {
                 if (verifiedSeasons.length > 0) {
                     this.currentSeasonFilter = Math.max(...verifiedSeasons);
                     this.renderSeasonDropdown();
+                    Boako.Util.setTitleSponsorBadge('archive-brand-title', this.currentSeasonFilter);
                 }
             }
 
@@ -281,6 +286,7 @@ Boako.Archive = {
         if (type === 'season') {
             this.currentSeasonFilter = val;
             this.renderSeasonDropdown();
+            Boako.Util.setTitleSponsorBadge('archive-brand-title', val);
         } else {
             this.currentRoundFilter = val;
             this.renderRoundDropdown();

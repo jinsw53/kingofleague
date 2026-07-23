@@ -8,6 +8,9 @@
  *    "팀 리그 외" 활동 어디서든 하루 1회 무료 주사위를 발동시킬 수 있게 하기 위함 (결제 없는 순수 보상 연출).
  * 🌟 getTitleSponsor / applyTitleSponsorPrefix: 팀 리그 타이틀 스폰서(네이밍권) 공용 조회+표시 함수.
  *    랭킹/대항전/리그콘텐츠/전적기록 4개 배너가 전부 이 함수만 공유해서 사용 (단순 알약 모양 배지, 원래 디자인으로 복원).
+ * 🌟 getTitleSponsorForSeason / setTitleSponsorBadge: 전적기록(archive.js) 시즌 드롭다운 전용.
+ *    시즌 번호를 직접 받아서 그 시즌의 스폰서만 조회하고, 기존 배지를 지운 뒤 다시 그려서
+ *    시즌을 바꿀 때마다 배지가 즉시 갱신되도록 함.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -314,6 +317,41 @@ Boako.Util = {
         if (!el) return;
         const badge = document.createElement('span');
         badge.style.cssText = 'display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px;';
+        badge.textContent = `🏷️ ${sponsorName}배`;
+        el.prepend(badge, ' ');
+    },
+
+    // 🌟 [신규] 특정 시즌 번호의 title_sponsor_name을 정확히 조회 (전적기록의 시즌 드롭다운 전용)
+    // seasonNo가 'all'/'none'/null이면 특정 시즌이 아니므로 조회하지 않고 null 반환
+    getTitleSponsorForSeason: async (seasonNo) => {
+        if (seasonNo === 'all' || seasonNo === 'none' || seasonNo === null || seasonNo === undefined) return null;
+        try {
+            const { data } = await Boako.db.from('seasons')
+                .select('title_sponsor_name')
+                .eq('season_no', seasonNo)
+                .maybeSingle();
+            return data?.title_sponsor_name || null;
+        } catch (e) {
+            console.error('시즌별 타이틀 스폰서 조회 실패:', e);
+            return null;
+        }
+    },
+
+    // 🌟 [신규] 시즌 필터가 바뀔 때마다 배지를 지우고 다시 그리는 버전.
+    // applyTitleSponsorPrefix와 달리 기존 배지를 먼저 제거하므로 반복 호출해도 중복으로 쌓이지 않음.
+    setTitleSponsorBadge: async (elementId, seasonNo) => {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        const existing = document.getElementById(`${elementId}-sponsor-badge`);
+        if (existing) existing.remove();
+
+        const sponsorName = await Boako.Util.getTitleSponsorForSeason(seasonNo);
+        if (!sponsorName) return;
+
+        const badge = document.createElement('span');
+        badge.id = `${elementId}-sponsor-badge`;
+        badge.style.cssText = 'display:inline-block; background:#eef2ff; color:#4338ca; padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px; border:1px solid #c7d2fe;';
         badge.textContent = `🏷️ ${sponsorName}배`;
         el.prepend(badge, ' ');
     }
