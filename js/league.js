@@ -1,4 +1,5 @@
-/*** * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
+/**
+ * 🎯 [LEAGUE] 실시간 리그 콘텐츠 전당 (완결본 - 빙고/챔피언/토너먼트 보존 + 챌린지 다중종목/달력 완벽 연동)
  * 🛠️ 2026 최신화 패치: 용병 프사 보안 에러 픽스, 라인업 함수 누락 해결, 프로필&챌린지 실시간 다중 감지(Realtime) 적용, UI 용어 변경(도전/응전/Opponent)
  * 🛠️ [킹 오브 리그 폴백] 진행 중인 시즌이 없을 때(스토브리그) 최근 종료 시즌의 최종 기록을 읽기전용으로 표시
  * 🌟 타이틀 스폰서(네이밍권) 배지를 상단(이미지 배너 위)에 표시 — h1 텍스트 제목이 없는 구조라 별도 줄로 추가
@@ -58,6 +59,29 @@ Boako.League.formatMode = function(modeStr) {
     return (modeStr || '4v4').replace('v', 'vs');
 };
 
+// 🌟 [신규] 상단 타이틀 스폰서 배지 갱신 — 챌린지/빙고 탭의 시즌 드롭다운이 바뀔 때마다 호출됨.
+// seasonNo === 'live'(또는 미지정)면 현재/다음 시즌 기준(getTitleSponsor), 특정 시즌 번호면 그 시즌만 정확히 조회.
+Boako.League.refreshSponsorBadge = async function(seasonNo) {
+    const badgeEl = document.getElementById('league-sponsor-badge');
+    if (!badgeEl) return;
+
+    try {
+        let sponsorName = null;
+        if (seasonNo === 'live' || !seasonNo) {
+            sponsorName = await Boako.Util.getTitleSponsor();
+        } else {
+            const { data } = await Boako.db.from('seasons').select('title_sponsor_name').eq('season_no', seasonNo).maybeSingle();
+            sponsorName = data?.title_sponsor_name || null;
+        }
+
+        badgeEl.innerHTML = sponsorName
+            ? `<div class="inline-block bg-violet-600 text-white text-[11px] font-black px-4 py-1.5 rounded-b-xl shadow-sm mt-0">🏷️ ${sponsorName}배 보아코 팀 리그</div>`
+            : '';
+    } catch (e) {
+        console.error('리그 스폰서 배지 갱신 실패:', e);
+    }
+};
+
 // ====================================================================
 // 💡 2. 메인 UI 사출 엔진 및 탭 제어
 // ====================================================================
@@ -96,13 +120,8 @@ Boako.League.buildUI = function(containerId) {
     this.switchTab('bingo');
 
     // 🌟 타이틀 스폰서(네이밍권) 배지 — 이 화면은 텍스트 제목이 없는 이미지 배너 구조라 상단에 별도 줄로 표시
-    (async () => {
-        const sponsorName = await Boako.Util.getTitleSponsor();
-        const badgeEl = document.getElementById('league-sponsor-badge');
-        if (sponsorName && badgeEl) {
-            badgeEl.innerHTML = `<div class="inline-block bg-violet-600 text-white text-[11px] font-black px-4 py-1.5 rounded-b-xl shadow-sm mt-0">🏷️ ${sponsorName}배 보아코 팀 리그</div>`;
-        }
-    })();
+    // 기본 진입 시엔 '실시간(현재/다음) 시즌' 기준. 챌린지/빙고 탭의 시즌 드롭다운을 바꾸면 그 시즌 기준으로 갱신됨.
+    Boako.League.refreshSponsorBadge('live');
 };
 
 Boako.League.switchTab = async function(tabId) {
@@ -250,6 +269,7 @@ Boako.League.loadChallengesForSeason = async function(seasonNo) {
 Boako.League.changeChallengeSeason = async function(seasonNo) {
     Boako.League.State.selectedChallengeSeason = seasonNo;
     Boako.League.toggleDropdown('challenge-season-filter');
+    Boako.League.refreshSponsorBadge(seasonNo);
     
     const listContainer = document.getElementById('challenge-list');
     if (listContainer) listContainer.innerHTML = `<div class="text-center py-10 font-black text-violet-500 animate-pulse">데이터를 불러오는 중...</div>`;
@@ -1740,7 +1760,7 @@ Boako.League.getBingoHTML = function() {
     `;
 };
 
-Boako.League.selectBingoSeason = function(val) { Boako.League.toggleDropdown('bingo-season'); if (Boako.League.State.currentBingoSeason !== val) { Boako.League.State.currentBingoSeason = val; Boako.League.loadBingoBoardData(); } };
+Boako.League.selectBingoSeason = function(val) { Boako.League.toggleDropdown('bingo-season'); if (Boako.League.State.currentBingoSeason !== val) { Boako.League.State.currentBingoSeason = val; Boako.League.refreshSponsorBadge(val); Boako.League.loadBingoBoardData(); } };
 
 Boako.League.renderBingoSeasonDropdown = function() {
     const container = document.getElementById('bingo-season-dropdown-container'); if (!container) return;
