@@ -92,6 +92,244 @@ Boako.Team = {
         else { Boako.Util.toast("✅ 팀 정보가 업데이트되었습니다."); Boako.View.render('team'); }
     },
 
+    // ========== 🌟 [신규] 우승 별 붙이기 ==========
+    // 시즌 종료 후 우승 확정되면(view.js에서 season_final_rankings로 자격 판별) 팀장이 로고 위에
+    // 직접 별 위치를 지정해서 붙일 수 있음. 매 우승마다 "현재 로고" 위에 별 1개를 누적 추가.
+    // 별 위치를 다시 잡고 싶으면 초기화(원본 logo_url_origin 기준으로 champion_star_count만큼 재배치) 가능.
+
+    // 드래그 가능한 별 아이콘 하나를 컨테이너 안에서만 움직이게 만듦 (위치는 0~1 상대좌표로 dataset에 저장)
+    _makeDraggableStar: (el, container) => {
+        let dragging = false;
+        el.addEventListener('pointerdown', (e) => {
+            dragging = true;
+            el.setPointerCapture(e.pointerId);
+            el.style.cursor = 'grabbing';
+        });
+        el.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            const rect = container.getBoundingClientRect();
+            let x = (e.clientX - rect.left) / rect.width;
+            let y = (e.clientY - rect.top) / rect.height;
+            x = Math.min(1, Math.max(0, x));
+            y = Math.min(1, Math.max(0, y));
+            el.style.left = (x * 100) + '%';
+            el.style.top = (y * 100) + '%';
+            el.dataset.relX = x;
+            el.dataset.relY = y;
+        });
+        el.addEventListener('pointerup', (e) => {
+            dragging = false;
+            el.style.cursor = 'grab';
+        });
+    },
+
+    // 캔버스에 5각 별을 벡터로 직접 그림 (이미지 합성이 아니라 경로 채우기라 배경이 완전히 투명하게 유지됨)
+    _drawStar: (ctx, cx, cy, outerRadius) => {
+        const innerRadius = outerRadius * 0.5;
+        const spikes = 5;
+        let rot = (Math.PI / 2) * 3;
+        const step = Math.PI / spikes;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - outerRadius);
+        for (let i = 0; i < spikes; i++) {
+            let x = cx + Math.cos(rot) * outerRadius;
+            let y = cy + Math.sin(rot) * outerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+            x = cx + Math.cos(rot) * innerRadius;
+            y = cy + Math.sin(rot) * innerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+        }
+        ctx.lineTo(cx, cy - outerRadius);
+        ctx.closePath();
+        ctx.fillStyle = '#fbbf24';
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = Math.max(1, outerRadius * 0.08);
+        ctx.fill();
+        ctx.stroke();
+    },
+
+    // baseImageUrl(로고) 위에 starPositions(상대좌표 0~1) 배열만큼 별을 합성해서 PNG Blob으로 반환
+    // 배경은 원본 로고의 투명도를 그대로 유지 (정사각형 캔버스에 원본 비율 유지해서 중앙 배치 = object-fit:contain과 동일)
+    _compositeStars: (baseImageUrl, starPositions) => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                try {
+                    const size = Math.max(img.naturalWidth, img.naturalHeight, 512);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+
+                    const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+                    const dw = img.naturalWidth * scale;
+                    const dh = img.naturalHeight * scale;
+                    const dx = (size - dw) / 2;
+                    const dy = (size - dh) / 2;
+                    ctx.drawImage(img, dx, dy, dw, dh);
+
+                    starPositions.forEach(pos => {
+                        const starSize = size * (pos.relSize || 0.15);
+                        Boako.Team._drawStar(ctx, pos.relX * size, pos.relY * size, starSize);
+                    });
+
+                    canvas.toBlob((blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('이미지 합성 실패'));
+                    }, 'image/png');
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            img.onerror = () => reject(new Error('로고 이미지를 불러오지 못했습니다.'));
+            img.src = baseImageUrl;
+        });
+    },
+
+    // 합성된 Blob을 teams 버킷에 업로드하고 공개 URL 반환
+    _uploadStarLogo: async (blob) => {
+        const fName = `star_${Boako.state.team.info.id}_${Date.now()}.png`;
+        const { error: upErr } = await Boako.db.storage.from('teams').upload(fName, blob, { contentType: 'image/png' });
+        if (upErr) throw upErr;
+        const { data: uData } = Boako.db.storage.from('teams').getPublicUrl(fName);
+        return uData.publicUrl;
+    },
+
+    // 🌟 우승 별 붙이기 모달 (현재 logo_url 위에 별 1개를 새로 얹음 — 이미 붙어있던 별들은 그대로 유지됨)
+    openStarModal: (winSeasonNo) => {
+        if (!Boako.state.team) return;
+        const team = Boako.state.team.info;
+        document.getElementById('boako-star-modal')?.remove();
+
+        const modalHtml = `
+            <div id="boako-star-modal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white rounded-2xl w-full max-w-md p-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-lg">🌟 우승 별 붙이기 (시즌 ${winSeasonNo})</h3>
+                        <button onclick="document.getElementById('boako-star-modal').remove()" class="text-slate-400 font-black text-xl">×</button>
+                    </div>
+                    <p class="text-xs text-slate-500 font-bold mb-4">별을 드래그해서 로고 위 원하는 위치에 놓아주세요.</p>
+                    <div id="star-canvas-wrap" style="position:relative; width:100%; aspect-ratio:1; background:repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 20px 20px; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;">
+                        <img src="${team.logo_url}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
+                        <div class="star-drag" style="position:absolute; left:50%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="0.5" data-rel-y="0.15">
+                            <svg viewBox="0 0 24 24" style="width:100%; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><path fill="#fbbf24" stroke="#b45309" stroke-width="1" d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.9-6.2 3.9 1.6-7L2 9.2l7.1-.6z"/></svg>
+                        </div>
+                    </div>
+                    <button onclick="Boako.Team.confirmStarPlacement(${winSeasonNo})" class="w-full mt-5 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors">확정하고 저장</button>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const wrap = document.getElementById('star-canvas-wrap');
+        const starEl = wrap.querySelector('.star-drag');
+        Boako.Team._makeDraggableStar(starEl, wrap);
+    },
+
+    confirmStarPlacement: async (winSeasonNo) => {
+        const team = Boako.state.team.info;
+        const wrap = document.getElementById('star-canvas-wrap');
+        const starEl = wrap.querySelector('.star-drag');
+        const relX = parseFloat(starEl.dataset.relX);
+        const relY = parseFloat(starEl.dataset.relY);
+
+        const btn = document.querySelector('#boako-star-modal button.bg-amber-500');
+        btn.disabled = true; btn.innerText = '저장 중...';
+
+        try {
+            const blob = await Boako.Team._compositeStars(team.logo_url, [{ relX, relY, relSize: 0.16 }]);
+            const newLogoUrl = await Boako.Team._uploadStarLogo(blob);
+
+            const { error } = await Boako.db.from('teams').update({
+                logo_url: newLogoUrl,
+                champion_star_count: (team.champion_star_count || 0) + 1,
+                last_star_season_no: winSeasonNo
+            }).eq('id', team.id);
+            if (error) throw error;
+
+            document.getElementById('boako-star-modal')?.remove();
+            Boako.Util.toast('🌟 우승 별이 로고에 새겨졌습니다!');
+            if (window.sfx && window.sfx.success) window.sfx.success();
+            Boako.View.render('team');
+        } catch (err) {
+            console.error('우승 별 저장 실패:', err);
+            Boako.Util.toast('❌ ' + (err.message || '저장에 실패했습니다.'));
+            btn.disabled = false; btn.innerText = '확정하고 저장';
+        }
+    },
+
+    // 🌟 별 위치 초기화 모달 (원본 logo_url_origin 위에 champion_star_count개의 별을 전부 다시 배치)
+    openStarResetModal: () => {
+        if (!Boako.state.team) return;
+        const team = Boako.state.team.info;
+        const count = team.champion_star_count || 0;
+        if (count === 0) return;
+        document.getElementById('boako-star-modal')?.remove();
+
+        // 별들이 서로 겹치지 않도록 초기 위치를 가로로 살짝 흩어서 배치
+        const initialStars = Array.from({ length: count }, (_, i) => {
+            const spread = count > 1 ? (i / (count - 1)) : 0.5;
+            const x = 0.2 + spread * 0.6;
+            return `<div class="star-drag" style="position:absolute; left:${x * 100}%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="${x}" data-rel-y="0.15">
+                <svg viewBox="0 0 24 24" style="width:100%; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><path fill="#fbbf24" stroke="#b45309" stroke-width="1" d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.9-6.2 3.9 1.6-7L2 9.2l7.1-.6z"/></svg>
+            </div>`;
+        }).join('');
+
+        const modalHtml = `
+            <div id="boako-star-modal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white rounded-2xl w-full max-w-md p-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-lg">⭐ 별 위치 초기화 (총 ${count}개)</h3>
+                        <button onclick="document.getElementById('boako-star-modal').remove()" class="text-slate-400 font-black text-xl">×</button>
+                    </div>
+                    <p class="text-xs text-slate-500 font-bold mb-4">별 ${count}개를 원하는 위치로 각각 다시 배치해주세요. (원본 로고 기준으로 다시 그립니다)</p>
+                    <div id="star-canvas-wrap" style="position:relative; width:100%; aspect-ratio:1; background:repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 20px 20px; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;">
+                        <img src="${team.logo_url_origin}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
+                        ${initialStars}
+                    </div>
+                    <button onclick="Boako.Team.confirmStarReset()" class="w-full mt-5 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors">확정하고 저장</button>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const wrap = document.getElementById('star-canvas-wrap');
+        wrap.querySelectorAll('.star-drag').forEach(el => Boako.Team._makeDraggableStar(el, wrap));
+    },
+
+    confirmStarReset: async () => {
+        const team = Boako.state.team.info;
+        const wrap = document.getElementById('star-canvas-wrap');
+        const starEls = [...wrap.querySelectorAll('.star-drag')];
+        const positions = starEls.map(el => ({
+            relX: parseFloat(el.dataset.relX),
+            relY: parseFloat(el.dataset.relY),
+            relSize: 0.16
+        }));
+
+        const btn = document.querySelector('#boako-star-modal button.bg-amber-500');
+        btn.disabled = true; btn.innerText = '저장 중...';
+
+        try {
+            const blob = await Boako.Team._compositeStars(team.logo_url_origin, positions);
+            const newLogoUrl = await Boako.Team._uploadStarLogo(blob);
+
+            const { error } = await Boako.db.from('teams').update({ logo_url: newLogoUrl }).eq('id', team.id);
+            if (error) throw error;
+
+            document.getElementById('boako-star-modal')?.remove();
+            Boako.Util.toast('✅ 별 위치가 초기화되었습니다.');
+            Boako.View.render('team');
+        } catch (err) {
+            console.error('별 위치 초기화 실패:', err);
+            Boako.Util.toast('❌ ' + (err.message || '저장에 실패했습니다.'));
+            btn.disabled = false; btn.innerText = '확정하고 저장';
+        }
+    },
+
     addMember: () => {
         const existing = document.getElementById('boako-invite-modal');
         if (existing) existing.remove();
