@@ -8,7 +8,8 @@
  * 🌟 배지 합성 렌더링(renderBadgeHTML): 인벤토리/위젯/오버레이가 전부 공유하는 공용 함수.
  *    획득마다 별도 인벤토리 인스턴스(achv_<code>_<user_achievements.id>)라 매번 achievements 테이블에서 code로 조회.
  *    시즌형 배지는 배경 원본 비율 유지(정사각형 강제 X) + season_logo_overlay 좌표로 시즌 로고 합성.
- *    OO매니아는 배경 없이 게임 로고 + 티어(동/은/금) 테두리로 합성.
+ *    OO매니아는 배경 없이 게임 로고 + 티어(동/은/금) 스퀴클 테두리로 합성 — 이것도 정사각형 강제 없이 높이만 고정,
+ *    폭은 로고의 실제 비율에 맞춰 자동으로 늘어남(게임마다 로고 형태가 제각각이라 정사각형에 욱여넣지 않음).
  */
 Boako.Achievements = {
     channel: null,
@@ -234,7 +235,7 @@ Boako.Achievements = {
     },
 
     // 🌟 배지 HTML 생성 (비동기). itemId가 achv_ 형식이 아니면 null 반환(호출부에서 기존 방식으로 폴백).
-    // sizePx는 "높이" 기준 — 배경 이미지 원본 비율을 그대로 유지하고, 정사각형으로 강제 크롭하지 않음.
+    // sizePx는 "높이" 기준 — 배경 이미지/로고 원본 비율을 그대로 유지하고, 정사각형으로 강제 크롭하지 않음.
     renderBadgeHTML: async (itemId, seasonNo, meta, sizePx) => {
         sizePx = sizePx || 48;
         const parsed = Boako.Achievements.parseAchievementItemId(itemId);
@@ -246,15 +247,17 @@ Boako.Achievements = {
 
         const gameName = meta && meta.game_name ? meta.game_name : null;
 
-        // OO매니아: 배경 없이 게임 로고 + 티어(동/은/금) 테두리로 합성
+        // OO매니아: 배경 없이 게임 로고 + 티어(동/은/금) 스퀴클 테두리로 합성
+        // 🌟 정사각형 강제 금지: 높이만 고정, 스퀴클 틀은 로고의 실제 비율에 맞춰 폭이 자동으로 늘어남
         if (achievement.code.startsWith('game_mania_')) {
             const tier = Boako.Achievements.getTierStyle(achievement.name);
             const gameLogo = await Boako.Achievements.getGameLogo(gameName);
-            const pad = Math.max(2, Math.round(sizePx * 0.06));
+            const pad = Math.max(2, Math.round(sizePx * 0.08));
+            const innerPad = Math.max(2, Math.round(sizePx * 0.06));
             return `
-                <div style="width:${sizePx}px; height:${sizePx}px; border-radius:${Math.round(sizePx * 0.22)}px; background:${tier.bg}; padding:${pad}px; box-shadow:0 0 0 2px ${tier.ring}55; box-sizing:border-box;">
-                    <div style="width:100%; height:100%; border-radius:${Math.round(sizePx * 0.18)}px; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                        ${gameLogo ? `<img src="${Boako.Util.cdn(gameLogo)}" style="width:82%; height:82%; object-fit:contain;">` : `<span style="font-size:${Math.round(sizePx * 0.5)}px;">🎲</span>`}
+                <div style="height:${sizePx}px; display:inline-flex; align-items:center; justify-content:center; border-radius:${Math.round(sizePx * 0.22)}px; background:${tier.bg}; padding:${pad}px; box-shadow:0 0 0 2px ${tier.ring}55; box-sizing:border-box;">
+                    <div style="height:100%; display:inline-flex; align-items:center; justify-content:center; border-radius:${Math.round(sizePx * 0.18)}px; background:#fff; padding:${innerPad}px; box-sizing:border-box;">
+                        ${gameLogo ? `<img src="${Boako.Util.cdn(gameLogo)}" style="height:100%; width:auto; display:block;">` : `<span style="font-size:${Math.round(sizePx * 0.5)}px;">🎲</span>`}
                     </div>
                 </div>
             `;
