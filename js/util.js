@@ -11,6 +11,8 @@
  * 🌟 getTitleSponsorForSeason / setTitleSponsorBadge: 전적기록(archive.js) 시즌 드롭다운 전용.
  *    시즌 번호를 직접 받아서 그 시즌의 스폰서만 조회하고, 기존 배지를 지운 뒤 다시 그려서
  *    시즌을 바꿀 때마다 배지가 즉시 갱신되도록 함.
+ * 🌟 sfx.achievementUnlock: 업적 달성 풀스크린 오버레이(achievements.js) 전용 — success보다 화려한
+ *    4음 상승 아르페지오 + 반짝이는 배음으로 확실히 들리게 함.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -420,6 +422,15 @@ window.sfx = (function() {
         success: function() {
             tone(523.25, 0.1, 'sine', 0.15);
             tone(783.99, 0.2, 'sine', 0.13, 0.08);
+        },
+        // 🌟 [신규] 업적 달성 전용 — success보다 훨씬 화려한 4음 상승 아르페지오 + 마지막에 반짝이는 배음
+        // (achievements.js의 풀스크린 오버레이가 뜨는 순간 재생됨)
+        achievementUnlock: function() {
+            tone(523.25, 0.12, 'triangle', 0.16, 0);      // C5
+            tone(659.25, 0.12, 'triangle', 0.16, 0.09);   // E5
+            tone(783.99, 0.12, 'triangle', 0.16, 0.18);   // G5
+            tone(1046.5, 0.35, 'triangle', 0.18, 0.27);   // C6 (메인 타격)
+            tone(1568.0, 0.25, 'sine', 0.07, 0.3);        // G6 반짝임(배음)
         },
         // 🌟 "오늘의 주사위" 전용 — 던지기(휙) → 공중 스윕 → 착지 → 데구르르 굴러가며 통통 튐(점점 감소) → 정지(+buy) → 포인트 차임
         // showDiceRollOverlay의 CSS 애니메이션(총 3초, 55%=1.65초 첫 착지, 65/75/83/90/95%=바운스들, 100%=3.0초 정지)과
