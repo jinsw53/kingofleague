@@ -408,21 +408,18 @@ Boako.Auth = {
                     (seasonsData || []).forEach(s => { seasonsMap[s.season_no] = s; });
                 }
 
+                // 🌟 정사각형 강제 금지: 유니폼 이미지가 있으면 실제 img 태그로 그려서 원본 비율 그대로(높이만 고정, 폭 자동)
+                //    유니폼 이미지가 없을 때의 실루엣 SVG는 원래부터 1:1 벡터(viewBox 100x100)라 정사각형처럼 보이는 게 자연스러움
                 const buildUniformHtml = (teamLogo, uniformImage, size) => {
-                    const uniformBg = uniformImage
-                        ? `background-image:url('${Boako.Util.cdn(uniformImage)}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
-                        : '';
-                    const fallbackSilhouette = !uniformImage ? `
-                        <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
+                    const uniformContent = uniformImage
+                        ? `<img src="${Boako.Util.cdn(uniformImage)}" style="height:100%; width:auto; display:block;">`
+                        : `<svg height="${size}" viewBox="0 0 100 100" style="display:block;">
                             <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
-                        </svg>
-                    ` : '';
+                          </svg>`;
                     return `
-                        <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center;">
-                            ${fallbackSilhouette}
-                            <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
-                                ${teamLogo ? `<img src="${Boako.Util.cdn(teamLogo)}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:60%; height:60%; object-fit:contain;">` : ''}
-                            </div>
+                        <div style="height:${size}; position:relative; display:inline-flex; align-items:center; justify-content:center;">
+                            ${uniformContent}
+                            ${teamLogo ? `<img src="${Boako.Util.cdn(teamLogo)}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:60%; height:60%; object-fit:contain;">` : ''}
                         </div>
                     `;
                 };
@@ -449,8 +446,9 @@ Boako.Auth = {
                     const icon = item.shop_items?.icon || '🏅';
                     const name = item.shop_items?.name || '배지';
 
+                    // 🌟 정사각형/원형 강제 금지: 높이만 고정, 폭은 원본 비율 그대로
                     if (icon.startsWith('http')) {
-                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${Boako.Util.cdn(icon)}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"></div>`;
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${Boako.Util.cdn(icon)}" style="height: 26px; width:auto; object-fit: contain; display:block;"></div>`;
                     } else {
                         return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
                     }
