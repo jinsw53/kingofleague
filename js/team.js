@@ -198,35 +198,76 @@ Boako.Team = {
         return uData.publicUrl;
     },
 
-    // 🌟 우승 별 붙이기 모달 (현재 logo_url 위에 별 1개를 새로 얹음 — 이미 붙어있던 별들은 그대로 유지됨)
+    // 🌟 [통합] 우승 별 붙이기 + 초기화를 모달 하나로 합침 — 안에서 모드 전환 가능
+    // winSeasonNo가 있으면 '새 별 추가' 모드로 시작, 없으면(자격 없이 기존 별만 있는 경우) '초기화' 모드로 바로 시작
     openStarModal: (winSeasonNo) => {
         if (!Boako.state.team) return;
-        const team = Boako.state.team.info;
         document.getElementById('boako-star-modal')?.remove();
 
         const modalHtml = `
             <div id="boako-star-modal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div class="bg-white rounded-2xl w-full max-w-md p-6">
                     <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-black text-lg">🌟 우승 별 붙이기 (시즌 ${winSeasonNo})</h3>
+                        <h3 id="star-modal-title" class="font-black text-lg"></h3>
                         <button onclick="document.getElementById('boako-star-modal').remove()" class="text-slate-400 font-black text-xl">×</button>
                     </div>
-                    <p class="text-xs text-slate-500 font-bold mb-4">별을 드래그해서 로고 위 원하는 위치에 놓아주세요.</p>
-                    <div id="star-canvas-wrap" style="position:relative; width:100%; aspect-ratio:1; background:repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 20px 20px; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;">
-                        <img src="${team.logo_url}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
-                        <div class="star-drag" style="position:absolute; left:50%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="0.5" data-rel-y="0.15">
-                            <svg viewBox="0 0 24 24" style="width:100%; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><path fill="#fbbf24" stroke="#b45309" stroke-width="1" d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.9-6.2 3.9 1.6-7L2 9.2l7.1-.6z"/></svg>
-                        </div>
-                    </div>
-                    <button onclick="Boako.Team.confirmStarPlacement(${winSeasonNo})" class="w-full mt-5 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors">확정하고 저장</button>
+                    <p id="star-modal-desc" class="text-xs text-slate-500 font-bold mb-4"></p>
+                    <div id="star-canvas-wrap" style="position:relative; width:100%; aspect-ratio:1; background:repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 20px 20px; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;"></div>
+                    <div id="star-modal-switch" class="text-center mt-3"></div>
+                    <button id="star-modal-confirm" class="w-full mt-3 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors">확정하고 저장</button>
                 </div>
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
 
+        const initialMode = winSeasonNo ? 'add' : 'reset';
+        Boako.Team._renderStarModalMode(initialMode, winSeasonNo);
+    },
+
+    // 모달 안에서 '새 별 추가' ↔ '전체 재배치' 모드를 전환하며 그 부분만 다시 그림
+    _renderStarModalMode: (mode, winSeasonNo) => {
+        const team = Boako.state.team.info;
+        const titleEl = document.getElementById('star-modal-title');
+        const descEl = document.getElementById('star-modal-desc');
         const wrap = document.getElementById('star-canvas-wrap');
-        const starEl = wrap.querySelector('.star-drag');
-        Boako.Team._makeDraggableStar(starEl, wrap);
+        const switchEl = document.getElementById('star-modal-switch');
+        const confirmBtn = document.getElementById('star-modal-confirm');
+        const starSvg = `<svg viewBox="0 0 24 24" style="width:100%; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><path fill="#fbbf24" stroke="#b45309" stroke-width="1" d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.9-6.2 3.9 1.6-7L2 9.2l7.1-.6z"/></svg>`;
+
+        if (mode === 'add') {
+            titleEl.innerText = `🌟 우승 별 붙이기 (시즌 ${winSeasonNo})`;
+            descEl.innerText = '별을 드래그해서 로고 위 원하는 위치에 놓아주세요.';
+            wrap.innerHTML = `
+                <img src="${team.logo_url}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
+                <div class="star-drag" style="position:absolute; left:50%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="0.5" data-rel-y="0.15">${starSvg}</div>
+            `;
+            switchEl.innerHTML = (team.champion_star_count > 0)
+                ? `<button onclick="Boako.Team._renderStarModalMode('reset', ${winSeasonNo})" class="text-xs font-bold text-slate-400 hover:text-slate-600 underline">기존 별도 다시 배치하기</button>`
+                : '';
+            confirmBtn.onclick = () => Boako.Team.confirmStarPlacement(winSeasonNo);
+        } else {
+            const count = team.champion_star_count || 0;
+            titleEl.innerText = `⭐ 별 위치 초기화 (총 ${count}개)`;
+            descEl.innerText = `별 ${count}개를 원하는 위치로 각각 다시 배치해주세요. (원본 로고 기준으로 다시 그립니다)`;
+            // 별들이 서로 겹치지 않도록 초기 위치를 가로로 살짝 흩어서 배치
+            const initialStars = Array.from({ length: count }, (_, i) => {
+                const spread = count > 1 ? (i / (count - 1)) : 0.5;
+                const x = 0.2 + spread * 0.6;
+                return `<div class="star-drag" style="position:absolute; left:${x * 100}%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="${x}" data-rel-y="0.15">${starSvg}</div>`;
+            }).join('');
+            wrap.innerHTML = `
+                <img src="${team.logo_url_origin}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
+                ${initialStars}
+            `;
+            switchEl.innerHTML = winSeasonNo
+                ? `<button onclick="Boako.Team._renderStarModalMode('add', ${winSeasonNo})" class="text-xs font-bold text-slate-400 hover:text-slate-600 underline">새 별 추가로 돌아가기</button>`
+                : '';
+            confirmBtn.onclick = () => Boako.Team.confirmStarReset();
+        }
+
+        wrap.querySelectorAll('.star-drag').forEach(el => Boako.Team._makeDraggableStar(el, wrap));
+        confirmBtn.disabled = false;
+        confirmBtn.innerText = '확정하고 저장';
     },
 
     confirmStarPlacement: async (winSeasonNo) => {
@@ -236,7 +277,7 @@ Boako.Team = {
         const relX = parseFloat(starEl.dataset.relX);
         const relY = parseFloat(starEl.dataset.relY);
 
-        const btn = document.querySelector('#boako-star-modal button.bg-amber-500');
+        const btn = document.getElementById('star-modal-confirm');
         btn.disabled = true; btn.innerText = '저장 중...';
 
         try {
@@ -261,45 +302,6 @@ Boako.Team = {
         }
     },
 
-    // 🌟 별 위치 초기화 모달 (원본 logo_url_origin 위에 champion_star_count개의 별을 전부 다시 배치)
-    openStarResetModal: () => {
-        if (!Boako.state.team) return;
-        const team = Boako.state.team.info;
-        const count = team.champion_star_count || 0;
-        if (count === 0) return;
-        document.getElementById('boako-star-modal')?.remove();
-
-        // 별들이 서로 겹치지 않도록 초기 위치를 가로로 살짝 흩어서 배치
-        const initialStars = Array.from({ length: count }, (_, i) => {
-            const spread = count > 1 ? (i / (count - 1)) : 0.5;
-            const x = 0.2 + spread * 0.6;
-            return `<div class="star-drag" style="position:absolute; left:${x * 100}%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="${x}" data-rel-y="0.15">
-                <svg viewBox="0 0 24 24" style="width:100%; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"><path fill="#fbbf24" stroke="#b45309" stroke-width="1" d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.9-6.2 3.9 1.6-7L2 9.2l7.1-.6z"/></svg>
-            </div>`;
-        }).join('');
-
-        const modalHtml = `
-            <div id="boako-star-modal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                <div class="bg-white rounded-2xl w-full max-w-md p-6">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-black text-lg">⭐ 별 위치 초기화 (총 ${count}개)</h3>
-                        <button onclick="document.getElementById('boako-star-modal').remove()" class="text-slate-400 font-black text-xl">×</button>
-                    </div>
-                    <p class="text-xs text-slate-500 font-bold mb-4">별 ${count}개를 원하는 위치로 각각 다시 배치해주세요. (원본 로고 기준으로 다시 그립니다)</p>
-                    <div id="star-canvas-wrap" style="position:relative; width:100%; aspect-ratio:1; background:repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 20px 20px; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;">
-                        <img src="${team.logo_url_origin}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
-                        ${initialStars}
-                    </div>
-                    <button onclick="Boako.Team.confirmStarReset()" class="w-full mt-5 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors">확정하고 저장</button>
-                </div>
-            </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-        const wrap = document.getElementById('star-canvas-wrap');
-        wrap.querySelectorAll('.star-drag').forEach(el => Boako.Team._makeDraggableStar(el, wrap));
-    },
-
     confirmStarReset: async () => {
         const team = Boako.state.team.info;
         const wrap = document.getElementById('star-canvas-wrap');
@@ -310,7 +312,7 @@ Boako.Team = {
             relSize: 0.16
         }));
 
-        const btn = document.querySelector('#boako-star-modal button.bg-amber-500');
+        const btn = document.getElementById('star-modal-confirm');
         btn.disabled = true; btn.innerText = '저장 중...';
 
         try {
