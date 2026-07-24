@@ -2113,7 +2113,7 @@ function extractTournamentInfo() {
   }
 }
 
-function addTournamentRecordButton() {
+async function addTournamentRecordButton() {
   if (!isTournamentPage()) return;
   
   // 중복 생성 방지
@@ -2121,10 +2121,29 @@ function addTournamentRecordButton() {
 
   const button = document.createElement("button");
   button.id = "boako-tournament-save-button";
-  button.innerText = "토너먼트 정보 등록";
+  button.innerText = "토너먼트 정보 확인 중...";
   button.classList.add("boako-tournament-button", "bgabutton", "bgabutton_blue");
 
   document.body.appendChild(button);
+
+  // 🌟 [신규] 지금 상태(순위 확정/진행중/시작전)에 맞는 라벨을 미리 계산해서 표시
+  // (기존엔 무조건 "토너먼트 정보 등록"으로 고정돼 있어서, 순위가 이미 나온 상태에서도
+  //  실제로는 "기록 저장"이 실행되는데 라벨이 안 맞았음)
+  try {
+    const reporter = await getReporterNickname();
+    const tournamentData = reporter ? extractTournamentData(reporter) : null;
+
+    if (tournamentData && tournamentData.error !== "not_boako" && tournamentData.players?.length > 0) {
+      button.innerText = "🏆 기록 저장";
+    } else {
+      const scheduledDate = parseKoreanDateTimeToTZ(extractTournamentStartTime());
+      const hasStarted = scheduledDate ? (new Date(scheduledDate).getTime() < Date.now()) : false;
+      button.innerText = hasStarted ? "⏳ 토너먼트 종료 시 저장" : "📢 개최 공지 등록";
+    }
+  } catch (err) {
+    console.error("[토너먼트 버튼 라벨] 상태 확인 실패:", err);
+    button.innerText = "📢 개최 공지 등록";
+  }
 
   console.log("✅ 버튼을 다시 편안한 오른쪽 아래로 보냈습니다.");
 
