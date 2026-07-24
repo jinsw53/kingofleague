@@ -6,6 +6,9 @@
  * 🌟 제목/부제목 호버 확대: 카드 자체가 overflow-hidden(썸네일 둥근 모서리 자르기용)이라
  *    CSS transform만으로는 카드 밖으로 못 튀어나오고 잘렸음. position:fixed 팝업 방식으로 변경해서
  *    어떤 카드에 있든 overflow 제약 없이 화면 위에 그대로 확대 표시되도록 수정.
+ * 🌟 [수정] renderSupplementPadCard의 필러 이미지(팀/랭킹/게임 로고)가 object-fit:cover로 잘리던 버그 수정.
+ *    실제 뉴스 썸네일(item.thumbnail_url)은 사진이라 cover가 맞지만, 로고는 전체가 보여야 하므로
+ *    이 카드만 contain + 여백 배경으로 분리함.
  */
 Boako.NewsFeed = {
     items: [],
@@ -363,12 +366,14 @@ Boako.NewsFeed = {
     },
 
     // 아래쪽 그리드 마지막 줄을 채우는 사이트의 다른 실제 데이터 — production의 medium 카드와 동일한 마크업
+    // 🌟 [수정] 여기 들어오는 image는 팀/랭킹/게임 "로고"라서 object-fit:cover로 자르면 안 됨 —
+    // contain + 여백 배경으로 로고 전체가 보이도록 (실제 뉴스 썸네일용 object-fit:cover와는 용도가 다름)
     renderSupplementPadCard: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         const clickable = filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '';
         return `
             <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
-                ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
+                ${img ? `<div class="h-24 overflow-hidden bg-slate-50 flex items-center justify-center p-3"><img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;"></div>` : ''}
                 <div class="p-3 min-w-0">
                     <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.hoverTitle(filler.title)}</h4>
                 </div>
