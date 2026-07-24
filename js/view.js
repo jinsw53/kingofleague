@@ -6,7 +6,9 @@
  *    반시계 90도 회전시켜 주황 스텁 자리에 겹쳐 그림 (서포터즈 배지의 유니폼 합성과 동일한 패턴). 로고 크기 1.5배 확대.
  *    🌟 [낙찰 기한] 대상 시즌은 "시즌 시작 1주일 전" 마감을 아직 안 넘긴, 가장 가까운 시즌 (bid_title_sponsor RPC와 동일 기준)
  * 🌟 [신규] 우승 별 붙이기 자격 판별: season_final_rankings에서 우승(final_rank=1)한 시즌 중
- *    아직 팀.last_star_season_no로 청구 안 된 가장 최근 시즌이 있으면 팀 로고 옆에 버튼 노출 (Boako.Team.openStarModal).
+ *    아직 팀.last_star_season_no로 청구 안 된 가장 최근 시즌이 있으면 팀 로고 옆에 버튼 노출.
+ *    버튼은 하나로 통합(Boako.Team.openStarModal) — 자격 있으면 "우승 별 붙이기", 없고 기존 별만 있으면 "별 위치 관리"로
+ *    라벨만 바뀌고, 모달 안에서 추가/재배치 모드를 전환할 수 있음.
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -413,9 +415,8 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                             <button class="btn-edit-small" style="background:var(--primary); color:white;" onclick="Boako.Team.updateInfo('team_motto')">저장</button>
                                         </div>
                                         ${isLeader && (teamBannerStats.starEligible || team.champion_star_count > 0) ? `
-                                        <div style="display:flex; gap:8px; margin-top:12px;">
-                                            ${teamBannerStats.starEligible ? `<button class="btn-edit-small" style="background:#f59e0b; color:white; border:none;" onclick="Boako.Team.openStarModal(${teamBannerStats.latestWinSeasonNo})">🌟 우승 별 붙이기</button>` : ''}
-                                            ${team.champion_star_count > 0 ? `<button class="btn-edit-small" onclick="Boako.Team.openStarResetModal()">별 위치 초기화</button>` : ''}
+                                        <div style="margin-top:12px;">
+                                            <button class="btn-edit-small" style="background:#f59e0b; color:white; border:none;" onclick="Boako.Team.openStarModal(${teamBannerStats.starEligible ? teamBannerStats.latestWinSeasonNo : 'null'})">${teamBannerStats.starEligible ? '🌟 우승 별 붙이기' : '⭐ 별 위치 관리'}</button>
                                         </div>` : ''}
                                     </div>
                                 </div>
