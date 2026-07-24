@@ -10,6 +10,8 @@
  * 4. 사용자 피드백: 장착/해제 시 컨펌창(Confirm)을 통한 오클릭 방지
  * 5. 🌟 업적 배지(achv_<code>_<user_achievements.id>): achievements.js의 renderBadgeHTML로 위임
  *    (시즌 로고/게임 로고 합성, 정사각형 강제 없이 배경 원본 비율 유지)
+ * 6. 🌟 [전체 배지 통일] 일반 아이템 아이콘/서포터즈 유니폼 배지도 정사각형·원형 강제 없이
+ *    높이만 고정하고 폭은 원본 비율 그대로(auto) — 업적 배지와 동일한 원칙 적용
  */
 
 Boako.Inventory = {
@@ -21,9 +23,9 @@ Boako.Inventory = {
     getIconHTML: function(icon, size) {
         if (!icon) return `<span style="font-size:${size};">❓</span>`;
 
-        // 문자열이 'http'로 시작하면 <img> 태그로 생성
+        // 문자열이 'http'로 시작하면 <img> 태그로 생성 (🌟 정사각형 강제 금지: 높이만 고정, 폭은 원본 비율)
         if (icon.startsWith('http')) {
-            return `<img src="${Boako.Util.cdn(icon)}" style="width:${size}; height:${size}; object-fit:contain; display:block;">`;
+            return `<img src="${Boako.Util.cdn(icon)}" style="height:${size}; width:auto; object-fit:contain; display:block;">`;
         }
         // 그렇지 않으면 일반 텍스트(이모지)로 생성
         else {
@@ -37,24 +39,21 @@ Boako.Inventory = {
      */
     getUniformBadgeHTML: function(item, size) {
         const opacity = item.isExpired ? 'opacity:0.4;' : '';
-        const uniformBg = item.uniformImage
-            ? `background-image:url('${Boako.Util.cdn(item.uniformImage)}'); background-size:contain; background-repeat:no-repeat; background-position:center;`
-            : '';
 
-        const fallbackSilhouette = !item.uniformImage ? `
-            <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="position:absolute; top:0; left:0;">
+        // 🌟 정사각형 강제 금지: 유니폼 이미지가 있으면 실제 img 태그로 그려서 원본 비율 그대로(높이만 고정, 폭 자동)
+        //    유니폼 이미지가 없을 때의 실루엣 SVG는 원래부터 1:1 벡터(viewBox 100x100)라 정사각형처럼 보이는 게 자연스러움
+        const uniformContent = item.uniformImage
+            ? `<img src="${Boako.Util.cdn(item.uniformImage)}" style="height:100%; width:auto; display:block;">`
+            : `<svg height="${size}" viewBox="0 0 100 100" style="display:block;">
                 <path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
-            </svg>
-        ` : '';
+              </svg>`;
 
         return `
-            <div style="width:${size}; height:${size}; position:relative; display:flex; align-items:center; justify-content:center; ${opacity}">
-                ${fallbackSilhouette}
-                <div style="width:${size}; height:${size}; position:relative; ${uniformBg}">
-                    ${item.teamLogo ? `
-                        <img src="${Boako.Util.cdn(item.teamLogo)}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">
-                    ` : ''}
-                </div>
+            <div style="height:${size}; position:relative; display:inline-flex; align-items:center; justify-content:center; ${opacity}">
+                ${uniformContent}
+                ${item.teamLogo ? `
+                    <img src="${Boako.Util.cdn(item.teamLogo)}" style="position:absolute; top:48%; left:50%; transform:translate(-50%,-50%); width:42%; height:42%; object-fit:contain;">
+                ` : ''}
             </div>
         `;
     },
