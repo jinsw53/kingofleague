@@ -365,19 +365,22 @@ Boako.Auth = {
             document.head.appendChild(style);
         }
 
+        // 🌟 업적 배지 합성 렌더링에 필요 (없으면 로드)
+        if (!Boako.Achievements) await Boako.Util.loadScript('js/achievements.js');
+
         try {
             // inventory 테이블에서 is_equipped가 true인 것을 가져옵니다. (FK 없이 수동 조인)
             const { data: equippedItems, error } = await Boako.db
                 .from('inventory')
-                .select('item_id, season_no')
+                .select('item_id, season_no, meta')
                 .eq('user_id', Boako.state.user.id)
                 .eq('is_equipped', true);
 
             if (error) throw error;
 
-            // 서포터즈가 아닌 일반 배지들의 상점 정보를 별도로 조회해서 합침
+            // 서포터즈/업적 배지가 아닌 일반 배지들의 상점 정보를 별도로 조회해서 합침
             const normalItemIds = [...new Set((equippedItems || [])
-                .filter(row => !(row.item_id && row.item_id.startsWith('item_supporter_badge_')))
+                .filter(row => !(row.item_id && (row.item_id.startsWith('item_supporter_badge_') || row.item_id.startsWith('achv_'))))
                 .map(row => row.item_id))];
 
             let shopItemsMap = {};
@@ -424,9 +427,10 @@ Boako.Auth = {
                     `;
                 };
 
-                // 아이콘 타입(이미지 vs 이모지 vs 서포터즈)에 맞춰 HTML 생성
-                badgeArea.innerHTML = equippedItems.map(item => {
+                // 아이콘 타입(이미지 vs 이모지 vs 서포터즈 vs 업적 배지)에 맞춰 HTML 생성
+                const badgeHtmlList = await Promise.all(equippedItems.map(async item => {
                     const isSupporter = item.item_id && item.item_id.startsWith('item_supporter_badge_');
+                    const isAchievement = item.item_id && item.item_id.startsWith('achv_');
 
                     if (isSupporter) {
                         const teamId = Number(item.item_id.split('_').pop());
@@ -434,6 +438,12 @@ Boako.Auth = {
                         const season = seasonsMap[item.season_no];
                         const name = team ? `${team.team_name} 서포터즈` : '서포터즈 배지';
                         return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}">${buildUniformHtml(team?.logo_url, season?.uniform_image_url, '26px')}</div>`;
+                    }
+
+                    if (isAchievement) {
+                        // 🌟 정사각형 강제 없이 배경 원본 비율 유지 + 시즌 로고/게임 로고 합성
+                        const badgeHtml = await Boako.Achievements.renderBadgeHTML(item.item_id, item.season_no, item.meta, 26);
+                        return `<div class="badge-zoom-wrap badge-zoom-sm">${badgeHtml || ''}</div>`;
                     }
 
                     const icon = item.shop_items?.icon || '🏅';
@@ -444,7 +454,8 @@ Boako.Auth = {
                     } else {
                         return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
                     }
-                }).join('');
+                }));
+                badgeArea.innerHTML = badgeHtmlList.join('');
             } else {
                 // 장착된 배지가 없는 경우 (공간만 차지하도록 처리하거나 연한 글씨 출력)
                 badgeArea.innerHTML = `<span style="font-size:11px; color:#cbd5e1; font-weight:600;">장착된 배지가 없습니다</span>`;
