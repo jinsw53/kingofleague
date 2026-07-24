@@ -4,6 +4,7 @@
  * 🌟 랭킹 배너: 시즌 진행 중이면 스폰서 배지 + 시즌 로고를 타이틀 위에 표시 (Boako.Ranking.loadPrizeBanner)
  * 🌟 포인트샵 "타이틀 스폰서" 카드 아이콘: naming.png 티켓 이미지를 배경으로 깔고, 그 위에 시즌 로고를
  *    반시계 90도 회전시켜 주황 스텁 자리에 겹쳐 그림 (서포터즈 배지의 유니폼 합성과 동일한 패턴). 로고 크기 1.5배 확대.
+ *    🌟 [낙찰 기한] 대상 시즌은 "시즌 시작 1주일 전" 마감을 아직 안 넘긴, 가장 가까운 시즌 (bid_title_sponsor RPC와 동일 기준)
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -640,15 +641,16 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                     currentSeasonUniform = currentSeasonRow?.uniform_image_url || null;
                 }
 
-                // 🌟 타이틀 스폰서(네이밍권) 카드용: 대상 시즌(진행 중이거나 가장 가까운 다음 시즌)의 로고 조회
+                // 🌟 타이틀 스폰서(네이밍권) 카드용: 입찰 대상 시즌(마감 전, 가장 가까운 시즌)의 로고 조회
                 let titleSponsorSeasonLogo = null;
                 const hasTitleSponsorItem = (shopItems || []).some(i => i.item_type === 'TITLE_SPONSOR');
                 if (hasTitleSponsorItem) {
-                    const now = new Date().toISOString();
+                    // 마감 = 시즌 시작 1주일 전. 마감을 넘긴 시즌은 이미 확정(잠금)된 것으로 보고 건너뜀
+                    const deadlineCutoff = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
                     const { data: sponsorSeasonRow } = await Boako.db
                         .from('seasons')
                         .select('season_logo_url')
-                        .gte('end_date', now)
+                        .gt('start_date', deadlineCutoff)
                         .order('start_date', { ascending: true })
                         .limit(1)
                         .maybeSingle();
