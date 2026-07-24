@@ -4,6 +4,7 @@
  *    구매할수록 비싸지는 누진 가격(2000→2500→3000→3500→4000→5000)은 서버(purchase_slot_expansion RPC)가 계산.
  * 🌟 팀 리그 타이틀 스폰서(item_title_sponsor, TITLE_SPONSOR) 추가 — 경매식(최소 10,000P, 기존 최고가보다 높아야 갱신).
  *    밀려난 이전 입찰자는 자동 환불, 낙찰액은 시즌 상금풀에 적립 (bid_title_sponsor RPC).
+ *    🌟 [낙찰 기한] 시즌 시작 1주일 전 마감 — 마감 지난 시즌은 스폰서 확정(잠금), 자동으로 다음 시즌이 입찰 대상으로 전환.
  *    모달 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹침 (view.js 상점카드와 동일 패턴, 1.5배 확대).
  */
 Boako.Shop = {
@@ -216,11 +217,12 @@ if (window.sfx) window.sfx.buy();
     // 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹쳐서, 몇 시즌 것인지 한눈에 보이게 함
     openTitleSponsorModal: async (targetItem) => {
         const MIN_BID = 10000;
-        const now = new Date().toISOString();
+        // 🌟 [낙찰 기한] 입찰 대상은 "시즌 시작 1주일 전" 마감을 아직 안 넘긴, 가장 가까운 시즌
+        const deadlineCutoff = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         const { data: season } = await Boako.db
             .from('seasons')
             .select('season_no, title_sponsor_name, title_sponsor_amount, season_logo_url')
-            .gte('end_date', now)
+            .gt('start_date', deadlineCutoff)
             .order('start_date', { ascending: true })
             .limit(1)
             .maybeSingle();
