@@ -21,6 +21,12 @@ Boako.Auth = {
             // 🌟 로그인 즉시 실시간 쪽지 감지 시작 (메신저 페이지를 안 열어도 위젯 배지가 실시간으로 갱신되도록)
             if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
+            // 🌟 로그인 즉시 업적 획득 실시간 알림 구독 시작 (사이트 어느 화면에 있든 토스트가 떠야 함)
+            if (Object.keys(Boako.Achievements || {}).length === 0) await Boako.Util.loadScript('js/achievements.js');
+            if (Boako.Achievements.startRealtime) Boako.Achievements.startRealtime();
+            // 🌟 오프라인 중 획득한(=놓친) 업적도 로그인 시점에 확인
+            if (Boako.Achievements.checkUnseenAchievements) Boako.Achievements.checkUnseenAchievements();
+
             // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
             await Boako.Auth.requireBgaNickname();
             Boako.Auth.requireExtensionGuide();
@@ -65,6 +71,11 @@ Boako.Auth = {
                 // 🌟 로그인 즉시 실시간 쪽지 감지 시작
                 if (Boako.Messenger.startRealtime) Boako.Messenger.startRealtime();
 
+                // 🌟 업적 획득 실시간 알림 구독
+                if (Object.keys(Boako.Achievements || {}).length === 0) await Boako.Util.loadScript('js/achievements.js');
+                if (Boako.Achievements.startRealtime) Boako.Achievements.startRealtime();
+                if (Boako.Achievements.checkUnseenAchievements) Boako.Achievements.checkUnseenAchievements();
+
                 await Boako.Auth.renderWidget();
                 // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
                 await Boako.Auth.requireBgaNickname();
@@ -74,6 +85,7 @@ Boako.Auth = {
             } else {
                 Boako.state.user = null;
                 Boako.state.team = null;
+                if (Boako.Achievements && Boako.Achievements.stopRealtime) Boako.Achievements.stopRealtime();
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) adminMenu.style.display = 'none';
                 const verifyMenu = document.getElementById('menu-record-verify');
