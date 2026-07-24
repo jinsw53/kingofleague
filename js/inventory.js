@@ -8,6 +8,8 @@
  * 2. 데이터 유효성 검사: DB 데이터가 배열이 아닌 경우(null, 숫자 등) 자동 복구
  * 3. 스마트 아이콘: 이미지 URL과 이모지를 자동 판별하여 최적화된 HTML 출력
  * 4. 사용자 피드백: 장착/해제 시 컨펌창(Confirm)을 통한 오클릭 방지
+ * 5. 🌟 업적 배지(achv_<code>_<user_achievements.id>): achievements.js의 renderBadgeHTML로 위임
+ *    (시즌 로고/게임 로고 합성, 정사각형 강제 없이 배경 원본 비율 유지)
  */
 
 Boako.Inventory = {
@@ -81,6 +83,8 @@ Boako.Inventory = {
             console.error("사용자 정보가 없습니다. 로그인을 확인하세요.");
             return;
         }
+        // 🌟 업적 배지 합성 렌더링에 필요 (없으면 로드)
+        if (!Boako.Achievements) await Boako.Util.loadScript('js/achievements.js');
 
         const badgeArea = document.getElementById('equipped-badges'); // 장착 슬롯 영역
         const listArea = document.getElementById('inventory-list');   // 가방 목록 영역
@@ -116,14 +120,15 @@ Boako.Inventory = {
             // --- 2단계: 유저 인벤토리 아이템 가져오기 (FK 없이 수동 조인) ---
             const { data: myItems, error: iError } = await Boako.db
                 .from('inventory')
-                .select('id, item_id, quantity, expires_at, season_no')
+                .select('id, item_id, quantity, expires_at, season_no, meta')
                 .eq('user_id', Boako.state.user.id);
 
             if (iError) throw iError;
 
-            // 서포터즈가 아닌 일반 아이템들의 상점 정보를 별도로 조회해서 합침
+            // 서포터즈/업적 배지가 아닌 일반 아이템들의 상점 정보를 별도로 조회해서 합침
+            // (업적 배지는 achievements 테이블에서 직접 이름/배경/오버레이 정보를 가져오므로 shop_items 조회 불필요)
             const normalItemIds = [...new Set((myItems || [])
-                .filter(row => !(row.item_id && row.item_id.startsWith('item_supporter_badge_')))
+                .filter(row => !(row.item_id && (row.item_id.startsWith('item_supporter_badge_') || row.item_id.startsWith('achv_'))))
                 .map(row => row.item_id))];
 
             let shopItemsMap = {};
@@ -154,9 +159,10 @@ Boako.Inventory = {
             const equippedList = []; // 장착된 배지들
             const bagList = [];      // 가방에 남은 아이템들
 
-            // --- 3단계: 장착 여부에 따른 리스트 분류 ---
-            (myItems || []).forEach(row => {
+            // --- 3단계: 장착 여부에 따른 리스트 분류 (업적 배지 합성 때문에 비동기 처리) ---
+            for (const row of (myItems || [])) {
                 const isSupporter = row.item_id && row.item_id.startsWith('item_supporter_badge_');
+                const isAchievement = row.item_id && row.item_id.startsWith('achv_');
 
                 let itemData;
                 if (isSupporter) {
@@ -176,9 +182,28 @@ Boako.Inventory = {
                         expiresAt: row.expires_at,
                         isExpired: isExpired
                     };
+                } else if (isAchievement) {
+                    // 🌟 업적 배지: achv_<code>_<user_achievements.id> — 획득마다 별도 인스턴스
+                    const parsed = Boako.Achievements.parseAchievementItemId(row.item_id);
+                    const achievement = parsed ? await Boako.Achievements.getAchievementByCode(parsed.code) : null;
+                    let displayName = achievement ? achievement.name : '업적 배지';
+                    if (row.season_no) displayName += ` (시즌 ${row.season_no})`;
+                    else if (row.meta && row.meta.game_name) displayName += ` (${row.meta.game_name})`;
+
+                    itemData = {
+                        inv_id: String(row.id),
+                        name: displayName,
+                        type: 'BADGE',
+                        quantity: row.quantity,
+                        isSupporter: false,
+                        isAchievement: true,
+                        // 🌟 배경 원본 비율 유지(정사각형 강제 X) + 시즌 로고/게임 로고 합성까지 끝난 완성 HTML
+                        badgeHtmlSm: await Boako.Achievements.renderBadgeHTML(row.item_id, row.season_no, row.meta, 22),
+                        badgeHtmlMd: await Boako.Achievements.renderBadgeHTML(row.item_id, row.season_no, row.meta, 48)
+                    };
                 } else {
                     const info = row.shop_items;
-                    if (!info) return; // 상점 정보가 없는 데이터는 패스
+                    if (!info) continue; // 상점 정보가 없는 데이터는 패스
 
                     itemData = {
                         inv_id: String(row.id),
@@ -196,7 +221,7 @@ Boako.Inventory = {
                 } else {
                     bagList.push(itemData);
                 }
-            });
+            }
 
             // --- 4단계: 장착 슬롯 화면 그리기 ---
             let badgeHTML = `
@@ -215,7 +240,7 @@ Boako.Inventory = {
                     <div onclick="Boako.Inventory.unequip('${b.inv_id}')" 
                          style="background:white; border:2px solid #10b981; border-radius:50px; padding:8px 18px; display:flex; align-items:center; gap:10px; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); transition:transform 0.2s;"
                          onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                        <div class="badge-zoom-wrap badge-zoom-sm">${b.isSupporter ? this.getUniformBadgeHTML(b, '22px') : this.getIconHTML(b.icon, '22px')}</div>
+                        <div class="badge-zoom-wrap badge-zoom-sm">${b.isSupporter ? this.getUniformBadgeHTML(b, '22px') : (b.isAchievement ? b.badgeHtmlSm : this.getIconHTML(b.icon, '22px'))}</div>
                         <span style="font-weight:800; font-size:14px; color:#064e3b;">${b.name}</span>
                     </div>
                 `).join('');
@@ -241,7 +266,7 @@ Boako.Inventory = {
                     return `
                     <div style="background:white; border:1px solid #e2e8f0; border-radius:16px; padding:20px 10px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                         <div style="height:60px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; position:relative;">
-                            <div class="badge-zoom-wrap badge-zoom-md">${item.isSupporter ? this.getUniformBadgeHTML(item, '48px') : this.getIconHTML(item.icon, '48px')}</div>
+                            <div class="badge-zoom-wrap badge-zoom-md">${item.isSupporter ? this.getUniformBadgeHTML(item, '48px') : (item.isAchievement ? item.badgeHtmlMd : this.getIconHTML(item.icon, '48px'))}</div>
                             ${item.quantity > 1 ? `
                                 <span style="position:absolute; bottom:0; right:15%; background:#ef4444; color:white; font-size:11px; font-weight:900; padding:2px 7px; border-radius:10px; border:2px solid white;">
                                     x${item.quantity}
