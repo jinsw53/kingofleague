@@ -4,6 +4,10 @@
  *    로그인 즉시(auth.js) 구독 시작 — 메신저 실시간 쪽지 감지(startRealtime)와 동일한 패턴.
  *    포인트 지급/인벤토리 배지 지급은 DB 트리거(fn_grant_achievement_rewards)가 원자적으로 처리하므로,
  *    이 모듈은 순수하게 "알림 표시"만 담당함.
+ * 🌟 배지 합성 렌더링(renderBadgeHTML): 인벤토리/위젯/토스트가 전부 공유하는 공용 함수.
+ *    획득마다 별도 인벤토리 인스턴스(achv_<code>_<user_achievements.id>)라 매번 achievements 테이블에서 code로 조회.
+ *    시즌형 배지는 배경 원본 비율 유지(정사각형 강제 X) + season_logo_overlay 좌표로 시즌 로고 합성.
+ *    OO매니아는 배경 없이 게임 로고 + 티어(동/은/금) 테두리로 합성.
  */
 Boako.Achievements = {
     channel: null,
@@ -60,7 +64,7 @@ Boako.Achievements = {
                         .eq('id', payload.new.achievement_id)
                         .single();
                     if (achievement) {
-                        Boako.Achievements.showToast(achievement, payload.new.meta);
+                        Boako.Achievements.showToast(achievement, payload.new.meta, payload.new.season_no, payload.new.id);
                         // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
                         await Boako.Achievements.markConfirmed([payload.new.id]);
                     }
@@ -84,7 +88,7 @@ Boako.Achievements = {
 
             const { data: rows } = await Boako.db
                 .from('user_achievements')
-                .select('id, meta, achievements(*)')
+                .select('id, meta, season_no, achievements(*)')
                 .eq('user_id', Boako.state.user.id)
                 .order('achieved_at', { ascending: true });
 
@@ -93,7 +97,7 @@ Boako.Achievements = {
 
             unseen.forEach((row, idx) => {
                 setTimeout(() => {
-                    if (row.achievements) Boako.Achievements.showToast(row.achievements, row.meta);
+                    if (row.achievements) Boako.Achievements.showToast(row.achievements, row.meta, row.season_no, row.id);
                 }, idx * 900);
             });
 
@@ -128,7 +132,7 @@ Boako.Achievements = {
         }
     },
 
-    showToast: (achievement, meta) => {
+    showToast: async (achievement, meta, seasonNo, uaId) => {
         Boako.Achievements.injectStyle();
 
         let container = document.getElementById('achv-toast-container');
@@ -139,12 +143,18 @@ Boako.Achievements = {
             document.body.appendChild(container);
         }
 
-        const tier = Boako.Achievements.getTierStyle(achievement.name);
         const gameName = meta && meta.game_name ? meta.game_name : null;
 
-        const iconHtml = achievement.badge_icon_url
-            ? `<img src="${Boako.Util.cdn(achievement.badge_icon_url)}" style="width:44px; height:44px; object-fit:contain;">`
-            : `<i data-lucide="award" style="width:26px; height:26px; color:#fff;"></i>`;
+        // 🌟 시즌 로고/OO매니아 게임 로고까지 합성된 배지 HTML (정사각형 강제 없이 원본 비율 유지)
+        const itemId = uaId ? `achv_${achievement.code}_${uaId}` : null;
+        let iconHtml = itemId ? await Boako.Achievements.renderBadgeHTML(itemId, seasonNo, meta, 44) : null;
+        if (!iconHtml) {
+            iconHtml = achievement.badge_icon_url
+                ? `<img src="${Boako.Util.cdn(achievement.badge_icon_url)}" style="height:44px; width:auto; display:block;">`
+                : `<i data-lucide="award" style="width:26px; height:26px; color:#fff;"></i>`;
+        }
+
+        const tier = Boako.Achievements.getTierStyle(achievement.name);
 
         const toast = document.createElement('div');
         toast.className = 'achv-toast-in';
@@ -154,7 +164,7 @@ Boako.Achievements = {
             display:flex; align-items:center; gap:12px; padding:14px 16px; overflow:hidden;
         `;
         toast.innerHTML = `
-            <div class="achv-badge-pop" style="width:52px; height:52px; border-radius:14px; background:${tier.bg}; box-shadow:0 0 0 3px ${tier.ring}33; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <div class="achv-badge-pop" style="min-width:52px; height:52px; border-radius:14px; background:${tier.bg}; box-shadow:0 0 0 3px ${tier.ring}33; display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:2px 4px;">
                 ${iconHtml}
             </div>
             <div style="min-width:0; flex:1;">
@@ -180,5 +190,91 @@ Boako.Achievements = {
         toastEl.dataset.dismissing = '1';
         toastEl.className = 'achv-toast-out';
         setTimeout(() => toastEl.remove(), 300);
+    },
+
+    // ========== 🌟 [신규] 배지 합성 렌더링 공용 함수 (인벤토리/위젯/토스트 전부 공유) ==========
+    // item_id 형식: achv_<code>_<user_achievements.id> — 획득할 때마다 별도 인스턴스라 매번 파싱해서 조회
+    _achievementCache: {},
+    _seasonLogoCache: {},
+    _gameLogoCache: {},
+
+    parseAchievementItemId: (itemId) => {
+        if (!itemId) return null;
+        const m = String(itemId).match(/^achv_(.+)_(\d+)$/);
+        if (!m) return null;
+        return { code: m[1], uaId: m[2] };
+    },
+
+    getAchievementByCode: async (code) => {
+        if (Boako.Achievements._achievementCache[code] !== undefined) return Boako.Achievements._achievementCache[code];
+        const { data } = await Boako.db.from('achievements').select('*').eq('code', code).maybeSingle();
+        Boako.Achievements._achievementCache[code] = data || null;
+        return data || null;
+    },
+
+    getSeasonLogo: async (seasonNo) => {
+        if (!seasonNo) return null;
+        if (Boako.Achievements._seasonLogoCache[seasonNo] !== undefined) return Boako.Achievements._seasonLogoCache[seasonNo];
+        const { data } = await Boako.db.from('seasons').select('season_logo_url').eq('season_no', seasonNo).maybeSingle();
+        const url = data?.season_logo_url || null;
+        Boako.Achievements._seasonLogoCache[seasonNo] = url;
+        return url;
+    },
+
+    getGameLogo: async (gameName) => {
+        if (!gameName) return null;
+        if (Boako.Achievements._gameLogoCache[gameName] !== undefined) return Boako.Achievements._gameLogoCache[gameName];
+        const { data } = await Boako.db.from('games').select('image_url').eq('game_name', gameName).maybeSingle();
+        const url = data?.image_url || null;
+        Boako.Achievements._gameLogoCache[gameName] = url;
+        return url;
+    },
+
+    // 🌟 배지 HTML 생성 (비동기). itemId가 achv_ 형식이 아니면 null 반환(호출부에서 기존 방식으로 폴백).
+    // sizePx는 "높이" 기준 — 배경 이미지 원본 비율을 그대로 유지하고, 정사각형으로 강제 크롭하지 않음.
+    renderBadgeHTML: async (itemId, seasonNo, meta, sizePx) => {
+        sizePx = sizePx || 48;
+        const parsed = Boako.Achievements.parseAchievementItemId(itemId);
+        if (!parsed) return null;
+
+        const achievement = await Boako.Achievements.getAchievementByCode(parsed.code);
+        const fallbackEmoji = `<div style="width:${sizePx}px; height:${sizePx}px; display:flex; align-items:center; justify-content:center; font-size:${Math.round(sizePx * 0.6)}px;">🏅</div>`;
+        if (!achievement) return fallbackEmoji;
+
+        const gameName = meta && meta.game_name ? meta.game_name : null;
+
+        // OO매니아: 배경 없이 게임 로고 + 티어(동/은/금) 테두리로 합성
+        if (achievement.code.startsWith('game_mania_')) {
+            const tier = Boako.Achievements.getTierStyle(achievement.name);
+            const gameLogo = await Boako.Achievements.getGameLogo(gameName);
+            const pad = Math.max(2, Math.round(sizePx * 0.06));
+            return `
+                <div style="width:${sizePx}px; height:${sizePx}px; border-radius:${Math.round(sizePx * 0.22)}px; background:${tier.bg}; padding:${pad}px; box-shadow:0 0 0 2px ${tier.ring}55; box-sizing:border-box;">
+                    <div style="width:100%; height:100%; border-radius:${Math.round(sizePx * 0.18)}px; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                        ${gameLogo ? `<img src="${Boako.Util.cdn(gameLogo)}" style="width:82%; height:82%; object-fit:contain;">` : `<span style="font-size:${Math.round(sizePx * 0.5)}px;">🎲</span>`}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (!achievement.badge_icon_url) return fallbackEmoji;
+
+        // 🌟 시즌형 배지: 배경 위에 그 인스턴스가 획득된 시즌의 로고를 겹쳐 그림
+        let overlayHtml = '';
+        if (achievement.season_logo_overlay && seasonNo) {
+            const seasonLogo = await Boako.Achievements.getSeasonLogo(seasonNo);
+            if (seasonLogo) {
+                const ov = achievement.season_logo_overlay;
+                overlayHtml = `<img src="${Boako.Util.cdn(seasonLogo)}" style="position:absolute; top:${ov.top}; left:${ov.left}; width:${ov.width}; height:${ov.height}; object-fit:contain; transform:translate(-50%,-50%) rotate(${ov.rotate || 0}deg); pointer-events:none;">`;
+            }
+        }
+
+        // 🌟 정사각형 강제 금지: 높이만 고정하고 폭은 원본 비율 그대로(auto)
+        return `
+            <div style="height:${sizePx}px; position:relative; display:inline-block; vertical-align:middle;">
+                <img src="${Boako.Util.cdn(achievement.badge_icon_url)}" style="height:100%; width:auto; display:block;">
+                ${overlayHtml}
+            </div>
+        `;
     }
 };
