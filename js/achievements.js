@@ -1,10 +1,11 @@
 /**
  * [ACHIEVEMENTS] 업적 실시간 획득 알림
- * 🌟 user_achievements INSERT를 Realtime으로 감지해서, 사이트 어느 화면에 있든 우측 상단에 획득 토스트를 띄움.
- *    로그인 즉시(auth.js) 구독 시작 — 메신저 실시간 쪽지 감지(startRealtime)와 동일한 패턴.
+ * 🌟 user_achievements INSERT를 Realtime으로 감지해서, 사이트 어느 화면에 있든 주사위 굴림과 같은 톤의
+ *    풀스크린 축하 오버레이를 띄움. 로그인 즉시(auth.js) 구독 시작 — 메신저 실시간 쪽지 감지(startRealtime)와 동일한 패턴.
  *    포인트 지급/인벤토리 배지 지급은 DB 트리거(fn_grant_achievement_rewards)가 원자적으로 처리하므로,
  *    이 모듈은 순수하게 "알림 표시"만 담당함.
- * 🌟 배지 합성 렌더링(renderBadgeHTML): 인벤토리/위젯/토스트가 전부 공유하는 공용 함수.
+ *    여러 개가 한꺼번에 뜰 수 있어서(오프라인 중 놓친 업적 등) 큐(enqueueOverlay)로 순서대로 하나씩 보여줌.
+ * 🌟 배지 합성 렌더링(renderBadgeHTML): 인벤토리/위젯/오버레이가 전부 공유하는 공용 함수.
  *    획득마다 별도 인벤토리 인스턴스(achv_<code>_<user_achievements.id>)라 매번 achievements 테이블에서 code로 조회.
  *    시즌형 배지는 배경 원본 비율 유지(정사각형 강제 X) + season_logo_overlay 좌표로 시즌 로고 합성.
  *    OO매니아는 배경 없이 게임 로고 + 티어(동/은/금) 테두리로 합성.
@@ -17,21 +18,11 @@ Boako.Achievements = {
         const style = document.createElement('style');
         style.id = 'achievement-toast-style';
         style.innerHTML = `
-            @keyframes achv-toast-in {
-                from { transform: translateX(120%); opacity: 0; }
-                to   { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes achv-toast-out {
-                from { transform: translateX(0); opacity: 1; }
-                to   { transform: translateX(120%); opacity: 0; }
-            }
             @keyframes achv-badge-pop {
                 0%   { transform: scale(0.4) rotate(-10deg); opacity: 0; }
                 60%  { transform: scale(1.15) rotate(4deg); opacity: 1; }
                 100% { transform: scale(1) rotate(0deg); opacity: 1; }
             }
-            .achv-toast-in { animation: achv-toast-in 0.4s cubic-bezier(.34,1.56,.64,1) both; }
-            .achv-toast-out { animation: achv-toast-out 0.3s ease-in forwards; }
             .achv-badge-pop { animation: achv-badge-pop 0.5s cubic-bezier(.34,1.56,.64,1) 0.1s both; }
         `;
         document.head.appendChild(style);
@@ -64,7 +55,7 @@ Boako.Achievements = {
                         .eq('id', payload.new.achievement_id)
                         .single();
                     if (achievement) {
-                        Boako.Achievements.showToast(achievement, payload.new.meta, payload.new.season_no, payload.new.id);
+                        Boako.Achievements.enqueueOverlay(achievement, payload.new.meta, payload.new.season_no, payload.new.id);
                         // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
                         await Boako.Achievements.markConfirmed([payload.new.id]);
                     }
@@ -95,10 +86,9 @@ Boako.Achievements = {
             const unseen = (rows || []).filter(r => !confirmedIds.has(r.id));
             if (unseen.length === 0) return;
 
-            unseen.forEach((row, idx) => {
-                setTimeout(() => {
-                    if (row.achievements) Boako.Achievements.showToast(row.achievements, row.meta, row.season_no, row.id);
-                }, idx * 900);
+            // 🌟 풀스크린 오버레이는 겹치면 안 되니, 한 번에 다 넣어도 큐가 순서대로 하나씩 보여줌
+            unseen.forEach(row => {
+                if (row.achievements) Boako.Achievements.enqueueOverlay(row.achievements, row.meta, row.season_no, row.id);
             });
 
             await Boako.Achievements.markConfirmed(unseen.map(r => r.id));
@@ -132,67 +122,81 @@ Boako.Achievements = {
         }
     },
 
-    showToast: async (achievement, meta, seasonNo, uaId) => {
-        Boako.Achievements.injectStyle();
+    // ========== 🌟 풀스크린 오버레이 큐 (여러 개 놓친 업적이 한꺼번에 뜨면 겹치지 않게 순서대로) ==========
+    _overlayQueue: [],
+    _overlayShowing: false,
 
-        let container = document.getElementById('achv-toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'achv-toast-container';
-            container.style.cssText = 'position:fixed; top:20px; right:20px; z-index:100000; display:flex; flex-direction:column; gap:10px; pointer-events:none;';
-            document.body.appendChild(container);
-        }
+    enqueueOverlay: (achievement, meta, seasonNo, uaId) => {
+        Boako.Achievements._overlayQueue.push({ achievement, meta, seasonNo, uaId });
+        Boako.Achievements._processOverlayQueue();
+    },
 
-        const gameName = meta && meta.game_name ? meta.game_name : null;
+    _processOverlayQueue: async () => {
+        if (Boako.Achievements._overlayShowing) return;
+        const next = Boako.Achievements._overlayQueue.shift();
+        if (!next) return;
+        Boako.Achievements._overlayShowing = true;
+        await Boako.Achievements.showToast(next.achievement, next.meta, next.seasonNo, next.uaId);
+        Boako.Achievements._overlayShowing = false;
+        Boako.Achievements._processOverlayQueue();
+    },
 
-        // 🌟 시즌 로고/OO매니아 게임 로고까지 합성된 배지 HTML (정사각형 강제 없이 원본 비율 유지)
-        const itemId = uaId ? `achv_${achievement.code}_${uaId}` : null;
-        let iconHtml = itemId ? await Boako.Achievements.renderBadgeHTML(itemId, seasonNo, meta, 44) : null;
-        if (!iconHtml) {
-            iconHtml = achievement.badge_icon_url
-                ? `<img src="${Boako.Util.cdn(achievement.badge_icon_url)}" style="height:44px; width:auto; display:block;">`
-                : `<i data-lucide="award" style="width:26px; height:26px; color:#fff;"></i>`;
-        }
+    // 🌟 [전면 교체] 주사위 굴림(showDiceRollOverlay)과 같은 톤의 풀스크린 축하 오버레이.
+    // 클릭하거나 4초 지나면 닫힘. Promise를 반환해서 큐가 "닫힌 뒤에" 다음 걸 보여줄 수 있게 함.
+    showToast: (achievement, meta, seasonNo, uaId) => {
+        return new Promise(async (resolve) => {
+            Boako.Achievements.injectStyle();
 
-        const tier = Boako.Achievements.getTierStyle(achievement.name);
+            const gameName = meta && meta.game_name ? meta.game_name : null;
 
-        const toast = document.createElement('div');
-        toast.className = 'achv-toast-in';
-        toast.style.cssText = `
-            pointer-events:auto; cursor:pointer; width:300px; background:#fff; border-radius:16px;
-            box-shadow:0 12px 30px rgba(0,0,0,0.18); border:1px solid rgba(0,0,0,0.06);
-            display:flex; align-items:center; gap:12px; padding:14px 16px; overflow:hidden;
-        `;
-        toast.innerHTML = `
-            <div class="achv-badge-pop" style="min-width:52px; height:52px; border-radius:14px; background:${tier.bg}; box-shadow:0 0 0 3px ${tier.ring}33; display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:2px 4px;">
-                ${iconHtml}
-            </div>
-            <div style="min-width:0; flex:1;">
-                <div style="font-size:10px; font-weight:900; color:#8b5cf6; letter-spacing:0.05em; text-transform:uppercase;">🏅 업적 달성!</div>
-                <div style="font-size:14px; font-weight:900; color:#1e293b; line-height:1.3; margin-top:2px;">
-                    ${achievement.name}${gameName ? ` <span style="color:#94a3b8; font-weight:700;">(${gameName})</span>` : ''}
+            // 🌟 시즌 로고/OO매니아 게임 로고까지 합성된 배지 HTML (정사각형 강제 없이 원본 비율 유지)
+            const itemId = uaId ? `achv_${achievement.code}_${uaId}` : null;
+            let badgeHtml = itemId ? await Boako.Achievements.renderBadgeHTML(itemId, seasonNo, meta, 140) : null;
+            if (!badgeHtml) {
+                badgeHtml = achievement.badge_icon_url
+                    ? `<img src="${Boako.Util.cdn(achievement.badge_icon_url)}" style="height:140px; width:auto; display:block;">`
+                    : `<div style="font-size:100px; line-height:1;">🏅</div>`;
+            }
+
+            const overlay = document.createElement('div');
+            overlay.id = 'achv-fullscreen-overlay';
+            overlay.style.cssText = `
+                position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center;
+                background:rgba(15,23,42,0.6); backdrop-filter:blur(3px); cursor:pointer;
+                opacity:0; transition:opacity .25s ease;
+            `;
+            overlay.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:20px; max-width:420px;">
+                    <div class="achv-badge-pop" style="display:flex; align-items:center; justify-content:center;">${badgeHtml}</div>
+                    <div style="font-size:13px; font-weight:900; color:#c4b5fd; letter-spacing:0.12em; text-transform:uppercase;">🏅 업적 달성!</div>
+                    <div style="font-size:26px; font-weight:900; color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.45); line-height:1.35;">
+                        ${achievement.name}${gameName ? `<br><span style="font-size:16px; color:#cbd5e1; font-weight:700;">(${gameName})</span>` : ''}
+                    </div>
+                    <div style="font-size:16px; font-weight:900; color:#fbbf24; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
+                        +${Number(achievement.point_reward || 0).toLocaleString()} P 획득
+                    </div>
+                    <div style="font-size:11px; font-weight:700; color:rgba(255,255,255,0.6); margin-top:6px;">화면을 탭하면 닫혀요</div>
                 </div>
-                <div style="font-size:11px; font-weight:700; color:#f59e0b; margin-top:3px;">+${Number(achievement.point_reward || 0).toLocaleString()} P 획득</div>
-            </div>
-        `;
+            `;
+            document.body.appendChild(overlay);
+            requestAnimationFrame(() => { overlay.style.opacity = '1'; });
 
-        toast.addEventListener('click', () => Boako.Achievements.dismissToast(toast));
-        container.appendChild(toast);
+            if (window.lucide) window.lucide.createIcons();
+            try { if (window.sfx && window.sfx.success) window.sfx.success(); } catch (e) { /* 자동재생 정책으로 인한 무음은 무시 */ }
 
-        if (window.lucide) window.lucide.createIcons();
-        if (window.sfx && window.sfx.success) window.sfx.success();
-
-        setTimeout(() => Boako.Achievements.dismissToast(toast), 5000);
+            let dismissed = false;
+            const dismiss = () => {
+                if (dismissed) return;
+                dismissed = true;
+                overlay.style.opacity = '0';
+                setTimeout(() => { overlay.remove(); resolve(); }, 250);
+            };
+            overlay.addEventListener('click', dismiss);
+            setTimeout(dismiss, 4000);
+        });
     },
 
-    dismissToast: (toastEl) => {
-        if (!toastEl || toastEl.dataset.dismissing) return;
-        toastEl.dataset.dismissing = '1';
-        toastEl.className = 'achv-toast-out';
-        setTimeout(() => toastEl.remove(), 300);
-    },
-
-    // ========== 🌟 [신규] 배지 합성 렌더링 공용 함수 (인벤토리/위젯/토스트 전부 공유) ==========
+    // ========== 🌟 배지 합성 렌더링 공용 함수 (인벤토리/위젯/오버레이 전부 공유) ==========
     // item_id 형식: achv_<code>_<user_achievements.id> — 획득할 때마다 별도 인스턴스라 매번 파싱해서 조회
     _achievementCache: {},
     _seasonLogoCache: {},
