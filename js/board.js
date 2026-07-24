@@ -6,6 +6,9 @@
  * 🌟 게시글 등록 시 하루 1회 주사위(1~6) 굴려서 나온 눈만큼 포인트 지급 (fn_roll_daily_dice RPC).
  *    🌟 [이전됨] 주사위 연출/사운드 로직(showDiceRollOverlay 등)은 util.js로 이전 — 라이벌전/토너먼트/같이하자 등
  *    다른 페이지에서도 같은 하루 1회 보상을 발동시킬 수 있게 하기 위함. 여기선 Boako.Util.tryRollDailyDice()만 호출.
+ * 🌟 [배지 표시 수정] 작성자 배지 조회가 업적 배지(achv_<code>_<id>)를 shop_items에서 찾다 실패해서
+ *    조용히 누락되던 버그 수정 — achievements.js의 renderBadgeHTML로 별도 분기 처리.
+ *    아이콘 렌더링도 정사각형·원형 강제 없이 높이만 고정하도록 사이트 전체 배지 규칙과 통일.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -57,16 +60,20 @@ Boako.Board = {
     },
 
     // 🌟 [신규 - 공용] 여러 유저의 "장착 중인 배지"를 한 번에 조회 (목록/상세/댓글 공용)
-    // 일반 배지(shop_items)뿐 아니라 서포터즈 배지(item_supporter_badge_*, 팀 로고)도 함께 포함해서
-    // { userId: [{name, icon}, ...] } 형태로 반환 (isSupporter: true인 항목은 팀 로고 표시용)
+    // 일반 배지(shop_items) + 서포터즈 배지(item_supporter_badge_*, 팀 로고) + 🌟업적 배지(achv_<code>_<id>)
+    // { userId: [{...}, ...] } 형태로 반환. 업적 배지는 achievements.js의 renderBadgeHTML로 합성한 완성 HTML을 담아서 반환.
     fetchBadgeMap: async (userIds) => {
         const uniqueIds = [...new Set(userIds)].filter(Boolean);
         if (uniqueIds.length === 0) return {};
 
-        const { data: equipped } = await Boako.db.from('inventory').select('user_id, item_id').eq('is_equipped', true).in('user_id', uniqueIds);
+        // 🌟 업적 배지 합성 렌더링에 필요 (없으면 로드)
+        if (!Boako.Achievements) await Boako.Util.loadScript('js/achievements.js');
 
-        const normalRows = (equipped || []).filter(r => !r.item_id.startsWith('item_supporter_badge_'));
+        const { data: equipped } = await Boako.db.from('inventory').select('user_id, item_id, season_no, meta').eq('is_equipped', true).in('user_id', uniqueIds);
+
         const supporterRows = (equipped || []).filter(r => r.item_id.startsWith('item_supporter_badge_'));
+        const achvRows = (equipped || []).filter(r => r.item_id.startsWith('achv_'));
+        const normalRows = (equipped || []).filter(r => !r.item_id.startsWith('item_supporter_badge_') && !r.item_id.startsWith('achv_'));
 
         const normalItemIds = [...new Set(normalRows.map(r => r.item_id))];
         let shopMap = {};
@@ -99,19 +106,29 @@ Boako.Board = {
                 name: team ? `${team.team_name} 서포터즈` : '서포터즈'
             });
         });
+        // 🌟 업적 배지: 시즌 로고/게임 로고 합성까지 끝난 완성 HTML을 미리 만들어서 담아둠 (renderBadgeIcons에서 그대로 출력)
+        await Promise.all(achvRows.map(async row => {
+            if (!badgeMap[row.user_id]) badgeMap[row.user_id] = [];
+            const html = await Boako.Achievements.renderBadgeHTML(row.item_id, row.season_no, row.meta, 16);
+            if (html) badgeMap[row.user_id].push({ isAchievement: true, html });
+        }));
         return badgeMap;
     },
 
-    // 🌟 [신규 - 공용] 배지 배열을 작은 아이콘 목록 HTML로 변환 (일반 배지 + 서포터즈 배지 둘 다 처리)
+    // 🌟 [신규 - 공용] 배지 배열을 작은 아이콘 목록 HTML로 변환 (일반/서포터즈/업적 배지 전부 처리)
+    // 🌟 정사각형·원형 강제 금지: 전부 높이만 고정하고 폭은 원본 비율 그대로(auto)
     renderBadgeIcons: (badges) => {
         return (badges || []).map(b => {
+            if (b.isAchievement) {
+                return b.html; // achievements.js에서 이미 높이 고정/원본 비율로 합성 완료된 HTML
+            }
             if (b.isSupporter) {
                 return b.icon
-                    ? `<img src="${Boako.Util.cdn(b.icon)}" class="w-4 h-4 rounded-full object-cover inline-block border border-slate-200" title="${b.name}">`
+                    ? `<img src="${Boako.Util.cdn(b.icon)}" style="height:16px; width:auto; object-fit:contain; display:inline-block; vertical-align:middle;" title="${b.name}">`
                     : `<span title="${b.name}">🛡️</span>`;
             }
             return (b.icon && b.icon.startsWith('http'))
-                ? `<img src="${Boako.Util.cdn(b.icon)}" class="w-4 h-4 rounded-full object-cover inline-block" title="${b.name}">`
+                ? `<img src="${Boako.Util.cdn(b.icon)}" style="height:16px; width:auto; object-fit:contain; display:inline-block; vertical-align:middle;" title="${b.name}">`
                 : `<span title="${b.name}">${b.icon || '🏅'}</span>`;
         }).join('');
     },
