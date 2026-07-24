@@ -11,6 +11,8 @@
  *    아이콘 렌더링도 정사각형·원형 강제 없이 높이만 고정하도록 사이트 전체 배지 규칙과 통일.
  * 🌟 [배지 노출 범위 조정] 배지 슬롯이 7개까지 늘어날 예정이라 목록 한 줄에 다 들어가지 않을 수 있어서,
  *    목록(loadPosts)에서는 배지를 아예 표시하지 않고 상세페이지(글 본문 + 댓글)에서만 노출하도록 변경.
+ * 🌟 [상세페이지 레이아웃 수정] 이름+배지 그룹과 날짜/조회수/수정·삭제 버튼 그룹을 완전히 분리해서
+ *    justify-between으로 오른쪽 끝에 고정 — 배지가 몇 개로 늘어나든 날짜/조회수 위치가 안 밀리게 함.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -1091,12 +1093,12 @@ Boako.Board = {
             const canDelete = myId === c.author_id || Boako.Board.State.isAdmin;
             return `
                 <div class="${isReply ? 'ml-8 border-l-2 border-slate-100 pl-4' : ''} py-3 ${isReply ? '' : 'border-b border-slate-100'}">
-                    <div class="flex items-center justify-between mb-1">
-                        <div class="flex items-center gap-2 text-sm">
+                    <div class="flex items-center justify-between mb-1 gap-3">
+                        <div class="flex items-center gap-2 text-sm flex-wrap min-w-0">
                             ${Boako.Board.renderAuthorLine(c.author_id)}
-                            <span class="text-[11px] text-slate-400">${Boako.Board.timeAgo(c.created_at)}</span>
                         </div>
-                        <div class="flex items-center gap-3 text-[11px] font-bold text-slate-400">
+                        <div class="flex items-center gap-3 text-[11px] font-bold text-slate-400 shrink-0">
+                            <span class="font-normal whitespace-nowrap">${Boako.Board.timeAgo(c.created_at)}</span>
                             ${!isReply ? `<button onclick="Boako.Board.toggleReplyForm(${c.id})" class="hover:text-teal-600">답글</button>` : ''}
                             ${canDelete ? `<button onclick="Boako.Board.deleteComment(${c.id})" class="hover:text-rose-500">삭제</button>` : ''}
                         </div>
@@ -1119,17 +1121,18 @@ Boako.Board = {
                             ${post.game_name ? `<span class="text-[11px] font-bold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-md">🎲 ${Boako.Board.escapeHtml(post.game_name)}</span>` : ''}
                         </div>
                         <h1 class="text-2xl font-black text-slate-900 mb-3">${Boako.Board.escapeHtml(post.title)}</h1>
-                        <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-                            <div class="flex items-center gap-2 text-sm">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4 gap-3">
+                            <div class="flex items-center gap-2 text-sm flex-wrap min-w-0">
                                 ${Boako.Board.renderAuthorLine(post.author_id)}
-                                <span class="text-[11px] text-slate-400">${Boako.Board.timeAgo(post.created_at)}</span>
-                                <span class="text-[11px] text-slate-400">· 👁 ${post.view_count}</span>
                             </div>
-                            ${isAuthor || Boako.Board.State.isAdmin ? `
-                            <div class="flex gap-2 text-xs font-bold">
-                                ${isAuthor ? `<button onclick="Boako.Board.openEditModal()" class="text-slate-400 hover:text-slate-600">수정</button>` : ''}
-                                <button onclick="Boako.Board.deletePost()" class="text-slate-400 hover:text-rose-500">삭제</button>
-                            </div>` : ''}
+                            <div class="flex items-center gap-3 shrink-0">
+                                <span class="text-[11px] text-slate-400 whitespace-nowrap">${Boako.Board.timeAgo(post.created_at)} · 👁 ${post.view_count}</span>
+                                ${isAuthor || Boako.Board.State.isAdmin ? `
+                                <div class="flex gap-2 text-xs font-bold">
+                                    ${isAuthor ? `<button onclick="Boako.Board.openEditModal()" class="text-slate-400 hover:text-slate-600">수정</button>` : ''}
+                                    <button onclick="Boako.Board.deletePost()" class="text-slate-400 hover:text-rose-500">삭제</button>
+                                </div>` : ''}
+                            </div>
                         </div>
                         <div class="prose max-w-none text-slate-800 leading-relaxed">${post.content}</div>
 
