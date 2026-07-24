@@ -9,6 +9,8 @@
  *    획득마다 별도 인벤토리 인스턴스(achv_<code>_<user_achievements.id>)라 매번 achievements 테이블에서 code로 조회.
  *    모든 배지 유형(시즌형/OO매니아/그래픽 미완성 폴백)이 정사각형 강제 없이 높이만 고정하고,
  *    폭은 내용(배경 이미지/게임 로고/이모지)의 실제 비율에 맞춰 자동으로 늘어남.
+ * 🌟 [수정] 알림 라벨에서 이모지 제거("업적 달성!"만 표시) + util.js의 sfx.achievementUnlock
+ *    (업적 전용 4음 상승 아르페지오)로 사운드 교체. achievementUnlock이 없는 구버전 대비 success로 폴백.
  */
 Boako.Achievements = {
     channel: null,
@@ -168,7 +170,7 @@ Boako.Achievements = {
             overlay.innerHTML = `
                 <div style="display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:20px; max-width:420px;">
                     <div class="achv-badge-pop" style="display:flex; align-items:center; justify-content:center;">${badgeHtml}</div>
-                    <div style="font-size:13px; font-weight:900; color:#c4b5fd; letter-spacing:0.12em; text-transform:uppercase;">🏅 업적 달성!</div>
+                    <div style="font-size:13px; font-weight:900; color:#c4b5fd; letter-spacing:0.12em; text-transform:uppercase;">업적 달성!</div>
                     <div style="font-size:26px; font-weight:900; color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.45); line-height:1.35;">
                         ${achievement.name}${gameName ? `<br><span style="font-size:16px; color:#cbd5e1; font-weight:700;">(${gameName})</span>` : ''}
                     </div>
@@ -182,7 +184,12 @@ Boako.Achievements = {
             requestAnimationFrame(() => { overlay.style.opacity = '1'; });
 
             if (window.lucide) window.lucide.createIcons();
-            try { if (window.sfx && window.sfx.success) window.sfx.success(); } catch (e) { /* 자동재생 정책으로 인한 무음은 무시 */ }
+            try {
+                if (window.sfx) {
+                    if (window.sfx.achievementUnlock) window.sfx.achievementUnlock();
+                    else if (window.sfx.success) window.sfx.success();
+                }
+            } catch (e) { /* 자동재생 정책으로 인한 무음은 무시 */ }
 
             let dismissed = false;
             const dismiss = () => {
