@@ -142,7 +142,7 @@ Boako.Achievements = {
     },
 
     // 🌟 [전면 교체] 주사위 굴림(showDiceRollOverlay)과 같은 톤의 풀스크린 축하 오버레이.
-    // 클릭하거나 4초 지나면 닫힘. Promise를 반환해서 큐가 "닫힌 뒤에" 다음 걸 보여줄 수 있게 함.
+    // 클릭해야만 닫힘(자동 닫힘 없음). Promise를 반환해서 큐가 "닫힌 뒤에" 다음 걸 보여줄 수 있게 함.
     showToast: (achievement, meta, seasonNo, uaId) => {
         return new Promise(async (resolve) => {
             Boako.Achievements.injectStyle();
@@ -192,7 +192,6 @@ Boako.Achievements = {
                 setTimeout(() => { overlay.remove(); resolve(); }, 250);
             };
             overlay.addEventListener('click', dismiss);
-            setTimeout(dismiss, 4000);
         });
     },
 
