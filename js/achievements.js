@@ -7,9 +7,8 @@
  *    여러 개가 한꺼번에 뜰 수 있어서(오프라인 중 놓친 업적 등) 큐(enqueueOverlay)로 순서대로 하나씩 보여줌.
  * 🌟 배지 합성 렌더링(renderBadgeHTML): 인벤토리/위젯/오버레이가 전부 공유하는 공용 함수.
  *    획득마다 별도 인벤토리 인스턴스(achv_<code>_<user_achievements.id>)라 매번 achievements 테이블에서 code로 조회.
- *    시즌형 배지는 배경 원본 비율 유지(정사각형 강제 X) + season_logo_overlay 좌표로 시즌 로고 합성.
- *    OO매니아는 배경 없이 게임 로고 + 티어(동/은/금) 스퀴클 테두리로 합성 — 이것도 정사각형 강제 없이 높이만 고정,
- *    폭은 로고의 실제 비율에 맞춰 자동으로 늘어남(게임마다 로고 형태가 제각각이라 정사각형에 욱여넣지 않음).
+ *    모든 배지 유형(시즌형/OO매니아/그래픽 미완성 폴백)이 정사각형 강제 없이 높이만 고정하고,
+ *    폭은 내용(배경 이미지/게임 로고/이모지)의 실제 비율에 맞춰 자동으로 늘어남.
  */
 Boako.Achievements = {
     channel: null,
@@ -235,14 +234,15 @@ Boako.Achievements = {
     },
 
     // 🌟 배지 HTML 생성 (비동기). itemId가 achv_ 형식이 아니면 null 반환(호출부에서 기존 방식으로 폴백).
-    // sizePx는 "높이" 기준 — 배경 이미지/로고 원본 비율을 그대로 유지하고, 정사각형으로 강제 크롭하지 않음.
+    // sizePx는 "높이" 기준 — 배경 이미지/로고/이모지 실제 비율을 그대로 유지하고, 정사각형으로 강제하지 않음.
     renderBadgeHTML: async (itemId, seasonNo, meta, sizePx) => {
         sizePx = sizePx || 48;
         const parsed = Boako.Achievements.parseAchievementItemId(itemId);
         if (!parsed) return null;
 
         const achievement = await Boako.Achievements.getAchievementByCode(parsed.code);
-        const fallbackEmoji = `<div style="width:${sizePx}px; height:${sizePx}px; display:flex; align-items:center; justify-content:center; font-size:${Math.round(sizePx * 0.6)}px;">🏅</div>`;
+        // 🌟 정사각형 강제 금지: 높이만 고정, 폭은 이모지 크기에 맞춰 자동(패딩만 좌우로)
+        const fallbackEmoji = `<div style="height:${sizePx}px; display:inline-flex; align-items:center; justify-content:center; padding:0 ${Math.round(sizePx * 0.15)}px; font-size:${Math.round(sizePx * 0.6)}px; box-sizing:border-box;">🏅</div>`;
         if (!achievement) return fallbackEmoji;
 
         const gameName = meta && meta.game_name ? meta.game_name : null;
