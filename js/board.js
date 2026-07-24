@@ -9,6 +9,8 @@
  * 🌟 [배지 표시 수정] 작성자 배지 조회가 업적 배지(achv_<code>_<id>)를 shop_items에서 찾다 실패해서
  *    조용히 누락되던 버그 수정 — achievements.js의 renderBadgeHTML로 별도 분기 처리.
  *    아이콘 렌더링도 정사각형·원형 강제 없이 높이만 고정하도록 사이트 전체 배지 규칙과 통일.
+ * 🌟 [배지 노출 범위 조정] 배지 슬롯이 7개까지 늘어날 예정이라 목록 한 줄에 다 들어가지 않을 수 있어서,
+ *    목록(loadPosts)에서는 배지를 아예 표시하지 않고 상세페이지(글 본문 + 댓글)에서만 노출하도록 변경.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -59,7 +61,7 @@ Boako.Board = {
         return div.innerHTML;
     },
 
-    // 🌟 [신규 - 공용] 여러 유저의 "장착 중인 배지"를 한 번에 조회 (목록/상세/댓글 공용)
+    // 🌟 [신규 - 공용] 여러 유저의 "장착 중인 배지"를 한 번에 조회 (상세페이지/댓글 공용 — 목록에서는 미사용)
     // 일반 배지(shop_items) + 서포터즈 배지(item_supporter_badge_*, 팀 로고) + 🌟업적 배지(achv_<code>_<id>)
     // { userId: [{...}, ...] } 형태로 반환. 업적 배지는 achievements.js의 renderBadgeHTML로 합성한 완성 HTML을 담아서 반환.
     fetchBadgeMap: async (userIds) => {
@@ -594,11 +596,10 @@ Boako.Board = {
         const authorIds = [...new Set(posts.map(p => p.author_id))];
         const postIds = posts.map(p => p.id);
 
-        // 🌟 [수정] 작성자 이름 + 댓글 수와 함께, 작성자의 장착 배지도 같이 조회
-        const [{ data: profiles }, { data: comments }, badgeMap] = await Promise.all([
+        // 🌟 [수정] 목록에서는 배지를 표시하지 않기로 함(7슬롯으로 늘어나면 목록 줄 공간이 부족해짐) — 상세페이지에서만 노출
+        const [{ data: profiles }, { data: comments }] = await Promise.all([
             Boako.db.from('profiles').select('id, full_name').in('id', authorIds),
-            Boako.db.from('board_comments').select('post_id').eq('is_deleted', false).in('post_id', postIds),
-            Boako.Board.fetchBadgeMap(authorIds)
+            Boako.db.from('board_comments').select('post_id').eq('is_deleted', false).in('post_id', postIds)
         ]);
 
         const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
@@ -610,7 +611,6 @@ Boako.Board = {
             : '';
 
         container.innerHTML = backBtnHtml + posts.map(p => {
-            const badgesHtml = Boako.Board.renderBadgeIcons(badgeMap[p.author_id]);
             return `
             <div onclick="Boako.Board.openDetail(${p.id})" class="flex items-center justify-between gap-4 bg-white border ${p.is_notice ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'} rounded-xl px-5 py-4 cursor-pointer hover:shadow-md transition-shadow">
                 <div class="flex items-center gap-3 min-w-0 flex-1">
@@ -620,7 +620,7 @@ Boako.Board = {
                     ${commentCountMap[p.id] ? `<span class="text-teal-600 text-xs font-black shrink-0">[${commentCountMap[p.id]}]</span>` : ''}
                 </div>
                 <div class="flex items-center gap-4 text-xs text-slate-400 font-bold shrink-0">
-                    <span class="inline-flex items-center gap-1">${profileMap[p.author_id] || '익명'}${badgesHtml ? ` <span class="inline-flex items-center gap-0.5">${badgesHtml}</span>` : ''}</span>
+                    <span>${profileMap[p.author_id] || '익명'}</span>
                     <span>${Boako.Board.timeAgo(p.created_at)}</span>
                     ${p.like_count > 0 ? `<span class="text-rose-400">❤️ ${p.like_count}</span>` : ''}
                     <span>👁 ${p.view_count}</span>
