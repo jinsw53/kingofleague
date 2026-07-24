@@ -5,6 +5,8 @@
  * 🌟 포인트샵 "타이틀 스폰서" 카드 아이콘: naming.png 티켓 이미지를 배경으로 깔고, 그 위에 시즌 로고를
  *    반시계 90도 회전시켜 주황 스텁 자리에 겹쳐 그림 (서포터즈 배지의 유니폼 합성과 동일한 패턴). 로고 크기 1.5배 확대.
  *    🌟 [낙찰 기한] 대상 시즌은 "시즌 시작 1주일 전" 마감을 아직 안 넘긴, 가장 가까운 시즌 (bid_title_sponsor RPC와 동일 기준)
+ * 🌟 [신규] 우승 별 붙이기 자격 판별: season_final_rankings에서 우승(final_rank=1)한 시즌 중
+ *    아직 팀.last_star_season_no로 청구 안 된 가장 최근 시즌이 있으면 팀 로고 옆에 버튼 노출 (Boako.Team.openStarModal).
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -260,11 +262,16 @@ Boako.View = {
                             }
                         }
 
-                        const { data: historyRows } = await Boako.db.from('season_final_rankings').select('final_rank').eq('team_name', team.team_name);
+                        const { data: historyRows } = await Boako.db.from('season_final_rankings').select('final_rank, season_no').eq('team_name', team.team_name);
                         if (historyRows && historyRows.length > 0) {
                             teamBannerStats.totalChampionships = historyRows.filter(r => r.final_rank === 1).length;
                             teamBannerStats.bestRank = Math.min(...historyRows.map(r => r.final_rank));
                         }
+
+                        // 🌟 [신규] 우승 별 붙이기 자격 판별 — 우승한 시즌 중 아직 별을 안 붙인 가장 최근 시즌
+                        const winSeasonNos = (historyRows || []).filter(r => r.final_rank === 1).map(r => r.season_no);
+                        teamBannerStats.latestWinSeasonNo = winSeasonNos.length > 0 ? Math.max(...winSeasonNos) : null;
+                        teamBannerStats.starEligible = teamBannerStats.latestWinSeasonNo !== null && team.last_star_season_no !== teamBannerStats.latestWinSeasonNo;
 
                         const { count: supporterCount } = await Boako.db.from('inventory').select('id', { count: 'exact', head: true }).like('item_id', `item_supporter_badge_${team.id}`).gt('expires_at', nowIso);
                         teamBannerStats.supporterCount = supporterCount || 0;
@@ -405,6 +412,11 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                             <input type="text" id="input-motto" class="edit-input-box" style="width:250px; padding:8px;" value="${team.team_motto || ''}">
                                             <button class="btn-edit-small" style="background:var(--primary); color:white;" onclick="Boako.Team.updateInfo('team_motto')">저장</button>
                                         </div>
+                                        ${isLeader && (teamBannerStats.starEligible || team.champion_star_count > 0) ? `
+                                        <div style="display:flex; gap:8px; margin-top:12px;">
+                                            ${teamBannerStats.starEligible ? `<button class="btn-edit-small" style="background:#f59e0b; color:white; border:none;" onclick="Boako.Team.openStarModal(${teamBannerStats.latestWinSeasonNo})">🌟 우승 별 붙이기</button>` : ''}
+                                            ${team.champion_star_count > 0 ? `<button class="btn-edit-small" onclick="Boako.Team.openStarResetModal()">별 위치 초기화</button>` : ''}
+                                        </div>` : ''}
                                     </div>
                                 </div>
                                 
