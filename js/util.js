@@ -13,6 +13,9 @@
  *    시즌을 바꿀 때마다 배지가 즉시 갱신되도록 함.
  * 🌟 sfx.achievementUnlock: 업적 달성 풀스크린 오버레이(achievements.js) 전용 — success보다 화려한
  *    4음 상승 아르페지오 + 반짝이는 배음으로 확실히 들리게 함.
+ * 🌟 [신규] sfx 자동재생 잠금 대응: 페이지 진입 직후(첫 클릭 전) 자동으로 뜨는 알림(업적 등)은
+ *    브라우저가 AudioContext를 잠가둬서 무음일 수 있음 — 재생 직후에도 여전히 suspended면 큐에 담아뒀다가
+ *    사용자가 화면 어디든 처음 클릭/터치/키입력하는 순간 자동으로 재생되도록 모든 sfx 함수를 래핑함.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -366,6 +369,29 @@ document.addEventListener('click', function() {
 
 window.sfx = (function() {
     let ctx = null;
+    // 🌟 [신규] 브라우저 자동재생 정책 대응 — 페이지 진입 직후(첫 클릭 전) 자동으로 뜨는 알림(업적 등)은
+    // AudioContext가 아직 잠겨있어 소리가 안 날 수 있음. 재생 직후 상태를 확인해서 여전히 suspended면
+    // 재생 요청을 큐에 담아뒀다가, 사용자가 화면 어디든 처음 클릭/터치/키입력하는 순간 자동으로 재생함.
+    let pendingReplay = [];
+    let unlockListenerAttached = false;
+
+    function ensureUnlockListener() {
+        if (unlockListenerAttached) return;
+        unlockListenerAttached = true;
+        const unlock = () => {
+            if (ctx && ctx.state === 'suspended') ctx.resume();
+            const queued = pendingReplay.splice(0, pendingReplay.length);
+            queued.forEach(fn => fn());
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('keydown', unlock);
+            document.removeEventListener('touchstart', unlock);
+            unlockListenerAttached = false;
+        };
+        document.addEventListener('click', unlock, { once: true });
+        document.addEventListener('keydown', unlock, { once: true });
+        document.addEventListener('touchstart', unlock, { once: true });
+    }
+
     function getCtx() {
         if (!ctx) {
             const AC = window.AudioContext || window.webkitAudioContext;
@@ -408,7 +434,7 @@ window.sfx = (function() {
         src.start(c.currentTime + (delay || 0));
     }
 
-    return {
+    const raw = {
         // 범용 클릭음 (전체 클릭 위임에서 사용)
         click: function() { tone(700, 0.05, 'sine', 0.06); },
         // 기존 코드에 이미 있던 이름들 (playClick / playBingo)
@@ -541,6 +567,20 @@ recovery: function() {
         },
         returnHome: function() { tone(180, 0.25, 'sawtooth', 0.1); }
     };
+
+    // 🌟 모든 sfx 함수를 래핑: 호출 직후에도 AudioContext가 여전히 suspended면(=브라우저가 막음)
+    // 첫 사용자 상호작용 때 자동으로 재시도하도록 큐에 담아둠
+    const wrapped = {};
+    Object.keys(raw).forEach(key => {
+        wrapped[key] = function(...args) {
+            raw[key].apply(null, args);
+            if (ctx && ctx.state !== 'running') {
+                ensureUnlockListener();
+                pendingReplay.push(() => raw[key].apply(null, args));
+            }
+        };
+    });
+    return wrapped;
 })();
 // 클릭 가능한 모든 요소에 범용 클릭음 자동 부착
 document.addEventListener('click', function(e) {
