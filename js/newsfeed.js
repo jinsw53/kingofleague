@@ -18,6 +18,8 @@
  *    컬럼(row-span-2, 2칸)을 코드에서 직접 명시적으로 배치해서 항상 안정적으로 나오게 함.
  * 🌟 [수정] 헤드라인급 소식이 여러 개면 전부 헤드라인 카드로 그려지던 버그 수정 — 점수 내림차순,
  *    동점이면 최신순으로 정렬해서 1등만 헤드라인, 나머지는 large 카드로 강등.
+ * 🌟 [수정] large 카드가 고정 128px 정사각형 옆배치라 폭 2배인 카드 치고 이미지가 오히려 작아 보이던 문제 —
+ *    medium처럼 이미지를 카드 상단 풀폭으로 깔고(높이만 더 키움) 텍스트를 아래로 배치.
  */
 Boako.NewsFeed = {
     items: [],
@@ -483,9 +485,9 @@ Boako.NewsFeed = {
 
         if (item._tier === 'large') {
             return `
-                <div class="col-span-4 md:col-span-2 min-h-[112px] bg-white rounded-xl overflow-hidden shadow-md border border-slate-200 flex hover:shadow-lg transition-shadow" ${clickable}>
-                    ${img ? `<div class="w-32 shrink-0"><img src="${img}" class="w-full h-full object-cover"></div>` : `<div class="w-32 shrink-0 bg-slate-100 flex items-center justify-center text-3xl">📰</div>`}
-                    <div class="p-4 flex-1 flex flex-col justify-center min-w-0">
+                <div class="col-span-4 md:col-span-2 bg-white rounded-xl overflow-hidden shadow-md border border-slate-200 flex flex-col hover:shadow-lg transition-shadow" ${clickable}>
+                    ${img ? `<div class="h-36 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : `<div class="h-36 bg-slate-100 flex items-center justify-center text-4xl">📰</div>`}
+                    <div class="p-4 min-w-0">
                         <h3 class="text-base font-black text-slate-900 leading-snug mb-1">${Boako.NewsFeed.hoverTitle(item.title)}</h3>
                         ${item.subtitle ? `<p class="text-xs text-slate-500 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
                     </div>
