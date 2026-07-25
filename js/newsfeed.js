@@ -13,6 +13,10 @@
  *    hasHeadline 분기에도 헌정 카드 분기와 동일하게 필러 풀로 최소 카드 수를 채우도록 함.
  * 🌟 [수정] 헤드라인 카드 레이아웃 — 이미지가 좌측 40%로 좁게 눌려 있던 걸, 이미지를 카드 전체 배경으로
  *    깔고 제목/부제목을 하단 그라데이션 위에 얹는 방식으로 변경 (AI 생성 이미지가 훨씬 크게 강조됨).
+ * 🌟 [수정] 위 변경으로 헤드라인 카드가 row-span 없이 aspect-ratio로 키를 갖게 되면서,
+ *    CSS Grid 기본값(align-items:stretch) 때문에 같은 줄의 작은 카드들이 헤드라인 높이만큼 억지로
+ *    늘어나던 버그 수정. 메인 그리드(hasHeadline 분기)에 align-items:start 추가해서 각 카드가
+ *    자기 콘텐츠 높이만큼만 차지하도록 함.
  */
 Boako.NewsFeed = {
     items: [],
@@ -294,7 +298,7 @@ Boako.NewsFeed = {
 
         root.innerHTML = `
             ${bannerHtml}
-            <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
+            <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense; align-items: start;">
                 ${scored.map(item => Boako.NewsFeed.renderCard(item)).join('')}
                 ${padHtml}
             </div>
