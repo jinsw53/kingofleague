@@ -9,6 +9,8 @@
  * 🌟 [수정] renderSupplementPadCard의 필러 이미지(팀/랭킹/게임 로고)가 object-fit:cover로 잘리던 버그 수정.
  *    실제 뉴스 썸네일(item.thumbnail_url)은 사진이라 cover가 맞지만, 로고는 전체가 보여야 하므로
  *    이 카드만 contain + 여백 배경으로 분리함.
+ * 🌟 [수정] 헤드라인이 있어도 다른 실제 소식이 몇 개 안 되면 화면이 휑하게 비어 보이던 버그 수정.
+ *    hasHeadline 분기에도 헌정 카드 분기와 동일하게 필러 풀로 최소 카드 수를 채우도록 함.
  */
 Boako.NewsFeed = {
     items: [],
@@ -277,10 +279,22 @@ Boako.NewsFeed = {
             return;
         }
 
+        // 🌟 [수정] 헤드라인이 있어도 다른 실제 소식이 몇 개 안 되면 화면이 휑해 보임 —
+        // 헤드라인 제외 카드 수가 부족하면 사이트의 다른 실제 데이터(필러 풀)로 최소한 채워준다.
+        const nonHeadlineCount = scored.filter(item => item._tier !== 'headline').length;
+        const MIN_TOTAL_CARDS = 4;
+        let padHtml = '';
+        for (let i = nonHeadlineCount; i < MIN_TOTAL_CARDS; i++) {
+            const filler = Boako.NewsFeed.nextFiller();
+            if (!filler) break; // 필러도 소진되면 그냥 있는 만큼만 (반복 카드 방지)
+            padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
+        }
+
         root.innerHTML = `
             ${bannerHtml}
             <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
                 ${scored.map(item => Boako.NewsFeed.renderCard(item)).join('')}
+                ${padHtml}
             </div>
         `;
     },
