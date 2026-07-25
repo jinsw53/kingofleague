@@ -9,6 +9,8 @@
  *    아직 팀.last_star_season_no로 청구 안 된 가장 최근 시즌이 있으면 팀 로고 옆에 버튼 노출.
  *    버튼은 하나로 통합(Boako.Team.openStarModal) — 자격 있으면 "우승 별 붙이기", 없고 기존 별만 있으면 "별 위치 관리"로
  *    라벨만 바뀌고, 모달 안에서 추가/재배치 모드를 전환할 수 있음.
+ * 🌟 [신규] 검수센터에 "타이틀 스폰서 URL 승인" 버튼 추가 (Boako.Shop.openTitleSponsorApprovalModal).
+ *    admin_review 페이지는 shop.js를 기본 로드 안 하므로 여기서 같이 로드해줌.
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -793,6 +795,9 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                 if (!Boako.AdminReview || !Boako.AdminReview.init) {
                     await Boako.Util.loadScript('js/admin_review.js');
                 }
+                if (!Boako.Shop || !Boako.Shop.buyItem) {
+                    await Boako.Util.loadScript('js/shop.js');
+                }
 
                 html = `
                     <div class="main-banner" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
@@ -803,6 +808,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                         <div class="card-header flex justify-between items-center">
                             <span>데이터 검수 대기 리스트</span>
                             <button onclick="Boako.Sponsor.openManageModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">🎫 후원 배너 관리</button>
+                            <button onclick="Boako.Shop.openTitleSponsorApprovalModal()" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors ml-2">🏷️ 타이틀 스폰서 URL 승인</button>
                         </div>
                         <div class="card-body" style="min-height: 400px; background: #f8fafc;">
                             <div id="review-container">
