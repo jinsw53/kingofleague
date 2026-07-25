@@ -8,6 +8,7 @@
  *    모달 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹침 (view.js 상점카드와 동일 패턴, 1.5배 확대).
  * 🌟 [신규] 타이틀 스폰서 입찰 시 홍보 링크(URL)도 같이 입력 가능 — 이상한 사이트로 연결될 위험 방지 위해
  *    관리자가 검수센터에서 승인하기 전까지는 실제 사이트 배지에서 클릭이 안 됨 (title_sponsor_url_approved).
+ *    승인 관리 UI: Boako.Shop.openTitleSponsorApprovalModal (검수센터 버튼에서 호출).
  */
 Boako.Shop = {
     // 구매 로직
@@ -295,6 +296,69 @@ if (window.sfx) window.sfx.buy();
     closeTitleSponsorModal: () => {
         document.getElementById('title-sponsor-modal-backdrop')?.remove();
         Boako.Shop._titleSponsorState = null;
+    },
+
+    // 🌟 [신규] 관리자 전용 — 타이틀 스폰서 홍보 링크(URL) 승인/취소 관리 모달
+    // 스폰서가 입찰하면서 등록한 URL은 여기서 관리자가 승인해야만 실제 사이트 배지에서 클릭이 됨
+    openTitleSponsorApprovalModal: async function() {
+        const { data: seasons, error } = await Boako.db
+            .from('seasons')
+            .select('season_no, title_sponsor_name, title_sponsor_url, title_sponsor_url_approved')
+            .not('title_sponsor_url', 'is', null)
+            .order('season_no', { ascending: true });
+
+        if (error) {
+            Boako.Util.toast('❌ 로드 실패: ' + error.message);
+            return;
+        }
+
+        const list = seasons || [];
+
+        const modalHtml = `
+            <div id="title-sponsor-approval-overlay" class="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-black text-lg">🏷️ 타이틀 스폰서 URL 승인</h3>
+                        <button onclick="document.getElementById('title-sponsor-approval-overlay').remove()" class="text-slate-400 font-black text-xl">×</button>
+                    </div>
+                    <p class="text-xs text-slate-500 font-bold mb-4">승인해야만 사이트 배지에서 이 링크가 실제로 클릭됩니다. 이상한 사이트로 연결되지 않는지 꼭 확인 후 승인해주세요.</p>
+                    <div class="flex flex-col gap-2">
+                        ${list.length === 0 ? `<div class="text-center py-6 text-slate-400 font-bold text-sm">등록된 홍보 링크가 없습니다.</div>` : list.map(s => `
+                            <div class="border border-slate-200 rounded-xl px-4 py-3">
+                                <div class="flex justify-between items-start gap-3 mb-2">
+                                    <div class="min-w-0">
+                                        <div class="font-black text-sm">시즌 ${s.season_no} · ${s.title_sponsor_name || '(스폰서명 없음)'}배</div>
+                                        <a href="${s.title_sponsor_url}" target="_blank" class="text-[11px] text-indigo-500 font-bold break-all hover:underline">${s.title_sponsor_url}</a>
+                                    </div>
+                                    <span class="shrink-0 text-[10px] font-black px-2 py-1 rounded-full ${s.title_sponsor_url_approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+                                        ${s.title_sponsor_url_approved ? '✅ 승인됨' : '⏳ 승인 대기'}
+                                    </span>
+                                </div>
+                                <div class="flex gap-2">
+                                    ${s.title_sponsor_url_approved
+                                        ? `<button onclick="Boako.Shop.setTitleSponsorApproval(${s.season_no}, false)" class="flex-1 text-xs font-bold bg-rose-50 text-rose-500 px-3 py-1.5 rounded-lg">승인 취소</button>`
+                                        : `<button onclick="Boako.Shop.setTitleSponsorApproval(${s.season_no}, true)" class="flex-1 text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg">✅ 승인하기</button>`
+                                    }
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    setTitleSponsorApproval: async function(seasonNo, approved) {
+        try {
+            const { error } = await Boako.db.rpc('fn_set_title_sponsor_url_approval', { p_season_no: seasonNo, p_approved: approved });
+            if (error) throw error;
+            Boako.Util.toast(approved ? '✅ 승인되었습니다.' : '승인이 취소되었습니다.');
+            document.getElementById('title-sponsor-approval-overlay')?.remove();
+            await Boako.Shop.openTitleSponsorApprovalModal();
+        } catch (err) {
+            Boako.Util.toast('❌ ' + (err.message || '처리에 실패했습니다.'));
+        }
     },
 
     confirmTitleSponsorBid: async () => {
