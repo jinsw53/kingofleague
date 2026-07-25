@@ -16,6 +16,8 @@
  * 🌟 [수정] 헤드라인 카드 옆 빈 칸을 CSS grid-auto-flow:dense의 자동 배치에 맡기던 걸(왼쪽/오른쪽에 따라
  *    결과가 들쭉날쭉했음) renderTributeGrid와 동일한 패턴으로 교체 — 헤드라인(row-span-2)과 사이드
  *    컬럼(row-span-2, 2칸)을 코드에서 직접 명시적으로 배치해서 항상 안정적으로 나오게 함.
+ * 🌟 [수정] 헤드라인급 소식이 여러 개면 전부 헤드라인 카드로 그려지던 버그 수정 — 점수 내림차순,
+ *    동점이면 최신순으로 정렬해서 1등만 헤드라인, 나머지는 large 카드로 강등.
  */
 Boako.NewsFeed = {
     items: [],
@@ -288,9 +290,14 @@ Boako.NewsFeed = {
         // (헤드라인이 왼쪽/오른쪽 어느 쪽이냐에 따라 결과가 들쭉날쭉해서) 예측이 안 됨.
         // renderTributeGrid와 똑같은 패턴 — 헤드라인(row-span-2) + 옆 2칸 사이드 컬럼(row-span-2)을
         // 코드에서 직접 명시적으로 배치해서 항상 안정적으로 나오게 함.
-        const headlineItems = scored.filter(item => item._tier === 'headline');
+        // 🌟 [수정] 헤드라인급이 여러 개면 전부 헤드라인 카드로 그려지던 버그 수정.
+        // 점수 내림차순 → 동점이면 최신순으로 정렬해서 1등만 진짜 헤드라인, 나머지는 large로 강등.
+        const headlineItems = scored.filter(item => item._tier === 'headline').sort((a, b) => {
+            if (b._score !== a._score) return b._score - a._score;
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
         const mainHeadline = headlineItems[0];
-        const extraHeadlines = headlineItems.slice(1); // 헤드라인이 여러 개인 드문 경우, 첫 번째만 특별 대우
+        const extraHeadlines = headlineItems.slice(1).map(item => ({ ...item, _tier: 'large' }));
         const nonHeadline = scored.filter(item => item._tier !== 'headline');
 
         const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, 2);
