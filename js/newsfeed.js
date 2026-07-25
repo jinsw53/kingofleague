@@ -13,10 +13,9 @@
  *    hasHeadline 분기에도 헌정 카드 분기와 동일하게 필러 풀로 최소 카드 수를 채우도록 함.
  * 🌟 [수정] 헤드라인 카드 레이아웃 — 이미지가 좌측 40%로 좁게 눌려 있던 걸, 이미지를 카드 전체 배경으로
  *    깔고 제목/부제목을 하단 그라데이션 위에 얹는 방식으로 변경 (AI 생성 이미지가 훨씬 크게 강조됨).
- * 🌟 [수정] 위 변경으로 헤드라인 카드가 row-span 없이 aspect-ratio로 키를 갖게 되면서,
- *    CSS Grid 기본값(align-items:stretch) 때문에 같은 줄의 작은 카드들이 헤드라인 높이만큼 억지로
- *    늘어나던 버그 수정. 메인 그리드(hasHeadline 분기)에 align-items:start 추가해서 각 카드가
- *    자기 콘텐츠 높이만큼만 차지하도록 함.
+ * 🌟 [수정] 헤드라인 카드 옆 빈 칸을 CSS grid-auto-flow:dense의 자동 배치에 맡기던 걸(왼쪽/오른쪽에 따라
+ *    결과가 들쭉날쭉했음) renderTributeGrid와 동일한 패턴으로 교체 — 헤드라인(row-span-2)과 사이드
+ *    컬럼(row-span-2, 2칸)을 코드에서 직접 명시적으로 배치해서 항상 안정적으로 나오게 함.
  */
 Boako.NewsFeed = {
     items: [],
@@ -285,21 +284,57 @@ Boako.NewsFeed = {
             return;
         }
 
+        // 🌟 [수정] 헤드라인 옆 빈 칸을 CSS grid-auto-flow:dense의 자동 배치에 맡기면
+        // (헤드라인이 왼쪽/오른쪽 어느 쪽이냐에 따라 결과가 들쭉날쭉해서) 예측이 안 됨.
+        // renderTributeGrid와 똑같은 패턴 — 헤드라인(row-span-2) + 옆 2칸 사이드 컬럼(row-span-2)을
+        // 코드에서 직접 명시적으로 배치해서 항상 안정적으로 나오게 함.
+        const headlineItems = scored.filter(item => item._tier === 'headline');
+        const mainHeadline = headlineItems[0];
+        const extraHeadlines = headlineItems.slice(1); // 헤드라인이 여러 개인 드문 경우, 첫 번째만 특별 대우
+        const nonHeadline = scored.filter(item => item._tier !== 'headline');
+
+        const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, 2);
+        const sideIds = new Set(sideCandidates.map(item => item.id));
+        const remaining = nonHeadline.filter(item => !sideIds.has(item.id));
+
+        let sideHtml = '';
+        for (let i = 0; i < 2; i++) {
+            if (sideCandidates[i]) {
+                sideHtml += Boako.NewsFeed.renderFillerReal(sideCandidates[i]);
+            } else {
+                const filler = Boako.NewsFeed.nextFiller();
+                if (filler) sideHtml += Boako.NewsFeed.renderSupplementFiller(filler);
+                // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
+            }
+        }
+
+        const belowItems = [...remaining, ...extraHeadlines].sort((a, b) => b._score - a._score);
+        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
+
         // 🌟 [수정] 헤드라인이 있어도 다른 실제 소식이 몇 개 안 되면 화면이 휑해 보임 —
-        // 헤드라인 제외 카드 수가 부족하면 사이트의 다른 실제 데이터(필러 풀)로 최소한 채워준다.
-        const nonHeadlineCount = scored.filter(item => item._tier !== 'headline').length;
-        const MIN_TOTAL_CARDS = 4;
+        // 카드 수가 부족하면 사이트의 다른 실제 데이터(필러 풀)로 최소한 채워준다.
+        const usedCols = belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
+        const remainder = usedCols % 4;
+        const padCount = remainder === 0 ? 0 : (4 - remainder);
         let padHtml = '';
-        for (let i = nonHeadlineCount; i < MIN_TOTAL_CARDS; i++) {
+        for (let i = 0; i < padCount; i++) {
             const filler = Boako.NewsFeed.nextFiller();
             if (!filler) break; // 필러도 소진되면 그냥 있는 만큼만 (반복 카드 방지)
             padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
         }
 
+        const headlineBlock = Boako.NewsFeed.renderHeadlineBlock(mainHeadline);
+        const sideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${sideHtml}</div>`;
+        const side = Boako.NewsFeed.hashSide(mainHeadline.id);
+        // 헤드라인이 왼쪽이면 [헤드라인][사이드], 오른쪽이면 [사이드][헤드라인] 순서로 그냥 배치 —
+        // 자동 배치(auto-flow)가 이 둘을 순서대로 나란히 채우므로 col-start 계산이 아예 필요 없음
+        const topRowHtml = side === 'left' ? (headlineBlock + sideBlock) : (sideBlock + headlineBlock);
+
         root.innerHTML = `
             ${bannerHtml}
-            <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense; align-items: start;">
-                ${scored.map(item => Boako.NewsFeed.renderCard(item)).join('')}
+            <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
+                ${topRowHtml}
+                ${belowCardsHtml}
                 ${padHtml}
             </div>
         `;
@@ -358,6 +393,24 @@ Boako.NewsFeed = {
                 </div>
                 ${belowCardsHtml}
                 ${padHtml}
+            </div>
+        `;
+    },
+
+    // 🌟 [신규] 메인 헤드라인 전용 — 사이드 컬럼(2칸, row-span-2)과 짝을 이루는 형태라
+    // aspect-ratio 대신 row-span-2로 옆 컬럼과 정확히 같은 높이를 갖도록 함 (grid 기본 stretch 활용)
+    renderHeadlineBlock: (item) => {
+        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
+        const img = item.thumbnail_url ? Boako.Util.cdn(item.thumbnail_url) : null;
+        return `
+            <div class="col-span-4 md:col-span-3 md:row-span-2 relative rounded-2xl overflow-hidden shadow-lg border border-slate-200 hover:shadow-xl transition-shadow" style="min-height: 280px;" ${clickable}>
+                ${img ? `<img src="${img}" class="absolute inset-0 w-full h-full object-cover">` : `<div class="absolute inset-0 bg-slate-100 flex items-center justify-center text-8xl">📰</div>`}
+                <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                    <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 block">HEADLINE</span>
+                    <h2 class="text-xl md:text-2xl font-black text-white leading-snug mb-2">${Boako.NewsFeed.hoverTitle(item.title)}</h2>
+                    ${item.subtitle ? `<p class="text-sm text-slate-200 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
+                </div>
             </div>
         `;
     },
