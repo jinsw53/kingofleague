@@ -6,6 +6,8 @@
  *    밀려난 이전 입찰자는 자동 환불, 낙찰액은 시즌 상금풀에 적립 (bid_title_sponsor RPC).
  *    🌟 [낙찰 기한] 시즌 시작 1주일 전 마감 — 마감 지난 시즌은 스폰서 확정(잠금), 자동으로 다음 시즌이 입찰 대상으로 전환.
  *    모달 헤더 아이콘: naming.png 티켓 위에 대상 시즌 로고를 반시계 90도 회전시켜 겹침 (view.js 상점카드와 동일 패턴, 1.5배 확대).
+ * 🌟 [신규] 타이틀 스폰서 입찰 시 홍보 링크(URL)도 같이 입력 가능 — 이상한 사이트로 연결될 위험 방지 위해
+ *    관리자가 검수센터에서 승인하기 전까지는 실제 사이트 배지에서 클릭이 안 됨 (title_sponsor_url_approved).
  */
 Boako.Shop = {
     // 구매 로직
@@ -269,6 +271,11 @@ if (window.sfx) window.sfx.buy();
                             <input type="text" id="title-sponsor-name-input" maxlength="20" placeholder="예: 신한증권" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 shadow-inner">
                         </div>
                         <div>
+                            <label class="block text-xs font-black text-slate-700 mb-1.5">🔗 홍보 링크 (선택, 배지 클릭 시 이동할 주소)</label>
+                            <input type="text" id="title-sponsor-url-input" placeholder="https://..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 shadow-inner">
+                            <p class="text-[10px] text-slate-400 font-bold mt-1.5">⚠️ 관리자 검수 후 승인돼야 실제로 클릭됩니다. 승인 전까지는 배지가 그냥 텍스트로만 보여요.</p>
+                        </div>
+                        <div>
                             <label class="block text-xs font-black text-slate-700 mb-1.5">💰 입찰 금액</label>
                             <input type="number" id="title-sponsor-amount-input" min="${requiredMin}" step="1000" value="${requiredMin}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 shadow-inner">
                             <p class="text-[10px] text-slate-400 font-bold mt-1.5">내 보유 포인트: ${myPoints.toLocaleString()} P</p>
@@ -292,18 +299,21 @@ if (window.sfx) window.sfx.buy();
 
     confirmTitleSponsorBid: async () => {
         const nameInput = document.getElementById('title-sponsor-name-input');
+        const urlInput = document.getElementById('title-sponsor-url-input');
         const amountInput = document.getElementById('title-sponsor-amount-input');
         const name = nameInput?.value.trim();
+        const sponsorUrl = urlInput?.value.trim() || null;
         const amount = parseInt(amountInput?.value, 10);
         const state = Boako.Shop._titleSponsorState;
         const requiredMin = state?.requiredMin || 10000;
 
         if (!name) return Boako.Util.toast('스폰서명을 입력해주세요.');
         if (!amount || amount < requiredMin) return Boako.Util.toast(`최소 ${requiredMin.toLocaleString()}P 이상 입력해주세요.`);
+        if (sponsorUrl && !/^https?:\/\//i.test(sponsorUrl)) return Boako.Util.toast('링크는 http:// 또는 https://로 시작해야 합니다.');
         if (!confirm(`"${name}배"로 ${amount.toLocaleString()}P를 입찰하시겠습니까?`)) return;
 
         try {
-            const { data, error } = await Boako.db.rpc('bid_title_sponsor', { p_sponsor_name: name, p_amount: amount });
+            const { data, error } = await Boako.db.rpc('bid_title_sponsor', { p_sponsor_name: name, p_amount: amount, p_sponsor_url: sponsorUrl });
             if (error) throw error;
 
             if (window.sfx) window.sfx.buy();
