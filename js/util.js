@@ -11,6 +11,9 @@
  * 🌟 getTitleSponsorForSeason / setTitleSponsorBadge: 전적기록(archive.js) 시즌 드롭다운 전용.
  *    시즌 번호를 직접 받아서 그 시즌의 스폰서만 조회하고, 기존 배지를 지운 뒤 다시 그려서
  *    시즌을 바꿀 때마다 배지가 즉시 갱신되도록 함.
+ * 🌟 [신규] getTitleSponsor/getTitleSponsorForSeason이 이제 문자열 대신 {name, url} 객체를 반환함.
+ *    url은 관리자가 검수센터에서 승인한 경우에만 채워짐 — 미승인이면 null이라 배지가 그냥 텍스트로만 보임
+ *    (이상한 사이트로 바로 연결되는 걸 막기 위한 안전장치). 호출부(league.js/ranking.js/match.js)도 함께 수정됨.
  * 🌟 sfx.achievementUnlock: 업적 달성 풀스크린 오버레이(achievements.js) 전용 — 저음 임팩트 + 옥타브로
  *    두껍게 겹친 상승 아르페지오 + C-E-G 3화음을 길게 서스테인시켜 웅장하게 들리도록 설계.
  * 🌟 [신규] sfx 자동재생 잠금 대응: 페이지 진입 직후(첫 클릭 전) 자동으로 뜨는 알림(업적 등)은
@@ -295,19 +298,23 @@ Boako.Util = {
     },
 
     // ========== 🌟 [신규] 팀 리그 타이틀 스폰서 (네이밍권) ==========
-    // 현재 진행 중이거나(없으면) 가장 가까운 다음 시즌의 title_sponsor_name을 조회.
+    // 현재 진행 중이거나(없으면) 가장 가까운 다음 시즌의 title_sponsor_name(+url/승인여부)을 조회.
     // 랭킹/대항전/리그콘텐츠/전적기록 4개 배너가 전부 이 함수 하나만 공유해서 씀
     // (한 군데만 고치면 4곳 다 동시에 반영되도록, 로직을 여기 한 곳에만 둠).
     getTitleSponsor: async () => {
         try {
             const nowIso = new Date().toISOString();
             const { data } = await Boako.db.from('seasons')
-                .select('season_no, title_sponsor_name')
+                .select('season_no, title_sponsor_name, title_sponsor_url, title_sponsor_url_approved')
                 .gte('end_date', nowIso)
                 .order('start_date', { ascending: true })
                 .limit(1)
                 .maybeSingle();
-            return data?.title_sponsor_name || null;
+            if (!data?.title_sponsor_name) return null;
+            return {
+                name: data.title_sponsor_name,
+                url: (data.title_sponsor_url_approved && data.title_sponsor_url) ? data.title_sponsor_url : null
+            };
         } catch (e) {
             console.error('타이틀 스폰서 조회 실패:', e);
             return null;
@@ -315,27 +322,40 @@ Boako.Util = {
     },
 
     // 지정한 엘리먼트(보통 배너의 <h1>)의 맨 앞에 "🏷️ OO배" 배지를 붙임. 스폰서가 없으면 아무것도 안 함.
+    // 🌟 [수정] 관리자가 승인한 URL이 있을 때만 <a>로 감싸서 실제 클릭이 되게 함. 미승인이면 그냥 텍스트.
     applyTitleSponsorPrefix: async (elementId) => {
-        const sponsorName = await Boako.Util.getTitleSponsor();
-        if (!sponsorName) return;
+        const sponsor = await Boako.Util.getTitleSponsor();
+        if (!sponsor) return;
         const el = document.getElementById(elementId);
         if (!el) return;
-        const badge = document.createElement('span');
-        badge.style.cssText = 'display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px;';
-        badge.textContent = `🏷️ ${sponsorName}배`;
+        const badgeStyle = 'display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px;';
+        const badge = document.createElement(sponsor.url ? 'a' : 'span');
+        if (sponsor.url) {
+            badge.href = sponsor.url;
+            badge.target = '_blank';
+            badge.rel = 'noopener noreferrer';
+            badge.style.cssText = badgeStyle + ' text-decoration:none; color:inherit; cursor:pointer;';
+        } else {
+            badge.style.cssText = badgeStyle;
+        }
+        badge.textContent = `🏷️ ${sponsor.name}배`;
         el.prepend(badge, ' ');
     },
 
-    // 🌟 [신규] 특정 시즌 번호의 title_sponsor_name을 정확히 조회 (전적기록의 시즌 드롭다운 전용)
+    // 🌟 [신규] 특정 시즌 번호의 title_sponsor_name(+url/승인여부)을 정확히 조회 (전적기록의 시즌 드롭다운 전용)
     // seasonNo가 'all'/'none'/null이면 특정 시즌이 아니므로 조회하지 않고 null 반환
     getTitleSponsorForSeason: async (seasonNo) => {
         if (seasonNo === 'all' || seasonNo === 'none' || seasonNo === null || seasonNo === undefined) return null;
         try {
             const { data } = await Boako.db.from('seasons')
-                .select('title_sponsor_name')
+                .select('title_sponsor_name, title_sponsor_url, title_sponsor_url_approved')
                 .eq('season_no', seasonNo)
                 .maybeSingle();
-            return data?.title_sponsor_name || null;
+            if (!data?.title_sponsor_name) return null;
+            return {
+                name: data.title_sponsor_name,
+                url: (data.title_sponsor_url_approved && data.title_sponsor_url) ? data.title_sponsor_url : null
+            };
         } catch (e) {
             console.error('시즌별 타이틀 스폰서 조회 실패:', e);
             return null;
@@ -344,6 +364,7 @@ Boako.Util = {
 
     // 🌟 [신규] 시즌 필터가 바뀔 때마다 배지를 지우고 다시 그리는 버전.
     // applyTitleSponsorPrefix와 달리 기존 배지를 먼저 제거하므로 반복 호출해도 중복으로 쌓이지 않음.
+    // 🌟 [수정] 관리자가 승인한 URL이 있을 때만 <a>로 감싸서 실제 클릭이 되게 함. 미승인이면 그냥 텍스트.
     setTitleSponsorBadge: async (elementId, seasonNo) => {
         const el = document.getElementById(elementId);
         if (!el) return;
@@ -351,13 +372,21 @@ Boako.Util = {
         const existing = document.getElementById(`${elementId}-sponsor-badge`);
         if (existing) existing.remove();
 
-        const sponsorName = await Boako.Util.getTitleSponsorForSeason(seasonNo);
-        if (!sponsorName) return;
+        const sponsor = await Boako.Util.getTitleSponsorForSeason(seasonNo);
+        if (!sponsor) return;
 
-        const badge = document.createElement('span');
+        const badgeStyle = 'display:inline-block; background:#eef2ff; color:#4338ca; padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px; border:1px solid #c7d2fe;';
+        const badge = document.createElement(sponsor.url ? 'a' : 'span');
         badge.id = `${elementId}-sponsor-badge`;
-        badge.style.cssText = 'display:inline-block; background:#eef2ff; color:#4338ca; padding:3px 12px; border-radius:999px; font-size:0.55em; font-weight:900; margin-right:10px; vertical-align:middle; letter-spacing:-0.5px; border:1px solid #c7d2fe;';
-        badge.textContent = `🏷️ ${sponsorName}배`;
+        if (sponsor.url) {
+            badge.href = sponsor.url;
+            badge.target = '_blank';
+            badge.rel = 'noopener noreferrer';
+            badge.style.cssText = badgeStyle + ' text-decoration:none; cursor:pointer;';
+        } else {
+            badge.style.cssText = badgeStyle;
+        }
+        badge.textContent = `🏷️ ${sponsor.name}배`;
         el.prepend(badge, ' ');
     }
 };
