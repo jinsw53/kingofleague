@@ -1,6 +1,7 @@
 /**
  * [MATCH] 대항전 메인 대시보드 관리
  * 🌟 타이틀 스폰서(네이밍권) 배지를 시즌 로고/날짜 영역 위에 표시 (h1 타이틀은 원래 숨겨져 있는 구조라 여기가 실제 노출 지점)
+ * 🌟 [신규] 승인된 홍보 링크가 있으면 배지가 실제로 클릭되는 링크로 표시됨 (미승인이면 그냥 텍스트)
  */
 Boako.Match = {
     // 🌟 [신규] 스코어보드 리얼타임 채널 보관용
@@ -215,9 +216,13 @@ Boako.Match = {
 
                 // 🌟 타이틀 스폰서(네이밍권) 배지 — h1이 숨겨진 구조라 여기 로고 영역 위에 표시
                 // (선택된 시즌의 title_sponsor_name을 그대로 사용 — 위에서 이미 조회해둔 currentSeason과 동일 시즌 기준)
+                // 🌟 [수정] select('*')로 이미 title_sponsor_url/title_sponsor_url_approved도 같이 와있음 — 승인된 경우만 링크로
                 const sponsorName = currentSeason?.title_sponsor_name || null;
+                const sponsorUrl = (currentSeason?.title_sponsor_url_approved && currentSeason?.title_sponsor_url) ? currentSeason.title_sponsor_url : null;
                 const sponsorBadgeHtml = sponsorName
-                    ? `<div class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner">🏷️ ${sponsorName}배 보아코 팀 리그</div>`
+                    ? (sponsorUrl
+                        ? `<a href="${sponsorUrl}" target="_blank" rel="noopener noreferrer" class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner" style="display:block; text-decoration:none;">🏷️ ${sponsorName}배 보아코 팀 리그</a>`
+                        : `<div class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner">🏷️ ${sponsorName}배 보아코 팀 리그</div>`)
                     : '';
                 
                 logoEl.innerHTML = sponsorBadgeHtml + logoHtml + dateHtml;
