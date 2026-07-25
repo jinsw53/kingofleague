@@ -3,6 +3,8 @@
  * v_season_current_ranking(진행중) / season_final_rankings(확정) 기반
  * 🌟 명예의 전당에 시즌별 타이틀 스폰서(네이밍권) 표기 — 시즌마다 다를 수 있어 조회 시점마다 새로 가져옴
  * 🌟 랭킹 배너: 시즌 진행 중이면 스폰서 배지 + 시즌 로고를 타이틀 위에 표시 (loadPrizeBanner에서 처리)
+ * 🌟 [신규] 스폰서 배지: 관리자가 검수센터에서 승인한 URL이 있을 때만 클릭 가능한 링크로 표시.
+ *    미승인이면 그냥 텍스트로만 보임 (이상한 사이트로 바로 연결되는 것 방지).
  */
 
 Boako.Ranking = Boako.Ranking || {};
@@ -381,9 +383,10 @@ Boako.Ranking.loadHofTab = async function() {
             .single();
 
         // 🌟 [신규] 이 시즌의 타이틀 스폰서(네이밍권) 조회 — 시즌마다 다를 수 있으므로 선택된 시즌 기준으로 매번 새로 조회
+        // 🌟 [수정] url/승인여부도 같이 가져와서 승인된 경우만 배지를 클릭 가능하게 함
         const { data: seasonSponsorRow } = await Boako.db
             .from('seasons')
-            .select('title_sponsor_name')
+            .select('title_sponsor_name, title_sponsor_url, title_sponsor_url_approved')
             .eq('season_no', seasonNo)
             .maybeSingle();
 
@@ -434,6 +437,7 @@ Boako.Ranking.loadHofTab = async function() {
          Boako.Ranking.State.hofData = {
             seasonTitle: `시즌 ${seasonNo}`,
             titleSponsorName: seasonSponsorRow?.title_sponsor_name || null,
+            titleSponsorUrl: (seasonSponsorRow?.title_sponsor_url_approved && seasonSponsorRow?.title_sponsor_url) ? seasonSponsorRow.title_sponsor_url : null,
             championTeam: championTeamRow,
             mvp,
             championGames: championGamesEnriched
@@ -526,9 +530,11 @@ Boako.Ranking.getHofHTML = function() {
             </div>
         `).join('');
 
-    // 🌟 타이틀 스폰서가 있으면 시즌 제목 앞에 배지로 표시
+    // 🌟 타이틀 스폰서가 있으면 시즌 제목 앞에 배지로 표시 (승인된 URL 있으면 클릭 가능하게)
     const sponsorBadgeHtml = d.titleSponsorName
-        ? `<span class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle">🏷️ ${d.titleSponsorName}배</span>`
+        ? (d.titleSponsorUrl
+            ? `<a href="${d.titleSponsorUrl}" target="_blank" rel="noopener noreferrer" class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle" style="text-decoration:none;">🏷️ ${d.titleSponsorName}배</a>`
+            : `<span class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle">🏷️ ${d.titleSponsorName}배</span>`)
         : '';
 
     return `
@@ -674,9 +680,12 @@ Boako.Ranking.loadPrizeBanner = async function() {
         }
 
         // 🌟 [신규] 시즌 진행 중일 때: 스폰서 배지(있으면) + 시즌 로고(있으면)를 타이틀 위에 표시
+        // 🌟 [수정] title_sponsor_url은 RPC에서 이미 승인된 경우만 채워져서 내려옴 (미승인이면 null)
         if (headerEl) {
             const badgeHtml = data.title_sponsor_name
-                ? `<span style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px;">🏷️ ${data.title_sponsor_name}배</span>`
+                ? (data.title_sponsor_url
+                    ? `<a href="${data.title_sponsor_url}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px; text-decoration:none; color:inherit;">🏷️ ${data.title_sponsor_name}배</a>`
+                    : `<span style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px;">🏷️ ${data.title_sponsor_name}배</span>`)
                 : '';
             const logoHtml = data.season_logo_url
                 ? `<img src="${Boako.Util.cdn(data.season_logo_url)}" style="width:56px; height:56px; object-fit:contain;">`
