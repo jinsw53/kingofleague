@@ -11,6 +11,8 @@
  *    이 카드만 contain + 여백 배경으로 분리함.
  * 🌟 [수정] 헤드라인이 있어도 다른 실제 소식이 몇 개 안 되면 화면이 휑하게 비어 보이던 버그 수정.
  *    hasHeadline 분기에도 헌정 카드 분기와 동일하게 필러 풀로 최소 카드 수를 채우도록 함.
+ * 🌟 [수정] 헤드라인 카드 레이아웃 — 이미지가 좌측 40%로 좁게 눌려 있던 걸, 이미지를 카드 전체 배경으로
+ *    깔고 제목/부제목을 하단 그라데이션 위에 얹는 방식으로 변경 (AI 생성 이미지가 훨씬 크게 강조됨).
  */
 Boako.NewsFeed = {
     items: [],
@@ -403,12 +405,13 @@ Boako.NewsFeed = {
             const side = Boako.NewsFeed.hashSide(item.id);
             const startClass = side === 'left' ? 'md:col-start-1' : 'md:col-start-2';
             return `
-                <div class="col-span-4 md:col-span-3 ${startClass} row-span-2 bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex hover:shadow-xl transition-shadow" ${clickable}>
-                    ${img ? `<div class="w-2/5 shrink-0"><img src="${img}" class="w-full h-full object-cover"></div>` : `<div class="w-2/5 shrink-0 bg-slate-100 flex items-center justify-center text-6xl">📰</div>`}
-                    <div class="p-8 flex-1 flex flex-col justify-center min-w-0">
-                        <span class="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">HEADLINE</span>
-                        <h2 class="text-2xl font-black text-slate-900 leading-snug mb-2">${Boako.NewsFeed.hoverTitle(item.title)}</h2>
-                        ${item.subtitle ? `<p class="text-sm text-slate-500 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
+                <div class="col-span-4 md:col-span-3 ${startClass} relative rounded-2xl overflow-hidden shadow-lg border border-slate-200 hover:shadow-xl transition-shadow" style="aspect-ratio: 16/9;" ${clickable}>
+                    ${img ? `<img src="${img}" class="absolute inset-0 w-full h-full object-cover">` : `<div class="absolute inset-0 bg-slate-100 flex items-center justify-center text-8xl">📰</div>`}
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
+                    <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                        <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 block">HEADLINE</span>
+                        <h2 class="text-xl md:text-2xl font-black text-white leading-snug mb-2">${Boako.NewsFeed.hoverTitle(item.title)}</h2>
+                        ${item.subtitle ? `<p class="text-sm text-slate-200 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
                     </div>
                 </div>
             `;
