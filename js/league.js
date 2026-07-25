@@ -61,22 +61,24 @@ Boako.League.formatMode = function(modeStr) {
 
 // 🌟 [신규] 상단 타이틀 스폰서 배지 갱신 — 챌린지/빙고 탭의 시즌 드롭다운이 바뀔 때마다 호출됨.
 // seasonNo === 'live'(또는 미지정)면 현재/다음 시즌 기준(getTitleSponsor), 특정 시즌 번호면 그 시즌만 정확히 조회.
+// 🌟 [수정] getTitleSponsor/getTitleSponsorForSeason이 이제 {name, url} 객체를 반환 — url은 관리자 승인된 경우만 채워짐.
 Boako.League.refreshSponsorBadge = async function(seasonNo) {
     const badgeEl = document.getElementById('league-sponsor-badge');
     if (!badgeEl) return;
 
     try {
-        let sponsorName = null;
+        let sponsor = null;
         if (seasonNo === 'live' || !seasonNo) {
-            sponsorName = await Boako.Util.getTitleSponsor();
+            sponsor = await Boako.Util.getTitleSponsor();
         } else {
-            const { data } = await Boako.db.from('seasons').select('title_sponsor_name').eq('season_no', seasonNo).maybeSingle();
-            sponsorName = data?.title_sponsor_name || null;
+            sponsor = await Boako.Util.getTitleSponsorForSeason(seasonNo);
         }
 
-        badgeEl.innerHTML = sponsorName
-            ? `<div class="inline-block bg-violet-600 text-white text-[11px] font-black px-4 py-1.5 rounded-b-xl shadow-sm mt-0">🏷️ ${sponsorName}배 보아코 팀 리그</div>`
-            : '';
+        if (!sponsor) { badgeEl.innerHTML = ''; return; }
+
+        const tag = sponsor.url ? 'a' : 'div';
+        const linkAttrs = sponsor.url ? `href="${sponsor.url}" target="_blank" rel="noopener noreferrer"` : '';
+        badgeEl.innerHTML = `<${tag} ${linkAttrs} class="inline-block bg-violet-600 text-white text-[11px] font-black px-4 py-1.5 rounded-b-xl shadow-sm mt-0" style="text-decoration:none;">🏷️ ${sponsor.name}배 보아코 팀 리그</${tag}>`;
     } catch (e) {
         console.error('리그 스폰서 배지 갱신 실패:', e);
     }
