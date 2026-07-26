@@ -4,6 +4,9 @@
  * 🌟 [버그수정] init() 재진입 시 State.currentTab을 항상 'ANNOUNCEMENT'로 리셋.
  *    이전에 REQUEST 탭을 봤던 세션이면 State가 유지되어 버튼 표기(항상 공지가 활성으로 그려짐)와
  *    실제 렌더링 필터링(currentTab 기준)이 어긋나는 문제가 있었음.
+ * 🌟 [신규] "🗳️ 추천하기" 탭 추가 — 다음 회차 예상 종목(가중치 기반 확률) 프리뷰 +
+ *    검색형 카드그리드 투표(Boako.Tournament.Vote). 예상은 확정이 아니라 매일 바뀔 수 있고,
+ *    투표로 뒤집을 수 있다는 걸 명확히 안내해서 투표 참여를 유도함.
  */
 Boako.Tournament = {
     State: {
@@ -29,13 +32,14 @@ Boako.Tournament = {
             </div>
 
             <section class="section-card">
-                <div class="card-header flex justify-between items-center">
+                <div class="card-header flex justify-between items-center flex-wrap gap-2">
                     <div class="flex gap-2">
                         <button id="tourney-tab-btn-ANNOUNCEMENT" class="tourney-tab-btn bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.Tournament.switchTab('ANNOUNCEMENT')">📢 개최 공지</button>
                         <button id="tourney-tab-btn-REQUEST" class="tourney-tab-btn bg-slate-100 text-slate-500 px-4 py-2 rounded-lg text-sm font-bold transition-all relative" onclick="Boako.Tournament.switchTab('REQUEST')">
                             🙋 개최 요청
                             <span id="tourney-request-badge" class="hidden absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">0</span>
                         </button>
+                        <button id="tourney-tab-btn-VOTE" class="tourney-tab-btn bg-slate-100 text-slate-500 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.Tournament.switchTab('VOTE')">🗳️ 추천하기</button>
                     </div>
                     <button id="tourney-write-btn" class="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-violet-700 transition-colors" onclick="Boako.Tournament.openWriteModal()">+ 공지하기</button>
                 </div>
@@ -49,6 +53,7 @@ Boako.Tournament = {
                     <div id="tourney-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="col-span-full text-center py-16 text-slate-400 font-bold">불러오는 중...</div>
                     </div>
+                    <div id="tourney-vote-container" class="hidden"></div>
                 </div>
             </section>
 
@@ -83,11 +88,26 @@ Boako.Tournament = {
         }
 
         const writeBtn = document.getElementById('tourney-write-btn');
-        if (writeBtn) {
-            writeBtn.textContent = tab === 'ANNOUNCEMENT' ? '+ 공지하기' : '+ 요청하기';
-        }
+        const guideBox = document.getElementById('tourney-guide-box');
+        const listContainer = document.getElementById('tourney-list-container');
+        const voteContainer = document.getElementById('tourney-vote-container');
 
-        Boako.Tournament.renderList();
+        if (tab === 'VOTE') {
+            if (writeBtn) writeBtn.classList.add('hidden');
+            if (guideBox) guideBox.classList.add('hidden');
+            if (listContainer) listContainer.classList.add('hidden');
+            if (voteContainer) voteContainer.classList.remove('hidden');
+            Boako.Tournament.Vote.init();
+        } else {
+            if (writeBtn) {
+                writeBtn.classList.remove('hidden');
+                writeBtn.textContent = tab === 'ANNOUNCEMENT' ? '+ 공지하기' : '+ 요청하기';
+            }
+            if (guideBox) guideBox.classList.remove('hidden');
+            if (listContainer) listContainer.classList.remove('hidden');
+            if (voteContainer) voteContainer.classList.add('hidden');
+            Boako.Tournament.renderList();
+        }
     },
 
     loadPosts: async () => {
@@ -341,6 +361,151 @@ Boako.Tournament = {
     },
 
     };
+
+// 🌟 [신규] 추천(투표) 탭 — 다음 회차 예상치 프리뷰 + 검색형 카드그리드 투표
+Boako.Tournament.Vote = {
+    searchDebounceTimer: null,
+
+    init: async () => {
+        const root = document.getElementById('tourney-vote-container');
+        if (!root) return;
+        root.innerHTML = `
+            <div id="tourney-vote-preview" class="mb-5">
+                <div class="text-center py-8 text-slate-400 font-bold">예상치 계산 중...</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-4">
+                <div class="relative mb-4">
+                    <input type="text" id="tourney-vote-search" placeholder="게임 이름으로 검색해서 투표하세요" autocomplete="off"
+                        class="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm font-bold focus:outline-none focus:border-violet-500"
+                        oninput="Boako.Tournament.Vote.onSearchInput(this.value)">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+                </div>
+                <div id="tourney-vote-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    <div class="col-span-full text-center py-10 text-slate-400 font-bold">불러오는 중...</div>
+                </div>
+            </div>
+        `;
+
+        await Boako.Tournament.Vote.loadPreview();
+        await Boako.Tournament.Vote.loadGrid('');
+    },
+
+    // 🌟 다음 회차 예상치 — 확정이 아니라 "지금 시점 기준 예상"임을 명확히 안내
+    loadPreview: async () => {
+        const previewBox = document.getElementById('tourney-vote-preview');
+        if (!previewBox) return;
+
+        const { data: nextSlot } = await Boako.db
+            .from('tournament_rotation_slots')
+            .select('round_no, scheduled_date')
+            .eq('status', 'PENDING')
+            .order('scheduled_date', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        const { data: candidates, error } = await Boako.db.rpc('fn_get_tournament_rotation_preview', { p_limit: 5 });
+
+        if (error || !candidates || candidates.length === 0) {
+            previewBox.innerHTML = `<div class="text-center py-6 text-slate-400 font-bold text-sm">예상치를 불러오지 못했습니다.</div>`;
+            return;
+        }
+
+        const dateLabel = nextSlot
+            ? new Date(nextSlot.scheduled_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) + ` (${nextSlot.round_no}회차)`
+            : '다음 회차';
+
+        const maxProb = Math.max(...candidates.map(c => Number(c.probability)));
+
+        previewBox.innerHTML = `
+            <div class="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
+                <div class="text-[11px] font-black opacity-80 mb-1">🔮 ${dateLabel} 예상 종목</div>
+                <div class="flex flex-col gap-2 mt-3">
+                    ${candidates.map((c, idx) => {
+                        const pct = Math.round(Number(c.probability) * 1000) / 10;
+                        const barWidth = maxProb > 0 ? Math.round((Number(c.probability) / maxProb) * 100) : 0;
+                        return `
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-black w-4 opacity-70">${idx + 1}</span>
+                            <img src="${Boako.Util.cdn(c.image_url) || DEFAULT_LOGO_FALLBACK}" class="w-8 h-8 rounded-lg object-contain bg-white/10 border border-white/20 p-0.5 shrink-0">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-center text-xs font-bold mb-1">
+                                    <span class="truncate">${c.game_name}</span>
+                                    <span class="opacity-80 shrink-0 ml-2">${pct}%</span>
+                                </div>
+                                <div class="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                                    <div class="h-full bg-white rounded-full" style="width:${barWidth}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;}).join('')}
+                </div>
+                <div class="text-[10px] font-bold opacity-70 mt-4">⚠️ 확정 아님 · 매일 바뀔 수 있어요. 원하는 게임에 투표하면 순위를 뒤집을 수 있습니다!</div>
+            </div>
+        `;
+    },
+
+    onSearchInput: (value) => {
+        clearTimeout(Boako.Tournament.Vote.searchDebounceTimer);
+        Boako.Tournament.Vote.searchDebounceTimer = setTimeout(() => {
+            Boako.Tournament.Vote.loadGrid(value.trim());
+        }, 250);
+    },
+
+    loadGrid: async (search) => {
+        const grid = document.getElementById('tourney-vote-grid');
+        if (!grid) return;
+
+        if (!Boako.state.user) {
+            grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 font-bold text-sm">🔒 투표하려면 로그인이 필요합니다.</div>`;
+            return;
+        }
+
+        const { data, error } = await Boako.db.rpc('fn_get_tournament_vote_candidates', { p_search: search || null });
+
+        if (error) {
+            grid.innerHTML = `<div class="col-span-full text-center py-10 text-rose-400 font-bold text-sm">목록을 불러오지 못했습니다.</div>`;
+            return;
+        }
+        if (!data || data.length === 0) {
+            grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 font-bold text-sm">검색 결과가 없습니다.</div>`;
+            return;
+        }
+
+        // 표가 많이 쌓인 순으로 정렬해서 보여주면 "지금 뜨는 게임"이 눈에 잘 띔
+        const sorted = [...data].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+
+        grid.innerHTML = sorted.slice(0, 60).map(g => `
+            <div onclick="Boako.Tournament.Vote.vote('${g.game_id}', this)" class="relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-slate-200 bg-white hover:border-violet-400 hover:shadow-md cursor-pointer transition-all">
+                ${g.vote_count > 0 ? `<span class="absolute -top-1.5 -right-1.5 bg-violet-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm">${g.vote_count}</span>` : ''}
+                <img src="${Boako.Util.cdn(g.image_url) || DEFAULT_LOGO_FALLBACK}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
+                <span class="text-[11px] font-black text-slate-700 text-center leading-tight">${g.game_name}</span>
+            </div>
+        `).join('');
+    },
+
+    vote: async (gameId, cardEl) => {
+        try {
+            const { data, error } = await Boako.db.rpc('fn_vote_tournament_game', { p_game_id: gameId });
+            if (error) throw error;
+
+            if (window.sfx) window.sfx.click();
+            Boako.Util.toast(`🗳️ "${data.game_name}"에 투표했어요!`);
+
+            // 카드는 바로 화면에서 제거 (본인 화면에서만 사라지는 것 — 다른 유저 화면엔 계속 보임)
+            if (cardEl) {
+                cardEl.style.transition = 'opacity 0.2s, transform 0.2s';
+                cardEl.style.opacity = '0';
+                cardEl.style.transform = 'scale(0.9)';
+                setTimeout(() => cardEl.remove(), 200);
+            }
+
+            await Boako.Tournament.Vote.loadPreview();
+        } catch (err) {
+            console.error(err);
+            Boako.Util.toast('❌ ' + (err.message || '투표에 실패했습니다.'));
+        }
+    }
+};
 
 // 게임 로고를 못 찾았을 때 대체용 (사이트 전체에서 공용으로 쓰는 기본 로고 URL로 바꿔주세요)
 const DEFAULT_LOGO_FALLBACK = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
