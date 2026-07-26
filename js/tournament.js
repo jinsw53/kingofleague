@@ -1,6 +1,9 @@
 /**
  * [TOURNAMENT] 보아코 토너먼트 공지 + 개최 요청 게시판
  * 🌟 개최 요청(REQUEST) 등록 성공 시 오늘의 주사위 시도 (팀 리그 외 활동, 하루 1회)
+ * 🌟 [버그수정] init() 재진입 시 State.currentTab을 항상 'ANNOUNCEMENT'로 리셋.
+ *    이전에 REQUEST 탭을 봤던 세션이면 State가 유지되어 버튼 표기(항상 공지가 활성으로 그려짐)와
+ *    실제 렌더링 필터링(currentTab 기준)이 어긋나는 문제가 있었음.
  */
 Boako.Tournament = {
     State: {
@@ -13,6 +16,11 @@ Boako.Tournament = {
     init: async (containerId) => {
         const root = document.getElementById(containerId);
         if (!root) return;
+
+        // 🌟 [버그수정] State는 페이지 재진입시에도 유지되는 전역 객체라, 이전에 REQUEST 탭을 봤었으면
+        // currentTab이 그대로 남아있어서 버튼 표기(항상 ANNOUNCEMENT가 활성으로 그려짐)와 실제 필터링이 어긋남.
+        // 매번 새로 진입할 때는 무조건 ANNOUNCEMENT부터 시작하도록 명시적으로 리셋.
+        Boako.Tournament.State.currentTab = 'ANNOUNCEMENT';
 
         root.innerHTML = `
             <div class="main-banner" style="background:linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%);">
