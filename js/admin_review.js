@@ -3,6 +3,7 @@
  * 이미지 업로드 및 미리보기 기능 추가
  * 🌟 [신규] BGA 카탈로그 동기화(북마클릿)에서 이름을 못 뽑은 게임들 수동 매칭 큐(openBgaMatchQueue) 추가
  * 🌟 [수정] BGA 페이지 CSP 때문에 북마클릿 직접 호출이 막혀서, 붙여넣기+동기화 실행 UI(runBgaSync) 추가.
+ * 🌟 [수정] 대기열 카드에 타이틀 이미지(로고) 표시 + 검색결과에도 게임 로고 같이 표시해서 눈으로 매칭 확인 가능하게 함.
  */
 Boako.AdminReview = {
     pendingGames: [],
@@ -201,17 +202,20 @@ Boako.AdminReview = {
                     </div>
 
                     <h3 class="font-black text-sm mb-2">🧩 매칭 대기 (${list.length}건)</h3>
-                    <p class="text-xs text-slate-500 font-bold mb-4">이름을 텍스트로 못 뽑은(로고 이미지형) 게임들이에요. 링크 열어서 확인 후, 우리 아카이브의 어떤 게임인지 검색해서 매칭해주세요.</p>
+                    <p class="text-xs text-slate-500 font-bold mb-4">이미지가 있으면 눈으로 게임명을 바로 확인할 수 있어요. 검색해서 매칭해주세요.</p>
                     <div id="bga-match-list" class="flex flex-col gap-3">
                         ${list.length === 0 ? `<div class="text-center py-10 text-slate-400 font-bold text-sm">대기 중인 항목이 없습니다.</div>` : list.map(p => `
                             <div class="border border-slate-200 rounded-xl p-3" id="bga-match-row-${p.id}">
-                                <div class="flex items-center justify-between gap-2 mb-2">
-                                    <a href="${p.url}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline truncate">${p.slug} 🔗</a>
+                                <div class="flex items-center gap-3 mb-2">
+                                    ${p.title_image_url
+                                        ? `<img src="${p.title_image_url}" class="h-8 object-contain bg-slate-800 rounded px-2 py-1 shrink-0" style="max-width:160px;">`
+                                        : `<span class="text-[10px] text-slate-400 font-bold shrink-0">(이미지 없음)</span>`}
+                                    <a href="${p.url}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline truncate ml-auto">${p.slug} 🔗</a>
                                     ${p.is_beta ? `<span class="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">🚧 베타</span>` : ''}
                                 </div>
                                 <div class="relative mb-2">
                                     <input type="text" placeholder="게임 이름 검색해서 매칭..." oninput="Boako.AdminReview.searchGameForMatch(${p.id}, this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold">
-                                    <div id="bga-match-results-${p.id}" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto"></div>
+                                    <div id="bga-match-results-${p.id}" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
                                 </div>
                                 <button onclick="Boako.AdminReview.dismissBgaMatch(${p.id})" class="text-[10px] font-bold text-slate-400 hover:text-rose-500">해당 없음 (건너뛰기)</button>
                             </div>
@@ -255,14 +259,17 @@ Boako.AdminReview = {
             resultsBox.innerHTML = '';
             return;
         }
-        const { data } = await Boako.db.from('games').select('id, game_name').ilike('game_name', `%${query.trim()}%`).limit(8);
+        const { data } = await Boako.db.from('games').select('id, game_name, image_url').ilike('game_name', `%${query.trim()}%`).limit(8);
         if (!data || data.length === 0) {
             resultsBox.innerHTML = `<div class="p-2 text-xs text-slate-400 font-bold">검색 결과가 없습니다.</div>`;
             resultsBox.classList.remove('hidden');
             return;
         }
         resultsBox.innerHTML = data.map(g => `
-            <div class="p-2 text-xs font-bold text-slate-700 hover:bg-violet-50 cursor-pointer" onclick="Boako.AdminReview.resolveBgaMatch(${pendingId}, '${g.id}', '${g.game_name.replace(/'/g, "\\'")}')">${g.game_name}</div>
+            <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer" onclick="Boako.AdminReview.resolveBgaMatch(${pendingId}, '${g.id}', '${g.game_name.replace(/'/g, "\\'")}')">
+                <img src="${Boako.Util.cdn(g.image_url) || ''}" class="w-8 h-8 rounded object-contain bg-slate-50 border border-slate-100 shrink-0">
+                <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
+            </div>
         `).join('');
         resultsBox.classList.remove('hidden');
     },
