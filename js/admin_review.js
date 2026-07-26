@@ -227,7 +227,7 @@ Boako.AdminReview = {
             return;
         }
         resultsBox.innerHTML = data.map(g => `
-            <div class="p-2 text-xs font-bold text-slate-700 hover:bg-violet-50 cursor-pointer" onclick="Boako.AdminReview.resolveBgaMatch(${p.id ?? pendingId}, '${g.id}', '${g.game_name.replace(/'/g, "\\'")}')">${g.game_name}</div>
+            <div class="p-2 text-xs font-bold text-slate-700 hover:bg-violet-50 cursor-pointer" onclick="Boako.AdminReview.resolveBgaMatch(${pendingId}, '${g.id}', '${g.game_name.replace(/'/g, "\\'")}')">${g.game_name}</div>
         `).join('');
         resultsBox.classList.remove('hidden');
     },
