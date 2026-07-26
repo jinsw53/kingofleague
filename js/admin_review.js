@@ -2,8 +2,8 @@
  * [ADMIN REVIEW SYSTEM - V7.0]
  * 이미지 업로드 및 미리보기 기능 추가
  * 🌟 [신규] BGA 카탈로그 동기화(북마클릿)에서 이름을 못 뽑은 게임들 수동 매칭 큐(openBgaMatchQueue) 추가
- * 🌟 [수정] BGA 페이지 CSP 때문에 북마클릿 직접 호출이 막혀서, 붙여넣기+동기화 실행 UI(runBgaSync) 추가.
  * 🌟 [수정] 대기열 카드에 타이틀 이미지(로고) 표시 + 검색결과에도 게임 로고 같이 표시해서 눈으로 매칭 확인 가능하게 함.
+ * 🌟 [수정] 붙여넣기+동기화 UI 제거 — 개인용 크롬 확장이 슈파베이스를 직접 호출하는 구조로 바뀌면서 불필요해짐.
  */
 Boako.AdminReview = {
     pendingGames: [],
@@ -180,8 +180,6 @@ Boako.AdminReview = {
     },
 
     // 🌟 [신규] BGA 카탈로그 동기화(북마클릿)에서 이름을 못 뽑은(로고 이미지형) 게임들 수동 매칭 큐
-    // 🌟 [수정] BGA 페이지의 CSP 때문에 북마클릿에서 직접 슈파베이스 호출이 불가능해서,
-    // 북마클릿은 클립보드 복사만 하고, 여기(보아코 사이트 내부, 관리자 세션)에서 붙여넣어 동기화 실행하는 방식으로 변경.
     openBgaMatchQueue: async function() {
         const { data, error } = await Boako.db.rpc('fn_get_pending_bga_matches');
         if (error) return Boako.Util.toast('❌ 로드 실패: ' + error.message);
@@ -191,17 +189,10 @@ Boako.AdminReview = {
             <div id="bga-match-overlay" class="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
                 <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-black text-lg">🎮 BGA 카탈로그 동기화</h3>
+                        <h3 class="font-black text-lg">🎮 BGA 카탈로그 매칭 대기 (${list.length}건)</h3>
                         <button onclick="document.getElementById('bga-match-overlay').remove()" class="text-slate-400 font-black text-xl">×</button>
                     </div>
 
-                    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-5">
-                        <p class="text-xs font-bold text-indigo-700 mb-2">📋 북마클릿으로 긁은 결과(클립보드에 자동 복사됨)를 여기 붙여넣으세요.</p>
-                        <textarea id="bga-sync-paste" rows="3" placeholder="여기에 Ctrl+V" class="w-full border border-indigo-200 rounded-lg px-3 py-2 text-xs font-mono"></textarea>
-                        <button onclick="Boako.AdminReview.runBgaSync()" class="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-2 rounded-lg">🔄 동기화 실행</button>
-                    </div>
-
-                    <h3 class="font-black text-sm mb-2">🧩 매칭 대기 (${list.length}건)</h3>
                     <p class="text-xs text-slate-500 font-bold mb-4">이미지가 있으면 눈으로 게임명을 바로 확인할 수 있어요. 검색해서 매칭해주세요.</p>
                     <div id="bga-match-list" class="flex flex-col gap-3">
                         ${list.length === 0 ? `<div class="text-center py-10 text-slate-400 font-bold text-sm">대기 중인 항목이 없습니다.</div>` : list.map(p => `
@@ -225,30 +216,6 @@ Boako.AdminReview = {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-    },
-
-    // 🌟 [신규] 붙여넣은 JSON을 파싱해서 fn_sync_bga_catalog_admin 호출 (auth.uid() 관리자 세션으로 인증)
-    runBgaSync: async function() {
-        const textarea = document.getElementById('bga-sync-paste');
-        const raw = textarea?.value.trim();
-        if (!raw) return Boako.Util.toast('붙여넣은 내용이 없어요.');
-
-        let entries;
-        try {
-            entries = JSON.parse(raw);
-        } catch (e) {
-            return Boako.Util.toast('❌ JSON 형식이 아니에요. 북마클릿 결과를 그대로 붙여넣었는지 확인해주세요.');
-        }
-
-        try {
-            const { data, error } = await Boako.db.rpc('fn_sync_bga_catalog_admin', { p_entries: entries });
-            if (error) throw error;
-            Boako.Util.toast(`✅ 동기화 완료! URL 백필 ${data.url_backfilled} · 신규베타 ${data.newly_beta} · 베타졸업 ${data.graduated_to_normal} · 매칭대기 등록 ${data.pending_unmatched}`);
-            document.getElementById('bga-match-overlay')?.remove();
-            Boako.AdminReview.openBgaMatchQueue();
-        } catch (err) {
-            Boako.Util.toast('❌ ' + (err.message || '동기화에 실패했습니다.'));
-        }
     },
 
     searchGameForMatch: async function(pendingId, query) {
