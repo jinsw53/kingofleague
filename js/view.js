@@ -11,6 +11,8 @@
  *    라벨만 바뀌고, 모달 안에서 추가/재배치 모드를 전환할 수 있음.
  * 🌟 [신규] 검수센터에 "타이틀 스폰서 URL 승인" 버튼 추가 (Boako.Shop.openTitleSponsorApprovalModal).
  *    admin_review 페이지는 shop.js를 기본 로드 안 하므로 여기서 같이 로드해줌.
+ * 🌟 [신규] 검수센터에 "BGA 매칭 대기열" 버튼 추가 (Boako.AdminReview.openBgaMatchQueue) —
+ *    북마클릿 동기화에서 이름을 못 뽑은 게임들을 관리자가 수동 매칭.
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -809,6 +811,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                             <span>데이터 검수 대기 리스트</span>
                             <button onclick="Boako.Sponsor.openManageModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">🎫 후원 배너 관리</button>
                             <button onclick="Boako.Shop.openTitleSponsorApprovalModal()" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors ml-2">🏷️ 타이틀 스폰서 URL 승인</button>
+                            <button onclick="Boako.AdminReview.openBgaMatchQueue()" class="bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors ml-2">🎮 BGA 매칭 대기열</button>
                         </div>
                         <div class="card-body" style="min-height: 400px; background: #f8fafc;">
                             <div id="review-container">
