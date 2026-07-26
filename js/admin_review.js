@@ -6,6 +6,7 @@
  * 🌟 [수정] 붙여넣기+동기화 UI 제거 — 개인용 크롬 확장이 슈파베이스를 직접 호출하는 구조로 바뀌면서 불필요해짐.
  * 🌟 [수정] 검색을 fn_search_games_loose RPC로 교체 — 띄어쓰기 차이(예: "티켓투라이드" vs "티켓 투 라이드")로
  *    매칭 안 되던 문제 해결. 검색어/DB 값 둘 다 공백 제거 후 비교함.
+ * 🌟 [수정] 대기열 카드의 타이틀 이미지를 훨씬 크게(h-24, 전체너비 블록) 표시 — 너무 작아서 분간이 안 되던 문제 해결.
  */
 Boako.AdminReview = {
     pendingGames: [],
@@ -199,13 +200,13 @@ Boako.AdminReview = {
                     <div id="bga-match-list" class="flex flex-col gap-3">
                         ${list.length === 0 ? `<div class="text-center py-10 text-slate-400 font-bold text-sm">대기 중인 항목이 없습니다.</div>` : list.map(p => `
                             <div class="border border-slate-200 rounded-xl p-3" id="bga-match-row-${p.id}">
-                                <div class="flex items-center gap-3 mb-2">
-                                    ${p.title_image_url
-                                        ? `<img src="${p.title_image_url}" class="h-8 object-contain bg-slate-800 rounded px-2 py-1 shrink-0" style="max-width:160px;">`
-                                        : `<span class="text-[10px] text-slate-400 font-bold shrink-0">(이미지 없음)</span>`}
-                                    <a href="${p.url}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline truncate ml-auto">${p.slug} 🔗</a>
+                                <div class="flex items-center justify-between gap-2 mb-2">
+                                    <a href="${p.url}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline truncate">${p.slug} 🔗</a>
                                     ${p.is_beta ? `<span class="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">🚧 베타</span>` : ''}
                                 </div>
+                                ${p.title_image_url
+                                    ? `<div class="w-full flex justify-center bg-slate-800 rounded-lg mb-2 p-3"><img src="${p.title_image_url}" class="h-24 object-contain"></div>`
+                                    : `<div class="w-full text-center py-4 text-xs text-slate-400 font-bold bg-slate-50 rounded-lg mb-2">(이미지 없음)</div>`}
                                 <div class="relative mb-2">
                                     <input type="text" placeholder="게임 이름 검색해서 매칭..." oninput="Boako.AdminReview.searchGameForMatch(${p.id}, this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold">
                                     <div id="bga-match-results-${p.id}" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
