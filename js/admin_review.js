@@ -4,6 +4,8 @@
  * 🌟 [신규] BGA 카탈로그 동기화(북마클릿)에서 이름을 못 뽑은 게임들 수동 매칭 큐(openBgaMatchQueue) 추가
  * 🌟 [수정] 대기열 카드에 타이틀 이미지(로고) 표시 + 검색결과에도 게임 로고 같이 표시해서 눈으로 매칭 확인 가능하게 함.
  * 🌟 [수정] 붙여넣기+동기화 UI 제거 — 개인용 크롬 확장이 슈파베이스를 직접 호출하는 구조로 바뀌면서 불필요해짐.
+ * 🌟 [수정] 검색을 fn_search_games_loose RPC로 교체 — 띄어쓰기 차이(예: "티켓투라이드" vs "티켓 투 라이드")로
+ *    매칭 안 되던 문제 해결. 검색어/DB 값 둘 다 공백 제거 후 비교함.
  */
 Boako.AdminReview = {
     pendingGames: [],
@@ -226,7 +228,7 @@ Boako.AdminReview = {
             resultsBox.innerHTML = '';
             return;
         }
-        const { data } = await Boako.db.from('games').select('id, game_name, image_url').ilike('game_name', `%${query.trim()}%`).limit(8);
+        const { data } = await Boako.db.rpc('fn_search_games_loose', { p_query: query.trim() });
         if (!data || data.length === 0) {
             resultsBox.innerHTML = `<div class="p-2 text-xs text-slate-400 font-bold">검색 결과가 없습니다.</div>`;
             resultsBox.classList.remove('hidden');
