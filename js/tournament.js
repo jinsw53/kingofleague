@@ -8,6 +8,8 @@
  *    나란히 보여주고, 아래엔 통합 카드그리드로 투표. 유저는 트랙을 신경 쓸 필요 없음 —
  *    게임 스펙(플레이타임 등)으로 서버가 자동으로 어느 트랙 표인지 판정함.
  *    검색 없을 땐 20개, 검색해서 좁혀지면 60개까지 표시.
+ * 🌟 [수정] 개최공지/요청 작성 시 게임 검색에서 베타/알파/협력 게임 제외 — 어차피 서버(RPC)에서
+ *    막히지만, 애초에 검색결과에 안 보이게 해서 UX를 개선함.
  */
 Boako.Tournament = {
     State: {
@@ -218,7 +220,7 @@ Boako.Tournament = {
         `;
     },
 
-    // 🌟 게임 검색 (games 테이블 자동완성)
+    // 🌟 게임 검색 (games 테이블 자동완성) — 베타/알파/협력 게임은 검색결과에서 아예 제외
     searchGames: async (query) => {
         const resultsBox = document.getElementById('tourney-game-search-results');
         if (!resultsBox) return;
@@ -228,7 +230,11 @@ Boako.Tournament = {
             return;
         }
 
-        const { data } = await Boako.db.from('games').select('game_name, image_url').ilike('game_name', `%${query.trim()}%`).limit(8);
+        const { data } = await Boako.db.from('games').select('game_name, image_url')
+            .ilike('game_name', `%${query.trim()}%`)
+            .eq('game_status', 'NORMAL')
+            .eq('is_cooperative', false)
+            .limit(8);
 
         if (!data || data.length === 0) {
             resultsBox.innerHTML = `<div class="p-3 text-xs text-slate-400 font-bold">검색 결과가 없습니다.</div>`;
