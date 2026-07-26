@@ -7,6 +7,7 @@
  * 🌟 [신규] "🗳️ 추천하기" 탭 추가 — 다음 회차 예상 종목(가중치 기반 확률) 프리뷰 +
  *    검색형 카드그리드 투표(Boako.Tournament.Vote). 예상은 확정이 아니라 매일 바뀔 수 있고,
  *    투표로 뒤집을 수 있다는 걸 명확히 안내해서 투표 참여를 유도함.
+ *    검색 없을 땐 20개, 검색해서 좁혀지면 60개까지 표시.
  */
 Boako.Tournament = {
     State: {
@@ -473,8 +474,10 @@ Boako.Tournament.Vote = {
 
         // 표가 많이 쌓인 순으로 정렬해서 보여주면 "지금 뜨는 게임"이 눈에 잘 띔
         const sorted = [...data].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+        // 🌟 검색 없을 땐 너무 많이 쏟아지지 않게 20개로 제한, 검색해서 좁혀진 경우엔 60개까지
+        const displayLimit = search ? 60 : 20;
 
-        grid.innerHTML = sorted.slice(0, 60).map(g => `
+        grid.innerHTML = sorted.slice(0, displayLimit).map(g => `
             <div onclick="Boako.Tournament.Vote.vote('${g.game_id}', this)" class="relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-slate-200 bg-white hover:border-violet-400 hover:shadow-md cursor-pointer transition-all">
                 ${g.vote_count > 0 ? `<span class="absolute -top-1.5 -right-1.5 bg-violet-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm">${g.vote_count}</span>` : ''}
                 <img src="${Boako.Util.cdn(g.image_url) || DEFAULT_LOGO_FALLBACK}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
