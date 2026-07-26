@@ -4,9 +4,9 @@
  * 🌟 [버그수정] init() 재진입 시 State.currentTab을 항상 'ANNOUNCEMENT'로 리셋.
  *    이전에 REQUEST 탭을 봤던 세션이면 State가 유지되어 버튼 표기(항상 공지가 활성으로 그려짐)와
  *    실제 렌더링 필터링(currentTab 기준)이 어긋나는 문제가 있었음.
- * 🌟 [신규] "🗳️ 추천하기" 탭 추가 — 다음 회차 예상 종목(가중치 기반 확률) 프리뷰 +
- *    검색형 카드그리드 투표(Boako.Tournament.Vote). 예상은 확정이 아니라 매일 바뀔 수 있고,
- *    투표로 뒤집을 수 있다는 걸 명확히 안내해서 투표 참여를 유도함.
+ * 🌟 [신규] "🗳️ 추천하기" 탭 — 정기(주간)/월간(스위스) 두 트랙의 다음 회차 예상치를
+ *    나란히 보여주고, 아래엔 통합 카드그리드로 투표. 유저는 트랙을 신경 쓸 필요 없음 —
+ *    게임 스펙(플레이타임 등)으로 서버가 자동으로 어느 트랙 표인지 판정함.
  *    검색 없을 땐 20개, 검색해서 좁혀지면 60개까지 표시.
  */
 Boako.Tournament = {
@@ -363,7 +363,8 @@ Boako.Tournament = {
 
     };
 
-// 🌟 [신규] 추천(투표) 탭 — 다음 회차 예상치 프리뷰 + 검색형 카드그리드 투표
+// 🌟 [신규] 추천(투표) 탭 — 주간/월간 예상치 프리뷰 2개 + 통합 검색형 카드그리드 투표
+// 유저는 트랙(주간/월간)을 신경 쓸 필요 없음 — 게임 자체 스펙(플레이타임 등)으로 서버가 자동 판정.
 Boako.Tournament.Vote = {
     searchDebounceTimer: null,
 
@@ -371,12 +372,13 @@ Boako.Tournament.Vote = {
         const root = document.getElementById('tourney-vote-container');
         if (!root) return;
         root.innerHTML = `
-            <div id="tourney-vote-preview" class="mb-5">
-                <div class="text-center py-8 text-slate-400 font-bold">예상치 계산 중...</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                <div id="tourney-vote-preview-weekly"><div class="text-center py-8 text-slate-400 font-bold text-sm">예상치 계산 중...</div></div>
+                <div id="tourney-vote-preview-monthly"><div class="text-center py-8 text-slate-400 font-bold text-sm">예상치 계산 중...</div></div>
             </div>
             <div class="bg-white border border-slate-200 rounded-xl p-4">
                 <div class="relative mb-4">
-                    <input type="text" id="tourney-vote-search" placeholder="게임 이름으로 검색해서 투표하세요" autocomplete="off"
+                    <input type="text" id="tourney-vote-search" placeholder="게임 이름으로 검색해서 투표하세요 (정기·월간 통합)" autocomplete="off"
                         class="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm font-bold focus:outline-none focus:border-violet-500"
                         oninput="Boako.Tournament.Vote.onSearchInput(this.value)">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
@@ -391,23 +393,31 @@ Boako.Tournament.Vote = {
         await Boako.Tournament.Vote.loadGrid('');
     },
 
-    // 🌟 다음 회차 예상치 — 확정이 아니라 "지금 시점 기준 예상"임을 명확히 안내
+    // 🌟 주간/월간 각각의 다음 회차 예상치 — 확정이 아니라 "지금 시점 기준 예상"임을 명확히 안내
     loadPreview: async () => {
-        const previewBox = document.getElementById('tourney-vote-preview');
+        await Promise.all([
+            Boako.Tournament.Vote.loadPreviewFor('WEEKLY', 'tourney-vote-preview-weekly', '🏅 다음 정기(주간) 예상', 'violet'),
+            Boako.Tournament.Vote.loadPreviewFor('MONTHLY', 'tourney-vote-preview-monthly', '🧩 다음 월간(스위스) 예상', 'indigo')
+        ]);
+    },
+
+    loadPreviewFor: async (track, containerId, label, colorName) => {
+        const previewBox = document.getElementById(containerId);
         if (!previewBox) return;
 
         const { data: nextSlot } = await Boako.db
             .from('tournament_rotation_slots')
             .select('round_no, scheduled_date')
             .eq('status', 'PENDING')
+            .eq('track', track)
             .order('scheduled_date', { ascending: true })
             .limit(1)
             .maybeSingle();
 
-        const { data: candidates, error } = await Boako.db.rpc('fn_get_tournament_rotation_preview', { p_limit: 5 });
+        const { data: candidates, error } = await Boako.db.rpc('fn_get_tournament_rotation_preview', { p_limit: 4, p_track: track });
 
         if (error || !candidates || candidates.length === 0) {
-            previewBox.innerHTML = `<div class="text-center py-6 text-slate-400 font-bold text-sm">예상치를 불러오지 못했습니다.</div>`;
+            previewBox.innerHTML = `<div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center text-slate-400 font-bold text-sm">${label}: 예상치를 불러오지 못했습니다.</div>`;
             return;
         }
 
@@ -416,10 +426,11 @@ Boako.Tournament.Vote = {
             : '다음 회차';
 
         const maxProb = Math.max(...candidates.map(c => Number(c.probability)));
+        const gradientClass = colorName === 'violet' ? 'from-violet-600 to-indigo-700' : 'from-indigo-600 to-blue-700';
 
         previewBox.innerHTML = `
-            <div class="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
-                <div class="text-[11px] font-black opacity-80 mb-1">🔮 ${dateLabel} 예상 종목</div>
+            <div class="bg-gradient-to-br ${gradientClass} rounded-2xl p-5 text-white shadow-lg h-full">
+                <div class="text-[11px] font-black opacity-80 mb-1">${label} · ${dateLabel}</div>
                 <div class="flex flex-col gap-2 mt-3">
                     ${candidates.map((c, idx) => {
                         const pct = Math.round(Number(c.probability) * 1000) / 10;
@@ -440,7 +451,7 @@ Boako.Tournament.Vote = {
                         </div>
                     `;}).join('')}
                 </div>
-                <div class="text-[10px] font-bold opacity-70 mt-4">⚠️ 확정 아님 · 매일 바뀔 수 있어요. 원하는 게임에 투표하면 순위를 뒤집을 수 있습니다!</div>
+                <div class="text-[10px] font-bold opacity-70 mt-4">⚠️ 확정 아님 · 매일 바뀔 수 있어요. 아래에서 투표하면 순위를 뒤집을 수 있습니다!</div>
             </div>
         `;
     },
@@ -452,6 +463,7 @@ Boako.Tournament.Vote = {
         }, 250);
     },
 
+    // 🌟 [수정] 트랙 구분 없이 통합 조회 — 주간 후보(30분 이하)와 월간 후보(30분 초과)가 같이 나옴
     loadGrid: async (search) => {
         const grid = document.getElementById('tourney-vote-grid');
         if (!grid) return;
@@ -482,10 +494,12 @@ Boako.Tournament.Vote = {
                 ${g.vote_count > 0 ? `<span class="absolute -top-1.5 -right-1.5 bg-violet-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm">${g.vote_count}</span>` : ''}
                 <img src="${Boako.Util.cdn(g.image_url) || DEFAULT_LOGO_FALLBACK}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
                 <span class="text-[11px] font-black text-slate-700 text-center leading-tight">${g.game_name}</span>
+                <span class="text-[9px] font-bold ${g.playtime > 30 ? 'text-indigo-400' : 'text-violet-400'}">${g.playtime > 30 ? '🧩 월간' : '🏅 정기'} · ${g.playtime}분</span>
             </div>
         `).join('');
     },
 
+    // 🌟 [수정] track 파라미터 불필요 — 서버가 게임 스펙 보고 자동으로 어느 트랙 표인지 판정해서 처리함
     vote: async (gameId, cardEl) => {
         try {
             const { data, error } = await Boako.db.rpc('fn_vote_tournament_game', { p_game_id: gameId });
