@@ -2126,29 +2126,43 @@ async function addTournamentRecordButton() {
 
   document.body.appendChild(button);
 
-  // 🌟 [신규] 지금 상태(순위 확정/진행중/시작전)에 맞는 라벨을 미리 계산해서 표시
-  // (기존엔 무조건 "토너먼트 정보 등록"으로 고정돼 있어서, 순위가 이미 나온 상태에서도
-  //  실제로는 "기록 저장"이 실행되는데 라벨이 안 맞았음)
-  try {
-    const reporter = await getReporterNickname();
-    const tournamentData = reporter ? extractTournamentData(reporter) : null;
+  // 🌟 [수정] 지금 상태(순위 확정/진행중/시작전)에 맞는 라벨을 계산해서 표시.
+  // BGA가 Dojo(AMD) 비동기 로딩이라, 1초 시점엔 아직 순위 데이터가 안 그려져 있을 수 있음.
+  // 라벨은 한 번만 계산하고 끝나면 그 이후로 다시 안 봐서, 늦게 뜬 결과를 영영 못 잡는 문제가 있었음.
+  // → 결과가 아직 없으면 몇 초간 재시도하면서 다시 계산하도록 변경 (버튼을 이미 클릭했으면 재시도 중단).
+  async function computeAndSetButtonLabel(attempt = 0, maxAttempts = 8) {
+    if (button.dataset.clicked === 'true') return; // 이미 클릭했으면 라벨 재계산 안 함
 
-    if (tournamentData && tournamentData.error !== "not_boako" && tournamentData.players?.length > 0) {
-      button.innerText = "🏆 기록 저장";
-    } else {
+    try {
+      const reporter = await getReporterNickname();
+      const tournamentData = reporter ? extractTournamentData(reporter) : null;
+
+      if (tournamentData && tournamentData.error !== "not_boako" && tournamentData.players?.length > 0) {
+        button.innerText = "🏆 기록 저장";
+        return; // 결과 찾았으면 재시도 종료
+      }
+
       const scheduledDate = parseKoreanDateTimeToTZ(extractTournamentStartTime());
       const hasStarted = scheduledDate ? (new Date(scheduledDate).getTime() < Date.now()) : false;
       button.innerText = hasStarted ? "⏳ 토너먼트 종료 시 저장" : "📢 개최 공지 등록";
+
+      // 이미 시작된 토너먼트인데 아직 결과가 안 잡혔으면, 조금 있다 다시 확인 (결과가 늦게 뜨는 경우 대응)
+      if (hasStarted && attempt < maxAttempts) {
+        setTimeout(() => computeAndSetButtonLabel(attempt + 1, maxAttempts), 1500);
+      }
+    } catch (err) {
+      console.error("[토너먼트 버튼 라벨] 상태 확인 실패:", err);
+      button.innerText = "📢 개최 공지 등록";
     }
-  } catch (err) {
-    console.error("[토너먼트 버튼 라벨] 상태 확인 실패:", err);
-    button.innerText = "📢 개최 공지 등록";
   }
+
+  await computeAndSetButtonLabel();
 
   console.log("✅ 버튼을 다시 편안한 오른쪽 아래로 보냈습니다.");
 
 
   button.onclick = async () => {
+    button.dataset.clicked = 'true'; // 🌟 클릭했으면 라벨 재계산(재시도) 중단
     const originalText = button.innerText;
     button.innerHTML = `${originalText} <div class="spinner"></div>`;
     button.disabled = true;
