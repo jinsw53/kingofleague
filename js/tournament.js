@@ -12,6 +12,9 @@
  *    막히지만, 애초에 검색결과에 안 보이게 해서 UX를 개선함.
  * 🌟 [신규] 개최 요청(REQUEST) 카드 — 아직 미개최 상태일 때, 그 게임의 실제 BGA 페이지(games.bga_url)로
  *    바로 갈 수 있는 링크 추가. 요청 보고 바로 가서 열 수 있게.
+ * 🌟 [버그수정] 카드 정렬을 created_at(등록시각)에서 scheduled_date(다가오는 일정) 오름차순으로 변경.
+ *    자동 로테이션이 한 번에 여러 회차를 생성할 때 created_at이 거의 똑같아서, 그 기준으로 정렬하면
+ *    날짜 순서가 뒤죽박죽으로 보이는 문제가 있었음(예: 8/22 → 8/29 → 8/1 → 9/12 순으로 표시).
  */
 Boako.Tournament = {
     State: {
@@ -122,6 +125,7 @@ Boako.Tournament = {
             .from('tournament_posts')
             .select('*')
             .or(`scheduled_date.is.null,scheduled_date.gte.${nowIso}`)
+            .order('scheduled_date', { ascending: true, nullsFirst: false })
             .order('created_at', { ascending: false });
 
         if (error) {
