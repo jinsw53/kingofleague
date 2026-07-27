@@ -482,14 +482,33 @@ Boako.Auth = {
 
     checkTournamentBadge: async function() {
         try {
+            const nowIso = new Date().toISOString();
+
             const { count } = await Boako.db.from('tournament_posts').select('*', { count: 'exact', head: true }).eq('type', 'REQUEST').eq('status', 'OPEN');
             const badge = document.getElementById('menu-tournament-badge');
-            if (!badge) return;
-            if (count > 0) {
-                badge.textContent = count;
-                badge.style.display = 'flex';
-            } else {
-                badge.style.display = 'none';
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+
+            // 🌟 [신규] 개최중/개최예정(ANNOUNCEMENT) 배지 — 실시간 이슈/전광판에 소식이 없어도
+            // 메뉴만 보고 "어? 토너먼트 뭔가 있네" 하고 눌러보게 유도
+            const { count: announceCount } = await Boako.db.from('tournament_posts')
+                .select('*', { count: 'exact', head: true })
+                .eq('type', 'ANNOUNCEMENT')
+                .or(`scheduled_date.is.null,scheduled_date.gte.${nowIso}`);
+            const announceBadge = document.getElementById('menu-tournament-announce-badge');
+            if (announceBadge) {
+                if (announceCount > 0) {
+                    announceBadge.textContent = announceCount;
+                    announceBadge.style.display = 'flex';
+                } else {
+                    announceBadge.style.display = 'none';
+                }
             }
         } catch (err) { console.error("토너먼트 배지 갱신 실패:", err); }
     },
