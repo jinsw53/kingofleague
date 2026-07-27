@@ -20,6 +20,8 @@
  *    동점이면 최신순으로 정렬해서 1등만 헤드라인, 나머지는 large 카드로 강등.
  * 🌟 [수정] large 카드가 고정 128px 정사각형 옆배치라 폭 2배인 카드 치고 이미지가 오히려 작아 보이던 문제 —
  *    medium처럼 이미지를 카드 상단 풀폭으로 깔고(높이만 더 키움) 텍스트를 아래로 배치.
+ * 🌟 [신규] 필러로 나오는 랜덤 게임 소개 카드 — bga_url 있으면 클릭 시 그 게임의 실제 BGA 페이지가
+ *    새 탭으로 열리도록 함 (renderSupplementFiller / renderSupplementPadCard에 externalUrl 지원 추가).
  */
 Boako.NewsFeed = {
     items: [],
@@ -200,11 +202,11 @@ Boako.NewsFeed = {
                 for (const offset of offsets) {
                     const { data } = await Boako.db
                         .from('games')
-                        .select('game_name, min_players, max_players, playtime, image_url')
+                        .select('game_name, min_players, max_players, playtime, image_url, bga_url')
                         .range(offset, offset);
                     if (data && data[0]) {
                         const g = data[0];
-                        pool.push({ title: `🎲 ${g.game_name} · ${g.min_players}-${g.max_players}인 · ${g.playtime}분`, image: g.image_url, icon: '🎲' });
+                        pool.push({ title: `🎲 ${g.game_name} · ${g.min_players}-${g.max_players}인 · ${g.playtime}분`, image: g.image_url, icon: '🎲', externalUrl: g.bga_url || null });
                     }
                 }
             }
@@ -436,9 +438,12 @@ Boako.NewsFeed = {
     },
 
     // 필러 슬롯을 채우는 사이트의 다른 실제 데이터 — 진짜 소식 카드와 똑같은 모양이라 자연스럽게 섞인다 (배지 없음)
+    // 🌟 [수정] externalUrl(게임의 실제 BGA 페이지 등)이 있으면 그걸 새 탭으로 열고, 없으면 기존처럼 내부 navigateToLink 사용
     renderSupplementFiller: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
-        const clickable = filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '';
+        const clickable = filler.externalUrl
+            ? `onclick="window.open('${filler.externalUrl.replace(/'/g, "\\'")}', '_blank')" style="cursor:pointer;"`
+            : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '');
         return `
             <div class="nf-filler-card" ${clickable}>
                 <div class="thumb">${img ? `<img src="${img}">` : filler.icon}</div>
@@ -450,9 +455,12 @@ Boako.NewsFeed = {
     // 아래쪽 그리드 마지막 줄을 채우는 사이트의 다른 실제 데이터 — production의 medium 카드와 동일한 마크업
     // 🌟 [수정] 여기 들어오는 image는 팀/랭킹/게임 "로고"라서 object-fit:cover로 자르면 안 됨 —
     // contain + 여백 배경으로 로고 전체가 보이도록 (실제 뉴스 썸네일용 object-fit:cover와는 용도가 다름)
+    // 🌟 [수정] externalUrl(게임의 실제 BGA 페이지 등)이 있으면 그걸 새 탭으로 열고, 없으면 기존처럼 내부 navigateToLink 사용
     renderSupplementPadCard: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
-        const clickable = filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '';
+        const clickable = filler.externalUrl
+            ? `onclick="window.open('${filler.externalUrl.replace(/'/g, "\\'")}', '_blank')" style="cursor:pointer;"`
+            : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '');
         return `
             <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                 ${img ? `<div class="h-24 overflow-hidden bg-slate-50 flex items-center justify-center p-3"><img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;"></div>` : ''}
