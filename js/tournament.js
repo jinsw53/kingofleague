@@ -10,12 +10,15 @@
  *    검색 없을 땐 20개, 검색해서 좁혀지면 60개까지 표시.
  * 🌟 [수정] 개최공지/요청 작성 시 게임 검색에서 베타/알파/협력 게임 제외 — 어차피 서버(RPC)에서
  *    막히지만, 애초에 검색결과에 안 보이게 해서 UX를 개선함.
+ * 🌟 [신규] 개최 요청(REQUEST) 카드 — 아직 미개최 상태일 때, 그 게임의 실제 BGA 페이지(games.bga_url)로
+ *    바로 갈 수 있는 링크 추가. 요청 보고 바로 가서 열 수 있게.
  */
 Boako.Tournament = {
     State: {
         currentTab: 'ANNOUNCEMENT', // 'ANNOUNCEMENT' | 'REQUEST'
         posts: [],
         gameLogoMap: {},
+        gameBgaUrlMap: {},
         realtimeChannel: null
     },
 
@@ -128,13 +131,15 @@ Boako.Tournament = {
             Boako.Tournament.State.posts = data || [];
         }
 
-        // 🌟 카드에 표시할 게임 로고 조회 (games 테이블과 별도 조인)
+        // 🌟 카드에 표시할 게임 로고 + BGA 페이지 URL 조회 (games 테이블과 별도 조인)
         const gameNames = [...new Set(Boako.Tournament.State.posts.map(p => p.game_name).filter(Boolean))];
         if (gameNames.length > 0) {
-            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url').in('game_name', gameNames);
+            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url, bga_url').in('game_name', gameNames);
             Boako.Tournament.State.gameLogoMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.image_url]));
+            Boako.Tournament.State.gameBgaUrlMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.bga_url]));
         } else {
             Boako.Tournament.State.gameLogoMap = {};
+            Boako.Tournament.State.gameBgaUrlMap = {};
         }
 
         const openRequestCount = Boako.Tournament.State.posts.filter(p => p.type === 'REQUEST' && p.status === 'OPEN').length;
@@ -194,6 +199,7 @@ Boako.Tournament = {
 
         // REQUEST 카드 — 내용(요청사항)을 더 신경써서 눈에 띄게
         const isFulfilled = p.status === 'FULFILLED';
+        const gameBgaUrl = Boako.Tournament.State.gameBgaUrlMap[p.game_name];
         return `
             <div class="bg-white border ${isFulfilled ? 'border-slate-200 opacity-70' : 'border-amber-200'} rounded-xl p-4">
                 <div class="flex items-center gap-3 mb-3">
@@ -214,7 +220,9 @@ Boako.Tournament = {
                     ${p.max_participants ? `<span class="text-[11px] text-slate-400 font-bold">👥 희망 인원 ${p.max_participants}명</span>` : '<span></span>'}
                 </div>
                 ${!isFulfilled
-                    ? `<div class="text-center mt-3 text-[11px] text-slate-400 font-bold">🎯 아레나에서 토너먼트 개최 후, 크롬 확장으로 등록 시 자동으로 매칭됩니다</div>`
+                    ? (gameBgaUrl
+                        ? `<a href="${gameBgaUrl}" target="_blank" class="block text-center mt-3 text-xs font-black text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg py-2 transition-colors">🎮 이 게임 아레나 페이지 열기 → 개최 후 크롬 확장으로 등록 시 자동 매칭</a>`
+                        : `<div class="text-center mt-3 text-[11px] text-slate-400 font-bold">🎯 아레나에서 토너먼트 개최 후, 크롬 확장으로 등록 시 자동으로 매칭됩니다</div>`)
                     : `<a href="${p.source_url}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
