@@ -147,11 +147,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // 🌟 [신규] 토너먼트 개최 공지 자동 등록 (PHP 중계 없이 슈파베이스 직행, 중복 방지는 DB가 담당)
+    // 🌟 [v2.19 수정] 토너먼트 개최 공지 자동 등록 — 이전엔 슈파베이스 응답을 확인 안 하고
+    // 무조건 성공으로 응답해서, 실제로 DB에 저장이 실패해도(예: 체크 제약조건 위반, 트리거 에러 등)
+    // 화면엔 항상 "등록 완료"로 표시되는 문제가 있었음. 이제 실제 HTTP 응답 상태를 확인해서
+    // 진짜 성공/실패를 그대로 전달함.
     else if (message.action === "saveTournamentAnnouncement") {
         console.log("📩 토너먼트 개최 공지 등록 요청:", message.data);
-        pushToSupabase("TOURNAMENT_ANNOUNCEMENT", message.data);
-        sendResponse({ success: true, message: "공지 등록 요청 완료" });
+
+        fetch(`${SUPABASE_URL}/rest/v1/raw_ingest_buffer`, {
+            method: "POST",
+            headers: {
+                "apikey": SUPABASE_KEY,
+                "Authorization": `Bearer ${SUPABASE_KEY}`,
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({
+                data_type: "TOURNAMENT_ANNOUNCEMENT",
+                payload: message.data
+            })
+        })
+        .then(async (res) => {
+            if (res.ok) {
+                console.log("🚀 [Supabase] TOURNAMENT_ANNOUNCEMENT 등록 성공");
+                sendResponse({ success: true, message: "공지 등록 완료" });
+            } else {
+                const errText = await res.text().catch(() => '');
+                console.error(`❌ [Supabase] TOURNAMENT_ANNOUNCEMENT 등록 실패 (HTTP ${res.status}):`, errText);
+                sendResponse({ success: false, error: "server_error", message: `등록 실패 (서버 오류 HTTP ${res.status})` });
+            }
+        })
+        .catch(err => {
+            console.error("❌ [Supabase] 요청 자체 실패:", err);
+            sendResponse({ success: false, error: "network_error", message: "네트워크 오류로 등록 실패" });
+        });
+
         return true;
     }
 });
