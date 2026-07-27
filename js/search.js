@@ -1,5 +1,6 @@
 /**
  * [SEARCH] 헤더 통합검색 결과 페이지 — 팀 / 유저 / 게시글 / 게임명 전체 검색
+ * 🌟 [수정] 게임 결과 썸네일 object-fit을 cover→contain으로 변경 (로고가 박스에 꽉 채워지며 잘리던 문제 해결)
  */
 Boako.Search = {
     lastQuery: '',
@@ -150,7 +151,7 @@ Boako.Search = {
         // (onclick 속성 자체가 큰따옴표라서, 인자는 반드시 작은따옴표로 감싸고 내부 작은따옴표만 이스케이프한다)
         const gamesHtml = games.map(g => `
             <div class="search-result-item" onclick="Boako.Util.navigateToLink('GAME', '${(g.game_name || '').replace(/'/g, "\\'")}')">
-                <div class="thumb">${g.image_url ? `<img src="${Boako.Util.cdn(g.image_url)}" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">` : '🎲'}</div>
+                <div class="thumb">${g.image_url ? `<img src="${Boako.Util.cdn(g.image_url)}" style="width:100%; height:100%; object-fit:contain; border-radius:10px; background:#f8fafc;">` : '🎲'}</div>
                 <div>
                     <div class="title">${Boako.Search.escapeHtml(g.game_name)}</div>
                     <div class="desc">게임 · 공략 게시판 보기</div>
