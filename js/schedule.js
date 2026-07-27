@@ -1,6 +1,8 @@
 /**
  * [SCHEDULE] 아카이브 일정 관리 및 캘린더 전광판 (히트맵 + 다중 콘텐츠 통합)
  * 표시 대상: 라이벌전 / 대항전(본선+밴투표마감+엔트리마감) / 드루와챌린지 / 같이하자 / 토너먼트 / 리그시즌일정
+ * 🌟 [버그수정] "🔔 톡캘린더"/"🔕 알림 취소" 버튼의 onclick이 실제 함수 위치(Boako.Schedule.View.* 안에 중첩됨)와
+ *    다르게 Boako.Schedule.*로 호출하고 있어서 "not a function" 에러가 나던 문제 수정 (.View. 경로 추가).
  */
 Boako.Schedule = {
     scheduleItems: [],
@@ -228,8 +230,8 @@ Boako.Schedule = {
             const typeBadge = `<span style="background:${meta.color}; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:bold; white-space:nowrap;">${meta.icon} ${meta.label}</span>`;
             const linkBtn = item.linkUrl ? `<a href="${item.linkUrl}" target="_blank" style="font-size:12px; font-weight:800; color:${meta.color}; text-decoration:underline; white-space:nowrap;">바로가기 🔗</a>` : '';
             const isFuture = new Date(item.scheduled_time).getTime() > Date.now();
-            const kakaoBtn = isFuture ? `<button onclick='Boako.Schedule.addToKakaoCalendar(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="font-size:11px; font-weight:800; color:#3c1e1e; background:#FEE500; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔔 톡캘린더</button>` : '';
-            const rejectBtn = (item.sourceType && isFuture) ? `<button onclick="Boako.Schedule.rejectBroadcastEvent('${item.sourceType}', '${item.sourceId}')" style="font-size:11px; font-weight:800; color:#64748b; background:#f1f5f9; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔕 알림 취소</button>` : '';
+            const kakaoBtn = isFuture ? `<button onclick='Boako.Schedule.View.addToKakaoCalendar(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="font-size:11px; font-weight:800; color:#3c1e1e; background:#FEE500; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔔 톡캘린더</button>` : '';
+            const rejectBtn = (item.sourceType && isFuture) ? `<button onclick="Boako.Schedule.View.rejectBroadcastEvent('${item.sourceType}', '${item.sourceId}')" style="font-size:11px; font-weight:800; color:#64748b; background:#f1f5f9; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔕 알림 취소</button>` : '';
 
             return `
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition:all 0.2s;">
