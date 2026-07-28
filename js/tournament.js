@@ -438,7 +438,7 @@ Boako.Tournament.Vote = {
         const { data: candidates, error } = await Boako.db.rpc('fn_get_tournament_rotation_preview', { p_limit: 4, p_track: track });
 
         if (error || !candidates || candidates.length === 0) {
-            previewBox.innerHTML = `<div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center text-slate-400 font-bold text-sm">${label}: 예상치를 불러오지 못했습니다.</div>`;
+            previewBox.innerHTML = `<div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center text-slate-400 font-bold text-sm">${label}: 예상 후보가 부족합니다.</div>`;
             return;
         }
 
