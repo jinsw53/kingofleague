@@ -3,6 +3,8 @@
  * 표시 대상: 라이벌전 / 대항전(본선+밴투표마감+엔트리마감) / 드루와챌린지 / 같이하자 / 토너먼트 / 리그시즌일정
  * 🌟 [버그수정] "🔔 톡캘린더"/"🔕 알림 취소" 버튼의 onclick이 실제 함수 위치(Boako.Schedule.View.* 안에 중첩됨)와
  *    다르게 Boako.Schedule.*로 호출하고 있어서 "not a function" 에러가 나던 문제 수정 (.View. 경로 추가).
+ * 🌟 [신규] 토너먼트/시즌 알림을 취소한 뒤 다시 켤 방법이 없던 문제 수정 — 실제 등록 여부(hasActiveBroadcast)를
+ *    조회해서 등록 상태면 "🔕 알림 취소", 취소된 상태면 "🔔 다시 받기" 버튼으로 자동 전환됨.
  */
 Boako.Schedule = {
     scheduleItems: [],
@@ -118,7 +120,6 @@ Boako.Schedule = {
         } catch (err) {
             console.error("토너먼트 일정 로드 오류:", err);
         }
-
         // 5. 리그 시즌 일정 — 시즌 시작일/종료일 + 밴투표 마감(시작+50일) + 엔트리 마감(시작+58일)
             try {
             const { data, error } = await Boako.db
@@ -197,6 +198,26 @@ Boako.Schedule = {
         }
 
         items.sort((a, b) => new Date(a.scheduled_time) - new Date(b.scheduled_time));
+
+        // 🌟 [신규] 토너먼트/시즌 항목에 대해, 현재 로그인 유저가 실제로 톡캘린더 등록이 돼있는지 조회
+        // (취소 후에도 "🔕 알림 취소" 버튼만 계속 보이던 문제 수정용 — 실제 등록 상태를 반영해서 버튼 전환)
+        if (Boako.state.user) {
+            try {
+                const { data: registered } = await Boako.db
+                    .from('broadcast_kakao_events')
+                    .select('source_type, source_id')
+                    .eq('user_id', Boako.state.user.id);
+                const registeredSet = new Set((registered || []).map(r => `${r.source_type}::${r.source_id}`));
+                items.forEach(item => {
+                    if (item.sourceType) {
+                        item.hasActiveBroadcast = registeredSet.has(`${item.sourceType}::${item.sourceId}`);
+                    }
+                });
+            } catch (err) {
+                console.error("톡캘린더 등록 상태 조회 오류:", err);
+            }
+        }
+
         return items;
     },
 
@@ -232,6 +253,9 @@ Boako.Schedule = {
             const isFuture = new Date(item.scheduled_time).getTime() > Date.now();
             const kakaoBtn = isFuture ? `<button onclick='Boako.Schedule.View.addToKakaoCalendar(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="font-size:11px; font-weight:800; color:#3c1e1e; background:#FEE500; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔔 톡캘린더</button>` : '';
             const rejectBtn = (item.sourceType && isFuture) ? `<button onclick="Boako.Schedule.View.rejectBroadcastEvent('${item.sourceType}', '${item.sourceId}')" style="font-size:11px; font-weight:800; color:#64748b; background:#f1f5f9; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔕 알림 취소</button>` : '';
+            // 🌟 [신규] 취소한 뒤 다시 받고 싶을 때를 위한 버튼 (실제 등록 여부에 따라 rejectBtn과 전환됨)
+            const rebroadcastBtn = (item.sourceType && isFuture) ? `<button onclick="Boako.Schedule.View.rebroadcastEvent('${item.sourceType}', '${item.sourceId}', this)" style="font-size:11px; font-weight:800; color:#3c1e1e; background:#FEE500; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔔 다시 받기</button>` : '';
+            const sourceBtn = item.hasActiveBroadcast ? rejectBtn : rebroadcastBtn;
 
             return `
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition:all 0.2s;">
@@ -245,7 +269,7 @@ Boako.Schedule = {
                     <div style="flex-shrink:0; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
                         ${item.subtitle ? `<span style="font-size:14px; font-weight:bold; color:#334155; background:#f1f5f9; padding:6px 14px; border-radius:8px;">${item.subtitle}</span>` : ''}
                         <div style="display:flex; gap:6px; align-items:center;">
-                            ${item.sourceType ? rejectBtn : kakaoBtn}
+                            ${item.sourceType ? sourceBtn : kakaoBtn}
                             ${linkBtn}
                         </div>
                     </div>
@@ -294,8 +318,34 @@ Boako.Schedule = {
                 });
                 if (error) throw error;
                 Boako.Util.toast('🔕 알림이 취소되었습니다.');
+                // 보던 월/날짜를 유지하기 위해 전체 재조회 대신 로컬 상태만 갱신
+                Boako.Schedule.scheduleItems.forEach(it => {
+                    if (it.sourceType === sourceType && it.sourceId === sourceId) it.hasActiveBroadcast = false;
+                });
+                Boako.Schedule.View.renderUI();
             } catch (err) {
                 Boako.Util.toast('❌ ' + (err.message || '취소에 실패했습니다.'));
+            }
+        },
+
+        // 🌟 [신규] 취소했던 토너먼트/시즌 톡캘린더 알림을 다시 받기
+        rebroadcastEvent: async (sourceType, sourceId, btnEl) => {
+            if (!Boako.state.user) { Boako.Util.toast('로그인 후 이용해주세요.'); return; }
+            if (btnEl) { btnEl.disabled = true; btnEl.innerHTML += ' <div class="spinner"></div>'; }
+            try {
+                const { error } = await Boako.db.rpc('fn_rebroadcast_kakao_event', {
+                    p_source_type: sourceType,
+                    p_source_id: sourceId
+                });
+                if (error) throw error;
+                Boako.Util.toast('🔔 톡캘린더에 다시 등록되었습니다!');
+                Boako.Schedule.scheduleItems.forEach(it => {
+                    if (it.sourceType === sourceType && it.sourceId === sourceId) it.hasActiveBroadcast = true;
+                });
+                Boako.Schedule.View.renderUI();
+            } catch (err) {
+                Boako.Util.toast('❌ ' + (err.message || '등록에 실패했습니다.'));
+                if (btnEl) btnEl.disabled = false;
             }
         },
 
