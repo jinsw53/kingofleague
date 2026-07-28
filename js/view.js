@@ -13,6 +13,8 @@
  *    admin_review 페이지는 shop.js를 기본 로드 안 하므로 여기서 같이 로드해줌.
  * 🌟 [신규] 검수센터에 "BGA 매칭 대기열" 버튼 추가 (Boako.AdminReview.openBgaMatchQueue) —
  *    북마클릿 동기화에서 이름을 못 뽑은 게임들을 관리자가 수동 매칭.
+ * 🌟 [수정] 팀 창단 로고 업로드 안내문구 중 "배경 없는 PNG" 요구사항이 다른 문구랑 똑같이 묻혀있어서
+ *    강조 안 되던 문제 수정 (빨간색+굵게+⚠️ 아이콘으로 눈에 띄게 변경).
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -515,7 +517,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                 <div class="form-group" style="margin-top:15px;">
                                     <label>팀 로고 (필수)</label>
                                     <div class="custom-upload" onclick="document.getElementById('team_logo').click()">
-                                        <div id="upload-placeholder">🖼️<br><b>로고 이미지 업로드</b><br><small>클릭하여 파일을 선택하세요</small><br><small>해상도 500 X 500 이하의 배경이 없는 Png 파일이여야 합니다</small></div>
+                                        <div id="upload-placeholder">🖼️<br><b>로고 이미지 업로드</b><br><small>클릭하여 파일을 선택하세요</small><br><small style="display:block; margin-top:6px; color:#dc2626; font-weight:800;">⚠️ 배경이 투명한 PNG 파일만 가능 (500x500 이하)</small></div>
                                         <div id="preview-container" class="preview-img-container">
                                             <img id="logo-preview-img" src="">
                                             <div style="position:absolute; top:10px; right:10px; background:red; color:white; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center;" onclick="Boako.Util.removeImgPreview(event)">✕</div>
