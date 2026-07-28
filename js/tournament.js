@@ -418,7 +418,7 @@ Boako.Tournament.Vote = {
     loadPreview: async () => {
         await Promise.all([
             Boako.Tournament.Vote.loadPreviewFor('WEEKLY', 'tourney-vote-preview-weekly', '🏅 다음 정기(주간) 예상', 'violet'),
-            Boako.Tournament.Vote.loadPreviewFor('MONTHLY', 'tourney-vote-preview-monthly', '🧩 다음 월간(스위스) 예상', 'indigo')
+            Boako.Tournament.Vote.loadPreviewFor('MONTHLY', 'tourney-vote-preview-monthly', '🧩 다음 월간(한달한판) 예상', 'indigo')
         ]);
     },
 
