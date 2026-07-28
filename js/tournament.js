@@ -15,6 +15,9 @@
  * 🌟 [버그수정] 카드 정렬을 created_at(등록시각)에서 scheduled_date(다가오는 일정) 오름차순으로 변경.
  *    자동 로테이션이 한 번에 여러 회차를 생성할 때 created_at이 거의 똑같아서, 그 기준으로 정렬하면
  *    날짜 순서가 뒤죽박죽으로 보이는 문제가 있었음(예: 8/22 → 8/29 → 8/1 → 9/12 순으로 표시).
+ * 🌟 [수정] 추천하기 탭 검색결과 "없음" 문구 개선 — 실제로는 검색이 고장난 게 아니라 투표 자격(베타/알파/
+ *    협력게임 제외, 쿨다운, 이미확정, 월간 실플레이 2명 이상 등) 조건을 하나라도 못 채워서 안 뜨는 거라,
+ *    그냥 "검색 결과가 없습니다"만 뜨면 오작동처럼 보임 — 이유를 설명하는 문구로 교체.
  */
 Boako.Tournament = {
     State: {
@@ -498,7 +501,10 @@ Boako.Tournament.Vote = {
             return;
         }
         if (!data || data.length === 0) {
-            grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 font-bold text-sm">검색 결과가 없습니다.</div>`;
+            const emptyMsg = search
+                ? `"${search}"는 지금 투표할 수 없어요.<br><span style="font-weight:600; color:#cbd5e1;">베타/알파/협력 게임이거나, 최근 개최돼 쿨다운 중이거나, 이미 다음 회차로 확정됐거나,<br>월간(30분 초과) 게임인데 아직 실제 플레이 기록(서로 다른 2명 이상)이 부족할 수 있어요.</span>`
+                : `지금 투표 가능한 후보가 없습니다.<br><span style="font-weight:600; color:#cbd5e1;">쿨다운 중이거나 이미 확정된 게임을 빼면 남는 후보가 없는 상태예요.</span>`;
+            grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 font-bold text-sm leading-relaxed">${emptyMsg}</div>`;
             return;
         }
 
