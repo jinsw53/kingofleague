@@ -22,6 +22,7 @@
  *    medium처럼 이미지를 카드 상단 풀폭으로 깔고(높이만 더 키움) 텍스트를 아래로 배치.
  * 🌟 [신규] 필러로 나오는 랜덤 게임 소개 카드 — bga_url 있으면 클릭 시 그 게임의 실제 BGA 페이지가
  *    새 탭으로 열리도록 함 (renderSupplementFiller / renderSupplementPadCard에 externalUrl 지원 추가).
+ * 🌟 [수정] 랜덤 게임 소개 카드의 인원수 표기 — 최소/최대 인원이 같으면 "2-2인"이 아니라 "2인"으로 깔끔하게 표시.
  */
 Boako.NewsFeed = {
     items: [],
@@ -206,7 +207,8 @@ Boako.NewsFeed = {
                         .range(offset, offset);
                     if (data && data[0]) {
                         const g = data[0];
-                        pool.push({ title: `🎲 ${g.game_name} · ${g.min_players}-${g.max_players}인 · ${g.playtime}분`, image: g.image_url, icon: '🎲', externalUrl: g.bga_url || null });
+                        const playerLabel = g.min_players === g.max_players ? `${g.min_players}인` : `${g.min_players}-${g.max_players}인`;
+                        pool.push({ title: `🎲 ${g.game_name} · ${playerLabel} · ${g.playtime}분`, image: g.image_url, icon: '🎲', externalUrl: g.bga_url || null });
                     }
                 }
             }
