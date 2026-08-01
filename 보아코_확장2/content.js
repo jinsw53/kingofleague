@@ -956,18 +956,51 @@ function setupSeeMoreButtonObserver() {
 // [임시 디버그용] 라이브 게임 종료 시점에 실제로 어떤 DOM 변화가 일어나는지
 // 확인하기 위한 무필터 추적 도구.
 // 콘솔에서 boakoStartDebug()를 실행하면 그때부터 모든 mutation을 그대로 찍고,
-// boakoStopDebug()로 끌 수 있음. 원인 파악 끝나면 이 블록 통째로 제거 예정.
+// boakoStopDebug()로 끌 수 있음.
+// boakoSaveDebugLog()를 실행하면 지금까지 쌓인 로그를 .txt 파일로 다운로드함
+// (콘솔 내용을 수동으로 복사/저장할 필요 없음). 원인 파악 끝나면 이 블록 통째로 제거 예정.
 // ========================================================================
 window.boakoDebugMutationsEnabled = false;
+window.boakoDebugLogBuffer = [];
+
+// all_frames:true로 인해 최상위 프레임과 iframe(gameIframe 등) 양쪽에서 각각 실행되므로,
+// 어느 프레임에서 찍힌 로그인지 구분 표시
+const boakoFrameLabel = (window === window.top) ? "top" : "iframe";
 
 window.boakoStartDebug = function () {
   window.boakoDebugMutationsEnabled = true;
-  console.log("[BOAKO 디버그] mutation 추적 시작. 게임 결과가 뜰 때까지 기다려보세요.");
+  window.boakoDebugLogBuffer = [];
+  console.log(`[BOAKO 디버그](${boakoFrameLabel}) mutation 추적 시작. 게임 결과가 뜰 때까지 기다려보세요.`);
 };
 
 window.boakoStopDebug = function () {
   window.boakoDebugMutationsEnabled = false;
-  console.log("[BOAKO 디버그] mutation 추적 중지.");
+  console.log(`[BOAKO 디버그](${boakoFrameLabel}) mutation 추적 중지.`);
+};
+
+// 지금까지 쌓인 디버그 로그를 .txt 파일로 다운로드 (복사/붙여넣기 불필요)
+window.boakoSaveDebugLog = function () {
+  if (window.boakoDebugLogBuffer.length === 0) {
+    console.log(`[BOAKO 디버그](${boakoFrameLabel}) 저장할 로그가 없습니다. boakoStartDebug()를 먼저 실행했는지 확인하세요.`);
+    return;
+  }
+
+  const text = window.boakoDebugLogBuffer.join("\n");
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const fileName = `boako_debug_${boakoFrameLabel}_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`;
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  console.log(`[BOAKO 디버그](${boakoFrameLabel}) ${window.boakoDebugLogBuffer.length}줄을 ${fileName}로 다운로드했습니다.`);
 };
 
 const boakoDebugObserver = new MutationObserver((mutations) => {
@@ -976,32 +1009,22 @@ const boakoDebugObserver = new MutationObserver((mutations) => {
   mutations.forEach((mutation) => {
     if (mutation.type === "attributes") {
       const t = mutation.target;
-      console.log(
-        "[BOAKO 디버그][attributes]",
-        "attr=" + mutation.attributeName,
-        "tag=" + t.tagName,
-        "id=" + t.id,
-        "class=" + (t.className || "")
-      );
+      const line = `[BOAKO 디버그](${boakoFrameLabel})[attributes] attr=${mutation.attributeName} tag=${t.tagName} id=${t.id} class=${t.className || ""}`;
+      console.log(line);
+      window.boakoDebugLogBuffer.push(line);
     } else if (mutation.type === "childList") {
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          console.log(
-            "[BOAKO 디버그][added]",
-            "tag=" + node.tagName,
-            "id=" + node.id,
-            "class=" + (node.className || "")
-          );
+          const line = `[BOAKO 디버그](${boakoFrameLabel})[added] tag=${node.tagName} id=${node.id} class=${node.className || ""}`;
+          console.log(line);
+          window.boakoDebugLogBuffer.push(line);
         }
       });
       mutation.removedNodes.forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          console.log(
-            "[BOAKO 디버그][removed]",
-            "tag=" + node.tagName,
-            "id=" + node.id,
-            "class=" + (node.className || "")
-          );
+          const line = `[BOAKO 디버그](${boakoFrameLabel})[removed] tag=${node.tagName} id=${node.id} class=${node.className || ""}`;
+          console.log(line);
+          window.boakoDebugLogBuffer.push(line);
         }
       });
     }
