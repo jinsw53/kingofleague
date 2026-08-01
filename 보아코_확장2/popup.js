@@ -8,4 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 새 탭으로 아카이브 열기
     chrome.tabs.create({ url: archiveUrl });
   });
+
+  // manifest.json의 version을 그대로 읽어서 표시 (버전 하드코딩 방지)
+  const versionFooter = document.getElementById('version-footer');
+  if (versionFooter && chrome.runtime && chrome.runtime.getManifest) {
+    const manifestVersion = chrome.runtime.getManifest().version;
+    versionFooter.textContent = `버전 ${manifestVersion}`;
+  }
 });
