@@ -962,6 +962,27 @@ const gameResultObserver = new MutationObserver((mutations) => {
           console.log("[확인] 'game_result_panel'이 새로 추가됨");
           addSaveButtons();
         }
+
+        // 라이브 게임 페이지: game_result_panel 자리에 pagesection_gameresult가
+        // 통째로 새 노드로 추가되는 경우 감지 (속성 변경이 아니라 노드 자체 교체이므로 여기서 잡아야 함)
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const pagesectionNode =
+            node.id === "pagesection_gameresult"
+              ? node
+              : node.querySelector?.("#pagesection_gameresult");
+          if (pagesectionNode) {
+            console.log("[확인] 라이브 게임 종료 감지 (pagesection_gameresult 추가됨) - 자동저장 버튼 추가 시도");
+            addLiveSaveButton();
+          }
+        }
+      });
+
+      // game_result_panel 자체가 통째로 제거되는 경우도 같은 시점의 신호로 사용
+      mutation.removedNodes.forEach((node) => {
+        if (node.id === "game_result_panel") {
+          console.log("[확인] 라이브 게임 종료 감지 ('game_result_panel' 제거됨) - 자동저장 버튼 추가 시도");
+          addLiveSaveButton();
+        }
       });
     }
     // 2) 속성 변경 감지 (예: style, class) - 버튼이 없을 때만 실행
@@ -2084,7 +2105,7 @@ function extractGameData(gameResult) {
 // 기존 정적 table/tableview 페이지 로직(addSaveButtons 등)은 건드리지 않음.
 // ========================================================================
 
-function addLiveSaveButton() {
+function addLiveSaveButton(retryCount = 0) {
   // 라이브 게임 URL에서만 동작 (정적 table/tableview 페이지는 addSaveButtons()가 담당)
   const currentUrl = window.location.href;
   if (!/^https:\/\/boardgamearena\.com\/\d+\/\w+\?table=\d+/.test(currentUrl)) {
@@ -2098,7 +2119,12 @@ function addLiveSaveButton() {
 
   const resultTitle = document.querySelector('#pagesection_gameresult h3');
   if (!resultTitle) {
-    console.log('[정보] 라이브 결과 제목 요소를 아직 못 찾음 - 대기');
+    // pagesection_gameresult 자체는 감지됐지만 내부 h3가 아직 안 그려졌을 수 있어 재시도
+    if (retryCount < MAX_RETRY_COUNT) {
+      setTimeout(() => addLiveSaveButton(retryCount + 1), 125);
+    } else {
+      console.log('[정보] 라이브 결과 제목 요소를 찾지 못해 포기');
+    }
     return;
   }
 
