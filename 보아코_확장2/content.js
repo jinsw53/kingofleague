@@ -2420,11 +2420,6 @@ function extractLiveGameDurationMinutes() {
   return null;
 }
 
-// 라이브 게임 페이지용 결과 데이터 추출.
-// extractGameData()와 동일한 형태(gameId, gameName, players, winner, gameType, date,
-// tournamentType, gameCreationTime)를 반환하되, 라이브 페이지엔 #table_name이 없고
-// URL도 "table?table=" 형태가 아니라서 BGA가 페이지에 심어둔 전역 데이터를 사용한다.
-// (참고: 이 파일 다른 곳에서도 gameui.current_player_name 같은 BGA 전역변수를 이미 사용 중)
 function extractLiveGameData() {
   const gameResult = document.querySelector("#game_result");
   if (!gameResult) return null;
@@ -2451,20 +2446,38 @@ function extractLiveGameData() {
   if (players.length === 0) return null;
 
   // 게임명: 라이브 페이지엔 #table_name도 없고 bgaGameData/g_gamename 전역변수도
-  // 이 프레임에는 존재하지 않는 것으로 확인됨. 대신 document.title이
-  // "게임 종료 • 럭키 넘버스 • Board Game Arena" 형태로 게임명을 항상 포함하고
-  // 있어서, 이걸 파싱해서 사용한다.
+  // 이 프레임에는 존재하지 않는 것으로 확인됨.
+  // 가장 안정적인 소스는 최상위 문서의 og:title 메타태그
+  // ("Board Game Arena 에서 럭키 넘버스 온라인으로 플레이하세요" 형태, 게임 상태와 무관하게 고정 문구).
+  // 이건 <head>에 있으므로 iframe 안에서 실행 중이면 window.top.document로 접근해야 함.
+  // og:title을 못 찾으면 document.title("게임 종료 • 럭키 넘버스 • Board Game Arena")을 보조로 파싱.
   let gameName = "게임명 오류";
   if (typeof bgaGameData !== "undefined" && bgaGameData && bgaGameData.gameNameDisplayed) {
     gameName = bgaGameData.gameNameDisplayed;
   } else if (typeof g_gamename !== "undefined" && g_gamename) {
     gameName = g_gamename;
   } else {
-    const titleParts = document.title.split("•").map((p) => p.trim()).filter(Boolean);
-    if (titleParts.length >= 2 && titleParts[titleParts.length - 1] === "Board Game Arena") {
-      gameName = titleParts[titleParts.length - 2];
-    } else if (titleParts.length >= 1) {
-      gameName = titleParts[titleParts.length - 1];
+    let ogTitleContent = null;
+    try {
+      const topDoc = (window.top && window.top.document) ? window.top.document : document;
+      ogTitleContent = topDoc.querySelector('meta[property="og:title"]')?.content || null;
+    } catch (e) {
+      ogTitleContent = null; // cross-origin 등으로 접근 불가하면 아래 보조 방법으로 넘어감
+    }
+
+    const ogMatch = ogTitleContent
+      ? ogTitleContent.match(/에서\s+(.+?)\s+온라인으로/)
+      : null;
+
+    if (ogMatch && ogMatch[1]) {
+      gameName = ogMatch[1];
+    } else {
+      const titleParts = document.title.split("•").map((p) => p.trim()).filter(Boolean);
+      if (titleParts.length >= 2 && titleParts[titleParts.length - 1] === "Board Game Arena") {
+        gameName = titleParts[titleParts.length - 2];
+      } else if (titleParts.length >= 1) {
+        gameName = titleParts[titleParts.length - 1];
+      }
     }
   }
 
@@ -2480,18 +2493,13 @@ function extractLiveGameData() {
 
   const formattedDateTime = getKSTDateTime();
   const tournamentType = extractTournamentInfo();
-
-  // 게임 생성(시작) 시각: 라이브 페이지엔 "N분 전에 생성됨" 같은 문구 자체가 없어서,
+  // 게임 생성(시작) 시각: 라이브 결과 영역엔 "생성" 관련 텍스트 자체가 없는 것으로 확인됨.
   // 대신 통계 영역의 "게임 시간"(예: "5 분")을 찾아 저장 시점에서 역산한다.
-  // 결과 화면을 실시간으로 보고 있다는 것 자체가 실시간 대전이었다는 뜻이라
-  // 이 역산이 대체로 맞는다. 통계를 못 찾으면(예: 비프리미엄 회원 등) null을 그대로
-  // 보내지 않고 저장 시점 현재 시각으로 대체한다 (null을 보내면 서버에서 이상한
-  // 기본값(예: 1998년)으로 잘못 변환되는 문제가 있었음).
+  // 못 찾으면(비프리미엄 등으로 통계가 안 보이는 경우) 저장 시점 현재 시각(KST)으로 대체.
   const durationMinutes = extractLiveGameDurationMinutes();
   const gameCreationTime = durationMinutes !== null
     ? getKSTDateTimeFromDate(new Date(Date.now() - durationMinutes * 60 * 1000))
     : formattedDateTime;
-
   const gameType = determineGameType(players);
 
   let winner;
@@ -3408,11 +3416,23 @@ function resetButton(buttonElement, originalText) {
 }
 
 // 팝업 메시지를 시스템 대화창으로 표시하는 함수
+// iframe(라이브 게임 페이지) 안에서 호출돼도 항상 최상위 화면 기준으로 뜨도록
+// window.top.document를 사용 (최상위 프레임에서 호출되면 window.top === window라 기존과 동일하게 동작)
 function showPopupMessage(message, isSuccess = true, buttonElement = null) {
-  let popup = document.createElement("div");
+  let targetDocument = document;
+  try {
+    if (window.top && window.top.document) {
+      targetDocument = window.top.document;
+    }
+  } catch (e) {
+    // cross-origin 등으로 접근 불가하면 현재 문서에 표시 (기존 동작 유지)
+    targetDocument = document;
+  }
+
+  let popup = targetDocument.createElement("div");
   popup.classList.add("z_popup");
   popup.innerText = message;
-  document.body.appendChild(popup);
+  targetDocument.body.appendChild(popup);
   setTimeout(() => {
     popup.remove();
   }, 3500);
@@ -4395,24 +4415,6 @@ function getKSTDateTime() {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
-// 주어진 Date를 KST datetime 문자열(YYYY-MM-DD HH:MM:SS)로 변환하는 함수
-// (getKSTDateTime()은 항상 "지금"만 다루므로, 임의 시각을 변환해야 하는
-// 라이브 게임 시작시각 역산용으로 별도 추가)
-function getKSTDateTimeFromDate(date) {
-  const kstOffset = 9 * 60; // KST는 UTC+9
-  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
-  const kst = new Date(utc + (kstOffset * 60000));
-
-  const year = kst.getFullYear();
-  const month = String(kst.getMonth() + 1).padStart(2, '0');
-  const day = String(kst.getDate()).padStart(2, '0');
-  const hours = String(kst.getHours()).padStart(2, '0');
-  const minutes = String(kst.getMinutes()).padStart(2, '0');
-  const seconds = String(kst.getSeconds()).padStart(2, '0');
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
 // KST 날짜만 반환하는 함수 (YYYY-MM-DD 형식)
 function getKSTDate() {
   const now = new Date();
@@ -4438,6 +4440,24 @@ function getKSTDateFromDate(date) {
   const day = String(kst.getDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
+}
+
+// 주어진 Date를 KST datetime 문자열(YYYY-MM-DD HH:MM:SS)로 변환하는 함수
+// (getKSTDateTime()은 항상 "지금"만 다루므로, 임의 시각을 변환해야 하는
+// 라이브 게임 시작시각 역산용으로 별도 추가)
+function getKSTDateTimeFromDate(date) {
+  const kstOffset = 9 * 60; // KST는 UTC+9
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const kst = new Date(utc + (kstOffset * 60000));
+
+  const year = kst.getFullYear();
+  const month = String(kst.getMonth() + 1).padStart(2, '0');
+  const day = String(kst.getDate()).padStart(2, '0');
+  const hours = String(kst.getHours()).padStart(2, '0');
+  const minutes = String(kst.getMinutes()).padStart(2, '0');
+  const seconds = String(kst.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 //토너먼트 시작날짜를 날짜 형태로 변환하는 함수 
