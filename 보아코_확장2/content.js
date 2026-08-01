@@ -952,6 +952,71 @@ function setupSeeMoreButtonObserver() {
   window.boakoSeeMoreButtonObserver = buttonObserver;
 }
 
+// ========================================================================
+// [임시 디버그용] 라이브 게임 종료 시점에 실제로 어떤 DOM 변화가 일어나는지
+// 확인하기 위한 무필터 추적 도구.
+// 콘솔에서 boakoStartDebug()를 실행하면 그때부터 모든 mutation을 그대로 찍고,
+// boakoStopDebug()로 끌 수 있음. 원인 파악 끝나면 이 블록 통째로 제거 예정.
+// ========================================================================
+window.boakoDebugMutationsEnabled = false;
+
+window.boakoStartDebug = function () {
+  window.boakoDebugMutationsEnabled = true;
+  console.log("[BOAKO 디버그] mutation 추적 시작. 게임 결과가 뜰 때까지 기다려보세요.");
+};
+
+window.boakoStopDebug = function () {
+  window.boakoDebugMutationsEnabled = false;
+  console.log("[BOAKO 디버그] mutation 추적 중지.");
+};
+
+const boakoDebugObserver = new MutationObserver((mutations) => {
+  if (!window.boakoDebugMutationsEnabled) return;
+
+  mutations.forEach((mutation) => {
+    if (mutation.type === "attributes") {
+      const t = mutation.target;
+      console.log(
+        "[BOAKO 디버그][attributes]",
+        "attr=" + mutation.attributeName,
+        "tag=" + t.tagName,
+        "id=" + t.id,
+        "class=" + (t.className || "")
+      );
+    } else if (mutation.type === "childList") {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          console.log(
+            "[BOAKO 디버그][added]",
+            "tag=" + node.tagName,
+            "id=" + node.id,
+            "class=" + (node.className || "")
+          );
+        }
+      });
+      mutation.removedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          console.log(
+            "[BOAKO 디버그][removed]",
+            "tag=" + node.tagName,
+            "id=" + node.id,
+            "class=" + (node.className || "")
+          );
+        }
+      });
+    }
+  });
+});
+
+boakoDebugObserver.observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+});
+// ========================================================================
+// [임시 디버그용 끝]
+// ========================================================================
+
 // MutationObserver를 사용하여 #game_result_panel이 동적으로 추가될 때 감지
 const gameResultObserver = new MutationObserver((mutations) => {
   mutations.forEach((mutation) => {
