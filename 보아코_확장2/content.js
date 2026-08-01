@@ -179,6 +179,18 @@ function addCustomStyles() {
         top: -11px;
         border: 0;
     }
+    /* 라이브 게임 페이지 전용 버튼 스타일 - 정적 페이지의 절대좌표 배치(left:120px 등)가
+       라이브 페이지 레이아웃과 안 맞아서 버튼이 늘어져 보이는 문제 수정.
+       .bga-save-button 자체는 정적 페이지가 계속 쓰므로 건드리지 않고, 새 클래스를
+       같이 붙여서 여기서만 덮어씀. */
+    .boako-live-save-button {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        display: inline-block;
+        margin-left: 12px;
+        vertical-align: middle;
+    }
     .disabled-button {
         background: #a5a5a5 !important;
         pointer-events: none;
@@ -2223,6 +2235,7 @@ function addLiveSaveButton(retryCount = 0) {
   button.classList.add(
     "bga-save-button",
     "boako-save-button", // 중복 실행 방지용 클래스 (addSaveButtons()와 공유)
+    "boako-live-save-button", // 라이브 페이지 전용 배치 스타일
     "bgabutton",
     "bgabutton_blue",
     "disabled-button"
@@ -2380,6 +2393,33 @@ function updateLiveButtonState(button) {
   }
 }
 
+// 라이브 게임 페이지의 통계 영역(#table_stats)에서 "게임 시간"(전체 소요시간, 예: "5 분")을
+// 찾아서 분 단위 숫자로 반환. 못 찾으면 null.
+// (참고: 통계 영역이 프리미엄 회원에게만 보일 가능성이 있어 방어적으로 null 허용)
+function extractLiveGameDurationMinutes() {
+  const rows = document.querySelectorAll('#table_stats .row-data');
+  for (const row of rows) {
+    const label = row.querySelector('.row-label');
+    if (!label || label.getAttribute('title') !== '게임 시간') {
+      continue;
+    }
+    const valueEl = row.querySelector('.row-value');
+    const text = valueEl ? valueEl.textContent.replace(/\u00a0/g, ' ').trim() : '';
+
+    let totalMinutes = 0;
+    const hourMatch = text.match(/(\d+)\s*시간/);
+    const minMatch = text.match(/(\d+)\s*분/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    if (!hourMatch && !minMatch) {
+      const onlyNum = text.match(/(\d+)/);
+      if (onlyNum) totalMinutes = parseInt(onlyNum[1], 10);
+    }
+    return totalMinutes > 0 ? totalMinutes : null;
+  }
+  return null;
+}
+
 // 라이브 게임 페이지용 결과 데이터 추출.
 // extractGameData()와 동일한 형태(gameId, gameName, players, winner, gameType, date,
 // tournamentType, gameCreationTime)를 반환하되, 라이브 페이지엔 #table_name이 없고
@@ -2410,12 +2450,22 @@ function extractLiveGameData() {
 
   if (players.length === 0) return null;
 
-  // 게임명: 라이브 페이지엔 #table_name이 없어서 BGA 전역 데이터 사용
+  // 게임명: 라이브 페이지엔 #table_name도 없고 bgaGameData/g_gamename 전역변수도
+  // 이 프레임에는 존재하지 않는 것으로 확인됨. 대신 document.title이
+  // "게임 종료 • 럭키 넘버스 • Board Game Arena" 형태로 게임명을 항상 포함하고
+  // 있어서, 이걸 파싱해서 사용한다.
   let gameName = "게임명 오류";
   if (typeof bgaGameData !== "undefined" && bgaGameData && bgaGameData.gameNameDisplayed) {
     gameName = bgaGameData.gameNameDisplayed;
   } else if (typeof g_gamename !== "undefined" && g_gamename) {
     gameName = g_gamename;
+  } else {
+    const titleParts = document.title.split("•").map((p) => p.trim()).filter(Boolean);
+    if (titleParts.length >= 2 && titleParts[titleParts.length - 1] === "Board Game Arena") {
+      gameName = titleParts[titleParts.length - 2];
+    } else if (titleParts.length >= 1) {
+      gameName = titleParts[titleParts.length - 1];
+    }
   }
 
   // 게임ID: 라이브 URL엔 "table?table=" 리터럴이 없어서(예: /892216718/arknova?table=892216718)
@@ -2430,7 +2480,18 @@ function extractLiveGameData() {
 
   const formattedDateTime = getKSTDateTime();
   const tournamentType = extractTournamentInfo();
-  const gameCreationTime = extractGameCreationTime();
+
+  // 게임 생성(시작) 시각: 라이브 페이지엔 "N분 전에 생성됨" 같은 문구 자체가 없어서,
+  // 대신 통계 영역의 "게임 시간"(예: "5 분")을 찾아 저장 시점에서 역산한다.
+  // 결과 화면을 실시간으로 보고 있다는 것 자체가 실시간 대전이었다는 뜻이라
+  // 이 역산이 대체로 맞는다. 통계를 못 찾으면(예: 비프리미엄 회원 등) null을 그대로
+  // 보내지 않고 저장 시점 현재 시각으로 대체한다 (null을 보내면 서버에서 이상한
+  // 기본값(예: 1998년)으로 잘못 변환되는 문제가 있었음).
+  const durationMinutes = extractLiveGameDurationMinutes();
+  const gameCreationTime = durationMinutes !== null
+    ? getKSTDateTimeFromDate(new Date(Date.now() - durationMinutes * 60 * 1000))
+    : formattedDateTime;
+
   const gameType = determineGameType(players);
 
   let winner;
@@ -4331,6 +4392,24 @@ function getKSTDateTime() {
   const minutes = String(kst.getMinutes()).padStart(2, '0');
   const seconds = String(kst.getSeconds()).padStart(2, '0');
   
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+// 주어진 Date를 KST datetime 문자열(YYYY-MM-DD HH:MM:SS)로 변환하는 함수
+// (getKSTDateTime()은 항상 "지금"만 다루므로, 임의 시각을 변환해야 하는
+// 라이브 게임 시작시각 역산용으로 별도 추가)
+function getKSTDateTimeFromDate(date) {
+  const kstOffset = 9 * 60; // KST는 UTC+9
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const kst = new Date(utc + (kstOffset * 60000));
+
+  const year = kst.getFullYear();
+  const month = String(kst.getMonth() + 1).padStart(2, '0');
+  const day = String(kst.getDate()).padStart(2, '0');
+  const hours = String(kst.getHours()).padStart(2, '0');
+  const minutes = String(kst.getMinutes()).padStart(2, '0');
+  const seconds = String(kst.getSeconds()).padStart(2, '0');
+
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
