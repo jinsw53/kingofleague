@@ -1,6 +1,8 @@
 /**
  * [AUTH] 인증 및 프로필 관리 (최종 통합본 - 데드락 방지 + 메신저 연결 + 상점 지연로딩 + BGA 닉네임 모달 + 🌟팀쳇 고속도로 + 🌟배지 디스플레이 + 🌟커스텀 프로필 사진 + 🌟기록기 설치 가이드 + 🌟공지사항 모달 + 🌟전력분석실 진입 버튼)
  * 온보딩 노출 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
+ * 🌟 [수정] 팀챗 배지가 실제 안 읽은 메시지 수와 무관하게 하드코딩된 'N' 글자만 뜨던 버그 수정 —
+ *    초기 마크업에서 'N' 제거 (team.js Chat.showNotification/clearNotification이 textContent를 채움)
  */
 Boako.Auth = {
     init: async () => {
@@ -179,7 +181,6 @@ Boako.Auth = {
                         💬 팀쳇
                     </button>
                     <div id="team-chat-badge" class="hidden absolute" style="top: -6px; right: -6px; background: #ef4444; color: white; font-size: 10px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        N
                     </div>
                 </div>
 
