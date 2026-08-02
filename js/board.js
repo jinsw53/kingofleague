@@ -13,6 +13,8 @@
  *    목록(loadPosts)에서는 배지를 아예 표시하지 않고 상세페이지(글 본문 + 댓글)에서만 노출하도록 변경.
  * 🌟 [상세페이지 레이아웃 수정] 이름+배지 그룹과 날짜/조회수/수정·삭제 버튼 그룹을 완전히 분리해서
  *    justify-between으로 오른쪽 끝에 고정 — 배지가 몇 개로 늘어나든 날짜/조회수 위치가 안 밀리게 함.
+ * 🌟 [배지 로직 수정] 요청 탭 배지가 공지글까지 "미답변"으로 세던 버그 수정 — loadRequestBadge()에서
+ *    is_notice=false 조건 추가하여 공지글은 댓글 여부와 무관하게 배지 카운트에서 제외.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -383,7 +385,8 @@ Boako.Board = {
                 .select('id')
                 .eq('category', '요청')
                 .eq('is_deleted', false)
-                .eq('is_draft', false);
+                .eq('is_draft', false)
+                .eq('is_notice', false);
 
             const postIds = (posts || []).map(p => p.id);
             const badge = document.getElementById('board-request-badge');
