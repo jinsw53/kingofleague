@@ -2393,6 +2393,11 @@ function updateLiveButtonState(button) {
   }
 }
 
+// 라이브 게임의 gameCreationTime(역산값)을 gameId 기준으로 고정 저장하는 캐시.
+// 자동클릭/재시도/수동 재클릭마다 값이 계속 바뀌면 PHP 서버가 같은 게임을
+// 다른 기록으로 오인할 수 있어서, 게임당 최초 1회 계산한 값을 재사용한다.
+const liveGameCreationTimeCache = {};
+
 // 라이브 게임 페이지의 통계 영역(#table_stats)에서 "게임 시간"(전체 소요시간, 예: "5 분")을
 // 찾아서 분 단위 숫자로 반환. 못 찾으면 null.
 // (참고: 통계 영역이 프리미엄 회원에게만 보일 가능성이 있어 방어적으로 null 허용)
@@ -2496,10 +2501,20 @@ function extractLiveGameData() {
   // 게임 생성(시작) 시각: 라이브 결과 영역엔 "생성" 관련 텍스트 자체가 없는 것으로 확인됨.
   // 대신 통계 영역의 "게임 시간"(예: "5 분")을 찾아 저장 시점에서 역산한다.
   // 못 찾으면(비프리미엄 등으로 통계가 안 보이는 경우) 저장 시점 현재 시각(KST)으로 대체.
-  const durationMinutes = extractLiveGameDurationMinutes();
-  const gameCreationTime = durationMinutes !== null
-    ? getKSTDateTimeFromDate(new Date(Date.now() - durationMinutes * 60 * 1000))
-    : formattedDateTime;
+  //
+  // 중요: 매번 다시 계산(Date.now() 기준)하면 자동클릭 시점과 이후 재시도/수동
+  // 재클릭 시점이 몇 초~몇 분 차이가 나서 값이 계속 달라짐. 히스토리 페이지는
+  // 고정된 문구를 읽어서 항상 같은 값이 나오는 것과 달리, 이 값이 계속 바뀌면
+  // PHP 서버가 같은 게임을 다른 기록으로 오인할 수 있어서, 게임(gameId)당
+  // 최초 1회만 계산하고 이후엔 그 값을 그대로 재사용한다.
+  let gameCreationTime = liveGameCreationTimeCache[gameId];
+  if (!gameCreationTime) {
+    const durationMinutes = extractLiveGameDurationMinutes();
+    gameCreationTime = durationMinutes !== null
+      ? getKSTDateTimeFromDate(new Date(Date.now() - durationMinutes * 60 * 1000))
+      : formattedDateTime;
+    liveGameCreationTimeCache[gameId] = gameCreationTime;
+  }
   const gameType = determineGameType(players);
 
   let winner;
