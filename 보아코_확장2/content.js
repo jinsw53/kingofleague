@@ -2628,6 +2628,15 @@ async function addTournamentRecordButton() {
 
       if (tournamentData && tournamentData.error !== "not_boako" && tournamentData.players?.length > 0) {
         button.innerText = "🏆 기록 저장";
+
+        // 결과가 확인되는 즉시 자동 저장 시도 (버튼이 이미 클릭 가능한 상태로 조립된 경우에만).
+        // onclick이 아직 할당되기 전(최초 1회차 동기 흐름)이면 여기서는 클릭이 무시되므로,
+        // computeAndSetButtonLabel() 최초 호출이 끝난 직후에도 한 번 더 확인함.
+        if (button.onclick && button.dataset.autoclickAttempted !== 'true') {
+          button.dataset.autoclickAttempted = 'true';
+          console.log("[토너먼트 버튼] 결과 확인됨 - 자동 클릭 실행");
+          button.click();
+        }
         return; // 결과 찾았으면 재시도 종료
       }
 
@@ -2649,6 +2658,18 @@ async function addTournamentRecordButton() {
 
   console.log("✅ 버튼을 다시 편안한 오른쪽 아래로 보냈습니다.");
 
+  // 최초 라벨 계산(위 await)이 끝난 시점에 이미 "🏆 기록 저장" 상태였다면,
+  // 그때는 onclick이 아직 없어서 자동 클릭이 무시됐을 수 있으므로 여기서 한 번 더 확인.
+  setTimeout(() => {
+    if (
+      button.innerText === "🏆 기록 저장" &&
+      button.dataset.autoclickAttempted !== 'true'
+    ) {
+      button.dataset.autoclickAttempted = 'true';
+      console.log("[토너먼트 버튼] 결과 확인됨(최초 확인) - 자동 클릭 실행");
+      button.click();
+    }
+  }, 0);
 
   button.onclick = async () => {
     button.dataset.clicked = 'true'; // 🌟 클릭했으면 라벨 재계산(재시도) 중단
