@@ -1,5 +1,7 @@
 /**
  * [TEAM] 팀 관리 (창단, 정보수정, 멤버관리, 밴 투표, 작전판, 채팅 등)
+ * 🌟 [수정] 팀챗 배지가 실제 안 읽은 메시지 수와 무관하게 하드코딩된 'N' 글자만 뜨던 버그 수정 —
+ *    Chat.unreadCount로 실제 개수를 세서 showNotification/clearNotification에서 textContent에 반영
  */
 Boako.Team = {
     syncStatus: async () => {
@@ -1455,9 +1457,12 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
     Chat: {
         channel: null,
+        unreadCount: 0, // 🌟 [신규] 안 읽은 메시지 개수 — 배지에 실제 숫자를 표시하기 위해 추가
         showNotification: () => {
             const badge = document.getElementById('team-chat-badge');
             if (badge) {
+                Boako.Team.Chat.unreadCount += 1;
+                badge.textContent = Boako.Team.Chat.unreadCount;
                 badge.classList.remove('hidden');
                 badge.style.display = 'flex';
             }
@@ -1465,6 +1470,8 @@ const isLeader = Boako.state.team.type === 'LEADER';
         clearNotification: () => {
             const badge = document.getElementById('team-chat-badge');
             if (badge) {
+                Boako.Team.Chat.unreadCount = 0;
+                badge.textContent = '';
                 badge.classList.add('hidden');
                 badge.style.display = 'none';
             }
