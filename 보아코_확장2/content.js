@@ -3306,6 +3306,8 @@ function sendToBackground(data, buttonElement, originalButtonText) {
   const gameKey = `${data.nickname}-${data.gameName}-${data.gameId}`;
   if (processedGameRecords.has(gameKey)) {
     console.log("[게임 기록] 이미 처리된 게임 기록:", gameKey);
+    resetButton(buttonElement, originalButtonText);
+    showPopupMessage("이미 저장된 게임 기록입니다.", true, buttonElement);
     return;
   }
 console.log("[게임 기록] 쌩쌩한 신규 데이터 발견! 슈파베이스로 출발합니다.");
