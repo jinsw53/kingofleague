@@ -1,6 +1,15 @@
 // 중복 로그 방지를 위한 변수들
 let loggedMessages = new Set();
 let processedFirstWins = new Set();
+// 🌟 [신규] 페이지 로드 시 이전 세션에서 이미 처리 완료된(=Supabase까지 도달 확인된) 첫승 기록을
+// chrome.storage.local에서 불러와 processedFirstWins에 미리 채워둠.
+// 기존엔 이 Set이 메모리뿐이라 새로고침/브라우저 재시작마다 초기화돼서, 알림 목록에 남아있는
+// 오래된 "첫 승" 게시물이 방문할 때마다 계속 신규로 재감지되어 반복 전송되는 문제가 있었음.
+if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+  chrome.storage.local.get('processedFirstWinKeys', (result) => {
+    (result.processedFirstWinKeys || []).forEach(key => processedFirstWins.add(key));
+  });
+}
 let processedGameRecords = new Set();
 let processedTournamentRecords = new Set();
 let lastClearTime = Date.now();
@@ -4414,6 +4423,12 @@ function saveFirstWinRecord(firstWinInfo) {
     return;
   }
 
+  // 🌟 [신규] 동시다발 폭주 방지: 응답을 기다리지 않고 요청을 보내는 "이 시점"에 즉시 임시 마킹.
+  // (여러 감지 경로가 거의 동시에 같은 첫승을 잡아도, 자바스크립트는 싱글 스레드라 이 마킹 이후엔
+  // 함수 맨 위의 중복 체크에 바로 걸려서 추가 요청이 안 나감)
+  // 응답 결과 확인 후 실패로 판명되면 아래에서 다시 지워서 재시도가 가능하도록 함.
+  processedFirstWins.add(gameKey);
+
   // 크롬 익스텐션을 통해 서버에 첫승 저장 요청
   try {
     chrome.runtime.sendMessage({
@@ -4422,23 +4437,38 @@ function saveFirstWinRecord(firstWinInfo) {
     }, (response) => {
       if (chrome.runtime.lastError) {
         console.log("[첫승 저장] 백그라운드 연결 실패:", chrome.runtime.lastError.message);
+        processedFirstWins.delete(gameKey); // 재시도 가능하도록 임시 마킹 롤백
         return;
       }
       
-      if (response && response.success) {
+      // 🌟 [수정] "PHP가 success를 줬는지"가 아니라 "실제로 Supabase까지 도달이 확인됐는지"
+      // (response.supabaseSaved)를 기준으로 영구 마킹함. PHP는 중복이어도 거의 항상 success:true를
+      // 주기 때문에 그 응답만 믿고 마킹하면, Supabase 전송이 그 이후 조용히 실패해도 영구 기록엔
+      // "보냈음"으로 남아 재시도가 막히는 문제가 있었음.
+      if (response && response.supabaseSaved) {
         console.log("[첫승 저장] 성공:", response.message);
         
-        // 처리 완료된 첫승으로 표시
-        processedFirstWins.add(gameKey);
+        // 영구 저장 (메모리 마킹은 위에서 이미 됨)
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          chrome.storage.local.get('processedFirstWinKeys', (result) => {
+            const stored = result.processedFirstWinKeys || [];
+            if (!stored.includes(gameKey)) {
+              stored.push(gameKey);
+              chrome.storage.local.set({ processedFirstWinKeys: stored });
+            }
+          });
+        }
         
         // 새로운 첫승 달성 시 메시지 표시(아직)
 
       } else {
-        console.log("[첫승 저장] 실패:", response?.error || "알 수 없는 오류");
+        console.log("[첫승 저장] 실패 (재시도 가능하도록 마킹 롤백):", response?.error || "알 수 없는 오류");
+        processedFirstWins.delete(gameKey); // 재시도 가능하도록 임시 마킹 롤백
       }
     });
   } catch (error) {
     console.log("[첫승 저장] chrome.runtime.sendMessage 호출 실패:", error);
+    processedFirstWins.delete(gameKey); // 재시도 가능하도록 임시 마킹 롤백
   }
 }
 
