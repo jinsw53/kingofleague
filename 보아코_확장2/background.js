@@ -88,16 +88,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             body: JSON.stringify(message.data)
         })
         .then(response => response.json())
-        .then(data => {
+        .then(async (data) => {
             console.log("📌 첫승 저장 응답:", data);
 
-            // 👊 [수정] '이미' 단어 검열 로직 적용
+            // 👊 [기존 유지] '이미' 단어 검열 로직 적용
             const serverMessage = data.message || "";
             const isDuplicate = serverMessage.includes("이미");
 
             if (data.success === true && !isDuplicate) {
-                console.log("✅ 신규 첫승 기록 확인! 슈파베이스 전송!");
-                pushToSupabase("FIRST_WIN", message.data);
+                // 🌟 [추가] PHP의 '이미' 판정이 부실해서 같은 첫승이 계속 신규로 통과되는 문제가 있어,
+                // Supabase로 push하기 직전에 raw_ingest_buffer에 이미 같은 (닉네임, 게임명) 조합의
+                // FIRST_WIN이 있는지 한 번 더 확인함 (fn_check_first_win_ingested RPC, SECURITY DEFINER).
+                // 확인 자체가 실패하면 중복 위험을 감수하지 않고 안전하게 전송을 취소함.
+                try {
+                    const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_check_first_win_ingested`, {
+                        method: "POST",
+                        headers: {
+                            "apikey": SUPABASE_KEY,
+                            "Authorization": `Bearer ${SUPABASE_KEY}`,
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            p_nickname: message.data.playerNickname,
+                            p_game_name: message.data.gameName
+                        })
+                    });
+                    const alreadyIngested = await checkRes.json();
+
+                    if (alreadyIngested === true) {
+                        console.log("🚫 [중복 컷] Supabase에 이미 같은 첫승이 존재함. 슈파베이스 전송 취소!");
+                    } else {
+                        console.log("✅ 신규 첫승 기록 확인! 슈파베이스 전송!");
+                        pushToSupabase("FIRST_WIN", message.data);
+                    }
+                } catch (checkErr) {
+                    console.error("❌ [Supabase] 첫승 중복 확인 요청 실패, 안전하게 전송 취소:", checkErr);
+                }
             } else if (isDuplicate) {
                 console.log("🚫 [중복 컷] 첫승 응답에 '이미' 포함. 슈파베이스 전송 취소!");
             }
