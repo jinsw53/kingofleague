@@ -1,7 +1,8 @@
 /**
  * [TEAM] 팀 관리 (창단, 정보수정, 멤버관리, 밴 투표, 작전판, 채팅 등)
- * 🌟 [수정] 팀챗 배지가 실제 안 읽은 메시지 수와 무관하게 하드코딩된 'N' 글자만 뜨던 버그 수정 —
- *    Chat.unreadCount로 실제 개수를 세서 showNotification/clearNotification에서 textContent에 반영
+ * 🌟 [수정] 팀챗 배지가 하드코딩된 'N' 글자만 뜨던 버그 수정 — Chat.unreadCount로 실제 개수 표시
+ * 🌟 [신규] 팀챗에 카카오톡 스타일 "안읽음 인원수" 추가 — team_chat_reads 테이블 기반,
+ *    채팅방 입장 시점 기준으로 읽음 처리, 내 메시지 옆에 아직 안 읽은 팀원 수 표시
  */
 Boako.Team = {
     syncStatus: async () => {
@@ -1457,7 +1458,10 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
     Chat: {
         channel: null,
+        readsChannel: null,
         unreadCount: 0, // 🌟 [신규] 안 읽은 메시지 개수 — 배지에 실제 숫자를 표시하기 위해 추가
+        activeMemberCount: 0, // 🌟 [신규] 안읽음 인원수 계산에 필요한 팀 전체 활성 인원 수
+        readRows: [], // 🌟 [신규] { user_id, last_read_message_id }[] — 팀원별 읽음 상태
         showNotification: () => {
             const badge = document.getElementById('team-chat-badge');
             if (badge) {
@@ -1476,6 +1480,60 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 badge.style.display = 'none';
             }
         },
+
+        // 🌟 [신규] 팀 전체 활성 인원 수 (안읽음 계산의 분모)
+        fetchActiveMemberCount: async (teamId) => {
+            const { count } = await Boako.db
+                .from('team_members')
+                .select('id', { count: 'exact', head: true })
+                .eq('team_id', teamId)
+                .eq('is_active', true);
+            Boako.Team.Chat.activeMemberCount = count || 0;
+        },
+
+        // 🌟 [신규] 팀원별 읽음 상태 전체를 다시 가져와 State에 채움
+        fetchReadRows: async (teamId) => {
+            const { data } = await Boako.db
+                .from('team_chat_reads')
+                .select('user_id, last_read_message_id')
+                .eq('team_id', teamId);
+            Boako.Team.Chat.readRows = data || [];
+        },
+
+        // 🌟 [신규] 채팅방 입장(또는 방을 보고 있는 동안 새 메시지 수신) 시 "여기까지 읽었다" 갱신 —
+        // 카카오톡처럼 스크롤 위치가 아니라 "입장 시점"에 그때까지의 메시지를 한 번에 읽음 처리
+        markRead: async (teamId) => {
+            try {
+                const { error } = await Boako.db.rpc('fn_mark_team_chat_read', { p_team_id: teamId });
+                if (error) throw error;
+                await Boako.Team.Chat.fetchReadRows(teamId);
+                Boako.Team.Chat.updateAllUnreadBadges();
+            } catch (err) {
+                console.error('읽음 처리 실패:', err);
+            }
+        },
+
+        // 🌟 [신규] 특정 메시지 id 기준 "아직 안 읽은 사람 수" 계산 (발신자 본인 제외)
+        computeUnreadCount: (msgId, senderId) => {
+            const others = (Boako.Team.Chat.readRows || []).filter(r => r.user_id !== senderId);
+            const readCount = others.filter(r => r.last_read_message_id != null && r.last_read_message_id >= msgId).length;
+            const totalOthers = Math.max(0, (Boako.Team.Chat.activeMemberCount || 1) - 1);
+            return Math.max(0, totalOthers - readCount);
+        },
+
+        // 🌟 [신규] 화면에 이미 그려진 내 메시지들의 안읽음 숫자를 전부 다시 계산해서 갱신
+        updateAllUnreadBadges: () => {
+            document.querySelectorAll('.own-msg-wrap').forEach(el => {
+                const msgId = Number(el.dataset.msgId);
+                const senderId = el.dataset.senderId;
+                if (!msgId) return;
+                const badge = el.querySelector('.own-msg-unread');
+                if (!badge) return;
+                const unread = Boako.Team.Chat.computeUnreadCount(msgId, senderId);
+                badge.textContent = unread > 0 ? unread : '';
+            });
+        },
+
         init: async (containerId) => {
             if (!Boako.state.team) return;
             const teamId = Boako.state.team.info.id;
@@ -1494,6 +1552,10 @@ const isLeader = Boako.state.team.type === 'LEADER';
             `;
             document.getElementById(containerId).innerHTML = chatHtml;
 
+            // 🌟 안읽음 계산에 필요한 값들 먼저 확보
+            await Boako.Team.Chat.fetchActiveMemberCount(teamId);
+            await Boako.Team.Chat.fetchReadRows(teamId);
+
             try {
                 const { data: messages, error } = await Boako.db
                     .from('team_chats')
@@ -1510,7 +1572,11 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 }
             } catch (err) { console.error("채팅 로드 실패:", err); }
 
+            // 🌟 입장 = 지금까지의 메시지를 전부 읽음 처리 (카카오톡 방식)
+            await Boako.Team.Chat.markRead(teamId);
+
             if (Boako.Team.Chat.channel) Boako.db.removeChannel(Boako.Team.Chat.channel);
+            if (Boako.Team.Chat.readsChannel) Boako.db.removeChannel(Boako.Team.Chat.readsChannel);
 
             Boako.Team.Chat.channel = Boako.db.channel(`team-chat-${teamId}`)
                 .on('postgres_changes', { 
@@ -1518,7 +1584,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
                     schema: 'public', 
                     table: 'team_chats',
                     filter: `team_id=eq.${teamId}`
-                }, (payload) => {
+                }, async (payload) => {
                     const newMsg = payload.new;
                     if (newMsg.sender_id !== Boako.state.user.id) {
                          newMsg.profiles = { full_name: "팀원" }; 
@@ -1526,7 +1592,22 @@ const isLeader = Boako.state.team.type === 'LEADER';
                          Boako.Team.Chat.scrollToBottom();
                          Boako.Team.Chat.showNotification();
                          Boako.Util.toast("💬 팀 작전 회의실에 새로운 메시지가 있습니다!");
+                         // 🌟 방을 계속 보고 있는 동안 온 메시지도 곧바로 읽음 처리 (카카오톡과 동일한 체감)
+                         await Boako.Team.Chat.markRead(teamId);
                     }
+                })
+                .subscribe();
+
+            // 🌟 [신규] 다른 팀원이 읽으면(=team_chat_reads 갱신되면) 내 메시지 옆 숫자가 실시간으로 줄어들도록 구독
+            Boako.Team.Chat.readsChannel = Boako.db.channel(`team-chat-reads-${teamId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'team_chat_reads',
+                    filter: `team_id=eq.${teamId}`
+                }, async () => {
+                    await Boako.Team.Chat.fetchReadRows(teamId);
+                    Boako.Team.Chat.updateAllUnreadBadges();
                 })
                 .subscribe();
         },
@@ -1537,8 +1618,11 @@ const isLeader = Boako.state.team.type === 'LEADER';
             const isMe = msg.sender_id === Boako.state.user.id;
             const senderName = msg.profiles?.full_name || "알 수 없음";
 
+            // 🌟 내 메시지에는 안읽음 인원수 배지(own-msg-unread)를 붙임. msg.id가 아직 없으면(전송 직후 낙관적 렌더링)
+            // data-msg-id를 비워두고, send()에서 실제 id를 받은 후 채워넣음.
             const html = isMe ? `
-                <div class="flex justify-end">
+                <div class="flex justify-end items-end gap-1.5 own-msg-wrap" data-msg-id="${msg.id || ''}" data-sender-id="${msg.sender_id}">
+                    <span class="own-msg-unread text-[10px] font-bold text-amber-500 mb-0.5"></span>
                     <div class="bg-blue-600 text-white rounded-l-xl rounded-tr-xl px-4 py-2 max-w-[70%] text-sm shadow-sm break-words">
                         ${msg.content}
                     </div>
@@ -1552,6 +1636,13 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', html);
+
+            if (isMe && msg.id) {
+                const unread = Boako.Team.Chat.computeUnreadCount(msg.id, msg.sender_id);
+                const wrap = container.lastElementChild;
+                const badge = wrap?.querySelector('.own-msg-unread');
+                if (badge) badge.textContent = unread > 0 ? unread : '';
+            }
         },
         send: async () => {
             const input = document.getElementById('chat-input');
@@ -1566,14 +1657,26 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 content: content
             };
 
+            // 🌟 전송 직후 아직 아무도 안 읽었을 게 확실하므로 낙관적으로 먼저 그림 (id는 잠시 비워둠)
             const tempMsg = { ...payload, profiles: { full_name: Boako.state.user.nickname } };
             Boako.Team.Chat.renderMessage(tempMsg);
             Boako.Team.Chat.scrollToBottom();
+            const container = document.getElementById('chat-messages');
+            const tempWrap = container?.lastElementChild;
 
-            const { error } = await Boako.db.from('team_chats').insert([payload]);
+            const { data, error } = await Boako.db.from('team_chats').insert([payload]).select().single();
             if (error) {
                 Boako.Util.toast("전송 실패: " + error.message);
                 console.error("채팅 전송 실패:", error);
+                return;
+            }
+
+            // 🌟 실제 DB에 저장된 id를 받아서 방금 그린 말풍선에 채워넣고, 안읽음 숫자도 계산해서 표시
+            if (data && tempWrap && tempWrap.classList.contains('own-msg-wrap')) {
+                tempWrap.dataset.msgId = data.id;
+                const unread = Boako.Team.Chat.computeUnreadCount(data.id, data.sender_id);
+                const badge = tempWrap.querySelector('.own-msg-unread');
+                if (badge) badge.textContent = unread > 0 ? unread : '';
             }
         },
         scrollToBottom: () => {
