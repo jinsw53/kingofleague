@@ -182,12 +182,19 @@ function addCustomStyles() {
     /* 라이브 게임 페이지 전용 버튼 스타일 - 정적 페이지의 절대좌표 배치(left:120px 등)가
        라이브 페이지 레이아웃과 안 맞아서 버튼이 늘어져 보이는 문제 수정.
        .bga-save-button 자체는 정적 페이지가 계속 쓰므로 건드리지 않고, 새 클래스를
-       같이 붙여서 여기서만 덮어씀. */
+       같이 붙여서 여기서만 덮어씀.
+       + 이 버튼이 들어가는 부모(게임 결과 탭 바)가 display:flex 구조라서
+       align-items:stretch(기본값) 때문에 버튼이 가로 전체로 늘어나는 문제가 있어서
+       align-self: flex-start로 그 stretch 규칙에서 빠지게 함. */
     .boako-live-save-button {
         position: static !important;
         left: auto !important;
         top: auto !important;
-        display: inline-block;
+        display: inline-flex !important;
+        align-self: flex-start !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        max-width: max-content !important;
         margin-left: 12px;
         vertical-align: middle;
     }
