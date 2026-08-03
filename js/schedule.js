@@ -5,6 +5,8 @@
  *    다르게 Boako.Schedule.*로 호출하고 있어서 "not a function" 에러가 나던 문제 수정 (.View. 경로 추가).
  * 🌟 [신규] 토너먼트/시즌 알림을 취소한 뒤 다시 켤 방법이 없던 문제 수정 — 실제 등록 여부(hasActiveBroadcast)를
  *    조회해서 등록 상태면 "🔕 알림 취소", 취소된 상태면 "🔔 다시 받기" 버튼으로 자동 전환됨.
+ * 🌟 [신규] 라이벌전 일정 카드에 "승자 예측 투표(응원)" UI 추가 — 매치 당사자 제외, 로그인 유저만,
+ *    매치당 1표, 마감은 scheduled_time. 결과 확정 시(complete_rival_match) 적중/미적중 모두 포인트 지급.
  */
 Boako.Schedule = {
     scheduleItems: [],
@@ -45,7 +47,9 @@ Boako.Schedule = {
                     scheduled_time: sch.scheduled_time,
                     title: sch.game_name,
                     subtitle: `${p1} VS ${p2}`,
-                    linkUrl: null
+                    linkUrl: null,
+                    // 🌟 [신규] 라이벌전 승자 예측 투표 UI를 붙이기 위해 실제 매치 id 보관
+                    matchId: (typeKey === 'RIVAL' && sch.reference_id) ? sch.reference_id : null
                 });
             });
         } catch (err) {
@@ -218,6 +222,58 @@ Boako.Schedule = {
             }
         }
 
+        // 🌟 [신규] 라이벌전 "승자 예측 투표" UI에 필요한 정보 배치 조회
+        // (매치 당사자 id/닉네임, 현재 로그인 유저의 기존 투표 여부, 매치 진행 상태)
+        try {
+            const nowMs = Date.now();
+            const rivalItems = items.filter(it => it.typeKey === 'RIVAL' && it.matchId && new Date(it.scheduled_time).getTime() > nowMs);
+            const matchIds = [...new Set(rivalItems.map(it => it.matchId))];
+
+            if (matchIds.length > 0) {
+                const { data: matches } = await Boako.db
+                    .from('rival_matches')
+                    .select('match_id, game_name, status, challenger_id, defender_id')
+                    .in('match_id', matchIds);
+
+                const matchMap = Object.fromEntries((matches || []).map(m => [m.match_id, m]));
+
+                const playerIds = [...new Set((matches || []).flatMap(m => [m.challenger_id, m.defender_id]))];
+                let nameMap = {};
+                if (playerIds.length > 0) {
+                    const { data: profiles } = await Boako.db.from('profiles').select('id, full_name').in('id', playerIds);
+                    nameMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
+                }
+
+                let myVoteMap = {};
+                if (Boako.state.user) {
+                    const { data: myVotes } = await Boako.db
+                        .from('rival_match_votes')
+                        .select('match_id, predicted_winner_id')
+                        .eq('voter_id', Boako.state.user.id)
+                        .in('match_id', matchIds);
+                    myVoteMap = Object.fromEntries((myVotes || []).map(v => [v.match_id, v.predicted_winner_id]));
+                }
+
+                rivalItems.forEach(it => {
+                    const m = matchMap[it.matchId];
+                    if (!m) return;
+                    const isParticipant = Boako.state.user && (Boako.state.user.id === m.challenger_id || Boako.state.user.id === m.defender_id);
+                    it.voteInfo = {
+                        matchId: m.match_id,
+                        status: m.status,
+                        challengerId: m.challenger_id,
+                        defenderId: m.defender_id,
+                        challengerName: nameMap[m.challenger_id] || '선수1',
+                        defenderName: nameMap[m.defender_id] || '선수2',
+                        isParticipant,
+                        myPick: myVoteMap[it.matchId] || null
+                    };
+                });
+            }
+        } catch (err) {
+            console.error("라이벌전 투표 정보 로드 오류:", err);
+        }
+
         return items;
     },
 
@@ -257,24 +313,72 @@ Boako.Schedule = {
             const rebroadcastBtn = (item.sourceType && isFuture) ? `<button onclick="Boako.Schedule.View.rebroadcastEvent('${item.sourceType}', '${item.sourceId}', this)" style="font-size:11px; font-weight:800; color:#3c1e1e; background:#FEE500; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔔 다시 받기</button>` : '';
             const sourceBtn = item.hasActiveBroadcast ? rejectBtn : rebroadcastBtn;
 
+            // 🌟 [신규] 라이벌전 승자 예측 투표(응원) 위젯 — 당사자/비로그인/투표종료 상태는 노출 안 함
+            let voteWidget = '';
+            if (item.voteInfo && item.voteInfo.status === 'UPCOMING' && Boako.state.user && !item.voteInfo.isParticipant) {
+                const v = item.voteInfo;
+                if (v.myPick) {
+                    const pickedName = v.myPick === v.challengerId ? v.challengerName : v.defenderName;
+                    voteWidget = `
+                        <div style="margin-top:8px; font-size:12px; font-weight:800; color:#059669; background:#ecfdf5; border:1px solid #a7f3d0; padding:6px 10px; border-radius:8px; text-align:center;">
+                            ✅ ${pickedName} 님 응원 완료! (결과 발표 시 참여 포인트 지급)
+                        </div>
+                    `;
+                } else {
+                    voteWidget = `
+                        <div style="margin-top:8px; display:flex; gap:6px;">
+                            <button onclick="Boako.Schedule.View.castRivalVote('${v.matchId}', '${v.challengerId}', this)" style="flex:1; font-size:12px; font-weight:800; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; padding:8px 6px; border-radius:8px; cursor:pointer;">📣 ${v.challengerName} 응원하기</button>
+                            <button onclick="Boako.Schedule.View.castRivalVote('${v.matchId}', '${v.defenderId}', this)" style="flex:1; font-size:12px; font-weight:800; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; padding:8px 6px; border-radius:8px; cursor:pointer;">📣 ${v.defenderName} 응원하기</button>
+                        </div>
+                    `;
+                }
+            }
+
             return `
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition:all 0.2s;">
-                    <div style="flex: 1; min-width:0;">
-                        <div style="font-size:13px; color:#64748b; font-weight:800; margin-bottom:6px;">⏰ ${timeStr}</div>
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            ${typeBadge}
-                            <span style="font-size:16px; font-weight:900; color:#0f172a;">${item.title}</span>
+                <div style="display:flex; flex-direction:column; gap:4px; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition:all 0.2s;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                        <div style="flex: 1; min-width:0;">
+                            <div style="font-size:13px; color:#64748b; font-weight:800; margin-bottom:6px;">⏰ ${timeStr}</div>
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                ${typeBadge}
+                                <span style="font-size:16px; font-weight:900; color:#0f172a;">${item.title}</span>
+                            </div>
+                        </div>
+                        <div style="flex-shrink:0; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                            ${item.subtitle ? `<span style="font-size:14px; font-weight:bold; color:#334155; background:#f1f5f9; padding:6px 14px; border-radius:8px;">${item.subtitle}</span>` : ''}
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${item.sourceType ? sourceBtn : kakaoBtn}
+                                ${linkBtn}
+                            </div>
                         </div>
                     </div>
-                    <div style="flex-shrink:0; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-                        ${item.subtitle ? `<span style="font-size:14px; font-weight:bold; color:#334155; background:#f1f5f9; padding:6px 14px; border-radius:8px;">${item.subtitle}</span>` : ''}
-                        <div style="display:flex; gap:6px; align-items:center;">
-                            ${item.sourceType ? sourceBtn : kakaoBtn}
-                            ${linkBtn}
-                        </div>
-                    </div>
+                    ${voteWidget}
                 </div>
             `;
+        },
+
+        // 🌟 [신규] 라이벌전 승자 예측 투표 등록. 결과 확정 전까지는 포인트가 지급되지 않고,
+        // 매치 완료 시(complete_rival_match) 적중/미적중 여부에 따라 자동으로 지급됨.
+        castRivalVote: async (matchId, predictedWinnerId, btnEl) => {
+            if (!Boako.state.user) { Boako.Util.toast('로그인 후 이용해주세요.'); return; }
+            const wrap = btnEl?.closest('div');
+            if (wrap) wrap.querySelectorAll('button').forEach(b => b.disabled = true);
+
+            try {
+                const { error } = await Boako.db.rpc('fn_cast_rival_vote', {
+                    p_match_id: matchId,
+                    p_predicted_winner_id: predictedWinnerId
+                });
+                if (error) throw error;
+
+                if (window.sfx) window.sfx.click();
+                Boako.Util.toast('📣 응원 참여 완료! 결과 발표 시 포인트가 지급됩니다.');
+                Boako.Schedule.scheduleItems = await Boako.Schedule.fetchAllScheduleItems();
+                Boako.Schedule.View.renderUI();
+            } catch (err) {
+                Boako.Util.toast('❌ ' + (err.message || '투표에 실패했습니다.'));
+                if (wrap) wrap.querySelectorAll('button').forEach(b => b.disabled = false);
+            }
         },
 
         addToKakaoCalendar: async (item) => {
