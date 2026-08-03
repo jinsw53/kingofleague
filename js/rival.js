@@ -7,6 +7,7 @@
  *    결과 확정(complete_rival_match) 시 적중/미적중 모두 포인트 지급(잃는 사람 없음).
  * 🌟 [수정] 메인 배너 문구를 "⚔️ 라이벌 탐색기" → "⚡ 라이벌 매치"로 변경 — 일정표(schedule.js)의
  *    라이벌전 아이콘(⚡)/명칭과 통일.
+ * 🌟 [신규] "응원하기" 카드에 두 선수 프로필 사진을 VS 구도로 표시 (닉네임만 있던 것에서 개선).
  */
 Boako.Rival = {
     State: {
@@ -152,9 +153,14 @@ Boako.Rival = {
 
             const playerIds = [...new Set((matches || []).flatMap(m => [m.challenger_id, m.defender_id]))];
             let nameMap = {};
+            let avatarMap = {};
             if (playerIds.length > 0) {
-                const { data: profiles } = await Boako.db.from('profiles').select('id, full_name').in('id', playerIds);
+                const { data: profiles } = await Boako.db.from('profiles').select('id, full_name, profile_url, custom_avatar_url').in('id', playerIds);
                 nameMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
+                avatarMap = Object.fromEntries((profiles || []).map(p => {
+                    const url = p.custom_avatar_url || p.profile_url || null;
+                    return [p.id, url ? url.replace('http://', 'https://') : null];
+                }));
             }
 
             let myVoteMap = {};
@@ -176,6 +182,12 @@ Boako.Rival = {
                     const isParticipant = Boako.state.user && (Boako.state.user.id === m.challenger_id || Boako.state.user.id === m.defender_id);
                     const myPick = myVoteMap[s.reference_id] || null;
                     const dt = new Date(s.scheduled_time).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                    const challengerAvatar = avatarMap[m.challenger_id];
+                    const defenderAvatar = avatarMap[m.defender_id];
+                    const avatarHtml = (url, name) => url
+                        ? `<img src="${Boako.Util.cdn(url)}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-200">`
+                        : `<div class="w-12 h-12 rounded-full bg-slate-200 border-2 border-slate-200 flex items-center justify-center text-slate-500 font-black text-base">${(name || '?').charAt(0)}</div>`;
 
                     let actionHtml;
                     if (!Boako.state.user) {
@@ -200,12 +212,22 @@ Boako.Rival = {
 
                     return `
                         <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center justify-between mb-3">
                                 <span class="text-[11px] font-black bg-red-500 text-white px-2 py-1 rounded-md">⚡ 라이벌전</span>
                                 <span class="text-[11px] text-slate-400 font-bold">⏰ ${dt}</span>
                             </div>
-                            <div class="text-center font-black text-slate-800 text-base mb-1">${s.game_name}</div>
-                            <div class="text-center text-sm font-bold text-slate-500 mb-3">${challengerName} VS ${defenderName}</div>
+                            <div class="text-center font-black text-slate-800 text-base mb-3">${s.game_name}</div>
+                            <div class="flex items-center justify-center gap-4 mb-3">
+                                <div class="flex flex-col items-center gap-1.5 flex-1">
+                                    ${avatarHtml(challengerAvatar, challengerName)}
+                                    <span class="text-xs font-black text-slate-700 truncate max-w-full">${challengerName}</span>
+                                </div>
+                                <div class="text-sm font-black text-slate-300 italic shrink-0 pb-4">VS</div>
+                                <div class="flex flex-col items-center gap-1.5 flex-1">
+                                    ${avatarHtml(defenderAvatar, defenderName)}
+                                    <span class="text-xs font-black text-slate-700 truncate max-w-full">${defenderName}</span>
+                                </div>
+                            </div>
                             ${actionHtml}
                         </div>
                     `;
