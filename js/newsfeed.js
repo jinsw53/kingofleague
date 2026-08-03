@@ -3,7 +3,7 @@
  * 🌟 [신규] "오늘의 추천 게임" 카드 추가 — fn_get_today_recommended_game() RPC로 게임명 조회 후
  *    games.image_url로 로고까지 가져와서, 사이드 슬롯(미디엄 카드 크기)에 항상 고정 1장으로 배치.
  *    해당 게임으로 오늘(기록 제출 시점 기준) 기록을 남기면 BTLDB 트리거(fn_award_daily_recommend_bonus)가
- *    자동으로 기본 지급 포인트의 2배를 개인 포인트로 보너스 지급 (하루 1회 한정).
+ *    자동으로 기본 지급 포인트의 2배를 개인 포인트(💎)로 보너스 지급 (하루 1회 한정).
  * 🌟 카드 등급 문턱값 재조정 (headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 피드에서 완전히 숨김)
  *    기존엔 headline≥7이었는데 importance=7짜리(팀창단/공략글)는 등록 직후 시간이 조금만 지나도
  *    감쇠 때문에 바로 7 밑으로 떨어져서 헤드라인이 사실상 유지가 안 됐음. 여유를 두도록 낮춤.
@@ -461,7 +461,7 @@ Boako.NewsFeed = {
                 </div>
                 <div class="p-3 min-w-0">
                     <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.escapeHtml(game.name)}</h4>
-                    <p class="text-[10px] font-bold text-amber-600 mt-0.5">기록 시 기본 포인트 2배!</p>
+                    <p class="text-[10px] font-bold text-amber-600 mt-0.5">기록 시 💎포인트 2배!</p>
                 </div>
             </div>
         `;
