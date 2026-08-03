@@ -3,7 +3,7 @@
  * 🌟 [신규] "오늘의 추천 게임" 카드 추가 — fn_get_today_recommended_game() RPC로 게임명 조회 후
  *    games.image_url로 로고까지 가져와서, 사이드 슬롯(미디엄 카드 크기)에 항상 고정 1장으로 배치.
  *    해당 게임으로 오늘(기록 제출 시점 기준) 기록을 남기면 BTLDB 트리거(fn_award_daily_recommend_bonus)가
- *    자동으로 기본 지급 포인트의 10배(라이벌전 보상과 동일 배율)를 개인 포인트(💎)로 보너스 지급 (하루 1회 한정).
+ *    자동으로 개인 포인트(💎) 보너스를 지급 (하루 1회 한정). 배율 수치는 카드에 노출하지 않음.
  * 🌟 카드 등급 문턱값 재조정 (headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 피드에서 완전히 숨김)
  *    기존엔 headline≥7이었는데 importance=7짜리(팀창단/공략글)는 등록 직후 시간이 조금만 지나도
  *    감쇠 때문에 바로 7 밑으로 떨어져서 헤드라인이 사실상 유지가 안 됐음. 여유를 두도록 낮춤.
@@ -449,6 +449,8 @@ Boako.NewsFeed = {
 
     // 🌟 [신규] 오늘의 추천 게임 — 미디엄 카드 크기로 고정 1장 배치 (게임 로고 이미지 표시).
     // 다른 필러/실제 소식과 자연스럽게 섞이되, 노란 테두리로 살짝 구분되게 함. 클릭하면 그 게임 공략 게시판으로 이동.
+    // 🌟 [수정] 배지 배경이 노란색이라 ⭐(노란 별) 이모티콘이 묻혀 안 보이던 문제 — 배지를 진한 남색으로 바꿔 대비를 줌.
+    // 🌟 [수정] 배율("10배") 문구 제거, 오늘 자정까지 마감이라는 기한 안내 추가.
     renderTodayRecommendCard: () => {
         const game = Boako.NewsFeed.todayRecommendGame;
         if (!game) return '';
@@ -456,12 +458,12 @@ Boako.NewsFeed = {
         return `
             <div class="min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300 flex flex-col hover:shadow-md transition-shadow" onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
                 <div class="h-24 overflow-hidden bg-amber-50 flex items-center justify-center p-2 relative">
-                    <span class="absolute top-1 left-1 text-[9px] font-black bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded">⭐ 오늘의 추천</span>
+                    <span class="absolute top-1 left-1 text-[9px] font-black bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded">⭐ 오늘의 추천</span>
                     ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;">` : `<span class="text-3xl">🎲</span>`}
                 </div>
                 <div class="p-3 min-w-0">
                     <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.escapeHtml(game.name)}</h4>
-                    <p class="text-[10px] font-bold text-amber-600 mt-0.5">기록 시 💎포인트 10배!</p>
+                    <p class="text-[10px] font-bold text-amber-600 mt-0.5">기록 시 💎포인트 지급! (오늘까지 입력하세요)</p>
                 </div>
             </div>
         `;
