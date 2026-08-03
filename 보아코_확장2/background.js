@@ -49,14 +49,42 @@ async function performArchiveLogin() {
     const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
     if (!resultUrl) throw new Error("로그인이 취소되었습니다.");
 
-    // Supabase는 쿼리스트링이 아니라 URL 프래그먼트(#)로 토큰을 돌려줌
-    const fragment = resultUrl.split("#")[1] || "";
-    const params = new URLSearchParams(fragment);
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-    const expiresIn = parseInt(params.get("expires_in") || "3600", 10);
+    // 🌟 [디버깅] 실제로 뭐가 돌아왔는지 전체를 그대로 남김 — access_token(#) 대신 code(?)나
+    // error 파라미터가 왔을 수도 있어서(PKCE 플로우 등) 원인 파악용으로 전체를 남겨둠
+    console.log("🔍 [로그인 디버그] launchWebAuthFlow 최종 리다이렉트 URL 전체:", resultUrl);
 
-    if (!accessToken) throw new Error("로그인 토큰을 받아오지 못했습니다.");
+    const urlObj = new URL(resultUrl);
+    const fragment = urlObj.hash.startsWith("#") ? urlObj.hash.slice(1) : "";
+    const fragParams = new URLSearchParams(fragment);
+    const queryParams = urlObj.searchParams;
+
+    const accessToken = fragParams.get("access_token");
+    const refreshToken = fragParams.get("refresh_token");
+    const expiresIn = parseInt(fragParams.get("expires_in") || "3600", 10);
+    const errorParam = fragParams.get("error") || queryParams.get("error");
+    const errorDesc = fragParams.get("error_description") || queryParams.get("error_description");
+    const codeParam = queryParams.get("code");
+
+    console.log("🔍 [로그인 디버그] 파싱 결과:", {
+        hasAccessToken: !!accessToken,
+        code: codeParam,
+        error: errorParam,
+        errorDescription: errorDesc,
+        rawFragment: fragment,
+        rawQuery: urlObj.search
+    });
+
+    if (errorParam) {
+        throw new Error(`Supabase 인증 오류: ${errorParam}${errorDesc ? ' - ' + decodeURIComponent(errorDesc) : ''}`);
+    }
+
+    if (!accessToken && codeParam) {
+        throw new Error(`PKCE 방식(code=${codeParam})으로 응답이 왔어요. 구현을 PKCE 교환 방식으로 바꿔야 합니다.`);
+    }
+
+    if (!accessToken) {
+        throw new Error(`로그인 토큰을 받아오지 못했습니다. 반환된 URL: ${resultUrl}`);
+    }
 
     // 액세스 토큰으로 본인 유저 id 확인
     const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
