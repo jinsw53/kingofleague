@@ -1,8 +1,16 @@
 /**
  * [RIVAL SYSTEM] 기록 기반 자동 매칭 라이벌 탐색기 (아코디언 VS 레이아웃 버전)
  * 🌟 라이벌전 도전장 발송(제안) 성공 시 오늘의 주사위 시도 (팀 리그 외 활동, 하루 1회)
+ * 🌟 [신규] 탭 2개로 구성: "🔍 라이벌 찾기"(기존 기능) / "📣 응원하기"(예정된 라이벌전 승자 예측 투표).
+ *    응원하러 왔다가 자연스럽게 "나도 라이벌전 해볼까?" 유입되도록 같은 화면 안에 배치.
+ *    응원 투표는 매치 당사자 제외, 로그인 유저만, 매치당 1표, 마감은 match_schedules.scheduled_time.
+ *    결과 확정(complete_rival_match) 시 적중/미적중 모두 포인트 지급(잃는 사람 없음).
  */
 Boako.Rival = {
+    State: {
+        currentTab: 'find' // 'find' | 'cheer'
+    },
+
     init: (containerId) => {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -14,6 +22,43 @@ Boako.Rival = {
                 <p>라이벌 매치를 진행하시면 포인트를 획득할 수 있습니다.</p>
             </div>
 
+            <div class="flex gap-2 mb-4">
+                <button id="rival-tab-btn-find" onclick="Boako.Rival.switchTab('find')" class="flex-1 py-3 rounded-xl font-black text-sm transition-all">🔍 라이벌 찾기</button>
+                <button id="rival-tab-btn-cheer" onclick="Boako.Rival.switchTab('cheer')" class="flex-1 py-3 rounded-xl font-black text-sm transition-all">📣 응원하기</button>
+            </div>
+
+            <div id="rival-tab-content"></div>
+        `;
+
+        container.innerHTML = html;
+        Boako.Rival.switchTab('find');
+    },
+
+    switchTab: (tab) => {
+        Boako.Rival.State.currentTab = tab;
+
+        const findBtn = document.getElementById('rival-tab-btn-find');
+        const cheerBtn = document.getElementById('rival-tab-btn-cheer');
+        if (findBtn && cheerBtn) {
+            const activeCls = 'bg-slate-900 text-white shadow-sm';
+            const inactiveCls = 'bg-slate-100 text-slate-500';
+            findBtn.className = `flex-1 py-3 rounded-xl font-black text-sm transition-all ${tab === 'find' ? activeCls : inactiveCls}`;
+            cheerBtn.className = `flex-1 py-3 rounded-xl font-black text-sm transition-all ${tab === 'cheer' ? activeCls : inactiveCls}`;
+        }
+
+        if (tab === 'find') {
+            Boako.Rival.renderFindTab();
+        } else {
+            Boako.Rival.renderCheerTab();
+        }
+    },
+
+    // 🌟 [신규] 기존 "라이벌 찾기" 화면을 별도 함수로 분리 (탭 전환 시 재사용)
+    renderFindTab: () => {
+        const content = document.getElementById('rival-tab-content');
+        if (!content) return;
+
+        content.innerHTML = `
             <section class="section-card">
                 <div class="card-header flex justify-between items-center">
                     <span>🔍 나의 주력 종목 TOP 10</span>
@@ -37,15 +82,164 @@ Boako.Rival = {
                 </div>
             </section>
         `;
-        
-        container.innerHTML = html;
-        if(typeof lucide !== 'undefined') lucide.createIcons();
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
 
         document.getElementById('rival-search-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') Boako.Rival.searchRivals();
         });
 
         Boako.Rival.searchRivals();
+    },
+
+    // 🌟 [신규] "응원하기" 탭: 예정된 라이벌전 목록 + 승자 예측 투표 UI
+    renderCheerTab: async () => {
+        const content = document.getElementById('rival-tab-content');
+        if (!content) return;
+
+        content.innerHTML = `
+            <section class="section-card">
+                <div class="card-header flex justify-between items-center">
+                    <span>📣 응원하고 참여 포인트 받기</span>
+                </div>
+                <div class="card-body" style="background: #f8fafc; min-height: 300px; padding: 25px;">
+                    <p class="text-xs text-slate-500 font-bold mb-4">예정된 라이벌전에서 승리를 예측하고 응원하세요! 결과가 확정되면 적중 여부와 관계없이 전원 참여 포인트가 지급됩니다.</p>
+                    <div id="rival-cheer-list" class="flex flex-col gap-3">
+                        <div class="text-center py-10 text-slate-400 font-bold text-sm flex flex-col items-center gap-2">
+                            <i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i>
+                            예정된 라이벌전을 불러오는 중...
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        await Boako.Rival.loadCheerMatches();
+    },
+
+    loadCheerMatches: async () => {
+        const listEl = document.getElementById('rival-cheer-list');
+        if (!listEl) return;
+
+        try {
+            const nowIso = new Date().toISOString();
+
+            const { data: schedules, error: schErr } = await Boako.db
+                .from('match_schedules')
+                .select('schedule_id, game_name, scheduled_time, reference_id')
+                .eq('source_type', 'RIVAL')
+                .gt('scheduled_time', nowIso)
+                .order('scheduled_time', { ascending: true });
+            if (schErr) throw schErr;
+
+            if (!schedules || schedules.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-10 text-slate-400 font-bold text-sm bg-white rounded-xl border border-slate-200">현재 예정된 라이벌전이 없습니다.</div>`;
+                return;
+            }
+
+            const matchIds = [...new Set(schedules.map(s => s.reference_id).filter(Boolean))];
+
+            const { data: matches } = await Boako.db
+                .from('rival_matches')
+                .select('match_id, status, challenger_id, defender_id')
+                .in('match_id', matchIds)
+                .eq('status', 'UPCOMING');
+
+            const matchMap = Object.fromEntries((matches || []).map(m => [m.match_id, m]));
+
+            const playerIds = [...new Set((matches || []).flatMap(m => [m.challenger_id, m.defender_id]))];
+            let nameMap = {};
+            if (playerIds.length > 0) {
+                const { data: profiles } = await Boako.db.from('profiles').select('id, full_name').in('id', playerIds);
+                nameMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
+            }
+
+            let myVoteMap = {};
+            if (Boako.state.user && matchIds.length > 0) {
+                const { data: myVotes } = await Boako.db
+                    .from('rival_match_votes')
+                    .select('match_id, predicted_winner_id')
+                    .eq('voter_id', Boako.state.user.id)
+                    .in('match_id', matchIds);
+                myVoteMap = Object.fromEntries((myVotes || []).map(v => [v.match_id, v.predicted_winner_id]));
+            }
+
+            const cards = schedules
+                .filter(s => s.reference_id && matchMap[s.reference_id])
+                .map(s => {
+                    const m = matchMap[s.reference_id];
+                    const challengerName = nameMap[m.challenger_id] || '선수1';
+                    const defenderName = nameMap[m.defender_id] || '선수2';
+                    const isParticipant = Boako.state.user && (Boako.state.user.id === m.challenger_id || Boako.state.user.id === m.defender_id);
+                    const myPick = myVoteMap[s.reference_id] || null;
+                    const dt = new Date(s.scheduled_time).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                    let actionHtml;
+                    if (!Boako.state.user) {
+                        actionHtml = `<div class="text-center text-xs font-bold text-slate-400 py-2">로그인 후 응원에 참여할 수 있어요</div>`;
+                    } else if (isParticipant) {
+                        actionHtml = `<div class="text-center text-xs font-bold text-slate-400 py-2">당사자는 응원 참여가 불가해요</div>`;
+                    } else if (myPick) {
+                        const pickedName = myPick === m.challenger_id ? challengerName : defenderName;
+                        actionHtml = `
+                            <div class="text-center text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 py-2.5 rounded-lg">
+                                ✅ ${pickedName} 님 응원 완료! (결과 발표 시 참여 포인트 지급)
+                            </div>
+                        `;
+                    } else {
+                        actionHtml = `
+                            <div class="flex gap-2">
+                                <button onclick="Boako.Rival.castVote('${s.reference_id}', '${m.challenger_id}', this)" class="flex-1 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-black py-2.5 rounded-lg transition-colors">📣 ${challengerName} 응원</button>
+                                <button onclick="Boako.Rival.castVote('${s.reference_id}', '${m.defender_id}', this)" class="flex-1 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-black py-2.5 rounded-lg transition-colors">📣 ${defenderName} 응원</button>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[11px] font-black bg-red-500 text-white px-2 py-1 rounded-md">⚡ 라이벌전</span>
+                                <span class="text-[11px] text-slate-400 font-bold">⏰ ${dt}</span>
+                            </div>
+                            <div class="text-center font-black text-slate-800 text-base mb-1">${s.game_name}</div>
+                            <div class="text-center text-sm font-bold text-slate-500 mb-3">${challengerName} VS ${defenderName}</div>
+                            ${actionHtml}
+                        </div>
+                    `;
+                });
+
+            listEl.innerHTML = cards.length > 0
+                ? cards.join('')
+                : `<div class="text-center py-10 text-slate-400 font-bold text-sm bg-white rounded-xl border border-slate-200">현재 예정된 라이벌전이 없습니다.</div>`;
+
+        } catch (err) {
+            console.error("응원하기 목록 로드 오류:", err);
+            listEl.innerHTML = `<div class="text-center py-10 text-red-500 font-bold text-sm bg-red-50 rounded-xl">목록을 불러오지 못했습니다.</div>`;
+        }
+    },
+
+    // 🌟 [신규] 승자 예측 투표(응원) 등록. 결과 확정 전까지는 포인트가 지급되지 않고,
+    // 매치 완료 시(complete_rival_match) 적중/미적중 여부에 따라 자동으로 지급됨.
+    castVote: async (matchId, predictedWinnerId, btnEl) => {
+        if (!Boako.state.user) { Boako.Util.toast('로그인 후 이용해주세요.'); return; }
+        const wrap = btnEl?.closest('div');
+        if (wrap) wrap.querySelectorAll('button').forEach(b => b.disabled = true);
+
+        try {
+            const { error } = await Boako.db.rpc('fn_cast_rival_vote', {
+                p_match_id: matchId,
+                p_predicted_winner_id: predictedWinnerId
+            });
+            if (error) throw error;
+
+            if (window.sfx) window.sfx.click();
+            Boako.Util.toast('📣 응원 참여 완료! 결과 발표 시 포인트가 지급됩니다.');
+            await Boako.Rival.loadCheerMatches();
+        } catch (err) {
+            Boako.Util.toast('❌ ' + (err.message || '투표에 실패했습니다.'));
+            if (wrap) wrap.querySelectorAll('button').forEach(b => b.disabled = false);
+        }
     },
 
     searchRivals: async () => {
