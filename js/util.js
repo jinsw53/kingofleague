@@ -19,6 +19,8 @@
  * 🌟 [신규] sfx 자동재생 잠금 대응: 페이지 진입 직후(첫 클릭 전) 자동으로 뜨는 알림(업적 등)은
  *    브라우저가 AudioContext를 잠가둬서 무음일 수 있음 — 재생 직후에도 여전히 suspended면 큐에 담아뒀다가
  *    사용자가 화면 어디든 처음 클릭/터치/키입력하는 순간 자동으로 재생되도록 모든 sfx 함수를 래핑함.
+ * 🌟 [신규] navigateToLink의 RIVAL_MATCH 케이스 — 라이벌 매치 소식 클릭 시 화면만 열던 것에서
+ *    "응원하기"(승자 예측 투표) 탭으로 바로 진입하도록 수정.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -120,7 +122,13 @@ Boako.Util = {
                     await Boako.View.render('together');
                     break;
                 case 'RIVAL_MATCH':
+                    // 🌟 [수정] 라이벌 매치 화면만 열던 것 → "응원하기"(투표) 탭으로 바로 진입하도록 변경
                     await Boako.View.render('rival');
+                    setTimeout(() => {
+                        if (Boako.Rival && typeof Boako.Rival.switchTab === 'function') {
+                            Boako.Rival.switchTab('cheer');
+                        }
+                    }, 150);
                     break;
                 case 'TEAM':
                     await Boako.View.render('team_list');
