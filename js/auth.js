@@ -3,6 +3,7 @@
  * 온보딩 노출 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
  * 🌟 [수정] 팀챗 배지가 실제 안 읽은 메시지 수와 무관하게 하드코딩된 'N' 글자만 뜨던 버그 수정 —
  *    초기 마크업에서 'N' 제거 (team.js Chat.showNotification/clearNotification이 textContent를 채움)
+ * 🌟 [신규] 라이벌전 승자 예측 투표 결과 실시간 알림(rival_notify.js) 로드/구독 — 업적 알림과 동일 패턴.
  */
 Boako.Auth = {
     init: async () => {
@@ -28,6 +29,12 @@ Boako.Auth = {
             if (Boako.Achievements.startRealtime) Boako.Achievements.startRealtime();
             // 🌟 오프라인 중 획득한(=놓친) 업적도 로그인 시점에 확인
             if (Boako.Achievements.checkUnseenAchievements) Boako.Achievements.checkUnseenAchievements();
+
+            // 🌟 로그인 즉시 라이벌전 승자 예측 투표 결과 실시간 알림 구독 시작
+            if (Object.keys(Boako.RivalNotify || {}).length === 0) await Boako.Util.loadScript('js/rival_notify.js');
+            if (Boako.RivalNotify.startRealtime) Boako.RivalNotify.startRealtime();
+            // 🌟 오프라인 중 확정된(=놓친) 투표 결과도 로그인 시점에 확인
+            if (Boako.RivalNotify.checkUnseenResults) Boako.RivalNotify.checkUnseenResults();
 
             // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
             await Boako.Auth.requireBgaNickname();
@@ -78,6 +85,11 @@ Boako.Auth = {
                 if (Boako.Achievements.startRealtime) Boako.Achievements.startRealtime();
                 if (Boako.Achievements.checkUnseenAchievements) Boako.Achievements.checkUnseenAchievements();
 
+                // 🌟 라이벌전 승자 예측 투표 결과 실시간 알림 구독
+                if (Object.keys(Boako.RivalNotify || {}).length === 0) await Boako.Util.loadScript('js/rival_notify.js');
+                if (Boako.RivalNotify.startRealtime) Boako.RivalNotify.startRealtime();
+                if (Boako.RivalNotify.checkUnseenResults) Boako.RivalNotify.checkUnseenResults();
+
                 await Boako.Auth.renderWidget();
                 // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
                 await Boako.Auth.requireBgaNickname();
@@ -88,6 +100,7 @@ Boako.Auth = {
                 Boako.state.user = null;
                 Boako.state.team = null;
                 if (Boako.Achievements && Boako.Achievements.stopRealtime) Boako.Achievements.stopRealtime();
+                if (Boako.RivalNotify && Boako.RivalNotify.stopRealtime) Boako.RivalNotify.stopRealtime();
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) adminMenu.style.display = 'none';
                 const verifyMenu = document.getElementById('menu-record-verify');
