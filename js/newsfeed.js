@@ -1,6 +1,7 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
- * 🌟 [신규] "오늘의 추천 게임" 배너 추가 — fn_get_today_recommended_game() RPC로 조회.
+ * 🌟 [신규] "오늘의 추천 게임" 카드 추가 — fn_get_today_recommended_game() RPC로 게임명 조회 후
+ *    games.image_url로 로고까지 가져와서, 사이드 슬롯(미디엄 카드 크기)에 항상 고정 1장으로 배치.
  *    해당 게임으로 오늘(기록 제출 시점 기준) 기록을 남기면 BTLDB 트리거(fn_award_daily_recommend_bonus)가
  *    자동으로 기본 지급 포인트의 2배를 개인 포인트로 보너스 지급 (하루 1회 한정).
  * 🌟 카드 등급 문턱값 재조정 (headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 피드에서 완전히 숨김)
@@ -62,8 +63,18 @@ Boako.NewsFeed = {
         Boako.NewsFeed.items = feedResult.data || [];
         Boako.NewsFeed.fillerPool = fillerPool;
         Boako.NewsFeed.fillerCursor = 0;
-        // 🌟 [신규] 오늘의 추천 게임 — 이 게임으로 오늘 기록을 남기면 기본 지급 포인트의 2배 보너스 지급
-        Boako.NewsFeed.todayRecommendGame = recommendResult?.data || null;
+        // 🌟 [신규] 오늘의 추천 게임 — 소식지 카드(미디엄 크기, 고정 1장)로 노출. 로고 이미지도 같이 조회.
+        Boako.NewsFeed.todayRecommendGame = null;
+        const recommendGameName = recommendResult?.data || null;
+        if (recommendGameName) {
+            try {
+                const { data: gameRow } = await Boako.db.from('games').select('image_url').eq('game_name', recommendGameName).maybeSingle();
+                Boako.NewsFeed.todayRecommendGame = { name: recommendGameName, image: gameRow?.image_url || null };
+            } catch (e) {
+                console.error('오늘의 추천 게임 로고 조회 실패:', e);
+                Boako.NewsFeed.todayRecommendGame = { name: recommendGameName, image: null };
+            }
+        }
         Boako.NewsFeed.render();
     },
 
@@ -276,12 +287,6 @@ Boako.NewsFeed = {
                 <h1>📰 아카이브 소식지</h1>
                 <p>${todayStr}</p>
             </div>
-            ${Boako.NewsFeed.todayRecommendGame ? `
-                <div style="display:flex; align-items:center; justify-content:center; gap:10px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 16px; margin-bottom:16px; flex-wrap:wrap; text-align:center;">
-                    <span style="font-size:13px; font-weight:900; color:#92400e;">⭐ 오늘의 추천 게임: ${Boako.NewsFeed.todayRecommendGame}</span>
-                    <span style="font-size:12px; font-weight:700; color:#b45309;">— 오늘 이 게임으로 기록을 남기면 기본 포인트 2배 보너스!</span>
-                </div>
-            ` : ''}
         `;
 
         let scored = Boako.NewsFeed.items.map(item => ({
@@ -318,12 +323,13 @@ Boako.NewsFeed = {
         const extraHeadlines = headlineItems.slice(1).map(item => ({ ...item, _tier: 'large' }));
         const nonHeadline = scored.filter(item => item._tier !== 'headline');
 
-        const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, 2);
+        const hasRecommend = !!Boako.NewsFeed.todayRecommendGame;
+        const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, hasRecommend ? 1 : 2);
         const sideIds = new Set(sideCandidates.map(item => item.id));
         const remaining = nonHeadline.filter(item => !sideIds.has(item.id));
 
-        let sideHtml = '';
-        for (let i = 0; i < 2; i++) {
+        let sideHtml = hasRecommend ? Boako.NewsFeed.renderTodayRecommendCard() : '';
+        for (let i = 0; i < (hasRecommend ? 1 : 2); i++) {
             if (sideCandidates[i]) {
                 sideHtml += Boako.NewsFeed.renderFillerReal(sideCandidates[i]);
             } else {
@@ -372,11 +378,12 @@ Boako.NewsFeed = {
         const mediumItems = scored.filter(item => item._tier === 'medium');
         const otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
 
-        const fillerReal = mediumItems.slice(0, 2);
-        const leftoverMedium = mediumItems.slice(2);
+        const hasRecommend = !!Boako.NewsFeed.todayRecommendGame;
+        const fillerReal = mediumItems.slice(0, hasRecommend ? 1 : 2);
+        const leftoverMedium = mediumItems.slice(hasRecommend ? 1 : 2);
 
-        let fillerHtml = '';
-        for (let i = 0; i < 2; i++) {
+        let fillerHtml = hasRecommend ? Boako.NewsFeed.renderTodayRecommendCard() : '';
+        for (let i = 0; i < (hasRecommend ? 1 : 2); i++) {
             if (fillerReal[i]) {
                 fillerHtml += Boako.NewsFeed.renderFillerReal(fillerReal[i]);
             } else {
@@ -435,6 +442,26 @@ Boako.NewsFeed = {
                     <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 block">HEADLINE</span>
                     <h2 class="text-xl md:text-2xl font-black text-white leading-snug mb-2">${Boako.NewsFeed.hoverTitle(item.title)}</h2>
                     ${item.subtitle ? `<p class="text-sm text-slate-200 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
+                </div>
+            </div>
+        `;
+    },
+
+    // 🌟 [신규] 오늘의 추천 게임 — 미디엄 카드 크기로 고정 1장 배치 (게임 로고 이미지 표시).
+    // 다른 필러/실제 소식과 자연스럽게 섞이되, 노란 테두리로 살짝 구분되게 함. 클릭하면 그 게임 공략 게시판으로 이동.
+    renderTodayRecommendCard: () => {
+        const game = Boako.NewsFeed.todayRecommendGame;
+        if (!game) return '';
+        const img = game.image ? Boako.Util.cdn(game.image) : null;
+        return `
+            <div class="min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300 flex flex-col hover:shadow-md transition-shadow" onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
+                <div class="h-24 overflow-hidden bg-amber-50 flex items-center justify-center p-2 relative">
+                    <span class="absolute top-1 left-1 text-[9px] font-black bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded">⭐ 오늘의 추천</span>
+                    ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;">` : `<span class="text-3xl">🎲</span>`}
+                </div>
+                <div class="p-3 min-w-0">
+                    <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.escapeHtml(game.name)}</h4>
+                    <p class="text-[10px] font-bold text-amber-600 mt-0.5">기록 시 기본 포인트 2배!</p>
                 </div>
             </div>
         `;
