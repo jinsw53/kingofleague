@@ -1,5 +1,8 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
+ * 🌟 [신규] "오늘의 추천 게임" 배너 추가 — fn_get_today_recommended_game() RPC로 조회.
+ *    해당 게임으로 오늘(기록 제출 시점 기준) 기록을 남기면 BTLDB 트리거(fn_award_daily_recommend_bonus)가
+ *    자동으로 기본 지급 포인트의 2배를 개인 포인트로 보너스 지급 (하루 1회 한정).
  * 🌟 카드 등급 문턱값 재조정 (headline≥5 / large≥3 / medium≥2 / small≥1, 1 미만은 피드에서 완전히 숨김)
  *    기존엔 headline≥7이었는데 importance=7짜리(팀창단/공략글)는 등록 직후 시간이 조금만 지나도
  *    감쇠 때문에 바로 7 밑으로 떨어져서 헤드라인이 사실상 유지가 안 됐음. 여유를 두도록 낮춤.
@@ -44,9 +47,10 @@ Boako.NewsFeed = {
 
         root.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">소식을 불러오는 중...</div>`;
 
-        const [feedResult, fillerPool] = await Promise.all([
+        const [feedResult, fillerPool, recommendResult] = await Promise.all([
             Boako.db.from('news_feed_items').select('*').order('created_at', { ascending: false }).limit(80),
             Boako.NewsFeed.buildFillerPool(),
+            Boako.db.rpc('fn_get_today_recommended_game'),
         ]);
 
         if (feedResult.error) {
@@ -58,6 +62,8 @@ Boako.NewsFeed = {
         Boako.NewsFeed.items = feedResult.data || [];
         Boako.NewsFeed.fillerPool = fillerPool;
         Boako.NewsFeed.fillerCursor = 0;
+        // 🌟 [신규] 오늘의 추천 게임 — 이 게임으로 오늘 기록을 남기면 기본 지급 포인트의 2배 보너스 지급
+        Boako.NewsFeed.todayRecommendGame = recommendResult?.data || null;
         Boako.NewsFeed.render();
     },
 
@@ -270,6 +276,12 @@ Boako.NewsFeed = {
                 <h1>📰 아카이브 소식지</h1>
                 <p>${todayStr}</p>
             </div>
+            ${Boako.NewsFeed.todayRecommendGame ? `
+                <div style="display:flex; align-items:center; justify-content:center; gap:10px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 16px; margin-bottom:16px; flex-wrap:wrap; text-align:center;">
+                    <span style="font-size:13px; font-weight:900; color:#92400e;">⭐ 오늘의 추천 게임: ${Boako.NewsFeed.todayRecommendGame}</span>
+                    <span style="font-size:12px; font-weight:700; color:#b45309;">— 오늘 이 게임으로 기록을 남기면 기본 포인트 2배 보너스!</span>
+                </div>
+            ` : ''}
         `;
 
         let scored = Boako.NewsFeed.items.map(item => ({
