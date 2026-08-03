@@ -5,6 +5,8 @@
  *    응원하러 왔다가 자연스럽게 "나도 라이벌전 해볼까?" 유입되도록 같은 화면 안에 배치.
  *    응원 투표는 매치 당사자 제외, 로그인 유저만, 매치당 1표, 마감은 match_schedules.scheduled_time.
  *    결과 확정(complete_rival_match) 시 적중/미적중 모두 포인트 지급(잃는 사람 없음).
+ * 🌟 [수정] 메인 배너 문구를 "⚔️ 라이벌 탐색기" → "⚡ 라이벌 매치"로 변경 — 일정표(schedule.js)의
+ *    라이벌전 아이콘(⚡)/명칭과 통일.
  */
 Boako.Rival = {
     State: {
@@ -17,7 +19,7 @@ Boako.Rival = {
 
         const html = `
             <div class="main-banner" style="background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%);">
-                <h1>⚔️ 라이벌 탐색기</h1>
+                <h1>⚡ 라이벌 매치</h1>
                 <p>내가 즐겨하는 종목을 클릭해 영혼의 맞수를 확인하세요.</p>
                 <p>라이벌 매치를 진행하시면 포인트를 획득할 수 있습니다.</p>
             </div>
