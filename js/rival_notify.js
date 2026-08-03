@@ -1,7 +1,8 @@
 /**
  * [RIVAL VOTE NOTIFY] 라이벌전 승자 예측 투표 결과 실시간 알림
- * 🌟 achievements.js와 완전히 동일한 패턴: rival_match_votes의 resolved_at이 채워지는 순간(결과 확정)을
- *    Realtime으로 감지해서, 사이트 어느 화면에 있든 풀스크린 오버레이로 적중/미적중 + 받은 포인트를 보여줌.
+ * 🌟 achievements.js와 동일한 실시간 감지/큐 패턴이되, 화면 구성은 별도 설계:
+ *    승자(크게, 프사+닉네임+WINNER 뱃지) — VS — 패자(작게, 프사+닉네임+LOSER 뱃지),
+ *    그 아래 내 예측 결과(적중/미적중 + 받은 포인트), 하단 "확인" 버튼으로만 닫힘(배경 클릭 닫힘 없음).
  *    포인트 지급 자체는 DB(complete_rival_match)가 원자적으로 처리하므로, 이 모듈은 순수 "알림 표시"만 담당.
  *    여러 개가 한꺼번에 뜰 수 있어서(오프라인 중 결과가 나온 경우 등) 큐로 순서대로 하나씩 보여줌.
  */
@@ -108,26 +109,39 @@ Boako.RivalNotify = {
         Boako.RivalNotify._processOverlayQueue();
     },
 
-    // 🌟 업적 알림(achievements.js showToast)과 같은 톤의 풀스크린 오버레이.
-    // 클릭해야만 닫힘(자동 닫힘 없음). Promise를 반환해서 큐가 "닫힌 뒤에" 다음 걸 보여줄 수 있게 함.
+    // 🌟 [전면 재설계] VS 구도 오버레이: 승자(크게)-VS-패자(작게), 각각 프사+닉네임+WINNER/LOSER 뱃지,
+    // 가운데 아래에 내 예측 결과(적중/미적중 + 받은 포인트), 하단에 명시적 "확인" 버튼으로만 닫힘.
     showToast: (voteRow) => {
         return new Promise(async (resolve) => {
-            let gameName = null;
-            let pickedName = '내가 고른 선수';
+            let gameName = '라이벌전';
+            let winner = null; // { name, avatar }
+            let loser = null;  // { name, avatar }
+
             try {
                 const { data: match } = await Boako.db
                     .from('rival_matches')
-                    .select('game_name, challenger_id, defender_id')
+                    .select('game_name, challenger_id, defender_id, winner_id')
                     .eq('match_id', voteRow.match_id)
                     .maybeSingle();
+
                 if (match) {
-                    gameName = match.game_name;
-                    const { data: profile } = await Boako.db
+                    gameName = match.game_name || '라이벌전';
+                    const loserId = match.winner_id === match.challenger_id ? match.defender_id : match.challenger_id;
+
+                    const { data: profiles } = await Boako.db
                         .from('profiles')
-                        .select('full_name')
-                        .eq('id', voteRow.predicted_winner_id)
-                        .maybeSingle();
-                    if (profile?.full_name) pickedName = profile.full_name;
+                        .select('id, full_name, profile_url, custom_avatar_url')
+                        .in('id', [match.challenger_id, match.defender_id]);
+
+                    const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+                    const buildPerson = (id) => {
+                        const p = profileMap[id];
+                        const avatar = p ? (p.custom_avatar_url || p.profile_url || null) : null;
+                        return { name: p?.full_name || '선수', avatar: avatar ? avatar.replace('http://', 'https://') : null };
+                    };
+
+                    winner = buildPerson(match.winner_id);
+                    loser = buildPerson(loserId);
                 }
             } catch (e) {
                 console.error('라이벌전 투표 결과 정보 조회 실패:', e);
@@ -136,26 +150,57 @@ Boako.RivalNotify = {
             const isCorrect = !!voteRow.is_correct;
             const rewardPoint = Number(voteRow.reward_point || 0);
 
+            const avatarHtml = (person, size) => person?.avatar
+                ? `<img src="${person.avatar}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; display:block;">`
+                : `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:${Math.round(size*0.4)}px; font-weight:900;">${(person?.name || '?').charAt(0)}</div>`;
+
             const overlay = document.createElement('div');
             overlay.id = 'rival-vote-result-overlay';
             overlay.style.cssText = `
                 position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center;
-                background:rgba(15,23,42,0.6); backdrop-filter:blur(3px); cursor:pointer;
+                background:rgba(15,23,42,0.75); backdrop-filter:blur(3px);
                 opacity:0; transition:opacity .25s ease;
             `;
             overlay.innerHTML = `
-                <div style="display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:20px; max-width:420px;">
-                    <div style="font-size:80px; line-height:1;">${isCorrect ? '🎉' : '🙌'}</div>
-                    <div style="font-size:13px; font-weight:900; color:${isCorrect ? '#fca5a5' : '#c4b5fd'}; letter-spacing:0.12em; text-transform:uppercase;">
-                        ${isCorrect ? '승자 예측 적중!' : '응원 참여 완료!'}
+                <div style="display:flex; flex-direction:column; align-items:center; gap:18px; text-align:center; padding:28px; max-width:440px;">
+                    <div style="font-size:12px; font-weight:900; color:#94a3b8; letter-spacing:0.14em; text-transform:uppercase;">${gameName} · 라이벌전 결과</div>
+
+                    <div style="display:flex; align-items:center; justify-content:center; gap:14px;">
+                        <!-- 승자: 크게 -->
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                            <div style="position:relative;">
+                                <div style="border-radius:50%; padding:4px; background:linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow:0 0 24px rgba(251,191,36,0.5);">
+                                    ${avatarHtml(winner, 84)}
+                                </div>
+                            </div>
+                            <div style="font-size:16px; font-weight:900; color:#fff;">${winner?.name || '승자'}</div>
+                            <div style="font-size:10px; font-weight:900; letter-spacing:0.1em; color:#78350f; background:linear-gradient(135deg,#fde68a,#fbbf24); padding:3px 12px; border-radius:999px;">🏆 WINNER</div>
+                        </div>
+
+                        <div style="font-size:20px; font-weight:900; color:#64748b; font-style:italic; padding-bottom:24px;">VS</div>
+
+                        <!-- 패자: 작게 -->
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:6px; opacity:0.75;">
+                            <div style="border-radius:50%; padding:3px; background:#334155;">
+                                ${avatarHtml(loser, 56)}
+                            </div>
+                            <div style="font-size:13px; font-weight:800; color:#cbd5e1;">${loser?.name || '패자'}</div>
+                            <div style="font-size:9px; font-weight:900; letter-spacing:0.1em; color:#94a3b8; background:#1e293b; padding:2px 10px; border-radius:999px;">LOSER</div>
+                        </div>
                     </div>
-                    <div style="font-size:24px; font-weight:900; color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.45); line-height:1.35;">
-                        ${gameName ? gameName : '라이벌전'}${gameName ? `<br><span style="font-size:15px; color:#cbd5e1; font-weight:700;">${pickedName} 응원 결과</span>` : ''}
+
+                    <div style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:16px;">
+                        <div style="font-size:12px; font-weight:900; color:${isCorrect ? '#fbbf24' : '#c4b5fd'}; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px;">
+                            ${isCorrect ? '🎉 내 예측 적중!' : '🙌 응원 참여 완료'}
+                        </div>
+                        <div style="font-size:15px; font-weight:900; color:#fff; background:rgba(0,0,0,0.3); display:inline-block; padding:6px 18px; border-radius:999px;">
+                            +${rewardPoint.toLocaleString()} P 획득
+                        </div>
                     </div>
-                    <div style="font-size:16px; font-weight:900; color:#fbbf24; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
-                        +${rewardPoint.toLocaleString()} P 획득
-                    </div>
-                    <div style="font-size:11px; font-weight:700; color:rgba(255,255,255,0.6); margin-top:6px;">화면을 탭하면 닫혀요</div>
+
+                    <button id="rival-vote-result-confirm-btn" style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">
+                        확인
+                    </button>
                 </div>
             `;
             document.body.appendChild(overlay);
@@ -175,7 +220,8 @@ Boako.RivalNotify = {
                 overlay.style.opacity = '0';
                 setTimeout(() => { overlay.remove(); resolve(); }, 250);
             };
-            overlay.addEventListener('click', dismiss);
+            // 🌟 화면 아무데나 눌러서 닫히던 것 제거 — 명시적 "확인" 버튼으로만 닫힘
+            document.getElementById('rival-vote-result-confirm-btn')?.addEventListener('click', dismiss);
         });
     }
 };
