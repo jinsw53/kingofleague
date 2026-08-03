@@ -2,6 +2,133 @@
 const SUPABASE_URL = "https://qrredwrxdnvqwdxzanba.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY";
 
+// ==============================================================================
+// 🌟 [신규] 아카이브 로그인 연동 (쪽지함/팀챗/토스트 알림용)
+// 사이트 로그인과는 완전히 별개의 독립 로그인. chrome.identity.launchWebAuthFlow로
+// 카카오 로그인 → Supabase가 발급한 토큰을 확장 프로그램 전용 콜백 주소로 직접 받아옴.
+// 사이트의 localStorage는 전혀 건드리지 않음 (host_permissions로 사이트에 콘텐츠 스크립트를
+// 심을 필요 없음 — 그래서 매니페스트에도 boakoarchive.co.kr은 안 들어감).
+// ==============================================================================
+
+const ARCHIVE_SESSION_KEY = "archiveSession";
+
+// 저장된 세션(액세스 토큰 등)을 가져옴. 저장 안 돼있으면 null.
+async function getStoredArchiveSession() {
+    const result = await chrome.storage.local.get(ARCHIVE_SESSION_KEY);
+    return result[ARCHIVE_SESSION_KEY] || null;
+}
+
+// Supabase에서 받은 사용자 id로 profiles 테이블 조회 (닉네임/프사 등 표시용 최소 정보만)
+async function fetchArchiveProfile(userId, accessToken) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=id,full_name,profile_url,custom_avatar_url`, {
+        headers: {
+            "apikey": SUPABASE_KEY,
+            "Authorization": `Bearer ${accessToken}`
+        }
+    });
+    const rows = await res.json();
+    return rows?.[0] || null;
+}
+
+// 리프레시 토큰으로 액세스 토큰을 갱신 (만료됐을 때 재로그인 없이 자동 연장)
+async function refreshArchiveSession(refreshToken) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken })
+    });
+    if (!res.ok) return null;
+    return await res.json(); // { access_token, refresh_token, expires_in, user }
+}
+
+// 실제 로그인 팝업을 띄우고, 성공하면 세션을 저장까지 마친 뒤 최종 세션 객체를 반환
+async function performArchiveLogin() {
+    const redirectUri = chrome.identity.getRedirectURL(); // https://<확장ID>.chromiumapp.org/
+    const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=kakao&redirect_to=${encodeURIComponent(redirectUri)}`;
+
+    const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+    if (!resultUrl) throw new Error("로그인이 취소되었습니다.");
+
+    // Supabase는 쿼리스트링이 아니라 URL 프래그먼트(#)로 토큰을 돌려줌
+    const fragment = resultUrl.split("#")[1] || "";
+    const params = new URLSearchParams(fragment);
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    const expiresIn = parseInt(params.get("expires_in") || "3600", 10);
+
+    if (!accessToken) throw new Error("로그인 토큰을 받아오지 못했습니다.");
+
+    // 액세스 토큰으로 본인 유저 id 확인
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${accessToken}` }
+    });
+    const userData = await userRes.json();
+    const profile = await fetchArchiveProfile(userData.id, accessToken);
+
+    const session = {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_at: Date.now() + expiresIn * 1000,
+        user: { id: userData.id, nickname: profile?.full_name || "사용자", avatar: profile?.custom_avatar_url || profile?.profile_url || null }
+    };
+
+    await chrome.storage.local.set({ [ARCHIVE_SESSION_KEY]: session });
+    return session;
+}
+
+// content.js가 페이지 로드 시 "지금 로그인 상태 맞는지" 확인할 때 호출.
+// 토큰이 곧 만료되거나 이미 만료됐으면 조용히 리프레시까지 시도함.
+async function getValidArchiveSession() {
+    let session = await getStoredArchiveSession();
+    if (!session) return null;
+
+    // 만료 5분 전부터는 미리 갱신 시도
+    if (Date.now() > session.expires_at - 5 * 60 * 1000) {
+        const refreshed = await refreshArchiveSession(session.refresh_token);
+        if (!refreshed) {
+            // 리프레시도 실패하면 세션이 죽은 것 — 로그아웃 처리
+            await chrome.storage.local.remove(ARCHIVE_SESSION_KEY);
+            return null;
+        }
+        const profile = await fetchArchiveProfile(refreshed.user.id, refreshed.access_token);
+        session = {
+            access_token: refreshed.access_token,
+            refresh_token: refreshed.refresh_token,
+            expires_at: Date.now() + refreshed.expires_in * 1000,
+            user: { id: refreshed.user.id, nickname: profile?.full_name || "사용자", avatar: profile?.custom_avatar_url || profile?.profile_url || null }
+        };
+        await chrome.storage.local.set({ [ARCHIVE_SESSION_KEY]: session });
+    }
+    return session;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "archiveLogin") {
+        performArchiveLogin()
+            .then(session => sendResponse({ success: true, user: session.user }))
+            .catch(err => {
+                console.error("❌ 아카이브 로그인 실패:", err);
+                sendResponse({ success: false, error: err.message });
+            });
+        return true;
+    }
+
+    if (message.action === "archiveLogout") {
+        chrome.storage.local.remove(ARCHIVE_SESSION_KEY).then(() => sendResponse({ success: true }));
+        return true;
+    }
+
+    if (message.action === "getArchiveSession") {
+        getValidArchiveSession()
+            .then(session => sendResponse({ session }))
+            .catch(err => {
+                console.error("❌ 아카이브 세션 확인 실패:", err);
+                sendResponse({ session: null });
+            });
+        return true;
+    }
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     // [추가] 슈파베이스 직송 전용 함수 (기존 로직 방해 안 함)
