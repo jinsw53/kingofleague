@@ -1,0 +1,701 @@
+/**
+ * [BOAKO WIDGET] 아카이브 로그인 연동 - 쪽지함/팀챗/토스트 알림 위젯
+ * 🌟 content.js(기존 175KB, 게임기록 관련)와 완전히 분리된 독립 모듈. 매니페스트 content_scripts에서
+ *    boako-realtime.min.js → boako-widget.js → content.js 순서로 로드됨.
+ * 🌟 화면 좌측 하단 고정 아이콘(토너먼트 버튼이 우측 하단이라 반대편으로 배치, 겹침 없음).
+ * 🌟 실시간 연결은 content.js가 살아있는 동안(=BGA 탭이 열려있는 동안)만 유지됨 — MV3 서비스워커는
+ *    상시 웹소켓 연결을 못 하기 때문에 background.js가 아니라 여기(콘텐츠 스크립트)에서 직접 연결함.
+ * 🌟 [디버깅] BGA 페이지의 CSP(Content-Security-Policy)가 Supabase로의 웹소켓 연결을 막을 가능성이
+ *    있어서, 연결 시도/성공/실패/닫힘 각 단계를 전부 눈에 띄는 색깔의 console 로그로 남김.
+ *    문제가 생기면 개발자 도구 콘솔에서 "[BOAKO WIDGET]"으로 검색하면 바로 원인 단계를 특정할 수 있음.
+ */
+(function () {
+  // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
+  if (window.top !== window) return;
+
+  const SUPABASE_URL = "https://qrredwrxdnvqwdxzanba.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY";
+
+  // ========================================================================
+  // 🌟 [디버깅용] 색깔 있는 콘솔 로그 헬퍼 — 브라우저 콘솔에서 "[BOAKO WIDGET]"으로 필터링하면
+  // 이 위젯 관련 로그만 쫙 모아볼 수 있음
+  // ========================================================================
+  const boakoLog = (msg, ...args) => console.log(`%c[BOAKO WIDGET] ${msg}`, 'color:#4f46e5;font-weight:bold;', ...args);
+  const boakoWarn = (msg, ...args) => console.warn(`%c[BOAKO WIDGET] ⚠️ ${msg}`, 'color:#f59e0b;font-weight:bold;', ...args);
+  const boakoErr = (msg, ...args) => console.error(`%c[BOAKO WIDGET] ❌ ${msg}`, 'color:#ef4444;font-weight:bold;', ...args);
+  const boakoOk = (msg, ...args) => console.log(`%c[BOAKO WIDGET] ✅ ${msg}`, 'color:#16a34a;font-weight:bold;', ...args);
+
+  boakoLog('스크립트 로드됨. Realtime 라이브러리 확인 중...');
+  if (typeof BoakoRealtimeClient === 'undefined') {
+    boakoErr('BoakoRealtimeClient를 찾을 수 없음 — boako-realtime.min.js가 이 스크립트보다 먼저 로드됐는지 manifest.json의 content_scripts 순서를 확인하세요.');
+  } else {
+    boakoOk('BoakoRealtimeClient 로드 확인됨. 실시간 연결에 사용할 준비가 됐어요.');
+  }
+
+  const State = {
+    session: null,       // { access_token, refresh_token, expires_at, user: {id, nickname, avatar} }
+    teamId: null,
+    unread: 0,
+    panelOpen: false,
+    activeTab: 'messages',
+    activeConversation: null, // { otherId, otherName }
+    realtimeClient: null,
+    messages: [],   // 최근 쪽지 (내가 받은/보낸 것 중 상대방별 최신 1건씩)
+    teamChats: [],  // 최근 팀챗
+    settings: {
+      showSenderName: false,
+      dnd: {
+        message: { enabled: false, start: '23:00', end: '08:00' },
+        news: { enabled: false, start: '23:00', end: '08:00' }
+      }
+    }
+  };
+
+  // ========================================================================
+  // 설정 저장/불러오기 (chrome.storage.sync — 같은 구글 계정 크롬이면 기기 간에도 유지됨)
+  // ========================================================================
+  function loadSettings() {
+    return new Promise((resolve) => {
+      chrome.storage.sync.get('boakoWidgetSettings', (result) => {
+        if (result.boakoWidgetSettings) {
+          State.settings = Object.assign(State.settings, result.boakoWidgetSettings);
+        }
+        resolve();
+      });
+    });
+  }
+  function saveSettings() {
+    chrome.storage.sync.set({ boakoWidgetSettings: State.settings });
+  }
+
+  function isInDnd(type) {
+    const cfg = State.settings.dnd[type];
+    if (!cfg.enabled) return false;
+    const now = new Date();
+    const [sh, sm] = cfg.start.split(':').map(Number);
+    const [eh, em] = cfg.end.split(':').map(Number);
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    if (startMin <= endMin) return nowMin >= startMin && nowMin < endMin;
+    return nowMin >= startMin || nowMin < endMin; // 자정 넘어가는 구간
+  }
+
+  // ========================================================================
+  // background.js와의 메시지 통신 (로그인/세션 확인)
+  // ========================================================================
+  function sendBgMessage(action, data) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action, data }, (response) => {
+        if (chrome.runtime.lastError) {
+          boakoErr(`백그라운드 통신 실패 (${action}):`, chrome.runtime.lastError.message);
+          resolve(null);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  }
+
+  async function checkSession() {
+    boakoLog('세션 확인 요청 중...');
+    const res = await sendBgMessage('getArchiveSession');
+    State.session = res?.session || null;
+    if (State.session) {
+      boakoOk('로그인 세션 확인됨:', State.session.user.nickname);
+    } else {
+      boakoLog('로그인 안 된 상태');
+    }
+    return State.session;
+  }
+
+  async function doLogin() {
+    boakoLog('로그인 팝업 요청 중... (chrome.identity.launchWebAuthFlow)');
+    const res = await sendBgMessage('archiveLogin');
+    if (res?.success) {
+      boakoOk('로그인 성공:', res.user.nickname);
+      await initAfterLogin();
+    } else {
+      boakoErr('로그인 실패:', res?.error);
+      showToast('system', '❌', '로그인 실패', res?.error || '알 수 없는 오류');
+    }
+  }
+
+  async function doLogout() {
+    boakoLog('로그아웃 처리 중...');
+    disconnectRealtime();
+    await sendBgMessage('archiveLogout');
+    State.session = null;
+    State.teamId = null;
+    State.unread = 0;
+    render();
+    boakoOk('로그아웃 완료');
+  }
+
+  // ========================================================================
+  // 데이터 조회 (REST) — content_script는 fetch를 페이지 컨텍스트에서 직접 실행 가능
+  // ========================================================================
+  function authHeaders() {
+    return {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${State.session.access_token}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  async function fetchTeamId() {
+    try {
+      const profRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${State.session.user.id}&select=full_name`, { headers: authHeaders() });
+      const [profile] = await profRes.json();
+      if (!profile?.full_name) return null;
+
+      const teamRes = await fetch(`${SUPABASE_URL}/rest/v1/team_members?player_name=eq.${encodeURIComponent(profile.full_name)}&is_active=eq.true&select=team_id`, { headers: authHeaders() });
+      const [member] = await teamRes.json();
+      return member?.team_id || null;
+    } catch (e) {
+      boakoErr('팀 id 조회 실패:', e);
+      return null;
+    }
+  }
+
+  async function fetchUnreadCount() {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/messages?receiver_id=eq.${State.session.user.id}&is_read=eq.false&select=message_id`,
+        { headers: { ...authHeaders(), Prefer: 'count=exact' } }
+      );
+      const countHeader = res.headers.get('content-range'); // 형식: "0-9/총개수"
+      const total = countHeader ? parseInt(countHeader.split('/')[1], 10) : 0;
+      State.unread = total || 0;
+      boakoLog(`안읽은 쪽지 ${State.unread}개 확인됨`);
+    } catch (e) {
+      boakoErr('안읽음 개수 조회 실패:', e);
+    }
+  }
+
+  async function fetchMessages() {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/messages?or=(sender_id.eq.${State.session.user.id},receiver_id.eq.${State.session.user.id})&order=created_at.desc&limit=30&select=message_id,sender_id,receiver_id,content,created_at,sender_name_override,receiver_name_override`,
+        { headers: authHeaders() }
+      );
+      const rows = await res.json();
+      // 상대방 id별로 가장 최근 메시지 1건만 남겨서 "대화 목록"처럼 구성
+      const byOther = new Map();
+      rows.forEach(m => {
+        const isMine = m.sender_id === State.session.user.id;
+        const otherId = isMine ? m.receiver_id : m.sender_id;
+        const otherName = isMine ? m.receiver_name_override : m.sender_name_override;
+        if (!byOther.has(otherId)) byOther.set(otherId, { otherId, otherName, lastMessage: m.content, lastTime: m.created_at });
+      });
+      State.messages = [...byOther.values()];
+      boakoLog(`쪽지 대화 ${State.messages.length}건 로드됨`);
+    } catch (e) {
+      boakoErr('쪽지 목록 조회 실패:', e);
+    }
+  }
+
+  async function fetchTeamChats() {
+    if (!State.teamId) return;
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/team_chats?team_id=eq.${State.teamId}&order=created_at.desc&limit=30&select=id,sender_id,content,created_at`,
+        { headers: authHeaders() }
+      );
+      const rows = await res.json();
+      State.teamChats = rows.reverse();
+      boakoLog(`팀챗 ${State.teamChats.length}건 로드됨`);
+    } catch (e) {
+      boakoErr('팀챗 조회 실패:', e);
+    }
+  }
+
+  async function sendMessageReply(receiverId, content) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+        method: 'POST',
+        headers: { ...authHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ sender_id: State.session.user.id, receiver_id: receiverId, content, sender_name_override: State.session.user.nickname })
+      });
+      boakoOk('쪽지 답장 전송 완료');
+    } catch (e) {
+      boakoErr('쪽지 전송 실패:', e);
+    }
+  }
+
+  async function sendTeamChatMessage(content) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/team_chats`, {
+        method: 'POST',
+        headers: { ...authHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ team_id: State.teamId, sender_id: State.session.user.id, content })
+      });
+      boakoOk('팀챗 전송 완료');
+    } catch (e) {
+      boakoErr('팀챗 전송 실패:', e);
+    }
+  }
+
+  // ========================================================================
+  // 🌟 실시간 연결 (핵심 디버깅 대상) — 이 단계에서 CSP 문제가 있으면 아래 로그로 바로 드러남
+  // ========================================================================
+  function connectRealtime() {
+    if (typeof BoakoRealtimeClient === 'undefined') {
+      boakoErr('BoakoRealtimeClient 없음 — 실시간 연결 시도 자체를 할 수 없음');
+      return;
+    }
+    if (State.realtimeClient) {
+      boakoLog('이미 연결된 realtime 클라이언트가 있어 재사용');
+      return;
+    }
+
+    const wsUrl = `${SUPABASE_URL.replace('https://', 'wss://')}/realtime/v1`;
+    boakoLog('웹소켓 연결 시도:', wsUrl);
+
+    const client = new BoakoRealtimeClient(wsUrl, { params: { apikey: SUPABASE_KEY } });
+    State.realtimeClient = client;
+
+    // 🌟 연결 단계별 상태를 전부 로그로 남김 — CSP가 막으면 보통 onError가 뜨거나, onOpen이 영원히 안 뜸
+    client.onOpen(() => boakoOk('웹소켓 연결 성공! (CSP 문제 없음)'));
+    client.onClose((e) => boakoWarn('웹소켓 연결 종료됨:', e));
+    client.onError((e) => boakoErr('웹소켓 연결 오류 발생 — BGA 페이지의 CSP가 Supabase 연결을 막고 있을 가능성이 있음. 개발자 도구 콘솔에 "Refused to connect" 또는 "violates the following Content Security Policy" 에러가 같이 떠 있는지 확인해보세요.', e));
+
+    client.setAuth(State.session.access_token);
+    client.connect();
+
+    // 내 쪽지함 실시간 구독
+    const msgTopic = `messages-${State.session.user.id}`;
+    boakoLog(`채널 구독 시도: ${msgTopic}`);
+    const msgChannel = client.channel(msgTopic, { config: {} });
+    msgChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${State.session.user.id}` }, (payload) => {
+      boakoOk('새 쪽지 실시간 수신:', payload.new);
+      State.unread += 1;
+      fetchMessages().then(render);
+      handleIncomingToast('message', payload.new);
+    });
+    msgChannel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${msgTopic}`);
+      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${msgTopic}`, err);
+      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT, CSP/네트워크 문제 가능성): ${msgTopic}`);
+      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${msgTopic}`);
+    });
+
+    // 팀챗 실시간 구독 (팀 소속인 경우만)
+    if (State.teamId) {
+      const teamTopic = `team-chats-${State.teamId}`;
+      boakoLog(`채널 구독 시도: ${teamTopic}`);
+      const teamChannel = client.channel(teamTopic, { config: {} });
+      teamChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'team_chats', filter: `team_id=eq.${State.teamId}` }, (payload) => {
+        if (payload.new.sender_id === State.session.user.id) return; // 내가 보낸 건 알림 제외
+        boakoOk('새 팀챗 실시간 수신:', payload.new);
+        fetchTeamChats().then(render);
+        handleIncomingToast('message', payload.new, true);
+      });
+      teamChannel.subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${teamTopic}`);
+        else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${teamTopic}`, err);
+        else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${teamTopic}`);
+        else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${teamTopic}`);
+      });
+    }
+  }
+
+  function disconnectRealtime() {
+    if (State.realtimeClient) {
+      boakoLog('실시간 연결 해제');
+      State.realtimeClient.disconnect();
+      State.realtimeClient = null;
+    }
+  }
+
+  // ========================================================================
+  // 토스트
+  // ========================================================================
+  function handleIncomingToast(kind, payload, isTeam) {
+    const dndType = 'message';
+    if (isInDnd(dndType)) {
+      boakoLog(`방해금지 시간대(메시지) — 토스트 생략, 배지만 반영`);
+      renderBadge();
+      return;
+    }
+    const label = State.settings.showSenderName
+      ? `${payload.sender_name_override || '팀원'} 님이 메시지를 보냈어요`
+      : (isTeam ? '팀챗에 새 메시지가 도착했어요' : '새 쪽지가 도착했어요');
+    const body = State.settings.showSenderName ? (payload.content || '') : '클릭해서 확인해보세요';
+    showToast('message', '📬', label, body, () => {
+      openPanel();
+      showTab(isTeam ? 'teamchat' : 'messages');
+    });
+  }
+
+  function fireNewsToast(title, body, url) {
+    if (isInDnd('news')) {
+      boakoLog('방해금지 시간대(소식) — 소식 토스트 생략');
+      return;
+    }
+    showToast('news', '⭐', title, body, () => window.open(url || 'https://boakoarchive.co.kr/', '_blank'));
+  }
+
+  function showToast(type, icon, title, body, onClick) {
+    ensureToastStack();
+    const stack = document.getElementById('boako-toast-stack');
+    const el = document.createElement('div');
+    el.className = 'boako-toast';
+    el.innerHTML = `<div class="boako-toast-icon">${icon}</div><div><div class="boako-toast-title">${title}</div><div class="boako-toast-body">${body}</div></div>`;
+    if (onClick) { el.style.cursor = 'pointer'; el.addEventListener('click', onClick); }
+    stack.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 250); }, 4500);
+  }
+
+  function showSystemToast(icon, title, body) {
+    showToast('system', icon, title, body, null);
+  }
+
+  // ========================================================================
+  // UI 렌더링
+  // ========================================================================
+  function ensureStyles() {
+    if (document.getElementById('boako-widget-style')) return;
+    const style = document.createElement('style');
+    style.id = 'boako-widget-style';
+    style.textContent = `
+      #boako-widget-icon { position: fixed; left: 20px; bottom: 20px; width: 52px; height: 52px; border-radius: 50%;
+        background: #4f46e5; box-shadow: 0 4px 14px rgba(79,70,229,.4); cursor: pointer; display:flex; align-items:center;
+        justify-content:center; font-size: 24px; z-index: 999000; transition: transform .15s ease; }
+      #boako-widget-icon:hover { transform: scale(1.08); }
+      #boako-widget-icon.boako-logged-out { background:#64748b; box-shadow:0 4px 14px rgba(100,116,139,.35); }
+      #boako-widget-badge { position:absolute; top:-4px; right:-4px; background:#ef4444; color:#fff; font-size:11px;
+        font-weight:900; min-width:20px; height:20px; border-radius:999px; display:flex; align-items:center; justify-content:center;
+        border:2px solid #eef0f3; padding:0 4px; }
+      #boako-widget-badge.hidden { display:none; }
+      #boako-widget-panel { position:fixed; left:20px; bottom:84px; width:340px; max-height:480px; background:#fff;
+        border-radius:14px; box-shadow:0 12px 34px rgba(0,0,0,.22); z-index:999001; display:none; flex-direction:column;
+        overflow:hidden; border:1px solid #e2e8f0; font-family:-apple-system,"Malgun Gothic",sans-serif; }
+      #boako-widget-panel.open { display:flex; }
+      .boako-panel-header { background:#0f172a; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+      .boako-panel-header .boako-title { font-size:13px; font-weight:800; }
+      .boako-panel-header .boako-close { cursor:pointer; opacity:.7; font-size:16px; }
+      .boako-panel-tabs { display:flex; border-bottom:1px solid #e2e8f0; }
+      .boako-panel-tab { flex:1; text-align:center; padding:10px; font-size:12px; font-weight:800; color:#64748b; cursor:pointer; }
+      .boako-panel-tab.active { color:#4f46e5; border-bottom:2px solid #4f46e5; }
+      .boako-panel-body { flex:1; overflow-y:auto; padding:10px 12px; background:#f1f5f9; }
+      .boako-msg-item { background:#fff; border-radius:10px; padding:10px 12px; margin-bottom:8px; box-shadow:0 1px 2px rgba(0,0,0,.04); cursor:pointer; }
+      .boako-msg-item .boako-sender { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:2px; }
+      .boako-msg-item .boako-preview { font-size:12px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .boako-panel-footer { padding:10px 12px; border-top:1px solid #e2e8f0; background:#fff; }
+      .boako-reply-row { display:flex; gap:6px; }
+      .boako-reply-row input { flex:1; border:1px solid #e2e8f0; border-radius:20px; padding:9px 14px; font-size:12.5px; outline:none; }
+      .boako-reply-row button { background:#4f46e5; color:#fff; border:none; border-radius:20px; padding:0 16px; font-size:12px; font-weight:800; cursor:pointer; }
+      .boako-thread-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+      .boako-thread-header .boako-back { cursor:pointer; font-size:16px; color:#64748b; }
+      .boako-login-required { text-align:center; padding:40px 20px; }
+      .boako-login-required .boako-icon { font-size:34px; margin-bottom:10px; }
+      .boako-login-required button { background:#4f46e5; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer; }
+      .boako-settings-row { display:flex; justify-content:space-between; align-items:center; background:#fff; padding:10px 12px; border-radius:8px; margin-bottom:6px; }
+      #boako-toast-stack { position:fixed; top:16px; right:16px; z-index:999999; display:flex; flex-direction:column; gap:8px; width:300px; }
+      .boako-toast { background:#1e293b; color:#fff; border-radius:10px; padding:12px 14px; box-shadow:0 8px 24px rgba(0,0,0,.3);
+        display:flex; gap:10px; align-items:flex-start; opacity:0; transform:translateX(20px); transition:all .25s ease; }
+      .boako-toast.show { opacity:1; transform:translateX(0); }
+      .boako-toast-icon { font-size:20px; flex-shrink:0; }
+      .boako-toast-title { font-size:12px; font-weight:900; margin-bottom:2px; }
+      .boako-toast-body { font-size:11.5px; color:#cbd5e1; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function ensureToastStack() {
+    if (!document.getElementById('boako-toast-stack')) {
+      const stack = document.createElement('div');
+      stack.id = 'boako-toast-stack';
+      document.body.appendChild(stack);
+    }
+  }
+
+  function ensureDom() {
+    if (document.getElementById('boako-widget-icon')) return;
+    ensureStyles();
+    ensureToastStack();
+
+    const icon = document.createElement('div');
+    icon.id = 'boako-widget-icon';
+    icon.innerHTML = `📬<div id="boako-widget-badge" class="hidden">0</div>`;
+    icon.addEventListener('click', () => togglePanel());
+    document.body.appendChild(icon);
+
+    const panel = document.createElement('div');
+    panel.id = 'boako-widget-panel';
+    panel.innerHTML = `
+      <div class="boako-panel-header">
+        <span class="boako-title" id="boako-panel-title">BOAKO 쪽지함</span>
+        <span class="boako-close">✕</span>
+      </div>
+      <div class="boako-panel-tabs">
+        <div class="boako-panel-tab active" data-tab="messages">📬 쪽지함</div>
+        <div class="boako-panel-tab" data-tab="teamchat">💬 팀챗</div>
+        <div class="boako-panel-tab" data-tab="settings">⚙️ 설정</div>
+      </div>
+      <div class="boako-panel-body" id="boako-panel-body"></div>
+      <div class="boako-panel-footer" id="boako-panel-footer"></div>
+    `;
+    document.body.appendChild(panel);
+
+    panel.querySelector('.boako-close').addEventListener('click', () => closePanel());
+    panel.querySelectorAll('.boako-panel-tab').forEach(tabEl => {
+      tabEl.addEventListener('click', () => showTab(tabEl.dataset.tab));
+    });
+  }
+
+  function openPanel() { State.panelOpen = true; render(); }
+  function closePanel() { State.panelOpen = false; render(); }
+  function togglePanel() {
+    if (!State.session) { doLogin(); return; }
+    State.panelOpen = !State.panelOpen;
+    render();
+  }
+  function showTab(tab) {
+    if (!State.session) { doLogin(); return; }
+    State.activeTab = tab;
+    State.activeConversation = null;
+    State.panelOpen = true;
+    render();
+  }
+
+  function renderBadge() {
+    const badge = document.getElementById('boako-widget-badge');
+    const icon = document.getElementById('boako-widget-icon');
+    if (!badge || !icon) return;
+    icon.classList.toggle('boako-logged-out', !State.session);
+    if (State.unread > 0) {
+      badge.textContent = State.unread > 99 ? '99+' : String(State.unread);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  function render() {
+    ensureDom();
+    renderBadge();
+
+    const panel = document.getElementById('boako-widget-panel');
+    panel.classList.toggle('open', State.panelOpen);
+    panel.querySelectorAll('.boako-panel-tab').forEach(tabEl => {
+      tabEl.classList.toggle('active', tabEl.dataset.tab === State.activeTab);
+    });
+
+    renderBody();
+    renderFooter();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.innerText = str || '';
+    return div.innerHTML;
+  }
+
+  function renderBody() {
+    const body = document.getElementById('boako-panel-body');
+    const title = document.getElementById('boako-panel-title');
+    if (!body) return;
+
+    if (!State.session) {
+      title.textContent = 'BOAKO 쪽지함';
+      body.innerHTML = `
+        <div class="boako-login-required">
+          <div class="boako-icon">🔒</div>
+          <p style="font-size:12px;color:#64748b;font-weight:700;line-height:1.6;margin:0 0 16px;">로그인하면 쪽지함과 팀챗을<br>바로 확인할 수 있어요.</p>
+          <button id="boako-login-btn">🟡 카카오 계정으로 로그인</button>
+        </div>
+      `;
+      document.getElementById('boako-login-btn').addEventListener('click', doLogin);
+      return;
+    }
+
+    if (State.activeTab === 'messages') {
+      title.textContent = 'BOAKO 쪽지함';
+      if (State.activeConversation) {
+        body.innerHTML = renderThreadPlaceholder(State.activeConversation);
+        return;
+      }
+      if (State.messages.length === 0) {
+        body.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;font-size:12px;font-weight:700;">받은 쪽지가 없어요</div>`;
+        return;
+      }
+      body.innerHTML = State.messages.map((m, i) => `
+        <div class="boako-msg-item" data-idx="${i}">
+          <div class="boako-sender">${escapeHtml(m.otherName || '알 수 없음')}</div>
+          <div class="boako-preview">${escapeHtml(m.lastMessage)}</div>
+        </div>
+      `).join('');
+      body.querySelectorAll('.boako-msg-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const m = State.messages[Number(el.dataset.idx)];
+          State.activeConversation = { otherId: m.otherId, otherName: m.otherName };
+          render();
+        });
+      });
+    } else if (State.activeTab === 'teamchat') {
+      title.textContent = '팀 작전 회의실';
+      if (!State.teamId) {
+        body.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;font-size:12px;font-weight:700;">소속된 팀이 없어요</div>`;
+        return;
+      }
+      body.innerHTML = State.teamChats.map(m => `
+        <div class="boako-msg-item">
+          <div class="boako-sender">${escapeHtml(m.sender_id === State.session.user.id ? '나' : '팀원')}</div>
+          <div class="boako-preview">${escapeHtml(m.content)}</div>
+        </div>
+      `).join('') || `<div style="text-align:center;padding:30px;color:#94a3b8;font-size:12px;font-weight:700;">아직 팀챗 메시지가 없어요</div>`;
+    } else if (State.activeTab === 'settings') {
+      title.textContent = '알림 설정';
+      body.innerHTML = renderSettings();
+      bindSettingsEvents();
+    }
+  }
+
+  function renderThreadPlaceholder(conv) {
+    return `
+      <div class="boako-thread-header">
+        <span class="boako-back" id="boako-thread-back">←</span>
+        <span style="font-size:13px;font-weight:900;">${escapeHtml(conv.otherName || '대화')}</span>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;text-align:center;padding:16px 0;">최근 대화는 여기 표시됩니다. 하단에서 답장을 보내보세요.</div>
+    `;
+  }
+
+  function renderFooter() {
+    const footer = document.getElementById('boako-panel-footer');
+    if (!footer) return;
+    if (!State.session || State.activeTab === 'settings') { footer.innerHTML = ''; return; }
+
+    if (State.activeTab === 'messages' && State.activeConversation) {
+      footer.innerHTML = `<div class="boako-reply-row"><input type="text" id="boako-reply-input" placeholder="답장을 입력하세요"><button id="boako-reply-send">전송</button></div>`;
+      const send = async () => {
+        const input = document.getElementById('boako-reply-input');
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        await sendMessageReply(State.activeConversation.otherId, text);
+        await fetchMessages();
+        render();
+      };
+      document.getElementById('boako-reply-send').addEventListener('click', send);
+      document.getElementById('boako-reply-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
+    } else if (State.activeTab === 'teamchat' && State.teamId) {
+      footer.innerHTML = `<div class="boako-reply-row"><input type="text" id="boako-team-input" placeholder="팀챗 메시지 입력"><button id="boako-team-send">전송</button></div>`;
+      const send = async () => {
+        const input = document.getElementById('boako-team-input');
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        await sendTeamChatMessage(text);
+        await fetchTeamChats();
+        render();
+      };
+      document.getElementById('boako-team-send').addEventListener('click', send);
+      document.getElementById('boako-team-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
+    } else {
+      footer.innerHTML = `<button style="width:100%;background:#f1f5f9;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:800;color:#334155;cursor:pointer;" id="boako-open-archive">🔗 아카이브에서 전체 보기</button>`;
+      const btn = document.getElementById('boako-open-archive');
+      if (btn) btn.addEventListener('click', () => window.open('https://boakoarchive.co.kr/', '_blank'));
+    }
+
+    // 뒤로가기 버튼(스레드 뷰)은 body 쪽에 있어서 여기서 별도 바인딩
+    const back = document.getElementById('boako-thread-back');
+    if (back) back.addEventListener('click', () => { State.activeConversation = null; render(); });
+  }
+
+  function renderSettings() {
+    const d = State.settings;
+    return `
+      <div style="font-size:11px;font-weight:900;color:#64748b;text-transform:uppercase;margin:0 0 8px;">메시지 미리보기</div>
+      <div class="boako-settings-row">
+        <div style="font-size:12px;font-weight:700;">발신자 이름 표시</div>
+        <input type="checkbox" id="boako-set-showsender" ${d.showSenderName ? 'checked' : ''}>
+      </div>
+
+      <div style="font-size:11px;font-weight:900;color:#64748b;text-transform:uppercase;margin:14px 0 8px;">메시지 방해금지</div>
+      <div class="boako-settings-row">
+        <div style="font-size:12px;font-weight:700;">방해금지 사용</div>
+        <input type="checkbox" id="boako-set-dnd-msg" ${d.dnd.message.enabled ? 'checked' : ''}>
+      </div>
+      <div class="boako-settings-row">
+        <input type="time" id="boako-set-dnd-msg-start" value="${d.dnd.message.start}">
+        <span>~</span>
+        <input type="time" id="boako-set-dnd-msg-end" value="${d.dnd.message.end}">
+      </div>
+
+      <div style="font-size:11px;font-weight:900;color:#64748b;text-transform:uppercase;margin:14px 0 8px;">아카이브 소식 방해금지</div>
+      <div class="boako-settings-row">
+        <div style="font-size:12px;font-weight:700;">방해금지 사용</div>
+        <input type="checkbox" id="boako-set-dnd-news" ${d.dnd.news.enabled ? 'checked' : ''}>
+      </div>
+      <div class="boako-settings-row">
+        <input type="time" id="boako-set-dnd-news-start" value="${d.dnd.news.start}">
+        <span>~</span>
+        <input type="time" id="boako-set-dnd-news-end" value="${d.dnd.news.end}">
+      </div>
+
+      <div class="boako-settings-row" style="margin-top:14px;">
+        <button id="boako-logout-btn" style="width:100%;background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:800;cursor:pointer;">로그아웃</button>
+      </div>
+    `;
+  }
+
+  function bindSettingsEvents() {
+    const d = State.settings;
+    document.getElementById('boako-set-showsender').addEventListener('change', (e) => { d.showSenderName = e.target.checked; saveSettings(); });
+
+    document.getElementById('boako-set-dnd-msg').addEventListener('change', (e) => {
+      d.dnd.message.enabled = e.target.checked;
+      saveSettings();
+      if (e.target.checked) showSystemToast('🔕', '메시지 방해금지 켜짐', `${d.dnd.message.start}~${d.dnd.message.end} 동안 알림이 표시되지 않아요. 배지 숫자는 계속 반영돼요.`);
+      else showSystemToast('🔔', '메시지 방해금지 꺼짐', '이제부터 다시 알림이 표시됩니다.');
+    });
+    document.getElementById('boako-set-dnd-msg-start').addEventListener('change', (e) => { d.dnd.message.start = e.target.value; saveSettings(); });
+    document.getElementById('boako-set-dnd-msg-end').addEventListener('change', (e) => { d.dnd.message.end = e.target.value; saveSettings(); });
+
+    document.getElementById('boako-set-dnd-news').addEventListener('change', (e) => {
+      d.dnd.news.enabled = e.target.checked;
+      saveSettings();
+      if (e.target.checked) showSystemToast('🔕', '아카이브 소식 방해금지 켜짐', `${d.dnd.news.start}~${d.dnd.news.end} 동안 알림이 표시되지 않아요.`);
+      else showSystemToast('🔔', '아카이브 소식 방해금지 꺼짐', '이제부터 다시 알림이 표시됩니다.');
+    });
+    document.getElementById('boako-set-dnd-news-start').addEventListener('change', (e) => { d.dnd.news.start = e.target.value; saveSettings(); });
+    document.getElementById('boako-set-dnd-news-end').addEventListener('change', (e) => { d.dnd.news.end = e.target.value; saveSettings(); });
+
+    document.getElementById('boako-logout-btn').addEventListener('click', doLogout);
+  }
+
+  // ========================================================================
+  // 초기화
+  // ========================================================================
+  async function initAfterLogin() {
+    boakoLog('로그인 이후 초기화 시작...');
+    await Promise.all([fetchUnreadCount()]);
+    State.teamId = await fetchTeamId();
+    boakoLog('소속 팀 id:', State.teamId || '(없음)');
+    await Promise.all([fetchMessages(), fetchTeamChats()]);
+    connectRealtime();
+    render();
+  }
+
+  async function init() {
+    boakoLog('위젯 초기화 시작');
+    ensureDom();
+    await loadSettings();
+    await checkSession();
+    render();
+    if (State.session) {
+      await initAfterLogin();
+    }
+    boakoOk('위젯 초기화 완료');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
