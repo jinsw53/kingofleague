@@ -20,6 +20,12 @@
  * 🌟 [버그수정] fetchMessages에 limit=30이 걸려있어서, 최근 메시지 30건 안에 없는 오래된 대화가
  *    목록에서 통째로 안 보이던 문제 — 사이트(messenger.js)처럼 제한 없이 전체를 가져오도록 수정.
  * 🌟 [신규] 쪽지 목록의 각 대화 항목에 그 대화의 안읽음 개수를 빨간 배지로 표시.
+ * 🌟 [버그수정] sendMessageReply에서 receiver_name_override를 안 넣어서, 확장에서 보낸 쪽지가
+ *    상대방 목록에 "알 수 없음"으로 뜨던 문제 — 이미 생긴 데이터는 DB에서 소급 백필, 코드도 같이 수정.
+ * 🌟 [신규] 게임 페이지 등에서 아이콘이 화면 밖/아래로 밀려나 보이는 현상에 대한 방어 로직 —
+ *    resize 이벤트 + 3초 주기로 화면 범위를 재확인해서 벗어나 있으면 자동으로 되돌림 (!important도 추가).
+ * 🌟 [수정] 대화 스레드를 한 번에(limit=100) 불러오던 것 → 카톡처럼 최근 30개만 먼저 불러오고
+ *    "이전 대화 더 보기" 버튼을 눌러야 그 이전 30개를 추가로 불러오는 방식으로 변경 (리소스 절약).
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -54,6 +60,8 @@
     realtimeClient: null,
     messages: [],   // 최근 쪽지 (내가 받은/보낸 것 중 상대방별 최신 1건씩)
     threadMessages: [], // 🌟 [신규] 현재 열어본 대화 상대와 주고받은 전체 메시지
+    threadHasMore: false, // 🌟 [신규] 더 불러올 과거 대화가 남아있는지
+    threadLoadingMore: false,
     teamChats: [],  // 최근 팀챗
     settings: {
       showSenderName: false,
@@ -231,19 +239,43 @@
     }
   }
 
-  // 🌟 [신규] 특정 상대방과 주고받은 전체 메시지(대화 내역)를 시간순으로 조회
-  async function fetchThreadMessages(otherId) {
+  const THREAD_PAGE_SIZE = 30;
+
+  // 🌟 [수정] 전체를 한 번에(limit=100) 불러오던 것 → 카톡처럼 최근 30개만 먼저 불러오고,
+  // "이전 대화 더 보기"를 눌러야 그 이전 30개를 추가로 불러오는 방식으로 변경 (불필요한 리소스 낭비 방지).
+  // before가 없으면 최신 30개, 있으면 그 시각 이전의 30개를 더 가져와서 앞쪽에 이어붙임.
+  async function fetchThreadMessages(otherId, before) {
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/messages?or=(and(sender_id.eq.${State.session.user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${State.session.user.id}))&order=created_at.asc&limit=100&select=message_id,sender_id,content,created_at`,
-        { headers: authHeaders() }
-      );
-      State.threadMessages = await res.json();
-      boakoLog(`대화 내역 ${State.threadMessages.length}건 로드됨`);
+      let url = `${SUPABASE_URL}/rest/v1/messages?or=(and(sender_id.eq.${State.session.user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${State.session.user.id}))&order=created_at.desc&limit=${THREAD_PAGE_SIZE}&select=message_id,sender_id,content,created_at`;
+      if (before) url += `&created_at=lt.${encodeURIComponent(before)}`;
+
+      const res = await fetch(url, { headers: authHeaders() });
+      const rows = await res.json(); // 최신순(desc)으로 옴
+      State.threadHasMore = rows.length === THREAD_PAGE_SIZE; // 정확히 페이지 크기만큼 왔으면 더 있을 가능성
+
+      const chronological = rows.reverse(); // 화면엔 오래된→최신 순으로 보여줘야 하니 뒤집음
+      State.threadMessages = before ? [...chronological, ...State.threadMessages] : chronological;
+      boakoLog(`대화 내역 ${chronological.length}건 ${before ? '추가' : ''}로드됨 (더 있음: ${State.threadHasMore})`);
     } catch (e) {
       boakoErr('대화 내역 조회 실패:', e);
-      State.threadMessages = [];
+      if (!before) State.threadMessages = [];
     }
+  }
+
+  // 🌟 [신규] "이전 대화 더 보기" 클릭 시 호출 — 지금 맨 위에 있는 메시지 시각 기준으로 그 이전 30개를 더 불러옴
+  async function loadMoreThread() {
+    if (State.threadLoadingMore || !State.threadHasMore || State.threadMessages.length === 0) return;
+    State.threadLoadingMore = true;
+    const oldestTime = State.threadMessages[0].created_at;
+    const body = document.getElementById('boako-panel-body');
+    const prevScrollHeight = body ? body.scrollHeight : 0;
+
+    await fetchThreadMessages(State.activeConversation.otherId, oldestTime);
+    render();
+
+    // 위로 새 메시지가 붙었을 때, 보던 위치가 화면에서 안 튀도록 스크롤 보정
+    if (body) body.scrollTop = body.scrollHeight - prevScrollHeight;
+    State.threadLoadingMore = false;
   }
 
   // 🌟 [신규] 이 상대방이 보낸(내가 받은) 메시지들을 읽음 처리 — 배지 숫자에도 반영
@@ -262,6 +294,8 @@
   // 🌟 [신규] 대화 열기 — 내역 조회 + 읽음 처리를 한 번에 처리
   async function openConversation(otherId, otherName) {
     State.activeConversation = { otherId, otherName };
+    State.threadMessages = []; // 🌟 이전에 보던 대화의 잔상이 잠깐 섞여 보이지 않도록 먼저 비움
+    State.threadHasMore = false;
     render(); // 우선 스레드 헤더만 보여주고
     await fetchThreadMessages(otherId);
     await markThreadAsRead(otherId);
@@ -269,12 +303,20 @@
     render(); // 실제 메시지로 다시 그림
   }
 
-  async function sendMessageReply(receiverId, content) {
+  // 🌟 [버그수정] receiver_name_override를 안 넣어서, 내가 보낸 답장 목록에서 상대방 이름이
+  // "알 수 없음"으로 뜨던 문제 — 대화창을 열 때 이미 알고 있는 상대방 이름(otherName)을 같이 저장.
+  async function sendMessageReply(receiverId, receiverName, content) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
         method: 'POST',
         headers: { ...authHeaders(), Prefer: 'return=minimal' },
-        body: JSON.stringify({ sender_id: State.session.user.id, receiver_id: receiverId, content, sender_name_override: State.session.user.nickname })
+        body: JSON.stringify({
+          sender_id: State.session.user.id,
+          receiver_id: receiverId,
+          content,
+          sender_name_override: State.session.user.nickname,
+          receiver_name_override: receiverName
+        })
       });
       boakoOk('쪽지 답장 전송 완료');
     } catch (e) {
@@ -429,7 +471,7 @@
     const style = document.createElement('style');
     style.id = 'boako-widget-style';
     style.textContent = `
-      #boako-widget-icon { position: fixed; left: 20px; top: calc(100vh - 72px); width: 52px; height: 52px; border-radius: 50%;
+      #boako-widget-icon { position: fixed !important; left: 20px; top: calc(100vh - 72px); width: 52px; height: 52px; border-radius: 50%;
         background: #4f46e5; box-shadow: 0 4px 14px rgba(79,70,229,.4); cursor: grab; display:flex; align-items:center;
         justify-content:center; font-size: 24px; z-index: 999000; user-select:none; }
       #boako-widget-icon.boako-dragging { cursor: grabbing; box-shadow: 0 8px 22px rgba(0,0,0,.35); }
@@ -503,6 +545,12 @@
 
     makeIconDraggable(icon);
 
+    // 🌟 [신규] 게임 페이지 등에서 가끔 아이콘이 화면 아래로 밀려나 보이는 현상에 대한 방어 로직.
+    // 정확한 원인(BGA 페이지 자체의 동적 레이아웃/스케일링 가능성)을 100% 재현은 못 했지만,
+    // 창 크기 변화 시 + 주기적으로 "화면 안에 있는지"를 다시 확인해서 벗어나 있으면 되돌려놓음.
+    window.addEventListener('resize', () => reclampIconPosition(icon));
+    setInterval(() => reclampIconPosition(icon), 3000);
+
     const panel = document.createElement('div');
     panel.id = 'boako-widget-panel';
     panel.innerHTML = `
@@ -528,6 +576,19 @@
 
   function clampToViewport(value, size, viewportSize) {
     return Math.max(4, Math.min(value, viewportSize - size - 4));
+  }
+
+  // 🌟 [신규] 아이콘이 화면 범위를 벗어나 있으면(드래그 중이 아닐 때) 강제로 다시 안쪽으로 당겨옴
+  function reclampIconPosition(icon) {
+    if (icon.classList.contains('boako-dragging')) return; // 드래그 중엔 건드리지 않음
+    const rect = icon.getBoundingClientRect();
+    const clampedLeft = clampToViewport(rect.left, rect.width || 52, window.innerWidth);
+    const clampedTop = clampToViewport(rect.top, rect.height || 52, window.innerHeight);
+    if (Math.abs(clampedLeft - rect.left) > 1 || Math.abs(clampedTop - rect.top) > 1) {
+      boakoWarn('아이콘이 화면 범위를 벗어나 있어 위치를 다시 보정했어요.', { before: { left: rect.left, top: rect.top }, after: { left: clampedLeft, top: clampedTop } });
+      icon.style.left = clampedLeft + 'px';
+      icon.style.top = clampedTop + 'px';
+    }
   }
 
   // 🌟 [신규] 아이콘 드래그 이동 — content.js의 사이드바 드래그(makeDraggable)와 같은 패턴:
@@ -676,7 +737,9 @@
       title.textContent = 'BOAKO 쪽지함';
       if (State.activeConversation) {
         body.innerHTML = renderThread(State.activeConversation);
-        // 렌더 직후 맨 아래(최신 메시지)로 스크롤
+        const loadMoreBtn = document.getElementById('boako-load-more-thread');
+        if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadMoreThread);
+        // 렌더 직후 맨 아래(최신 메시지)로 스크롤 (더 불러오기 시엔 openConversation/loadMoreThread 쪽에서 별도 보정함)
         body.scrollTop = body.scrollHeight;
         return;
       }
@@ -742,6 +805,7 @@
         <span class="boako-back" id="boako-thread-back">←</span>
         <span style="font-size:13px;font-weight:900;">${escapeHtml(conv.otherName || '대화')}</span>
       </div>
+      ${State.threadHasMore ? `<div style="text-align:center; margin-bottom:10px;"><button id="boako-load-more-thread" style="background:#e2e8f0; color:#475569; border:none; border-radius:999px; padding:6px 14px; font-size:11px; font-weight:800; cursor:pointer;">↑ 이전 대화 더 보기</button></div>` : ''}
       ${bubbles || `<div style="font-size:11px;color:#94a3b8;text-align:center;padding:16px 0;">불러오는 중...</div>`}
     `;
   }
@@ -758,7 +822,7 @@
         const text = input.value.trim();
         if (!text) return;
         input.value = '';
-        await sendMessageReply(State.activeConversation.otherId, text);
+        await sendMessageReply(State.activeConversation.otherId, State.activeConversation.otherName, text);
         await Promise.all([fetchMessages(), fetchThreadMessages(State.activeConversation.otherId)]);
         render();
         const body = document.getElementById('boako-panel-body');
