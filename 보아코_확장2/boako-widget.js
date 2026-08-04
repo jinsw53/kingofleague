@@ -14,6 +14,9 @@
  * 🌟 [버그수정] 로그인 성공 응답엔 user 정보만 오고 토큰이 없어서 State.session이 계속 null로 남아있던
  *    문제 수정 — 로그인 성공 직후 저장된 전체 세션을 다시 조회해서 채우도록 함.
  * 🌟 [버그수정] onOpen/onClose/onError는 RealtimeClient 최상위가 아니라 client.socketAdapter에 있음.
+ * 🌟 [버그수정] 대화방을 열어도 실제 메시지 없이 고정 안내 문구만 뜨던 문제 — fetchThreadMessages/
+ *    markThreadAsRead/openConversation을 신규 추가해서 실제 대화 내역을 말풍선으로 그리고 읽음 처리까지 함.
+ *    실시간으로 새 쪽지가 오면, 그 대화를 이미 보고 있는 경우 목록뿐 아니라 열린 대화창에도 바로 반영됨.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -47,6 +50,7 @@
     activeConversation: null, // { otherId, otherName }
     realtimeClient: null,
     messages: [],   // 최근 쪽지 (내가 받은/보낸 것 중 상대방별 최신 1건씩)
+    threadMessages: [], // 🌟 [신규] 현재 열어본 대화 상대와 주고받은 전체 메시지
     teamChats: [],  // 최근 팀챗
     settings: {
       showSenderName: false,
@@ -219,6 +223,43 @@
     }
   }
 
+  // 🌟 [신규] 특정 상대방과 주고받은 전체 메시지(대화 내역)를 시간순으로 조회
+  async function fetchThreadMessages(otherId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/messages?or=(and(sender_id.eq.${State.session.user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${State.session.user.id}))&order=created_at.asc&limit=100&select=message_id,sender_id,content,created_at`,
+        { headers: authHeaders() }
+      );
+      State.threadMessages = await res.json();
+      boakoLog(`대화 내역 ${State.threadMessages.length}건 로드됨`);
+    } catch (e) {
+      boakoErr('대화 내역 조회 실패:', e);
+      State.threadMessages = [];
+    }
+  }
+
+  // 🌟 [신규] 이 상대방이 보낸(내가 받은) 메시지들을 읽음 처리 — 배지 숫자에도 반영
+  async function markThreadAsRead(otherId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/messages?sender_id=eq.${otherId}&receiver_id=eq.${State.session.user.id}&is_read=eq.false`,
+        { method: 'PATCH', headers: { ...authHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify({ is_read: true }) }
+      );
+      if (res.ok) await fetchUnreadCount();
+    } catch (e) {
+      boakoErr('읽음 처리 실패:', e);
+    }
+  }
+
+  // 🌟 [신규] 대화 열기 — 내역 조회 + 읽음 처리를 한 번에 처리
+  async function openConversation(otherId, otherName) {
+    State.activeConversation = { otherId, otherName };
+    render(); // 우선 스레드 헤더만 보여주고
+    await fetchThreadMessages(otherId);
+    await markThreadAsRead(otherId);
+    render(); // 실제 메시지로 다시 그림
+  }
+
   async function sendMessageReply(receiverId, content) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
@@ -278,11 +319,19 @@
     const msgTopic = `messages-${State.session.user.id}`;
     boakoLog(`채널 구독 시도: ${msgTopic}`);
     const msgChannel = client.channel(msgTopic, { config: {} });
-    msgChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${State.session.user.id}` }, (payload) => {
+    msgChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${State.session.user.id}` }, async (payload) => {
       boakoOk('새 쪽지 실시간 수신:', payload.new);
       State.unread += 1;
-      fetchMessages().then(render);
-      handleIncomingToast('message', payload.new);
+      await fetchMessages();
+      // 🌟 지금 그 상대방과의 대화를 이미 보고 있으면, 목록뿐 아니라 열린 대화창에도 바로 반영 + 읽음 처리
+      const isViewingThisThread = State.panelOpen && State.activeTab === 'messages' && State.activeConversation?.otherId === payload.new.sender_id;
+      if (isViewingThisThread) {
+        await fetchThreadMessages(payload.new.sender_id);
+        await markThreadAsRead(payload.new.sender_id);
+      }
+      render();
+      // 이미 그 대화를 보고 있는 중이면 토스트까지 띄울 필요는 없음
+      if (!isViewingThisThread) handleIncomingToast('message', payload.new);
     });
     msgChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${msgTopic}`);
@@ -617,7 +666,9 @@
     if (State.activeTab === 'messages') {
       title.textContent = 'BOAKO 쪽지함';
       if (State.activeConversation) {
-        body.innerHTML = renderThreadPlaceholder(State.activeConversation);
+        body.innerHTML = renderThread(State.activeConversation);
+        // 렌더 직후 맨 아래(최신 메시지)로 스크롤
+        body.scrollTop = body.scrollHeight;
         return;
       }
       if (State.messages.length === 0) {
@@ -633,8 +684,7 @@
       body.querySelectorAll('.boako-msg-item').forEach(el => {
         el.addEventListener('click', () => {
           const m = State.messages[Number(el.dataset.idx)];
-          State.activeConversation = { otherId: m.otherId, otherName: m.otherName };
-          render();
+          openConversation(m.otherId, m.otherName);
         });
       });
     } else if (State.activeTab === 'teamchat') {
@@ -656,13 +706,31 @@
     }
   }
 
-  function renderThreadPlaceholder(conv) {
+  // 🌟 [버그수정] 예전엔 실제 메시지 없이 고정 안내 문구만 보여주던 걸, 실제 대화 내역을
+  // 말풍선(내 메시지는 우측/보라, 상대 메시지는 좌측/흰색)으로 그리도록 수정.
+  function renderThread(conv) {
+    const bubbles = State.threadMessages.map(m => {
+      const isMe = m.sender_id === State.session.user.id;
+      const time = new Date(m.created_at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+      return `
+        <div style="display:flex; margin-bottom:8px; ${isMe ? 'justify-content:flex-end;' : 'justify-content:flex-start;'}">
+          <div>
+            <div style="max-width:220px; padding:8px 12px; border-radius:14px; font-size:12.5px; line-height:1.4;
+              ${isMe ? 'background:#4f46e5; color:#fff; border-bottom-right-radius:4px;' : 'background:#fff; color:#0f172a; border-bottom-left-radius:4px; box-shadow:0 1px 2px rgba(0,0,0,.05);'}">
+              ${escapeHtml(m.content)}
+            </div>
+            <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0; text-align:${isMe ? 'right' : 'left'};">${time}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
     return `
       <div class="boako-thread-header">
         <span class="boako-back" id="boako-thread-back">←</span>
         <span style="font-size:13px;font-weight:900;">${escapeHtml(conv.otherName || '대화')}</span>
       </div>
-      <div style="font-size:11px;color:#94a3b8;text-align:center;padding:16px 0;">최근 대화는 여기 표시됩니다. 하단에서 답장을 보내보세요.</div>
+      ${bubbles || `<div style="font-size:11px;color:#94a3b8;text-align:center;padding:16px 0;">불러오는 중...</div>`}
     `;
   }
 
@@ -679,8 +747,10 @@
         if (!text) return;
         input.value = '';
         await sendMessageReply(State.activeConversation.otherId, text);
-        await fetchMessages();
+        await Promise.all([fetchMessages(), fetchThreadMessages(State.activeConversation.otherId)]);
         render();
+        const body = document.getElementById('boako-panel-body');
+        if (body) body.scrollTop = body.scrollHeight;
       };
       document.getElementById('boako-reply-send').addEventListener('click', send);
       document.getElementById('boako-reply-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
