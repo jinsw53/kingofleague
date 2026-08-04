@@ -31,6 +31,9 @@
  * 🌟 [수정] 소식 토스트 클릭 시 무조건 홈으로만 가던 것 → link_type/link_id를 URL 쿼리로 실어서
  *    보냄 (예: ?open=RIVAL_MATCH&id=매치id). 사이트 쪽(auth.js)에서 이 쿼리를 읽어
  *    Boako.Util.navigateToLink()로 정확한 화면으로 자동 이동시킴.
+ * 🌟 [신규] 업적 획득/라이벌전 투표결과/오늘의 추천게임 보너스 실시간 오버레이 추가 — 사이트의
+ *    achievements.js/rival_notify.js/recommend_notify.js와 동일한 실시간 감지 방식을, BGA 페이지에
+ *    직접 그려넣는 전체화면 팝업(큐 처리 포함)으로 재현.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -436,6 +439,66 @@
       else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${newsTopic}`);
       else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${newsTopic}`);
     });
+
+    // 🌟 [신규] 업적 획득 실시간 구독 — 사이트 achievements.js와 동일한 실시간 감지, 오버레이는 확장 전용 간소화 버전
+    const achvTopic = `achievements-${State.session.user.id}`;
+    boakoLog(`채널 구독 시도: ${achvTopic}`);
+    const achvChannel = client.channel(achvTopic, { config: {} });
+    achvChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${State.session.user.id}` }, async (payload) => {
+      boakoOk('새 업적 달성 실시간 수신:', payload.new);
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${payload.new.achievement_id}&select=name,description`, { headers: authHeaders() });
+        const [ach] = await res.json();
+        enqueueFullscreenOverlay(renderAchievementOverlay(ach?.name || '새 업적', ach?.description || ''));
+      } catch (e) { boakoErr('업적 정보 조회 실패:', e); }
+    });
+    achvChannel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${achvTopic}`);
+      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${achvTopic}`, err);
+      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${achvTopic}`);
+      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${achvTopic}`);
+    });
+
+    // 🌟 [신규] 라이벌전 승자 예측 투표 결과 실시간 구독 — resolved_at이 새로 채워지는 순간만 알림
+    const rivalTopic = `rival-votes-${State.session.user.id}`;
+    boakoLog(`채널 구독 시도: ${rivalTopic}`);
+    const rivalChannel = client.channel(rivalTopic, { config: {} });
+    rivalChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rival_match_votes', filter: `voter_id=eq.${State.session.user.id}` }, async (payload) => {
+      if (!payload.new.resolved_at || payload.old.resolved_at) return; // 이번에 새로 확정된 것만
+      boakoOk('라이벌전 투표 결과 실시간 수신:', payload.new);
+      try {
+        const [matchRes, winnerRes] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/rival_matches?match_id=eq.${payload.new.match_id}&select=game_name`, { headers: authHeaders() }),
+          fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${payload.new.predicted_winner_id}&select=full_name`, { headers: authHeaders() })
+        ]);
+        const [match] = await matchRes.json();
+        const [winner] = await winnerRes.json();
+        enqueueFullscreenOverlay(renderRivalResultOverlay(match?.game_name || '라이벌전', winner?.full_name || '', payload.new.is_correct, payload.new.reward_point));
+      } catch (e) { boakoErr('라이벌전 결과 정보 조회 실패:', e); }
+    });
+    rivalChannel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${rivalTopic}`);
+      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${rivalTopic}`, err);
+      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${rivalTopic}`);
+      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${rivalTopic}`);
+    });
+
+    // 🌟 [신규] 오늘의 추천 게임 보너스 지급 실시간 구독 — bonus_point가 0에서 실제 값으로 바뀌는 순간만 알림
+    const recTopic = `recommend-bonus-${State.session.user.id}`;
+    boakoLog(`채널 구독 시도: ${recTopic}`);
+    const recChannel = client.channel(recTopic, { config: {} });
+    recChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_recommend_bonus_claims', filter: `user_id=eq.${State.session.user.id}` }, (payload) => {
+      if (!payload.new.bonus_point || payload.new.bonus_point <= 0) return;
+      if (payload.old.bonus_point > 0) return; // 이번에 새로 지급된 것만
+      boakoOk('오늘의 추천 게임 보너스 실시간 수신:', payload.new);
+      enqueueFullscreenOverlay(renderRecommendBonusOverlay(payload.new.game_name, payload.new.bonus_point));
+    });
+    recChannel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${recTopic}`);
+      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${recTopic}`, err);
+      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${recTopic}`);
+      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${recTopic}`);
+    });
   }
 
   function disconnectRealtime() {
@@ -488,6 +551,93 @@
 
   function showSystemToast(icon, title, body) {
     showToast('system', icon, title, body, null);
+  }
+
+  // ========================================================================
+  // 🌟 [신규] 전체화면 오버레이 (업적/라이벌전 결과/추천게임 보너스) — 사이트의 팝업들과 동일한
+  // 톤(어두운 배경 + 중앙 카드 + 확인 버튼으로만 닫힘)을 확장 프로그램에서도 재현. 여러 개가
+  // 한꺼번에 오면 겹치지 않게 큐로 순서대로 보여줌.
+  // ========================================================================
+  const _fsOverlayQueue = [];
+  let _fsOverlayShowing = false;
+
+  function enqueueFullscreenOverlay(html) {
+    _fsOverlayQueue.push(html);
+    processFullscreenOverlayQueue();
+  }
+
+  async function processFullscreenOverlayQueue() {
+    if (_fsOverlayShowing) return;
+    const next = _fsOverlayQueue.shift();
+    if (!next) return;
+    _fsOverlayShowing = true;
+    await showFullscreenOverlay(next);
+    _fsOverlayShowing = false;
+    processFullscreenOverlayQueue();
+  }
+
+  function showFullscreenOverlay(innerHtml) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position:fixed; inset:0; z-index:1000000; display:flex; align-items:center; justify-content:center;
+        background:rgba(15,23,42,0.75); backdrop-filter:blur(3px); opacity:0; transition:opacity .25s ease;
+      `;
+      overlay.innerHTML = innerHtml;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+      let dismissed = false;
+      const dismiss = () => {
+        if (dismissed) return;
+        dismissed = true;
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.remove(); resolve(); }, 250);
+      };
+      overlay.querySelector('[data-boako-dismiss]')?.addEventListener('click', dismiss);
+    });
+  }
+
+  function renderAchievementOverlay(name, description) {
+    return `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:380px;">
+        <div style="font-size:12px; font-weight:900; color:#fbbf24; letter-spacing:0.14em; text-transform:uppercase;">🏆 업적 달성</div>
+        <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:40px; box-shadow:0 0 24px rgba(251,191,36,.35);">🏆</div>
+        <div style="font-size:19px; font-weight:900; color:#fff;">${escapeHtml(name)}</div>
+        <p style="font-size:12px; font-weight:700; color:#cbd5e1; margin:-8px 0 0;">${escapeHtml(description)}</p>
+        <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
+      </div>
+    `;
+  }
+
+  function renderRivalResultOverlay(gameName, predictedWinnerName, isCorrect, rewardPoint) {
+    return `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:380px;">
+        <div style="font-size:12px; font-weight:900; color:#93c5fd; letter-spacing:0.14em; text-transform:uppercase;">⚡ 라이벌전 예측 결과</div>
+        <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:40px;">${isCorrect ? '🎉' : '😅'}</div>
+        <div style="font-size:19px; font-weight:900; color:#fff;">${escapeHtml(gameName)}</div>
+        <p style="font-size:12px; font-weight:700; color:#cbd5e1; margin:-8px 0 0;">예측: ${escapeHtml(predictedWinnerName)} 승리 — ${isCorrect ? '적중!' : '미적중'}</p>
+        <div style="font-size:16px; font-weight:900; color:#fff; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
+          💎 ${rewardPoint > 0 ? '+' : ''}${Number(rewardPoint || 0).toLocaleString()} P
+        </div>
+        <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
+      </div>
+    `;
+  }
+
+  function renderRecommendBonusOverlay(gameName, bonusPoint) {
+    return `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:380px;">
+        <div style="font-size:12px; font-weight:900; color:#fbbf24; letter-spacing:0.14em; text-transform:uppercase;">⭐ 오늘의 추천 게임 보너스</div>
+        <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:40px;">🎲</div>
+        <div style="font-size:19px; font-weight:900; color:#fff;">${escapeHtml(gameName)}</div>
+        <p style="font-size:12px; font-weight:700; color:#cbd5e1; margin:-8px 0 0;">기록을 남겨주셔서 감사해요!</p>
+        <div style="font-size:16px; font-weight:900; color:#fff; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
+          💎 +${Number(bonusPoint).toLocaleString()} P 획득
+        </div>
+        <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
+      </div>
+    `;
   }
 
   // ========================================================================
