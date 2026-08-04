@@ -5,6 +5,8 @@
  *    초기 마크업에서 'N' 제거 (team.js Chat.showNotification/clearNotification이 textContent를 채움)
  * 🌟 [신규] 라이벌전 승자 예측 투표 결과 실시간 알림(rival_notify.js) 로드/구독 — 업적 알림과 동일 패턴.
  * 🌟 [신규] 오늘의 추천 게임 보너스 지급 실시간 알림(recommend_notify.js) 로드/구독 — 동일 패턴.
+ * 🌟 [신규] 크롬 확장 아카이브 소식 토스트에서 넘어오는 ?open=LINK_TYPE&id=LINK_ID 쿼리를 읽어
+ *    Boako.Util.navigateToLink()로 해당 화면(라이벌매치/토너먼트 등)으로 자동 이동시킴 (handleDeepLinkFromExtension).
  */
 Boako.Auth = {
     init: async () => {
@@ -53,6 +55,11 @@ Boako.Auth = {
         }
         await Boako.Auth.renderWidget();
         Boako.View.render('main'); 
+
+        // 🌟 [신규] 크롬 확장(boako-widget.js)의 아카이브 소식 토스트에서 ?open=LINK_TYPE&id=LINK_ID로
+        // 들어온 경우, 홈 화면 대신 해당 소식이 가리키는 화면으로 바로 이동시킴.
+        // 처리 후엔 새로고침해도 다시 안 뜨도록 URL에서 쿼리를 지움.
+        Boako.Auth.handleDeepLinkFromExtension();
 
         // 🌟 토너먼트 개최 요청 미해결 건수 — 로그인 여부 무관하게 항상 표시
         Boako.Auth.checkTournamentBadge();
@@ -125,6 +132,27 @@ Boako.Auth = {
     },
 
     login: () => Boako.db.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo: window.location.origin + window.location.pathname, scopes: 'talk_calendar' } }),
+
+    // 🌟 [신규] 크롬 확장(boako-widget.js)의 아카이브 소식 토스트 클릭 시 넘어오는
+    // ?open=LINK_TYPE&id=LINK_ID 쿼리를 읽어서 Boako.Util.navigateToLink()로 해당 화면으로 이동시킴.
+    // 로그인 여부와 무관하게(비로그인 방문객도) 동작해야 하므로 Auth.init()에서 로그인 분기 밖에서 호출됨.
+    handleDeepLinkFromExtension: () => {
+        const params = new URLSearchParams(window.location.search);
+        const linkType = params.get('open');
+        const linkId = params.get('id');
+        if (!linkType || !linkId) return;
+
+        // 처리 후 URL을 깨끗하게 되돌려서, 새로고침해도 같은 화면으로 다시 안 튀도록 함
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+
+        // Boako.Util이 아직 로드 전일 수 있으니 살짝 지연 후 이동 (다른 초기화 스크립트들과 동일한 패턴)
+        setTimeout(() => {
+            if (Boako.Util && typeof Boako.Util.navigateToLink === 'function') {
+                Boako.Util.navigateToLink(linkType, linkId);
+            }
+        }, 200);
+    },
 
     // 🌟 카카오 액세스/리프레시 토큰을 DB에 저장 (톡캘린더 API 호출용)
     saveKakaoToken: async (session) => {
