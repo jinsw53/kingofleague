@@ -17,6 +17,9 @@
  * 🌟 [버그수정] 대화방을 열어도 실제 메시지 없이 고정 안내 문구만 뜨던 문제 — fetchThreadMessages/
  *    markThreadAsRead/openConversation을 신규 추가해서 실제 대화 내역을 말풍선으로 그리고 읽음 처리까지 함.
  *    실시간으로 새 쪽지가 오면, 그 대화를 이미 보고 있는 경우 목록뿐 아니라 열린 대화창에도 바로 반영됨.
+ * 🌟 [버그수정] fetchMessages에 limit=30이 걸려있어서, 최근 메시지 30건 안에 없는 오래된 대화가
+ *    목록에서 통째로 안 보이던 문제 — 사이트(messenger.js)처럼 제한 없이 전체를 가져오도록 수정.
+ * 🌟 [신규] 쪽지 목록의 각 대화 항목에 그 대화의 안읽음 개수를 빨간 배지로 표시.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -186,20 +189,25 @@
     }
   }
 
+  // 🌟 [버그수정] limit=30 때문에 오래된 대화가 통째로 안 보이던 문제 — 사이트(messenger.js)처럼
+  // 제한 없이 전체를 가져오도록 수정. 대화별 안읽음 개수도 같이 집계해서 목록에 배지로 보여줌.
   async function fetchMessages() {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/messages?or=(sender_id.eq.${State.session.user.id},receiver_id.eq.${State.session.user.id})&order=created_at.desc&limit=30&select=message_id,sender_id,receiver_id,content,created_at,sender_name_override,receiver_name_override`,
+        `${SUPABASE_URL}/rest/v1/messages?or=(sender_id.eq.${State.session.user.id},receiver_id.eq.${State.session.user.id})&order=created_at.desc&select=message_id,sender_id,receiver_id,content,created_at,is_read,sender_name_override,receiver_name_override`,
         { headers: authHeaders() }
       );
       const rows = await res.json();
-      // 상대방 id별로 가장 최근 메시지 1건만 남겨서 "대화 목록"처럼 구성
+      // 상대방 id별로 가장 최근 메시지 1건 + 안읽음 개수를 같이 집계해서 "대화 목록"처럼 구성
       const byOther = new Map();
       rows.forEach(m => {
         const isMine = m.sender_id === State.session.user.id;
         const otherId = isMine ? m.receiver_id : m.sender_id;
         const otherName = isMine ? m.receiver_name_override : m.sender_name_override;
-        if (!byOther.has(otherId)) byOther.set(otherId, { otherId, otherName, lastMessage: m.content, lastTime: m.created_at });
+        if (!byOther.has(otherId)) {
+          byOther.set(otherId, { otherId, otherName, lastMessage: m.content, lastTime: m.created_at, unread: 0 });
+        }
+        if (!isMine && !m.is_read) byOther.get(otherId).unread += 1;
       });
       State.messages = [...byOther.values()];
       boakoLog(`쪽지 대화 ${State.messages.length}건 로드됨`);
@@ -257,6 +265,7 @@
     render(); // 우선 스레드 헤더만 보여주고
     await fetchThreadMessages(otherId);
     await markThreadAsRead(otherId);
+    await fetchMessages(); // 목록의 안읽음 배지도 즉시 갱신
     render(); // 실제 메시지로 다시 그림
   }
 
@@ -676,9 +685,12 @@
         return;
       }
       body.innerHTML = State.messages.map((m, i) => `
-        <div class="boako-msg-item" data-idx="${i}">
-          <div class="boako-sender">${escapeHtml(m.otherName || '알 수 없음')}</div>
-          <div class="boako-preview">${escapeHtml(m.lastMessage)}</div>
+        <div class="boako-msg-item" data-idx="${i}" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <div style="min-width:0;">
+            <div class="boako-sender">${escapeHtml(m.otherName || '알 수 없음')}</div>
+            <div class="boako-preview">${escapeHtml(m.lastMessage)}</div>
+          </div>
+          ${m.unread > 0 ? `<span style="flex-shrink:0; background:#ef4444; color:#fff; font-size:10.5px; font-weight:900; min-width:18px; height:18px; border-radius:999px; display:flex; align-items:center; justify-content:center; padding:0 4px;">${m.unread > 99 ? '99+' : m.unread}</span>` : ''}
         </div>
       `).join('');
       body.querySelectorAll('.boako-msg-item').forEach(el => {
