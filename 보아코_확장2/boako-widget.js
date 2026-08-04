@@ -28,6 +28,9 @@
  *    "이전 대화 더 보기" 버튼을 눌러야 그 이전 30개를 추가로 불러오는 방식으로 변경 (리소스 절약).
  * 🌟 [신규] 아카이브 소식(news_feed_items) 실시간 구독 연결 — 사이트 소식지에 새 카드가 등록되면
  *    토스트로 알림. 유저 필터 없는 공개 채널이라 로그인만 돼있으면 누구든 받음.
+ * 🌟 [수정] 소식 토스트 클릭 시 무조건 홈으로만 가던 것 → link_type/link_id를 URL 쿼리로 실어서
+ *    보냄 (예: ?open=RIVAL_MATCH&id=매치id). 사이트 쪽(auth.js)에서 이 쿼리를 읽어
+ *    Boako.Util.navigateToLink()로 정확한 화면으로 자동 이동시킴.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -420,7 +423,12 @@
     newsChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, (payload) => {
       boakoOk('새 아카이브 소식 실시간 수신:', payload.new);
       const item = payload.new;
-      fireNewsToast(item.title || '새 소식이 도착했어요', item.subtitle || '클릭해서 확인해보세요', 'https://boakoarchive.co.kr/');
+      // 🌟 [수정] 무조건 홈으로만 보내던 것 → link_type/link_id가 있으면 URL 쿼리에 실어서 보냄.
+      // 사이트 쪽(auth.js)에서 이 쿼리를 읽어 Boako.Util.navigateToLink()로 정확한 화면(라이벌매치/토너먼트 등)으로 이동시킴.
+      const targetUrl = (item.link_type && item.link_id)
+        ? `https://boakoarchive.co.kr/?open=${encodeURIComponent(item.link_type)}&id=${encodeURIComponent(item.link_id)}`
+        : 'https://boakoarchive.co.kr/';
+      fireNewsToast(item.title || '새 소식이 도착했어요', item.subtitle || '클릭해서 확인해보세요', targetUrl);
     });
     newsChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${newsTopic}`);
