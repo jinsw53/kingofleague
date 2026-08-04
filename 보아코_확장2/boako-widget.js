@@ -3,11 +3,17 @@
  * 🌟 content.js(기존 175KB, 게임기록 관련)와 완전히 분리된 독립 모듈. 매니페스트 content_scripts에서
  *    boako-realtime.min.js → boako-widget.js → content.js 순서로 로드됨.
  * 🌟 화면 좌측 하단 고정 아이콘(토너먼트 버튼이 우측 하단이라 반대편으로 배치, 겹침 없음).
+ *    🌟 [신규] 아이콘을 드래그해서 원하는 위치로 옮길 수 있음 (content.js 사이드바 드래그와 동일 패턴,
+ *    5px 이상 움직여야 드래그로 인식, 위치는 localStorage에 저장돼 다음 방문에도 유지됨). 패널도
+ *    아이콘 위치를 따라다니며 화면 밖으로 안 나가게 위/아래·좌/우가 자동으로 뒤집힘.
  * 🌟 실시간 연결은 content.js가 살아있는 동안(=BGA 탭이 열려있는 동안)만 유지됨 — MV3 서비스워커는
  *    상시 웹소켓 연결을 못 하기 때문에 background.js가 아니라 여기(콘텐츠 스크립트)에서 직접 연결함.
  * 🌟 [디버깅] BGA 페이지의 CSP(Content-Security-Policy)가 Supabase로의 웹소켓 연결을 막을 가능성이
  *    있어서, 연결 시도/성공/실패/닫힘 각 단계를 전부 눈에 띄는 색깔의 console 로그로 남김.
  *    문제가 생기면 개발자 도구 콘솔에서 "[BOAKO WIDGET]"으로 검색하면 바로 원인 단계를 특정할 수 있음.
+ * 🌟 [버그수정] 로그인 성공 응답엔 user 정보만 오고 토큰이 없어서 State.session이 계속 null로 남아있던
+ *    문제 수정 — 로그인 성공 직후 저장된 전체 세션을 다시 조회해서 채우도록 함.
+ * 🌟 [버그수정] onOpen/onClose/onError는 RealtimeClient 최상위가 아니라 client.socketAdapter에 있음.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -114,6 +120,9 @@
     const res = await sendBgMessage('archiveLogin');
     if (res?.success) {
       boakoOk('로그인 성공:', res.user.nickname);
+      // 🌟 [버그수정] archiveLogin 응답엔 user 정보만 오고 토큰은 안 실려있어서, State.session이
+      // 계속 null로 남아 그 이후 모든 조회가 실패했음. 저장된 전체 세션(토큰 포함)을 다시 조회해서 채움.
+      await checkSession();
       await initAfterLogin();
     } else {
       boakoErr('로그인 실패:', res?.error);
@@ -255,10 +264,12 @@
     const client = new BoakoRealtimeClient(wsUrl, { params: { apikey: SUPABASE_KEY } });
     State.realtimeClient = client;
 
-    // 🌟 연결 단계별 상태를 전부 로그로 남김 — CSP가 막으면 보통 onError가 뜨거나, onOpen이 영원히 안 뜸
-    client.onOpen(() => boakoOk('웹소켓 연결 성공! (CSP 문제 없음)'));
-    client.onClose((e) => boakoWarn('웹소켓 연결 종료됨:', e));
-    client.onError((e) => boakoErr('웹소켓 연결 오류 발생 — BGA 페이지의 CSP가 Supabase 연결을 막고 있을 가능성이 있음. 개발자 도구 콘솔에 "Refused to connect" 또는 "violates the following Content Security Policy" 에러가 같이 떠 있는지 확인해보세요.', e));
+    // 🌟 [버그수정] onOpen/onClose/onError는 client(RealtimeClient) 최상위가 아니라
+    // client.socketAdapter(내부 소켓 래퍼)에 있음 — 연결 단계별 상태를 전부 로그로 남김.
+    // CSP가 막으면 보통 onError가 뜨거나, onOpen이 영원히 안 뜸
+    client.socketAdapter.onOpen(() => boakoOk('웹소켓 연결 성공! (CSP 문제 없음)'));
+    client.socketAdapter.onClose((e) => boakoWarn('웹소켓 연결 종료됨:', e));
+    client.socketAdapter.onError((e) => boakoErr('웹소켓 연결 오류 발생 — BGA 페이지의 CSP가 Supabase 연결을 막고 있을 가능성이 있음. 개발자 도구 콘솔에 "Refused to connect" 또는 "violates the following Content Security Policy" 에러가 같이 떠 있는지 확인해보세요.', e));
 
     client.setAuth(State.session.access_token);
     client.connect();
@@ -360,16 +371,16 @@
     const style = document.createElement('style');
     style.id = 'boako-widget-style';
     style.textContent = `
-      #boako-widget-icon { position: fixed; left: 20px; bottom: 20px; width: 52px; height: 52px; border-radius: 50%;
-        background: #4f46e5; box-shadow: 0 4px 14px rgba(79,70,229,.4); cursor: pointer; display:flex; align-items:center;
-        justify-content:center; font-size: 24px; z-index: 999000; transition: transform .15s ease; }
-      #boako-widget-icon:hover { transform: scale(1.08); }
+      #boako-widget-icon { position: fixed; left: 20px; top: calc(100vh - 72px); width: 52px; height: 52px; border-radius: 50%;
+        background: #4f46e5; box-shadow: 0 4px 14px rgba(79,70,229,.4); cursor: grab; display:flex; align-items:center;
+        justify-content:center; font-size: 24px; z-index: 999000; user-select:none; }
+      #boako-widget-icon.boako-dragging { cursor: grabbing; box-shadow: 0 8px 22px rgba(0,0,0,.35); }
       #boako-widget-icon.boako-logged-out { background:#64748b; box-shadow:0 4px 14px rgba(100,116,139,.35); }
       #boako-widget-badge { position:absolute; top:-4px; right:-4px; background:#ef4444; color:#fff; font-size:11px;
         font-weight:900; min-width:20px; height:20px; border-radius:999px; display:flex; align-items:center; justify-content:center;
         border:2px solid #eef0f3; padding:0 4px; }
       #boako-widget-badge.hidden { display:none; }
-      #boako-widget-panel { position:fixed; left:20px; bottom:84px; width:340px; max-height:480px; background:#fff;
+      #boako-widget-panel { position:fixed; width:340px; max-height:480px; background:#fff;
         border-radius:14px; box-shadow:0 12px 34px rgba(0,0,0,.22); z-index:999001; display:none; flex-direction:column;
         overflow:hidden; border:1px solid #e2e8f0; font-family:-apple-system,"Malgun Gothic",sans-serif; }
       #boako-widget-panel.open { display:flex; }
@@ -420,8 +431,19 @@
     const icon = document.createElement('div');
     icon.id = 'boako-widget-icon';
     icon.innerHTML = `📬<div id="boako-widget-badge" class="hidden">0</div>`;
-    icon.addEventListener('click', () => togglePanel());
     document.body.appendChild(icon);
+
+    // 🌟 저장된 위치가 있으면 복원 (없으면 기본값: 좌측 하단)
+    const savedPos = localStorage.getItem('boako_widget_position');
+    if (savedPos) {
+      try {
+        const { left, top } = JSON.parse(savedPos);
+        icon.style.left = clampToViewport(left, icon.offsetWidth, window.innerWidth) + 'px';
+        icon.style.top = clampToViewport(top, icon.offsetHeight, window.innerHeight) + 'px';
+      } catch (e) { /* 저장된 값이 이상하면 기본 위치(CSS) 그대로 둠 */ }
+    }
+
+    makeIconDraggable(icon);
 
     const panel = document.createElement('div');
     panel.id = 'boako-widget-panel';
@@ -444,6 +466,85 @@
     panel.querySelectorAll('.boako-panel-tab').forEach(tabEl => {
       tabEl.addEventListener('click', () => showTab(tabEl.dataset.tab));
     });
+  }
+
+  function clampToViewport(value, size, viewportSize) {
+    return Math.max(4, Math.min(value, viewportSize - size - 4));
+  }
+
+  // 🌟 [신규] 아이콘 드래그 이동 — content.js의 사이드바 드래그(makeDraggable)와 같은 패턴:
+  // 5px 이상 움직여야 "드래그"로 인식하고, 그 미만이면 그냥 클릭(패널 토글)으로 처리함.
+  function makeIconDraggable(icon) {
+    let startX, startY, startLeft, startTop, isDragging = false, isDragReady = false;
+
+    function onMouseMove(e) {
+      if (!isDragReady) return;
+      const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+      if (!isDragging && dist > 5) {
+        isDragging = true;
+        icon.classList.add('boako-dragging');
+      }
+      if (isDragging) {
+        const newLeft = clampToViewport(startLeft + (e.clientX - startX), icon.offsetWidth, window.innerWidth);
+        const newTop = clampToViewport(startTop + (e.clientY - startY), icon.offsetHeight, window.innerHeight);
+        icon.style.left = newLeft + 'px';
+        icon.style.top = newTop + 'px';
+        if (State.panelOpen) positionPanelNearIcon();
+      }
+    }
+
+    function onMouseUp() {
+      isDragReady = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      if (isDragging) {
+        isDragging = false;
+        icon.classList.remove('boako-dragging');
+        const rect = icon.getBoundingClientRect();
+        localStorage.setItem('boako_widget_position', JSON.stringify({ left: rect.left, top: rect.top }));
+        boakoLog('아이콘 위치 저장됨:', { left: Math.round(rect.left), top: Math.round(rect.top) });
+      } else {
+        // 드래그가 아니라 그냥 클릭이었던 경우
+        togglePanel();
+      }
+    }
+
+    icon.addEventListener('mousedown', (e) => {
+      isDragReady = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = icon.getBoundingClientRect();
+      startLeft = rect.left;
+      startTop = rect.top;
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      e.preventDefault();
+    });
+  }
+
+  // 🌟 [신규] 패널을 아이콘 바로 옆(가능하면 위쪽)에 붙여서 표시. 아이콘이 화면 어디로 옮겨져도
+  // 항상 패널이 화면 밖으로 안 나가게 위/아래·좌/우를 자동으로 뒤집어줌.
+  function positionPanelNearIcon() {
+    const icon = document.getElementById('boako-widget-icon');
+    const panel = document.getElementById('boako-widget-panel');
+    if (!icon || !panel) return;
+
+    const iconRect = icon.getBoundingClientRect();
+    const panelW = 340, panelH = Math.min(480, panel.scrollHeight || 480);
+    const gap = 8;
+
+    // 세로: 아이콘 위 공간이 충분하면 위쪽에, 아니면 아래쪽에
+    const spaceAbove = iconRect.top;
+    const openUpward = spaceAbove >= panelH + gap;
+    const top = openUpward ? iconRect.top - panelH - gap : iconRect.bottom + gap;
+
+    // 가로: 아이콘 좌측 기준으로 두되, 화면 밖으로 나가면 우측 정렬로 전환
+    let left = iconRect.left;
+    if (left + panelW > window.innerWidth - 4) left = window.innerWidth - panelW - 4;
+    if (left < 4) left = 4;
+
+    panel.style.left = left + 'px';
+    panel.style.top = clampToViewport(top, panelH, window.innerHeight) + 'px';
   }
 
   function openPanel() { State.panelOpen = true; render(); }
@@ -480,6 +581,7 @@
 
     const panel = document.getElementById('boako-widget-panel');
     panel.classList.toggle('open', State.panelOpen);
+    if (State.panelOpen) positionPanelNearIcon();
     panel.querySelectorAll('.boako-panel-tab').forEach(tabEl => {
       tabEl.classList.toggle('active', tabEl.dataset.tab === State.activeTab);
     });
