@@ -26,6 +26,8 @@
  *    resize 이벤트 + 페이지 로드 직후 몇 번(1/3/6/10초)만 확인 후 멈춤 (무한 폴링 대신 경량화, !important 추가).
  * 🌟 [수정] 대화 스레드를 한 번에(limit=100) 불러오던 것 → 카톡처럼 최근 30개만 먼저 불러오고
  *    "이전 대화 더 보기" 버튼을 눌러야 그 이전 30개를 추가로 불러오는 방식으로 변경 (리소스 절약).
+ * 🌟 [신규] 아카이브 소식(news_feed_items) 실시간 구독 연결 — 사이트 소식지에 새 카드가 등록되면
+ *    토스트로 알림. 유저 필터 없는 공개 채널이라 로그인만 돼있으면 누구든 받음.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -409,6 +411,23 @@
         else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${teamTopic}`);
       });
     }
+
+    // 🌟 [신규] 아카이브 소식(news_feed_items) 실시간 구독 — 사이트 소식지에 새 카드가 등록되는 순간
+    // 토스트로 알림. 특정 유저 필터가 필요 없는 공개 정보라 filter 없이 전체 INSERT를 구독함.
+    const newsTopic = 'archive-news-feed';
+    boakoLog(`채널 구독 시도: ${newsTopic}`);
+    const newsChannel = client.channel(newsTopic, { config: {} });
+    newsChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, (payload) => {
+      boakoOk('새 아카이브 소식 실시간 수신:', payload.new);
+      const item = payload.new;
+      fireNewsToast(item.title || '새 소식이 도착했어요', item.subtitle || '클릭해서 확인해보세요', 'https://boakoarchive.co.kr/');
+    });
+    newsChannel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${newsTopic}`);
+      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${newsTopic}`, err);
+      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${newsTopic}`);
+      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${newsTopic}`);
+    });
   }
 
   function disconnectRealtime() {
