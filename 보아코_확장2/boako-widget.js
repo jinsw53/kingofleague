@@ -35,6 +35,8 @@
  * 🌟 [수정] 위 세 오버레이를 간소화 버전에서 사이트(achievements.js/rival_notify.js/recommend_notify.js)
  *    원본과 완전히 동일한 마크업으로 교체 — 업적은 시즌로고/OO매니아 티어 합성 배지까지, 라이벌전은
  *    승자(크게)-VS-패자(작게) 프로필사진 구도까지 그대로 재현.
+ * 🌟 [신규] 사이트 util.js의 window.sfx(Web Audio API로 직접 합성하는 효과음, 외부 음원 파일 없음)를
+ *    그대로 이식 — 업적/라이벌전결과/추천보너스 오버레이가 뜰 때 사운드도 사이트와 동일하게 재생됨.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -69,6 +71,113 @@
   const _achievementByCodeCache = {};
   const _seasonLogoCache = {};
   const _gameLogoCache = {};
+
+  // ========================================================================
+  // 🌟 [신규] 사이트 util.js의 window.sfx를 그대로 이식 — 외부 음원 파일이 아니라 Web Audio API로
+  // 직접 합성하는 방식이라(오실레이터로 음 생성) 확장 프로그램에서도 그대로 재사용 가능.
+  // 필요한 것만(success/achievementUnlock/click) 가져옴 — 브라우저 자동재생 정책 대응(pendingReplay) 포함.
+  // ========================================================================
+  const boakoSfx = (function () {
+    let ctx = null;
+    let pendingReplay = [];
+    let unlockListenerAttached = false;
+
+    function ensureUnlockListener() {
+      if (unlockListenerAttached) return;
+      unlockListenerAttached = true;
+      const unlock = () => {
+        if (ctx && ctx.state === 'suspended') ctx.resume();
+        const queued = pendingReplay.splice(0, pendingReplay.length);
+        queued.forEach(fn => fn());
+        document.removeEventListener('click', unlock);
+        document.removeEventListener('keydown', unlock);
+        document.removeEventListener('touchstart', unlock);
+        unlockListenerAttached = false;
+      };
+      document.addEventListener('click', unlock, { once: true });
+      document.addEventListener('keydown', unlock, { once: true });
+      document.addEventListener('touchstart', unlock, { once: true });
+    }
+
+    function getCtx() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+
+    function tone(freq, duration, type, startGain, delay) {
+      const c = getCtx();
+      if (!c) return;
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, c.currentTime + (delay || 0));
+      gain.gain.setValueAtTime(startGain, c.currentTime + (delay || 0));
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + (delay || 0) + duration);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start(c.currentTime + (delay || 0));
+      osc.stop(c.currentTime + (delay || 0) + duration);
+    }
+
+    function noiseBurst(duration, startGain, delay) {
+      const c = getCtx();
+      if (!c) return;
+      const bufferSize = c.sampleRate * duration;
+      const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      const src = c.createBufferSource();
+      src.buffer = buffer;
+      const gain = c.createGain();
+      gain.gain.setValueAtTime(startGain, c.currentTime + (delay || 0));
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + (delay || 0) + duration);
+      src.connect(gain);
+      gain.connect(c.destination);
+      src.start(c.currentTime + (delay || 0));
+    }
+
+    const raw = {
+      click: function () { tone(700, 0.05, 'sine', 0.06); },
+      success: function () {
+        tone(523.25, 0.1, 'sine', 0.15);
+        tone(783.99, 0.2, 'sine', 0.13, 0.08);
+      },
+      achievementUnlock: function () {
+        tone(65.41, 0.5, 'triangle', 0.32, 0);
+        tone(130.81, 0.4, 'sawtooth', 0.2, 0);
+        noiseBurst(0.15, 0.24, 0);
+        tone(523.25, 0.16, 'triangle', 0.24, 0.12);
+        tone(261.63, 0.16, 'triangle', 0.14, 0.12);
+        tone(659.25, 0.16, 'triangle', 0.24, 0.22);
+        tone(329.63, 0.16, 'triangle', 0.14, 0.22);
+        tone(783.99, 0.16, 'triangle', 0.24, 0.32);
+        tone(392.00, 0.16, 'triangle', 0.14, 0.32);
+        tone(1046.5, 0.65, 'triangle', 0.3, 0.44);
+        tone(1318.5, 0.65, 'triangle', 0.24, 0.44);
+        tone(1568.0, 0.65, 'triangle', 0.24, 0.44);
+        tone(523.25, 0.65, 'sine', 0.16, 0.44);
+        tone(2093.0, 0.45, 'sine', 0.11, 0.48);
+        tone(3136.0, 0.35, 'sine', 0.06, 0.52);
+      }
+    };
+
+    const wrapped = {};
+    Object.keys(raw).forEach(key => {
+      wrapped[key] = function (...args) {
+        raw[key].apply(null, args);
+        if (ctx && ctx.state !== 'running') {
+          ensureUnlockListener();
+          pendingReplay.push(() => raw[key].apply(null, args));
+        }
+      };
+    });
+    return wrapped;
+  })();
 
   const State = {
     session: null,       // { access_token, refresh_token, expires_at, user: {id, nickname, avatar} }
@@ -686,6 +795,7 @@
     ensureAchievementBadgeStyle();
     const gameName = meta && meta.game_name ? meta.game_name : null;
     const badgeHtml = await renderAchievementBadgeHTML(achievement, seasonNo, meta, 140);
+    boakoSfx.achievementUnlock();
 
     const html = `
       <div style="display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:20px; max-width:420px;">
@@ -747,6 +857,7 @@
 
     const isCorrect = !!voteRow.is_correct;
     const rewardPoint = Number(voteRow.reward_point || 0);
+    if (isCorrect) boakoSfx.success(); else boakoSfx.click();
 
     const avatarHtml = (person, size) => person?.avatar
       ? `<img src="${person.avatar}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; display:block;">`
@@ -817,6 +928,7 @@
         <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
       </div>
     `;
+    boakoSfx.success();
     return { html, dismissOnBackdrop: false };
   }
 
