@@ -31,9 +31,10 @@
  * 🌟 [수정] 소식 토스트 클릭 시 무조건 홈으로만 가던 것 → link_type/link_id를 URL 쿼리로 실어서
  *    보냄 (예: ?open=RIVAL_MATCH&id=매치id). 사이트 쪽(auth.js)에서 이 쿼리를 읽어
  *    Boako.Util.navigateToLink()로 정확한 화면으로 자동 이동시킴.
- * 🌟 [신규] 업적 획득/라이벌전 투표결과/오늘의 추천게임 보너스 실시간 오버레이 추가 — 사이트의
- *    achievements.js/rival_notify.js/recommend_notify.js와 동일한 실시간 감지 방식을, BGA 페이지에
- *    직접 그려넣는 전체화면 팝업(큐 처리 포함)으로 재현.
+ * 🌟 [신규] 업적 획득/라이벌전 투표결과/오늘의 추천게임 보너스 실시간 오버레이 추가.
+ * 🌟 [수정] 위 세 오버레이를 간소화 버전에서 사이트(achievements.js/rival_notify.js/recommend_notify.js)
+ *    원본과 완전히 동일한 마크업으로 교체 — 업적은 시즌로고/OO매니아 티어 합성 배지까지, 라이벌전은
+ *    승자(크게)-VS-패자(작게) 프로필사진 구도까지 그대로 재현.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -57,6 +58,17 @@
   } else {
     boakoOk('BoakoRealtimeClient 로드 확인됨. 실시간 연결에 사용할 준비가 됐어요.');
   }
+
+  // 🌟 사이트 Boako.Util.cdn과 동일 — Supabase Storage 경로를 CDN 도메인으로 치환
+  function cdnUrl(url) {
+    if (!url || typeof url !== 'string') return url;
+    return url.replace(/^http:\/\//i, 'https://').replace('qrredwrxdnvqwdxzanba.supabase.co', 'cdn.boakoarchive.co.kr');
+  }
+
+  // 🌟 업적 배지 합성 렌더링용 캐시 (사이트 achievements.js와 동일한 캐시 패턴)
+  const _achievementByCodeCache = {};
+  const _seasonLogoCache = {};
+  const _gameLogoCache = {};
 
   const State = {
     session: null,       // { access_token, refresh_token, expires_at, user: {id, nickname, avatar} }
@@ -440,16 +452,16 @@
       else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${newsTopic}`);
     });
 
-    // 🌟 [신규] 업적 획득 실시간 구독 — 사이트 achievements.js와 동일한 실시간 감지, 오버레이는 확장 전용 간소화 버전
+    // 🌟 [신규] 업적 획득 실시간 구독 — 사이트 achievements.js와 동일한 마크업(시즌로고/티어 합성 배지)으로 재현
     const achvTopic = `achievements-${State.session.user.id}`;
     boakoLog(`채널 구독 시도: ${achvTopic}`);
     const achvChannel = client.channel(achvTopic, { config: {} });
     achvChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${State.session.user.id}` }, async (payload) => {
       boakoOk('새 업적 달성 실시간 수신:', payload.new);
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${payload.new.achievement_id}&select=name,description`, { headers: authHeaders() });
-        const [ach] = await res.json();
-        enqueueFullscreenOverlay(renderAchievementOverlay(ach?.name || '새 업적', ach?.description || ''));
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${payload.new.achievement_id}&select=*`, { headers: authHeaders() });
+        const [achievement] = await res.json();
+        if (achievement) enqueueFullscreenOverlay(() => renderAchievementOverlay(achievement, payload.new.meta, payload.new.season_no));
       } catch (e) { boakoErr('업적 정보 조회 실패:', e); }
     });
     achvChannel.subscribe((status, err) => {
@@ -463,18 +475,10 @@
     const rivalTopic = `rival-votes-${State.session.user.id}`;
     boakoLog(`채널 구독 시도: ${rivalTopic}`);
     const rivalChannel = client.channel(rivalTopic, { config: {} });
-    rivalChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rival_match_votes', filter: `voter_id=eq.${State.session.user.id}` }, async (payload) => {
+    rivalChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rival_match_votes', filter: `voter_id=eq.${State.session.user.id}` }, (payload) => {
       if (!payload.new.resolved_at || payload.old.resolved_at) return; // 이번에 새로 확정된 것만
       boakoOk('라이벌전 투표 결과 실시간 수신:', payload.new);
-      try {
-        const [matchRes, winnerRes] = await Promise.all([
-          fetch(`${SUPABASE_URL}/rest/v1/rival_matches?match_id=eq.${payload.new.match_id}&select=game_name`, { headers: authHeaders() }),
-          fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${payload.new.predicted_winner_id}&select=full_name`, { headers: authHeaders() })
-        ]);
-        const [match] = await matchRes.json();
-        const [winner] = await winnerRes.json();
-        enqueueFullscreenOverlay(renderRivalResultOverlay(match?.game_name || '라이벌전', winner?.full_name || '', payload.new.is_correct, payload.new.reward_point));
-      } catch (e) { boakoErr('라이벌전 결과 정보 조회 실패:', e); }
+      enqueueFullscreenOverlay(() => renderRivalResultOverlay(payload.new));
     });
     rivalChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${rivalTopic}`);
@@ -491,7 +495,7 @@
       if (!payload.new.bonus_point || payload.new.bonus_point <= 0) return;
       if (payload.old.bonus_point > 0) return; // 이번에 새로 지급된 것만
       boakoOk('오늘의 추천 게임 보너스 실시간 수신:', payload.new);
-      enqueueFullscreenOverlay(renderRecommendBonusOverlay(payload.new.game_name, payload.new.bonus_point));
+      enqueueFullscreenOverlay(() => renderRecommendBonusOverlay(payload.new.game_name, payload.new.bonus_point));
     });
     recChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${recTopic}`);
@@ -555,14 +559,14 @@
 
   // ========================================================================
   // 🌟 [신규] 전체화면 오버레이 (업적/라이벌전 결과/추천게임 보너스) — 사이트의 팝업들과 동일한
-  // 톤(어두운 배경 + 중앙 카드 + 확인 버튼으로만 닫힘)을 확장 프로그램에서도 재현. 여러 개가
-  // 한꺼번에 오면 겹치지 않게 큐로 순서대로 보여줌.
+  // 톤(어두운 배경 + 중앙 카드)을 확장 프로그램에서도 재현. 여러 개가 한꺼번에 오면 겹치지 않게
+  // 큐로 순서대로 보여줌. 표시 직전에 데이터를 조회하는 지연 실행 방식(buildHtmlFn).
   // ========================================================================
   const _fsOverlayQueue = [];
   let _fsOverlayShowing = false;
 
-  function enqueueFullscreenOverlay(html) {
-    _fsOverlayQueue.push(html);
+  function enqueueFullscreenOverlay(buildHtmlFn) {
+    _fsOverlayQueue.push(buildHtmlFn);
     processFullscreenOverlayQueue();
   }
 
@@ -571,17 +575,19 @@
     const next = _fsOverlayQueue.shift();
     if (!next) return;
     _fsOverlayShowing = true;
-    await showFullscreenOverlay(next);
+    const result = await next();
+    if (result?.html) await showFullscreenOverlay(result.html, result.dismissOnBackdrop);
     _fsOverlayShowing = false;
     processFullscreenOverlayQueue();
   }
 
-  function showFullscreenOverlay(innerHtml) {
+  function showFullscreenOverlay(innerHtml, dismissOnBackdrop) {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.style.cssText = `
         position:fixed; inset:0; z-index:1000000; display:flex; align-items:center; justify-content:center;
-        background:rgba(15,23,42,0.75); backdrop-filter:blur(3px); opacity:0; transition:opacity .25s ease;
+        background:rgba(15,23,42,${dismissOnBackdrop ? '0.6' : '0.75'}); backdrop-filter:blur(3px); opacity:0; transition:opacity .25s ease;
+        ${dismissOnBackdrop ? 'cursor:pointer;' : ''}
       `;
       overlay.innerHTML = innerHtml;
       document.body.appendChild(overlay);
@@ -594,42 +600,215 @@
         overlay.style.opacity = '0';
         setTimeout(() => { overlay.remove(); resolve(); }, 250);
       };
-      overlay.querySelector('[data-boako-dismiss]')?.addEventListener('click', dismiss);
+      if (dismissOnBackdrop) {
+        overlay.addEventListener('click', dismiss);
+      } else {
+        overlay.querySelector('[data-boako-dismiss]')?.addEventListener('click', dismiss);
+      }
     });
   }
 
-  function renderAchievementOverlay(name, description) {
-    return `
-      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:380px;">
-        <div style="font-size:12px; font-weight:900; color:#fbbf24; letter-spacing:0.14em; text-transform:uppercase;">🏆 업적 달성</div>
-        <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:40px; box-shadow:0 0 24px rgba(251,191,36,.35);">🏆</div>
-        <div style="font-size:19px; font-weight:900; color:#fff;">${escapeHtml(name)}</div>
-        <p style="font-size:12px; font-weight:700; color:#cbd5e1; margin:-8px 0 0;">${escapeHtml(description)}</p>
-        <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
-      </div>
-    `;
+  // 🌟 사이트 achievements.js의 renderBadgeHTML과 동일한 합성 로직 (item_id 파싱 단계만 생략 —
+  // 확장에선 achievement 객체를 이미 갖고 있어서 code로 바로 조회하면 됨). 정사각형 강제 없이
+  // 높이만 고정하고 폭은 내용(로고/이모지) 비율 그대로.
+  async function getAchievementByCode(code) {
+    if (_achievementByCodeCache[code] !== undefined) return _achievementByCodeCache[code];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/achievements?code=eq.${encodeURIComponent(code)}&select=*`, { headers: authHeaders() });
+    const [row] = await res.json();
+    _achievementByCodeCache[code] = row || null;
+    return row || null;
+  }
+  async function getSeasonLogo(seasonNo) {
+    if (!seasonNo) return null;
+    if (_seasonLogoCache[seasonNo] !== undefined) return _seasonLogoCache[seasonNo];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/seasons?season_no=eq.${seasonNo}&select=season_logo_url`, { headers: authHeaders() });
+    const [row] = await res.json();
+    _seasonLogoCache[seasonNo] = row?.season_logo_url || null;
+    return _seasonLogoCache[seasonNo];
+  }
+  async function getGameLogo(gameName) {
+    if (!gameName) return null;
+    if (_gameLogoCache[gameName] !== undefined) return _gameLogoCache[gameName];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/games?game_name=eq.${encodeURIComponent(gameName)}&select=image_url`, { headers: authHeaders() });
+    const [row] = await res.json();
+    _gameLogoCache[gameName] = row?.image_url || null;
+    return _gameLogoCache[gameName];
+  }
+  function getTierStyle(name) {
+    if (name && name.includes('(금)')) return { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', ring: '#fbbf24' };
+    if (name && name.includes('(은)')) return { bg: 'linear-gradient(135deg,#e2e8f0,#94a3b8)', ring: '#cbd5e1' };
+    if (name && name.includes('(동)')) return { bg: 'linear-gradient(135deg,#fb923c,#c2703d)', ring: '#fb923c' };
+    return { bg: 'linear-gradient(135deg,#8b5cf6,#4f46e5)', ring: '#8b5cf6' };
   }
 
-  function renderRivalResultOverlay(gameName, predictedWinnerName, isCorrect, rewardPoint) {
-    return `
-      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:380px;">
-        <div style="font-size:12px; font-weight:900; color:#93c5fd; letter-spacing:0.14em; text-transform:uppercase;">⚡ 라이벌전 예측 결과</div>
-        <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:40px;">${isCorrect ? '🎉' : '😅'}</div>
-        <div style="font-size:19px; font-weight:900; color:#fff;">${escapeHtml(gameName)}</div>
-        <p style="font-size:12px; font-weight:700; color:#cbd5e1; margin:-8px 0 0;">예측: ${escapeHtml(predictedWinnerName)} 승리 — ${isCorrect ? '적중!' : '미적중'}</p>
-        <div style="font-size:16px; font-weight:900; color:#fff; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
-          💎 ${rewardPoint > 0 ? '+' : ''}${Number(rewardPoint || 0).toLocaleString()} P
+  async function renderAchievementBadgeHTML(achievement, seasonNo, meta, sizePx) {
+    sizePx = sizePx || 48;
+    const fallbackEmoji = `<div style="height:${sizePx}px; display:inline-flex; align-items:center; justify-content:center; padding:0 ${Math.round(sizePx * 0.15)}px; font-size:${Math.round(sizePx * 0.6)}px; box-sizing:border-box;">🏅</div>`;
+    if (!achievement) return fallbackEmoji;
+
+    const gameName = meta && meta.game_name ? meta.game_name : null;
+
+    if (achievement.code.startsWith('game_mania_')) {
+      const tier = getTierStyle(achievement.name);
+      const gameLogo = await getGameLogo(gameName);
+      const pad = Math.max(2, Math.round(sizePx * 0.08));
+      const innerPad = Math.max(2, Math.round(sizePx * 0.06));
+      return `
+        <div style="height:${sizePx}px; display:inline-flex; align-items:center; justify-content:center; border-radius:${Math.round(sizePx * 0.22)}px; background:${tier.bg}; padding:${pad}px; box-shadow:0 0 0 2px ${tier.ring}55; box-sizing:border-box;">
+          <div style="height:100%; display:inline-flex; align-items:center; justify-content:center; border-radius:${Math.round(sizePx * 0.18)}px; background:#fff; padding:${innerPad}px; box-sizing:border-box;">
+            ${gameLogo ? `<img src="${cdnUrl(gameLogo)}" style="height:100%; width:auto; display:block;">` : `<span style="font-size:${Math.round(sizePx * 0.5)}px;">🎲</span>`}
+          </div>
         </div>
-        <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
+      `;
+    }
+
+    if (!achievement.badge_icon_url) return fallbackEmoji;
+
+    let overlayHtml = '';
+    if (achievement.season_logo_overlay && seasonNo) {
+      const seasonLogo = await getSeasonLogo(seasonNo);
+      if (seasonLogo) {
+        const ov = achievement.season_logo_overlay;
+        overlayHtml = `<img src="${cdnUrl(seasonLogo)}" style="position:absolute; top:${ov.top}; left:${ov.left}; width:${ov.width}; height:${ov.height}; object-fit:contain; transform:translate(-50%,-50%) rotate(${ov.rotate || 0}deg); pointer-events:none;">`;
+      }
+    }
+
+    return `
+      <div style="height:${sizePx}px; position:relative; display:inline-block; vertical-align:middle;">
+        <img src="${cdnUrl(achievement.badge_icon_url)}" style="height:100%; width:auto; display:block;">
+        ${overlayHtml}
       </div>
     `;
   }
 
-  function renderRecommendBonusOverlay(gameName, bonusPoint) {
-    return `
+  // 🌟 사이트 achievements.js showToast와 동일한 풀스크린 오버레이. 화면 아무데나 클릭하면 닫힘(버튼 없음).
+  async function renderAchievementOverlay(achievement, meta, seasonNo) {
+    ensureAchievementBadgeStyle();
+    const gameName = meta && meta.game_name ? meta.game_name : null;
+    const badgeHtml = await renderAchievementBadgeHTML(achievement, seasonNo, meta, 140);
+
+    const html = `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:20px; max-width:420px;">
+        <div class="boako-achv-badge-pop" style="display:flex; align-items:center; justify-content:center;">${badgeHtml}</div>
+        <div style="font-size:13px; font-weight:900; color:#c4b5fd; letter-spacing:0.12em; text-transform:uppercase;">업적 달성!</div>
+        <div style="font-size:26px; font-weight:900; color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.45); line-height:1.35;">
+          ${achievement.name}${gameName ? `<br><span style="font-size:16px; color:#cbd5e1; font-weight:700;">(${gameName})</span>` : ''}
+        </div>
+        <div style="font-size:16px; font-weight:900; color:#fbbf24; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
+          +${Number(achievement.point_reward || 0).toLocaleString()} P 획득
+        </div>
+        <div style="font-size:11px; font-weight:700; color:rgba(255,255,255,0.6); margin-top:6px;">화면을 탭하면 닫혀요</div>
+      </div>
+    `;
+    return { html, dismissOnBackdrop: true };
+  }
+
+  function ensureAchievementBadgeStyle() {
+    if (document.getElementById('boako-achv-badge-style')) return;
+    const style = document.createElement('style');
+    style.id = 'boako-achv-badge-style';
+    style.textContent = `
+      @keyframes boako-achv-badge-pop {
+        0%   { transform: scale(0.4) rotate(-10deg); opacity: 0; }
+        60%  { transform: scale(1.15) rotate(4deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      .boako-achv-badge-pop { animation: boako-achv-badge-pop 0.5s cubic-bezier(.34,1.56,.64,1) 0.1s both; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // 🌟 사이트 rival_notify.js showToast와 동일한 VS 구도 오버레이 (승자 크게/패자 작게 + 프사 + 예측결과)
+  async function renderRivalResultOverlay(voteRow) {
+    let gameName = '라이벌전';
+    let winner = null, loser = null;
+
+    try {
+      const matchRes = await fetch(`${SUPABASE_URL}/rest/v1/rival_matches?match_id=eq.${voteRow.match_id}&select=game_name,challenger_id,defender_id,winner_id`, { headers: authHeaders() });
+      const [match] = await matchRes.json();
+      if (match) {
+        gameName = match.game_name || '라이벌전';
+        const loserId = match.winner_id === match.challenger_id ? match.defender_id : match.challenger_id;
+
+        const profRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=in.(${match.challenger_id},${match.defender_id})&select=id,full_name,profile_url,custom_avatar_url`, { headers: authHeaders() });
+        const profiles = await profRes.json();
+        const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+        const buildPerson = (id) => {
+          const p = profileMap[id];
+          const avatar = p ? (p.custom_avatar_url || p.profile_url || null) : null;
+          return { name: p?.full_name || '선수', avatar: avatar ? avatar.replace('http://', 'https://') : null };
+        };
+        winner = buildPerson(match.winner_id);
+        loser = buildPerson(loserId);
+      }
+    } catch (e) {
+      boakoErr('라이벌전 결과 정보 조회 실패:', e);
+    }
+
+    const isCorrect = !!voteRow.is_correct;
+    const rewardPoint = Number(voteRow.reward_point || 0);
+
+    const avatarHtml = (person, size) => person?.avatar
+      ? `<img src="${person.avatar}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; display:block;">`
+      : `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:${Math.round(size * 0.4)}px; font-weight:900;">${(person?.name || '?').charAt(0)}</div>`;
+
+    const html = `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:18px; text-align:center; padding:28px; max-width:440px;">
+        <div style="font-size:12px; font-weight:900; color:#94a3b8; letter-spacing:0.14em; text-transform:uppercase;">${gameName} · 라이벌전 결과</div>
+
+        <div style="display:flex; align-items:center; justify-content:center; gap:14px;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+            <div style="position:relative;">
+              <div style="border-radius:50%; padding:4px; background:linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow:0 0 24px rgba(251,191,36,0.5);">
+                ${avatarHtml(winner, 84)}
+              </div>
+            </div>
+            <div style="font-size:16px; font-weight:900; color:#fff;">${winner?.name || '승자'}</div>
+            <div style="font-size:10px; font-weight:900; letter-spacing:0.1em; color:#78350f; background:linear-gradient(135deg,#fde68a,#fbbf24); padding:3px 12px; border-radius:999px;">🏆 WINNER</div>
+          </div>
+
+          <div style="font-size:20px; font-weight:900; color:#64748b; font-style:italic; padding-bottom:24px;">VS</div>
+
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px; opacity:0.75;">
+            <div style="border-radius:50%; padding:3px; background:#334155;">
+              ${avatarHtml(loser, 56)}
+            </div>
+            <div style="font-size:13px; font-weight:800; color:#cbd5e1;">${loser?.name || '패자'}</div>
+            <div style="font-size:9px; font-weight:900; letter-spacing:0.1em; color:#94a3b8; background:#1e293b; padding:2px 10px; border-radius:999px;">LOSER</div>
+          </div>
+        </div>
+
+        <div style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:16px;">
+          <div style="font-size:12px; font-weight:900; color:${isCorrect ? '#fbbf24' : '#c4b5fd'}; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px;">
+            ${isCorrect ? '🎉 내 예측 적중!' : '🙌 응원 참여 완료'}
+          </div>
+          <div style="font-size:15px; font-weight:900; color:#fff; background:rgba(0,0,0,0.3); display:inline-block; padding:6px 18px; border-radius:999px;">
+            +${rewardPoint.toLocaleString()} P 획득
+          </div>
+        </div>
+
+        <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
+      </div>
+    `;
+    return { html, dismissOnBackdrop: false };
+  }
+
+  // 🌟 사이트 recommend_notify.js showToast와 동일 (게임 로고 실제 조회 포함)
+  async function renderRecommendBonusOverlay(gameName, bonusPoint) {
+    let logoUrl = null;
+    try {
+      const gl = await getGameLogo(gameName);
+      logoUrl = gl ? cdnUrl(gl) : null;
+    } catch (e) {
+      boakoErr('추천 게임 로고 조회 실패:', e);
+    }
+
+    const html = `
       <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:380px;">
         <div style="font-size:12px; font-weight:900; color:#fbbf24; letter-spacing:0.14em; text-transform:uppercase;">⭐ 오늘의 추천 게임 보너스</div>
-        <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:40px;">🎲</div>
+        <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; padding:10px; box-shadow:0 0 24px rgba(251,191,36,0.35);">
+          ${logoUrl ? `<img src="${logoUrl}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span style="font-size:40px;">🎲</span>`}
+        </div>
         <div style="font-size:19px; font-weight:900; color:#fff;">${escapeHtml(gameName)}</div>
         <p style="font-size:12px; font-weight:700; color:#cbd5e1; margin:-8px 0 0;">기록을 남겨주셔서 감사해요!</p>
         <div style="font-size:16px; font-weight:900; color:#fff; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
@@ -638,6 +817,7 @@
         <button data-boako-dismiss style="width:100%; background:#fff; color:#0f172a; font-weight:900; font-size:14px; padding:12px; border-radius:12px; border:none; cursor:pointer; margin-top:4px;">확인</button>
       </div>
     `;
+    return { html, dismissOnBackdrop: false };
   }
 
   // ========================================================================
