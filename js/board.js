@@ -15,6 +15,8 @@
  *    justify-between으로 오른쪽 끝에 고정 — 배지가 몇 개로 늘어나든 날짜/조회수 위치가 안 밀리게 함.
  * 🌟 [배지 로직 수정] 요청 탭 배지가 공지글까지 "미답변"으로 세던 버그 수정 — loadRequestBadge()에서
  *    is_notice=false 조건 추가하여 공지글은 댓글 여부와 무관하게 배지 카운트에서 제외.
+ * 🌟 [신규] 글쓰기 툴바에 취소선 버튼 추가 (toggleStrikethrough) — 선택한 텍스트에 execCommand로
+ *    취소선 적용/해제. 버튼 클릭 시 포커스가 편집창 밖으로 나가며 풀리는 선택 영역을 lastEditorRange로 복원.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -286,6 +288,24 @@ Boako.Board = {
                 Boako.Board.State.lastEditorRange = range.cloneRange();
             }
         }
+    },
+
+    // 🌟 [신규] 취소선 토글 — 툴바 버튼을 누르면 포커스가 편집창 밖으로 나가면서 선택 영역이
+    // 풀리기 때문에, 계속 기억해두던 lastEditorRange로 선택을 복원한 다음 취소선을 적용/해제함.
+    toggleStrikethrough: () => {
+        const editor = document.getElementById('board-input-content');
+        if (!editor) return;
+        editor.focus();
+
+        const range = Boako.Board.State.lastEditorRange;
+        if (range) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+
+        document.execCommand('strikeThrough');
+        Boako.Board.saveEditorSelection(editor);
     },
 
     // 마우스 좌표(드롭 지점)에서 정확한 삽입 위치를 계산 (지원 브라우저 우선, 없으면 null)
@@ -751,6 +771,7 @@ Boako.Board = {
                         <div class="bg-sky-50 border border-sky-200 rounded-lg p-2.5 mb-2 text-[11px] font-bold text-sky-700 flex items-center justify-between flex-wrap gap-2">
                             <span>💡 PC에서는 스크린샷을 Ctrl+V로 붙여넣거나 드래그해서 넣을 수 있어요. 커서가 있던 위치에 바로 삽입돼요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)</span>
                             <div class="flex gap-2 shrink-0">
+                                <button type="button" onclick="Boako.Board.toggleStrikethrough()" title="선택한 글자에 취소선" class="bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors" style="text-decoration:line-through;">S 취소선</button>
                                 <button type="button" onclick="Boako.Board.promptVideoEmbed()" class="bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors">🎬 영상 추가</button>
                                 <label id="board-file-picker-label" class="bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
                                     📷 사진 선택
