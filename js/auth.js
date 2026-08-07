@@ -7,6 +7,8 @@
  * 🌟 [신규] 오늘의 추천 게임 보너스 지급 실시간 알림(recommend_notify.js) 로드/구독 — 동일 패턴.
  * 🌟 [신규] 크롬 확장 아카이브 소식 토스트에서 넘어오는 ?open=LINK_TYPE&id=LINK_ID 쿼리를 읽어
  *    Boako.Util.navigateToLink()로 해당 화면(라이벌매치/토너먼트 등)으로 자동 이동시킴 (handleDeepLinkFromExtension).
+ * 🌟 [신규] 시즌 스플래시(season_splash.js) — 팀 소속자 대상, 로그인/인증 상태 갱신 시마다 트리거
+ *    (실제 하루 1회 노출 여부는 season_splash.js 내부에서 판단).
  */
 Boako.Auth = {
     init: async () => {
@@ -45,10 +47,14 @@ Boako.Auth = {
             // 🌟 오프라인 중 지급된(=놓친) 보너스도 로그인 시점에 확인
             if (Boako.RecommendNotify.checkUnseenResults) Boako.RecommendNotify.checkUnseenResults();
 
-            // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
+            // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달 → 시즌 스플래시(팀 소속자만)
             await Boako.Auth.requireBgaNickname();
             Boako.Auth.requireExtensionGuide();
             Boako.Auth.requireNoticeModal();
+            (async () => {
+                if (!Boako.SeasonSplash) await Boako.Util.loadScript('js/season_splash.js');
+                Boako.SeasonSplash.maybeShow('global');
+            })();
         } else {
             // 🌟 로그인 안 한 방문객은 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준으로만 판단
             Boako.Auth.requireExtensionGuideAnonymous();
@@ -110,10 +116,14 @@ Boako.Auth = {
                 if (Boako.RecommendNotify.checkUnseenResults) Boako.RecommendNotify.checkUnseenResults();
 
                 await Boako.Auth.renderWidget();
-                // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달
+                // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달 → 시즌 스플래시(팀 소속자만)
                 await Boako.Auth.requireBgaNickname();
                 Boako.Auth.requireExtensionGuide();
                 Boako.Auth.requireNoticeModal();
+                (async () => {
+                    if (!Boako.SeasonSplash) await Boako.Util.loadScript('js/season_splash.js');
+                    Boako.SeasonSplash.maybeShow('global');
+                })();
                 
             } else {
                 Boako.state.user = null;
