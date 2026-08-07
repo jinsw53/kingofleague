@@ -37,6 +37,10 @@
  *    승자(크게)-VS-패자(작게) 프로필사진 구도까지 그대로 재현.
  * 🌟 [신규] 사이트 util.js의 window.sfx(Web Audio API로 직접 합성하는 효과음, 외부 음원 파일 없음)를
  *    그대로 이식 — 업적/라이벌전결과/추천보너스 오버레이가 뜰 때 사운드도 사이트와 동일하게 재생됨.
+ * 🌟 [신규] 실시간 연결이 socket closed(1006 등)로 끊기면 그 탭에서는 재접속 전까지 계속 죽어있던 문제 —
+ *    onClose에서 의도적 해제(로그아웃)가 아니면 지수 백오프(2s→4s→8s→...최대30s)로 자동 재연결하도록 수정.
+ *    connectRealtime을 _doConnect/_scheduleReconnect/_subscribeAllChannels로 분리해서 재연결 시에도
+ *    동일하게 전체 채널을 다시 구독함.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -187,6 +191,9 @@
     activeTab: 'messages',
     activeConversation: null, // { otherId, otherName }
     realtimeClient: null,
+    reconnectAttempts: 0, // 🌟 [신규] 자동 재연결 시도 횟수 (지수 백오프 계산용)
+    reconnectTimer: null, // 🌟 [신규] 예약된 재연결 타이머
+    intentionalDisconnect: false, // 🌟 [신규] 로그아웃 등 의도적 연결 해제인지 구분 (true면 재연결 안 함)
     messages: [],   // 최근 쪽지 (내가 받은/보낸 것 중 상대방별 최신 1건씩)
     threadMessages: [], // 🌟 [신규] 현재 열어본 대화 상대와 주고받은 전체 메시지
     threadHasMore: false, // 🌟 [신규] 더 불러올 과거 대화가 남아있는지
@@ -468,14 +475,40 @@
 
   // ========================================================================
   // 🌟 실시간 연결 (핵심 디버깅 대상) — 이 단계에서 CSP 문제가 있으면 아래 로그로 바로 드러남
+  // 🌟 [신규] socket closed(1006 등)로 연결이 끊기면 기존엔 그냥 로그만 남기고 끝이었음 —
+  // 그 탭에서는 재접속 전까지 실시간 기능이 계속 죽어있는 상태로 남는 문제가 있었음.
+  // onClose에서 의도적 해제(로그아웃)가 아니면 지수 백오프(2s→4s→8s→...→최대 30s)로 자동 재연결하도록 수정.
   // ========================================================================
   function connectRealtime() {
-    if (typeof BoakoRealtimeClient === 'undefined') {
-      boakoErr('BoakoRealtimeClient 없음 — 실시간 연결 시도 자체를 할 수 없음');
-      return;
-    }
     if (State.realtimeClient) {
       boakoLog('이미 연결된 realtime 클라이언트가 있어 재사용');
+      return;
+    }
+    State.intentionalDisconnect = false;
+    _doConnect();
+  }
+
+  function _scheduleReconnect() {
+    if (State.intentionalDisconnect) return; // 로그아웃 등 의도적 해제면 재연결 안 함
+    if (State.reconnectTimer) return; // 이미 예약돼 있으면 중복 예약 방지
+
+    const delay = Math.min(2000 * Math.pow(2, State.reconnectAttempts), 30000);
+    State.reconnectAttempts += 1;
+    boakoWarn(`${(delay / 1000).toFixed(0)}초 후 실시간 연결 재시도 (${State.reconnectAttempts}번째 시도)`);
+
+    State.reconnectTimer = setTimeout(() => {
+      State.reconnectTimer = null;
+      if (State.realtimeClient) {
+        try { State.realtimeClient.disconnect(); } catch (e) { /* noop */ }
+        State.realtimeClient = null;
+      }
+      if (!State.intentionalDisconnect && State.session) _doConnect();
+    }, delay);
+  }
+
+  function _doConnect() {
+    if (typeof BoakoRealtimeClient === 'undefined') {
+      boakoErr('BoakoRealtimeClient 없음 — 실시간 연결 시도 자체를 할 수 없음');
       return;
     }
 
@@ -488,12 +521,25 @@
     // 🌟 [버그수정] onOpen/onClose/onError는 client(RealtimeClient) 최상위가 아니라
     // client.socketAdapter(내부 소켓 래퍼)에 있음 — 연결 단계별 상태를 전부 로그로 남김.
     // CSP가 막으면 보통 onError가 뜨거나, onOpen이 영원히 안 뜸
-    client.socketAdapter.onOpen(() => boakoOk('웹소켓 연결 성공! (CSP 문제 없음)'));
-    client.socketAdapter.onClose((e) => boakoWarn('웹소켓 연결 종료됨:', e));
+    client.socketAdapter.onOpen(() => {
+      boakoOk('웹소켓 연결 성공! (CSP 문제 없음)');
+      State.reconnectAttempts = 0; // 정상 연결됐으니 다음에 끊기면 다시 짧은 지연부터 재시도
+    });
+    client.socketAdapter.onClose((e) => {
+      boakoWarn('웹소켓 연결 종료됨:', e);
+      State.realtimeClient = null;
+      _scheduleReconnect();
+    });
     client.socketAdapter.onError((e) => boakoErr('웹소켓 연결 오류 발생 — BGA 페이지의 CSP가 Supabase 연결을 막고 있을 가능성이 있음. 개발자 도구 콘솔에 "Refused to connect" 또는 "violates the following Content Security Policy" 에러가 같이 떠 있는지 확인해보세요.', e));
 
     client.setAuth(State.session.access_token);
     client.connect();
+
+    _subscribeAllChannels(client);
+  }
+
+  // 🌟 재연결 시에도 동일하게 전체 채널을 다시 구독해야 하므로 별도 함수로 분리
+  function _subscribeAllChannels(client) {
 
     // 내 쪽지함 실시간 구독
     const msgTopic = `messages-${State.session.user.id}`;
@@ -615,6 +661,12 @@
   }
 
   function disconnectRealtime() {
+    State.intentionalDisconnect = true; // 🌟 로그아웃 등 의도적 해제 — 재연결 스케줄러가 다시 붙지 않도록
+    if (State.reconnectTimer) {
+      clearTimeout(State.reconnectTimer);
+      State.reconnectTimer = null;
+    }
+    State.reconnectAttempts = 0;
     if (State.realtimeClient) {
       boakoLog('실시간 연결 해제');
       State.realtimeClient.disconnect();
