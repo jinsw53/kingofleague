@@ -15,6 +15,8 @@
  *    북마클릿 동기화에서 이름을 못 뽑은 게임들을 관리자가 수동 매칭.
  * 🌟 [수정] 팀 창단 로고 업로드 안내문구 중 "배경 없는 PNG" 요구사항이 다른 문구랑 똑같이 묻혀있어서
  *    강조 안 되던 문제 수정 (빨간색+굵게+⚠️ 아이콘으로 눈에 띄게 변경).
+ * 🌟 [신규] 랭킹 페이지 진입 시 무소속 로그인 유저/비로그인 방문객 대상 시즌 스플래시(season_splash.js)
+ *    트리거 — 팀 소속자는 auth.js에서 사이트 전체 트리거로 이미 처리되므로 여긴 무소속자 전용.
  */
 Boako.View = {
     toggleEdit: (type) => {
@@ -148,6 +150,11 @@ Boako.View = {
                         Boako.Ranking.loadPrizeBanner();
                     }
                 }, 0);
+                // 🌟 [신규] 무소속 로그인 유저 / 비로그인 방문객 대상 시즌 스플래시 (팀 소속자는 auth.js에서 이미 처리됨)
+                (async () => {
+                    if (!Boako.SeasonSplash) await Boako.Util.loadScript('js/season_splash.js');
+                    Boako.SeasonSplash.maybeShow('ranking');
+                })();
                 break;
 
             case 'match':
