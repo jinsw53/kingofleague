@@ -19,6 +19,8 @@
  *    취소선 적용/해제. 버튼 클릭 시 포커스가 편집창 밖으로 나가며 풀리는 선택 영역을 lastEditorRange로 복원.
  * 🌟 [신규] 취소선 단축키(Ctrl/Cmd+Shift+X, 슬랙·디스코드와 동일) 추가 + 수정 모달 에디터에도
  *    같은 버튼/단축키 지원 (글쓰기에만 있고 수정엔 없던 것 보완). toggleStrikethrough가 editorId를 받도록 범용화.
+ * 🌟 [버그수정] "수정" 버튼이 본인 글일 때만 뜨고 관리자여도 안 뜨던 문제 수정 — 삭제는 관리자 가능한데
+ *    수정만 막혀있던 비일관성 해소 (isAuthor || isAdmin). DB의 fn_update_board_post RPC도 같이 수정.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -1168,7 +1170,7 @@ Boako.Board = {
                                 <span class="text-[11px] text-slate-400 whitespace-nowrap">${Boako.Board.timeAgo(post.created_at)} · 👁 ${post.view_count}</span>
                                 ${isAuthor || Boako.Board.State.isAdmin ? `
                                 <div class="flex gap-2 text-xs font-bold">
-                                    ${isAuthor ? `<button onclick="Boako.Board.openEditModal()" class="text-slate-400 hover:text-slate-600">수정</button>` : ''}
+                                    ${(isAuthor || Boako.Board.State.isAdmin) ? `<button onclick="Boako.Board.openEditModal()" class="text-slate-400 hover:text-slate-600">수정</button>` : ''}
                                     <button onclick="Boako.Board.deletePost()" class="text-slate-400 hover:text-rose-500">삭제</button>
                                 </div>` : ''}
                             </div>
