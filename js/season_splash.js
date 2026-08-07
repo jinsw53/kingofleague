@@ -2,8 +2,9 @@
  * [SEASON SPLASH] 시즌 진행중/우승팀 로고 스플래시 오버레이
  * 🌟 팀 소속 유저: 사이트 아무 페이지나 접속 시 (auth.js에서 호출) — 하루 1번
  * 🌟 무소속 로그인 유저 / 비로그인 방문객: 랭킹 페이지 진입 시 (view.js에서 호출) — 하루 1번
- * 🌟 최신 시즌(seasons)에 season_final_rankings 결과가 이미 있으면(=시즌 종료) 우승팀 로고,
- *    없으면(=진행 중) 그 시즌 로고를 보여줌.
+ * 🌟 오늘 날짜가 start_date~end_date 사이인 시즌이 있으면(=진행 중) 그 시즌 로고,
+ *    없고 가장 최근에 끝난 시즌에 season_final_rankings 결과가 확정돼 있으면(=시즌 종료) 우승팀 로고.
+ *    둘 다 없으면(아직 시작 전이거나, 끝났는데 결과 미집계) 아무것도 안 띄움.
  * 🌟 로고 진입 애니메이션은 목업(궤적 드로잉 도구로 직접 그린 궤적 + 좌우반전 반복 + 200% 피크)을
  *    그대로 이식. 사운드도 Web Audio로 직접 합성(외부 음원 파일 없음).
  */
@@ -50,21 +51,36 @@ Boako.SeasonSplash = {
 
   // 실제로 오버레이를 그리고, 확인 버튼 눌릴 때까지 기다림. 보여줄 데이터가 없으면 false 반환(하루 소진 처리 안 함).
   _render: async () => {
-    let season, champion;
+    let season, champion = null;
     try {
-      const { data: seasons } = await Boako.db.from('seasons')
-        .select('season_no, title, start_date, end_date, season_logo_url')
-        .order('season_no', { ascending: false })
-        .limit(1);
-      season = seasons?.[0];
-      if (!season) return false;
+      const nowIso = new Date().toISOString();
 
-      const { data: finals } = await Boako.db.from('season_final_rankings')
-        .select('team_name, logo_url')
-        .eq('season_no', season.season_no)
-        .eq('final_rank', 1)
+      // 1) 오늘 날짜가 start_date~end_date 사이인 "진행 중" 시즌부터 확인
+      const { data: liveSeasons } = await Boako.db.from('seasons')
+        .select('season_no, title, start_date, end_date, season_logo_url')
+        .lte('start_date', nowIso)
+        .gte('end_date', nowIso)
         .limit(1);
-      champion = finals?.[0] || null;
+      season = liveSeasons?.[0];
+
+      if (!season) {
+        // 2) 진행 중인 시즌이 없으면, 가장 최근에 끝난 시즌 중 실제로 결과가 확정된 것만 찾음
+        const { data: pastSeasons } = await Boako.db.from('seasons')
+          .select('season_no, title, start_date, end_date, season_logo_url')
+          .lt('end_date', nowIso)
+          .order('end_date', { ascending: false })
+          .limit(1);
+        season = pastSeasons?.[0];
+        if (!season) return false; // 아직 시작된 시즌 자체가 없음
+
+        const { data: finals } = await Boako.db.from('season_final_rankings')
+          .select('team_name, logo_url')
+          .eq('season_no', season.season_no)
+          .eq('final_rank', 1)
+          .limit(1);
+        champion = finals?.[0] || null;
+        if (!champion) return false; // 시즌은 끝났지만 아직 결과 집계 전이면 스킵
+      }
     } catch (err) {
       console.error('시즌 스플래시 데이터 조회 실패:', err);
       return false;
