@@ -17,6 +17,8 @@
  *    is_notice=false 조건 추가하여 공지글은 댓글 여부와 무관하게 배지 카운트에서 제외.
  * 🌟 [신규] 글쓰기 툴바에 취소선 버튼 추가 (toggleStrikethrough) — 선택한 텍스트에 execCommand로
  *    취소선 적용/해제. 버튼 클릭 시 포커스가 편집창 밖으로 나가며 풀리는 선택 영역을 lastEditorRange로 복원.
+ * 🌟 [신규] 취소선 단축키(Ctrl/Cmd+Shift+X, 슬랙·디스코드와 동일) 추가 + 수정 모달 에디터에도
+ *    같은 버튼/단축키 지원 (글쓰기에만 있고 수정엔 없던 것 보완). toggleStrikethrough가 editorId를 받도록 범용화.
  */
 Boako.Board = {
     CATEGORIES: ['공략', '자유', '질문', '요청'],
@@ -292,13 +294,14 @@ Boako.Board = {
 
     // 🌟 [신규] 취소선 토글 — 툴바 버튼을 누르면 포커스가 편집창 밖으로 나가면서 선택 영역이
     // 풀리기 때문에, 계속 기억해두던 lastEditorRange로 선택을 복원한 다음 취소선을 적용/해제함.
-    toggleStrikethrough: () => {
-        const editor = document.getElementById('board-input-content');
+    // editorId 파라미터로 글쓰기(board-input-content)/수정(board-edit-content) 양쪽 다 지원.
+    toggleStrikethrough: (editorId = 'board-input-content') => {
+        const editor = document.getElementById(editorId);
         if (!editor) return;
         editor.focus();
 
         const range = Boako.Board.State.lastEditorRange;
-        if (range) {
+        if (range && editor.contains(range.startContainer)) {
             const sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
@@ -306,6 +309,15 @@ Boako.Board = {
 
         document.execCommand('strikeThrough');
         Boako.Board.saveEditorSelection(editor);
+    },
+
+    // 🌟 [신규] 단축키(Ctrl/Cmd+Shift+X)로 취소선 토글 — 슬랙/디스코드와 동일한 조합.
+    // 이미 편집창에 포커스와 선택 영역이 살아있는 상태라 lastEditorRange 복원 없이 바로 적용.
+    handleStrikethroughShortcut: (e) => {
+        const isShortcut = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'x';
+        if (!isShortcut) return;
+        e.preventDefault();
+        document.execCommand('strikeThrough');
     },
 
     // 마우스 좌표(드롭 지점)에서 정확한 삽입 위치를 계산 (지원 브라우저 우선, 없으면 null)
@@ -771,7 +783,7 @@ Boako.Board = {
                         <div class="bg-sky-50 border border-sky-200 rounded-lg p-2.5 mb-2 text-[11px] font-bold text-sky-700 flex items-center justify-between flex-wrap gap-2">
                             <span>💡 PC에서는 스크린샷을 Ctrl+V로 붙여넣거나 드래그해서 넣을 수 있어요. 커서가 있던 위치에 바로 삽입돼요. (최대 ${Boako.Board.MAX_IMAGES}장, 자동 압축됨)</span>
                             <div class="flex gap-2 shrink-0">
-                                <button type="button" onclick="Boako.Board.toggleStrikethrough()" title="선택한 글자에 취소선" class="bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors" style="text-decoration:line-through;">S 취소선</button>
+                                <button type="button" onclick="Boako.Board.toggleStrikethrough()" title="선택한 글자에 취소선 (Ctrl/Cmd+Shift+X)" class="bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors" style="text-decoration:line-through;">S 취소선</button>
                                 <button type="button" onclick="Boako.Board.promptVideoEmbed()" class="bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors">🎬 영상 추가</button>
                                 <label id="board-file-picker-label" class="bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
                                     📷 사진 선택
@@ -802,6 +814,9 @@ Boako.Board = {
         ['keyup', 'mouseup', 'input', 'focus'].forEach(evt => {
             editor.addEventListener(evt, () => Boako.Board.saveEditorSelection(editor));
         });
+
+        // 🌟 [신규] 취소선 단축키 (Ctrl/Cmd+Shift+X)
+        editor.addEventListener('keydown', Boako.Board.handleStrikethroughShortcut);
 
         editor.addEventListener('paste', async (e) => {
             // 🌟 붙여넣는 바로 그 순간의 커서 위치를 정확히 캡처 (비동기 업로드 전에 미리 저장)
@@ -1256,6 +1271,9 @@ Boako.Board = {
                         <button onclick="document.getElementById('board-edit-modal-overlay').remove()" class="text-slate-400 font-black text-xl">×</button>
                     </div>
                     <input type="text" id="board-edit-title" value="${Boako.Board.escapeHtml(post.title)}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold mb-3">
+                    <div class="flex justify-end mb-2">
+                        <button type="button" onclick="Boako.Board.toggleStrikethrough('board-edit-content')" title="선택한 글자에 취소선 (Ctrl/Cmd+Shift+X)" class="bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors" style="text-decoration:line-through;">S 취소선</button>
+                    </div>
                     <div id="board-edit-content" contenteditable="true" class="w-full min-h-[240px] border border-slate-200 rounded-lg px-3 py-3 text-sm leading-relaxed">${post.content}</div>
                     <button onclick="Boako.Board.submitEdit()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-3 rounded-xl mt-4">저장</button>
                 </div>
@@ -1263,6 +1281,9 @@ Boako.Board = {
         `;
         document.getElementById('board-modal-root')?.remove();
         document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 🌟 [신규] 수정 모달 에디터에도 취소선 단축키 (Ctrl/Cmd+Shift+X) 등록
+        document.getElementById('board-edit-content').addEventListener('keydown', Boako.Board.handleStrikethroughShortcut);
     },
 
     submitEdit: async () => {
