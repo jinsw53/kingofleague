@@ -41,6 +41,8 @@
  *    onClose에서 의도적 해제(로그아웃)가 아니면 지수 백오프(2s→4s→8s→...최대30s)로 자동 재연결하도록 수정.
  *    connectRealtime을 _doConnect/_scheduleReconnect/_subscribeAllChannels로 분리해서 재연결 시에도
  *    동일하게 전체 채널을 다시 구독함.
+ * 🌟 [신규] 위 재연결과 별개로, 백그라운드 탭은 브라우저가 타이머를 느리게 만들어 하트비트가 늦어지며
+ *    끊기는 경우가 흔함 — visibilitychange로 탭이 다시 보이는 순간 백오프 대기 없이 즉시 재연결 시도.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -1463,6 +1465,21 @@
     }
     boakoOk('위젯 초기화 완료');
   }
+
+  // 🌟 [신규] 백그라운드 탭은 브라우저가 타이머를 느리게 만들어서(전력 절약) 하트비트가
+  // 제때 안 나가 연결이 끊기는 경우가 흔함. 탭이 다시 화면에 보이는 순간, 예약된 백오프 대기를
+  // 기다리지 않고 바로 재연결을 시도해서 복구 속도를 최대한 앞당김.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!State.session || State.realtimeClient) return; // 로그인 안 했거나 이미 연결돼 있으면 할 게 없음
+    boakoLog('탭이 다시 활성화됨 — 실시간 연결 상태 확인 중...');
+    if (State.reconnectTimer) {
+      clearTimeout(State.reconnectTimer);
+      State.reconnectTimer = null;
+    }
+    State.intentionalDisconnect = false;
+    _doConnect();
+  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
