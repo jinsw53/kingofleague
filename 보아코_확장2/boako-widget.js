@@ -43,6 +43,11 @@
  *    동일하게 전체 채널을 다시 구독함.
  * 🌟 [신규] 위 재연결과 별개로, 백그라운드 탭은 브라우저가 타이머를 느리게 만들어 하트비트가 늦어지며
  *    끊기는 경우가 흔함 — visibilitychange로 탭이 다시 보이는 순간 백오프 대기 없이 즉시 재연결 시도.
+ * 🌟 [신규] 탭 간 실시간 연결 리더 선출 — BGA 탭을 여러 개 열면 탭마다 각자 웹소켓을 만들어서
+ *    Supabase 무료 플랜 동시연결 한도를 필요 이상으로 빨리 잡아먹는 문제 방지. localStorage 하트비트로
+ *    같은 브라우저의 탭들 중 리더 하나만 진짜 연결을 열고, 나머지(팔로워)는 BroadcastChannel로 중계된
+ *    이벤트만 받아 동일하게 반응(토스트/뱃지/오버레이는 각 탭이 알아서 그림). 리더 탭이 닫히면(하트비트
+ *    끊김 또는 beforeunload로 즉시 통지) 남은 탭 중 하나가 자동 승격.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -476,6 +481,126 @@
   }
 
   // ========================================================================
+  // 🌟 [신규] 탭 간 실시간 연결 리더 선출 — BGA 탭을 여러 개 열면 탭마다 각자 웹소켓을 만들어서
+  // Supabase 무료 플랜 동시연결(200개) 한도를 필요 이상으로 빨리 잡아먹는 문제를 방지.
+  // 같은 브라우저 안의 탭들 중 "리더" 탭 하나만 진짜 연결을 열고, 나머지(팔로워)는 그 리더가
+  // BroadcastChannel로 중계해주는 이벤트만 받아서 동일하게 반응(토스트/뱃지/오버레이는 각 탭이 알아서 그림).
+  // 리더가 죽으면(탭 닫힘 등) 하트비트가 끊기고, 남은 탭 중 하나가 자동으로 리더를 이어받음.
+  // ========================================================================
+  const TAB_ID = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+  const LEADER_KEY = 'boako_realtime_leader';
+  const LEADER_TTL_MS = 6000;       // 이 시간 넘게 하트비트가 없으면 리더가 죽은 것으로 간주
+  const HEARTBEAT_INTERVAL_MS = 2000;
+
+  let isRealtimeLeader = false;
+  let leaderHeartbeatTimer = null;
+  let followerWatchTimer = null;
+  let realtimeBC = null;
+
+  function getLeaderInfo() {
+    try {
+      const raw = localStorage.getItem(LEADER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function isLeaderInfoAlive(info) {
+    return !!info && (Date.now() - info.ts) < LEADER_TTL_MS;
+  }
+
+  // 팔로워 탭으로 전달할 때 사용 — 리더 탭에서만 실제로 방송함
+  function broadcastToFollowers(type, payload) {
+    if (!isRealtimeLeader || !realtimeBC) return;
+    try { realtimeBC.postMessage({ type, payload }); } catch (e) { /* noop */ }
+  }
+
+  // 팔로워 탭이 리더로부터 중계받은 이벤트를 로컬 이벤트와 동일하게 처리
+  function dispatchRelayedEvent(type, payload) {
+    switch (type) {
+      case 'message-insert': onMessageInsert(payload); break;
+      case 'team-chat-insert': onTeamChatInsert(payload); break;
+      case 'news-insert': onNewsInsert(payload); break;
+      case 'achievement-insert': onAchievementInsert(payload); break;
+      case 'rival-vote-update': onRivalVoteUpdate(payload); break;
+      case 'recommend-bonus-update': onRecommendBonusUpdate(payload); break;
+    }
+  }
+
+  function claimLeadership() {
+    if (followerWatchTimer) { clearInterval(followerWatchTimer); followerWatchTimer = null; }
+    localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
+    isRealtimeLeader = true;
+    boakoOk(`이 탭이 실시간 연결 리더로 선출됨 (id: ${TAB_ID.slice(0, 8)})`);
+    _doConnect(); // 진짜 웹소켓 연결은 리더 탭에서만 생성
+    leaderHeartbeatTimer = setInterval(() => {
+      localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  function becomeFollower() {
+    isRealtimeLeader = false;
+    boakoLog('다른 탭이 이미 실시간 연결 리더 — 이 탭은 팔로워로 대기 (중계 이벤트만 수신, 별도 연결 안 만듦)');
+    if (!followerWatchTimer) {
+      followerWatchTimer = setInterval(() => {
+        const info = getLeaderInfo();
+        if (!isLeaderInfoAlive(info)) {
+          boakoWarn('리더 탭의 하트비트가 끊김 — 리더 승격 시도');
+          tryClaimWithJitter();
+        }
+      }, 2000);
+    }
+  }
+
+  // 여러 탭이 동시에 리더가 없다고 판단해서 한꺼번에 승격을 시도할 수 있으므로,
+  // 무작위 지연을 살짝 준 뒤 그 사이 다른 탭이 먼저 리더가 됐는지 다시 확인
+  function tryClaimWithJitter() {
+    const jitter = Math.random() * 400;
+    setTimeout(() => {
+      const info = getLeaderInfo();
+      if (!isLeaderInfoAlive(info)) {
+        claimLeadership();
+      } else {
+        becomeFollower();
+      }
+    }, jitter);
+  }
+
+  function initRealtimeCoordination() {
+    realtimeBC = new BroadcastChannel('boako-realtime-relay');
+    realtimeBC.onmessage = (e) => {
+      if (isRealtimeLeader) return; // 리더는 이벤트의 원본 발신자이므로 자기 방송은 무시
+      const { type, payload } = e.data || {};
+      if (type) dispatchRelayedEvent(type, payload);
+    };
+
+    window.addEventListener('beforeunload', () => {
+      if (isRealtimeLeader) {
+        // 리더가 사라진다는 걸 즉시 localStorage에서 지워서, 팔로워가 하트비트 타임아웃(최대 6초)까지
+        // 안 기다리고 다음 감시 주기(2초 이내)에 바로 승격하도록 함
+        try {
+          const info = getLeaderInfo();
+          if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+        } catch (e) { /* noop */ }
+        if (leaderHeartbeatTimer) clearInterval(leaderHeartbeatTimer);
+      }
+    });
+
+    tryClaimWithJitter();
+  }
+
+  function teardownRealtimeCoordination() {
+    if (leaderHeartbeatTimer) { clearInterval(leaderHeartbeatTimer); leaderHeartbeatTimer = null; }
+    if (followerWatchTimer) { clearInterval(followerWatchTimer); followerWatchTimer = null; }
+    if (isRealtimeLeader) {
+      try {
+        const info = getLeaderInfo();
+        if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+      } catch (e) { /* noop */ }
+    }
+    isRealtimeLeader = false;
+    if (realtimeBC) { try { realtimeBC.close(); } catch (e) {} realtimeBC = null; }
+  }
+
+  // ========================================================================
   // 🌟 실시간 연결 (핵심 디버깅 대상) — 이 단계에서 CSP 문제가 있으면 아래 로그로 바로 드러남
   // 🌟 [신규] socket closed(1006 등)로 연결이 끊기면 기존엔 그냥 로그만 남기고 끝이었음 —
   // 그 탭에서는 재접속 전까지 실시간 기능이 계속 죽어있는 상태로 남는 문제가 있었음.
@@ -541,25 +666,71 @@
   }
 
   // 🌟 재연결 시에도 동일하게 전체 채널을 다시 구독해야 하므로 별도 함수로 분리
+  // ========================================================================
+  // 🌟 [신규] 각 실시간 이벤트의 실제 처리 로직을 독립 함수로 분리.
+  // 리더 탭에서는 실제 구독 콜백에서 호출되고, 팔로워 탭에서는 BroadcastChannel로 중계받은
+  // 이벤트에서 동일하게 호출됨 — 어느 쪽이든 완전히 똑같은 화면 반응(토스트/뱃지/오버레이)을 보장.
+  // ========================================================================
+  async function onMessageInsert(payload) {
+    boakoOk('새 쪽지 실시간 수신:', payload.new);
+    State.unread += 1;
+    await fetchMessages();
+    const isViewingThisThread = State.panelOpen && State.activeTab === 'messages' && State.activeConversation?.otherId === payload.new.sender_id;
+    if (isViewingThisThread) {
+      await fetchThreadMessages(payload.new.sender_id);
+      await markThreadAsRead(payload.new.sender_id);
+    }
+    render();
+    if (!isViewingThisThread) handleIncomingToast('message', payload.new);
+  }
+
+  function onTeamChatInsert(payload) {
+    if (payload.new.sender_id === State.session.user.id) return;
+    boakoOk('새 팀챗 실시간 수신:', payload.new);
+    fetchTeamChats().then(render);
+    handleIncomingToast('message', payload.new, true);
+  }
+
+  function onNewsInsert(payload) {
+    boakoOk('새 아카이브 소식 실시간 수신:', payload.new);
+    const item = payload.new;
+    const targetUrl = (item.link_type && item.link_id)
+      ? `https://boakoarchive.co.kr/?open=${encodeURIComponent(item.link_type)}&id=${encodeURIComponent(item.link_id)}`
+      : 'https://boakoarchive.co.kr/';
+    fireNewsToast(item.title || '새 소식이 도착했어요', item.subtitle || '클릭해서 확인해보세요', targetUrl);
+  }
+
+  async function onAchievementInsert(payload) {
+    boakoOk('새 업적 달성 실시간 수신:', payload.new);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${payload.new.achievement_id}&select=*`, { headers: authHeaders() });
+      const [achievement] = await res.json();
+      if (achievement) enqueueFullscreenOverlay(() => renderAchievementOverlay(achievement, payload.new.meta, payload.new.season_no));
+    } catch (e) { boakoErr('업적 정보 조회 실패:', e); }
+  }
+
+  function onRivalVoteUpdate(payload) {
+    if (!payload.new.resolved_at || (payload.old && payload.old.resolved_at)) return;
+    boakoOk('라이벌전 투표 결과 실시간 수신:', payload.new);
+    enqueueFullscreenOverlay(() => renderRivalResultOverlay(payload.new));
+  }
+
+  function onRecommendBonusUpdate(payload) {
+    if (!payload.new.bonus_point || payload.new.bonus_point <= 0) return;
+    if (payload.old && payload.old.bonus_point > 0) return;
+    boakoOk('오늘의 추천 게임 보너스 실시간 수신:', payload.new);
+    enqueueFullscreenOverlay(() => renderRecommendBonusOverlay(payload.new.game_name, payload.new.bonus_point));
+  }
+
   function _subscribeAllChannels(client) {
 
     // 내 쪽지함 실시간 구독
     const msgTopic = `messages-${State.session.user.id}`;
     boakoLog(`채널 구독 시도: ${msgTopic}`);
     const msgChannel = client.channel(msgTopic, { config: {} });
-    msgChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${State.session.user.id}` }, async (payload) => {
-      boakoOk('새 쪽지 실시간 수신:', payload.new);
-      State.unread += 1;
-      await fetchMessages();
-      // 🌟 지금 그 상대방과의 대화를 이미 보고 있으면, 목록뿐 아니라 열린 대화창에도 바로 반영 + 읽음 처리
-      const isViewingThisThread = State.panelOpen && State.activeTab === 'messages' && State.activeConversation?.otherId === payload.new.sender_id;
-      if (isViewingThisThread) {
-        await fetchThreadMessages(payload.new.sender_id);
-        await markThreadAsRead(payload.new.sender_id);
-      }
-      render();
-      // 이미 그 대화를 보고 있는 중이면 토스트까지 띄울 필요는 없음
-      if (!isViewingThisThread) handleIncomingToast('message', payload.new);
+    msgChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${State.session.user.id}` }, (payload) => {
+      onMessageInsert(payload);
+      broadcastToFollowers('message-insert', payload);
     });
     msgChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${msgTopic}`);
@@ -574,10 +745,8 @@
       boakoLog(`채널 구독 시도: ${teamTopic}`);
       const teamChannel = client.channel(teamTopic, { config: {} });
       teamChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'team_chats', filter: `team_id=eq.${State.teamId}` }, (payload) => {
-        if (payload.new.sender_id === State.session.user.id) return; // 내가 보낸 건 알림 제외
-        boakoOk('새 팀챗 실시간 수신:', payload.new);
-        fetchTeamChats().then(render);
-        handleIncomingToast('message', payload.new, true);
+        onTeamChatInsert(payload);
+        broadcastToFollowers('team-chat-insert', payload);
       });
       teamChannel.subscribe((status, err) => {
         if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${teamTopic}`);
@@ -587,20 +756,13 @@
       });
     }
 
-    // 🌟 [신규] 아카이브 소식(news_feed_items) 실시간 구독 — 사이트 소식지에 새 카드가 등록되는 순간
-    // 토스트로 알림. 특정 유저 필터가 필요 없는 공개 정보라 filter 없이 전체 INSERT를 구독함.
+    // 🌟 아카이브 소식(news_feed_items) 실시간 구독
     const newsTopic = 'archive-news-feed';
     boakoLog(`채널 구독 시도: ${newsTopic}`);
     const newsChannel = client.channel(newsTopic, { config: {} });
     newsChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, (payload) => {
-      boakoOk('새 아카이브 소식 실시간 수신:', payload.new);
-      const item = payload.new;
-      // 🌟 [수정] 무조건 홈으로만 보내던 것 → link_type/link_id가 있으면 URL 쿼리에 실어서 보냄.
-      // 사이트 쪽(auth.js)에서 이 쿼리를 읽어 Boako.Util.navigateToLink()로 정확한 화면(라이벌매치/토너먼트 등)으로 이동시킴.
-      const targetUrl = (item.link_type && item.link_id)
-        ? `https://boakoarchive.co.kr/?open=${encodeURIComponent(item.link_type)}&id=${encodeURIComponent(item.link_id)}`
-        : 'https://boakoarchive.co.kr/';
-      fireNewsToast(item.title || '새 소식이 도착했어요', item.subtitle || '클릭해서 확인해보세요', targetUrl);
+      onNewsInsert(payload);
+      broadcastToFollowers('news-insert', payload);
     });
     newsChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${newsTopic}`);
@@ -609,17 +771,13 @@
       else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${newsTopic}`);
     });
 
-    // 🌟 [신규] 업적 획득 실시간 구독 — 사이트 achievements.js와 동일한 마크업(시즌로고/티어 합성 배지)으로 재현
+    // 🌟 업적 획득 실시간 구독
     const achvTopic = `achievements-${State.session.user.id}`;
     boakoLog(`채널 구독 시도: ${achvTopic}`);
     const achvChannel = client.channel(achvTopic, { config: {} });
-    achvChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${State.session.user.id}` }, async (payload) => {
-      boakoOk('새 업적 달성 실시간 수신:', payload.new);
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${payload.new.achievement_id}&select=*`, { headers: authHeaders() });
-        const [achievement] = await res.json();
-        if (achievement) enqueueFullscreenOverlay(() => renderAchievementOverlay(achievement, payload.new.meta, payload.new.season_no));
-      } catch (e) { boakoErr('업적 정보 조회 실패:', e); }
+    achvChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${State.session.user.id}` }, (payload) => {
+      onAchievementInsert(payload);
+      broadcastToFollowers('achievement-insert', payload);
     });
     achvChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${achvTopic}`);
@@ -628,14 +786,13 @@
       else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${achvTopic}`);
     });
 
-    // 🌟 [신규] 라이벌전 승자 예측 투표 결과 실시간 구독 — resolved_at이 새로 채워지는 순간만 알림
+    // 🌟 라이벌전 승자 예측 투표 결과 실시간 구독
     const rivalTopic = `rival-votes-${State.session.user.id}`;
     boakoLog(`채널 구독 시도: ${rivalTopic}`);
     const rivalChannel = client.channel(rivalTopic, { config: {} });
     rivalChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rival_match_votes', filter: `voter_id=eq.${State.session.user.id}` }, (payload) => {
-      if (!payload.new.resolved_at || payload.old.resolved_at) return; // 이번에 새로 확정된 것만
-      boakoOk('라이벌전 투표 결과 실시간 수신:', payload.new);
-      enqueueFullscreenOverlay(() => renderRivalResultOverlay(payload.new));
+      onRivalVoteUpdate(payload);
+      broadcastToFollowers('rival-vote-update', payload);
     });
     rivalChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${rivalTopic}`);
@@ -644,15 +801,13 @@
       else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${rivalTopic}`);
     });
 
-    // 🌟 [신규] 오늘의 추천 게임 보너스 지급 실시간 구독 — bonus_point가 0에서 실제 값으로 바뀌는 순간만 알림
+    // 🌟 오늘의 추천 게임 보너스 지급 실시간 구독
     const recTopic = `recommend-bonus-${State.session.user.id}`;
     boakoLog(`채널 구독 시도: ${recTopic}`);
     const recChannel = client.channel(recTopic, { config: {} });
     recChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_recommend_bonus_claims', filter: `user_id=eq.${State.session.user.id}` }, (payload) => {
-      if (!payload.new.bonus_point || payload.new.bonus_point <= 0) return;
-      if (payload.old.bonus_point > 0) return; // 이번에 새로 지급된 것만
-      boakoOk('오늘의 추천 게임 보너스 실시간 수신:', payload.new);
-      enqueueFullscreenOverlay(() => renderRecommendBonusOverlay(payload.new.game_name, payload.new.bonus_point));
+      onRecommendBonusUpdate(payload);
+      broadcastToFollowers('recommend-bonus-update', payload);
     });
     recChannel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${recTopic}`);
@@ -674,6 +829,7 @@
       State.realtimeClient.disconnect();
       State.realtimeClient = null;
     }
+    teardownRealtimeCoordination(); // 🌟 리더였다면 자리 비켜주고, 하트비트/방송 채널 정리
   }
 
   // ========================================================================
@@ -1450,7 +1606,7 @@
     State.teamId = await fetchTeamId();
     boakoLog('소속 팀 id:', State.teamId || '(없음)');
     await Promise.all([fetchMessages(), fetchTeamChats()]);
-    connectRealtime();
+    initRealtimeCoordination(); // 🌟 탭 리더 선출 후, 리더 탭만 실제 웹소켓 연결을 만듦
     render();
   }
 
@@ -1466,19 +1622,32 @@
     boakoOk('위젯 초기화 완료');
   }
 
-  // 🌟 [신규] 백그라운드 탭은 브라우저가 타이머를 느리게 만들어서(전력 절약) 하트비트가
+  // 🌟 백그라운드 탭은 브라우저가 타이머를 느리게 만들어서(전력 절약) 하트비트가
   // 제때 안 나가 연결이 끊기는 경우가 흔함. 탭이 다시 화면에 보이는 순간, 예약된 백오프 대기를
   // 기다리지 않고 바로 재연결을 시도해서 복구 속도를 최대한 앞당김.
+  // 🌟 [수정] 리더 탭일 때만 직접 재연결하고, 팔로워 탭이면 리더가 진짜 죽었을 때만 승격 시도
+  // (팔로워가 무작정 _doConnect()를 부르면 탭마다 중복 연결이 생겨 리더선출 의미가 없어짐).
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-    if (!State.session || State.realtimeClient) return; // 로그인 안 했거나 이미 연결돼 있으면 할 게 없음
-    boakoLog('탭이 다시 활성화됨 — 실시간 연결 상태 확인 중...');
-    if (State.reconnectTimer) {
-      clearTimeout(State.reconnectTimer);
-      State.reconnectTimer = null;
+    if (!State.session) return;
+
+    if (isRealtimeLeader) {
+      if (State.realtimeClient) return; // 이미 연결 살아있으면 할 일 없음
+      boakoLog('탭이 다시 활성화됨(리더) — 실시간 연결 상태 확인 중...');
+      if (State.reconnectTimer) {
+        clearTimeout(State.reconnectTimer);
+        State.reconnectTimer = null;
+      }
+      State.intentionalDisconnect = false;
+      _doConnect();
+    } else {
+      // 팔로워: 리더가 그 사이 죽었는지만 확인하고, 죽었으면 즉시 승격 시도
+      const info = getLeaderInfo();
+      if (!isLeaderInfoAlive(info)) {
+        boakoLog('탭이 다시 활성화됨(팔로워) — 리더 하트비트 확인 결과 죽어있어 승격 시도');
+        tryClaimWithJitter();
+      }
     }
-    State.intentionalDisconnect = false;
-    _doConnect();
   });
 
   if (document.readyState === 'loading') {
