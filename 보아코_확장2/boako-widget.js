@@ -48,6 +48,8 @@
  *    같은 브라우저의 탭들 중 리더 하나만 진짜 연결을 열고, 나머지(팔로워)는 BroadcastChannel로 중계된
  *    이벤트만 받아 동일하게 반응(토스트/뱃지/오버레이는 각 탭이 알아서 그림). 리더 탭이 닫히면(하트비트
  *    끊김 또는 beforeunload로 즉시 통지) 남은 탭 중 하나가 자동 승격.
+ * 🌟 [신규] 확장 방문 카운트 기록(fn_record_ext_visit) — 세션 확인마다 profiles.ext_visit_count,
+ *    ext_last_seen_at 갱신. 사이트만 왔다갔다 하고 확장은 안 켜본 사람을 구분하기 위한 용도.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -267,10 +269,21 @@
     State.session = res?.session || null;
     if (State.session) {
       boakoOk('로그인 세션 확인됨:', State.session.user.nickname);
+      recordExtVisit(); // 🌟 확장 방문 카운트 기록 (실패해도 무시, 결과 안 기다림)
     } else {
       boakoLog('로그인 안 된 상태');
     }
     return State.session;
+  }
+
+  // 🌟 [신규] 확장에서 세션이 확인될 때마다 profiles.ext_visit_count / ext_last_seen_at 갱신 —
+  // "확장을 실제로 켜본 적 있는지" 판별용 (사이트만 왔다갔다 하고 확장은 안 켠 사람을 구분하기 위함)
+  function recordExtVisit() {
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_record_ext_visit`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({})
+    }).catch(() => { /* 실패해도 조용히 무시 */ });
   }
 
   async function doLogin() {
