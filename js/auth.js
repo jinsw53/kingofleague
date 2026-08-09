@@ -9,6 +9,8 @@
  *    Boako.Util.navigateToLink()로 해당 화면(라이벌매치/토너먼트 등)으로 자동 이동시킴 (handleDeepLinkFromExtension).
  * 🌟 [신규] 시즌 스플래시(season_splash.js) — 팀 소속자 대상, 로그인/인증 상태 갱신 시마다 트리거
  *    (실제 하루 1회 노출 여부는 season_splash.js 내부에서 판단).
+ * 🌟 [신규] 사이트 방문 카운트 기록(fn_record_site_visit) — 로그인/세션 확인마다 profiles.visit_count,
+ *    last_seen_at 갱신. "관심은 있는데 뭘 해야 할지 모르는" 휴면 유저를 찾아내기 위한 용도.
  */
 Boako.Auth = {
     init: async () => {
@@ -19,6 +21,7 @@ Boako.Auth = {
         if (session?.user) {
             Boako.state.user = session.user;
             Boako.Auth.saveKakaoToken(session);
+            Boako.db.rpc('fn_record_site_visit'); // 🌟 방문 카운트 기록 (실패해도 무시, 결과 안 기다림)
             if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
             await Boako.Team.syncStatus();
             await Boako.Auth.checkAdminMenu();
@@ -90,6 +93,7 @@ Boako.Auth = {
 
                 Boako.state.user = s.user;
                 Boako.Auth.saveKakaoToken(s);
+                Boako.db.rpc('fn_record_site_visit'); // 🌟 방문 카운트 기록 (실패해도 무시, 결과 안 기다림)
                 if (!Boako.Team.syncStatus) await Boako.Util.loadScript('js/team.js');
                 await Boako.Team.syncStatus();
                 await Boako.Auth.checkAdminMenu();
