@@ -11,6 +11,8 @@
  *    (실제 하루 1회 노출 여부는 season_splash.js 내부에서 판단).
  * 🌟 [신규] 사이트 방문 카운트 기록(fn_record_site_visit) — 로그인/세션 확인마다 profiles.visit_count,
  *    last_seen_at 갱신. "관심은 있는데 뭘 해야 할지 모르는" 휴면 유저를 찾아내기 위한 용도.
+ * 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이(rival_recommend.js) 로드/체크. 대상 여부와
+ *    30일 쿨다운은 DB(fn_check_rival_recommend_eligibility)가 판단, 로그인 시점에 1회만 체크.
  */
 Boako.Auth = {
     init: async () => {
@@ -57,6 +59,12 @@ Boako.Auth = {
             (async () => {
                 if (!Boako.SeasonSplash) await Boako.Util.loadScript('js/season_splash.js');
                 Boako.SeasonSplash.maybeShow('global');
+            })();
+            // 🌟 [신규] ⑤번 활성화 시나리오 — 개인 기록형(기록 있음, 라이벌전 0건, 팀 무소속) 유저에게
+            // 실제 추천 상대 오버레이 표시. 대상 여부/쿨다운은 DB(fn_check_rival_recommend_eligibility)가 판단.
+            (async () => {
+                if (!Boako.RivalRecommend) await Boako.Util.loadScript('js/rival_recommend.js');
+                Boako.RivalRecommend.checkAndShow();
             })();
         } else {
             // 🌟 로그인 안 한 방문객은 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준으로만 판단
@@ -127,6 +135,11 @@ Boako.Auth = {
                 (async () => {
                     if (!Boako.SeasonSplash) await Boako.Util.loadScript('js/season_splash.js');
                     Boako.SeasonSplash.maybeShow('global');
+                })();
+                // 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이
+                (async () => {
+                    if (!Boako.RivalRecommend) await Boako.Util.loadScript('js/rival_recommend.js');
+                    Boako.RivalRecommend.checkAndShow();
                 })();
                 
             } else {
