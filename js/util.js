@@ -21,6 +21,8 @@
  *    사용자가 화면 어디든 처음 클릭/터치/키입력하는 순간 자동으로 재생되도록 모든 sfx 함수를 래핑함.
  * 🌟 [신규] navigateToLink의 RIVAL_MATCH 케이스 — 라이벌 매치 소식 클릭 시 화면만 열던 것에서
  *    "응원하기"(승자 예측 투표) 탭으로 바로 진입하도록 수정.
+ * 🌟 [신규] navigateToLink에 BOARD_CATEGORY 케이스 추가 — ④번 활성화 시나리오(크롬 확장의
+ *    "확장 사용 어려움" 오버레이)에서 요청 게시판으로 바로 이동시키는 용도. linkId = 카테고리명.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -112,6 +114,16 @@ Boako.Util = {
                     setTimeout(() => {
                         if (Boako.Board && typeof Boako.Board.openDetail === 'function') {
                             Boako.Board.openDetail(Number(linkId));
+                        }
+                    }, 150);
+                    break;
+                // 🌟 [신규] ④번 활성화 시나리오(확장 사용 어려움) — 크롬 확장 오버레이에서 "요청 게시판"으로
+                // 바로 이동시킬 때 사용. linkId = 카테고리명(예: '요청').
+                case 'BOARD_CATEGORY':
+                    await Boako.View.render('board');
+                    setTimeout(() => {
+                        if (Boako.Board && typeof Boako.Board.switchCategory === 'function') {
+                            Boako.Board.switchCategory(linkId);
                         }
                     }, 150);
                     break;
