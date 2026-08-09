@@ -50,6 +50,8 @@
  *    끊김 또는 beforeunload로 즉시 통지) 남은 탭 중 하나가 자동 승격.
  * 🌟 [신규] 확장 방문 카운트 기록(fn_record_ext_visit) — 세션 확인마다 profiles.ext_visit_count,
  *    ext_last_seen_at 갱신. 사이트만 왔다갔다 하고 확장은 안 켜본 사람을 구분하기 위한 용도.
+ * 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이(사이트 js/rival_recommend.js와 동일 로직).
+ *    여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -547,6 +549,9 @@
     leaderHeartbeatTimer = setInterval(() => {
       localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
     }, HEARTBEAT_INTERVAL_MS);
+    // 🌟 [신규] ⑤번 활성화 시나리오(라이벌전 추천) — 여러 BGA 탭이 열려있어도 리더 탭에서만
+    // 체크해서, 탭마다 각자 오버레이가 중복으로 뜨는 걸 방지
+    checkRivalRecommendEligibility();
   }
 
   function becomeFollower() {
@@ -1153,6 +1158,134 @@
     `;
     boakoSfx.success();
     return { html, dismissOnBackdrop: false };
+  }
+
+  // ========================================================================
+  // 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이 (사이트 js/rival_recommend.js와 동일 로직/문구).
+  // 여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
+  // 기존 achievements/rival결과/추천보너스 큐(_fsOverlayQueue)와는 별개로 독립 표시 —
+  // 수락/거절 버튼마다 다른 비동기 동작(도전장 전송 vs 그냥 닫기)이 필요해서 공용 큐 형식(html만 반환)과 안 맞음.
+  // ========================================================================
+  async function checkRivalRecommendEligibility() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_check_rival_recommend_eligibility`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({})
+      });
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) return; // 대상 아님
+      boakoOk('라이벌전 추천 대상 확인됨:', rows[0]);
+      showRivalRecommendOverlay(rows[0]);
+    } catch (e) {
+      boakoErr('라이벌전 추천 대상 확인 실패:', e);
+    }
+  }
+
+  function showRivalRecommendOverlay(rec) {
+    const avatarHtml = (url, name, size) => url
+      ? `<img src="${url}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; display:block;">`
+      : `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:${Math.round(size * 0.4)}px; font-weight:900;">${(name || '?').charAt(0)}</div>`;
+
+    const myName = State.session?.user?.nickname || '나';
+    const myAvatar = (State.session?.user?.avatar || '').replace('http://', 'https://') || null;
+    const gameLogo = rec.game_logo_url ? cdnUrl(rec.game_logo_url) : null;
+
+    const html = `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:400px;">
+        <div style="font-size:12px; font-weight:900; color:#94a3b8; letter-spacing:0.14em; text-transform:uppercase;">⚔️ 라이벌전 추천</div>
+
+        <div style="width:64px; height:64px; border-radius:16px; background:#fff; display:flex; align-items:center; justify-content:center; padding:8px;">
+          ${gameLogo ? `<img src="${gameLogo}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span style="font-size:28px;">🎲</span>`}
+        </div>
+        <div style="font-size:20px; font-weight:900; color:#fff;">${escapeHtml(rec.game_name)}</div>
+
+        <div style="display:flex; align-items:center; justify-content:center; gap:16px; margin-top:4px;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            ${avatarHtml(myAvatar, myName, 60)}
+            <div style="font-size:13px; font-weight:800; color:#fff;">${escapeHtml(myName)}</div>
+            <div style="font-size:11px; font-weight:700; color:#94a3b8;">${rec.my_record_count}판</div>
+          </div>
+          <div style="font-size:18px; font-weight:900; color:#64748b; font-style:italic;">VS</div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+            ${avatarHtml(rec.rival_profile_url, rec.rival_nickname, 60)}
+            <div style="font-size:13px; font-weight:800; color:#fff;">${escapeHtml(rec.rival_nickname)}</div>
+            <div style="font-size:11px; font-weight:700; color:#94a3b8;">${rec.rival_record_count}판</div>
+          </div>
+        </div>
+
+        <p style="font-size:13px; font-weight:700; color:#cbd5e1; line-height:1.6; margin:4px 0 0;">
+          ${escapeHtml(rec.rival_nickname)} 님과 라이벌전 한 번 해보실래요?<br>
+          같은 게임을 즐기는 분과 라이벌전을 하면,<br>
+          서로 응원하며 재밌게 승부를 겨룰 수 있어요!
+        </p>
+
+        <div style="display:flex; gap:8px; width:100%; margin-top:8px;">
+          <button id="boako-rival-recommend-reject" style="flex:1; background:rgba(255,255,255,0.08); color:#cbd5e1; font-weight:800; font-size:13px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); cursor:pointer;">
+            다음에 할게요
+          </button>
+          <button id="boako-rival-recommend-accept" style="flex:1.4; background:#fff; color:#0f172a; font-weight:900; font-size:13px; padding:12px; border-radius:12px; border:none; cursor:pointer;">
+            도전장 보내기
+          </button>
+        </div>
+      </div>
+    `;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed; inset:0; z-index:1000000; display:flex; align-items:center; justify-content:center;
+      background:rgba(15,23,42,0.75); backdrop-filter:blur(3px); opacity:0; transition:opacity .25s ease;
+    `;
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 250);
+    };
+
+    async function respondRivalRecommend(accept, rivalId, gameName) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_respond_rival_recommend`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ p_accept: accept, p_rival_id: rivalId || null, p_game_name: gameName || null })
+      });
+      if (!res.ok) throw new Error(await res.text());
+    }
+
+    document.getElementById('boako-rival-recommend-accept').addEventListener('click', async () => {
+      const btn = document.getElementById('boako-rival-recommend-accept');
+      btn.disabled = true;
+      btn.innerText = '전송 중...';
+      try {
+        await respondRivalRecommend(true, rec.rival_id, rec.game_name);
+        boakoSfx.success();
+        showToast('system', '⚔️', '도전장 전송 완료', `${rec.rival_nickname}님에게 도전장을 보냈어요!`);
+      } catch (e) {
+        boakoErr('라이벌전 도전장 전송 실패:', e);
+        showToast('system', '❌', '전송 실패', '잠시 후 다시 시도해주세요.');
+      }
+      dismiss();
+    });
+
+    document.getElementById('boako-rival-recommend-reject').addEventListener('click', async () => {
+      try {
+        await respondRivalRecommend(false);
+      } catch (e) {
+        boakoErr('라이벌전 추천 거절 처리 실패:', e);
+      }
+      dismiss();
+      // 🌟 거절해도 흥미가 있을 수 있으니, 아카이브 라이벌전 메뉴로 유도 (확장에선 사이트 새 탭으로 열기)
+      setTimeout(() => {
+        showToast('system', '👀', '다른 라이벌전도 둘러보세요', '아카이브에서 다른 상대도 확인해보실 수 있어요.', () => {
+          window.open('https://boakoarchive.co.kr/', '_blank');
+        });
+      }, 300);
+    });
   }
 
   // ========================================================================
