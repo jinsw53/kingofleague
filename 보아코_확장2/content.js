@@ -4,7 +4,7 @@ let processedFirstWins = new Set();
 // 🌟 [신규] 페이지 로드 시 이전 세션에서 이미 처리 완료된(=Supabase까지 도달 확인된) 첫승 기록을
 // chrome.storage.local에서 불러와 processedFirstWins에 미리 채워둠.
 // 기존엔 이 Set이 메모리뿐이라 새로고침/브라우저 재시작마다 초기화돼서, 알림 목록에 남아있는
-// 오래된 "첫 승" 게시물이 방문할 때마다 계속 신규로 재감지되어 반복 전송되는 문제가 있었음.
+// 오래된 "첫승" 게시물이 방문할 때마다 계속 신규로 재감지되어 반복 전송되는 문제가 있었음.
 if (typeof chrome !== 'undefined' && chrome.storage?.local) {
   chrome.storage.local.get('processedFirstWinKeys', (result) => {
     (result.processedFirstWinKeys || []).forEach(key => processedFirstWins.add(key));
@@ -2635,7 +2635,10 @@ async function addTournamentRecordButton() {
       const reporter = await getReporterNickname();
       const tournamentData = reporter ? extractTournamentData(reporter) : null;
 
-      if (tournamentData && tournamentData.error !== "not_boako" && tournamentData.players?.length > 0) {
+      // 🌟 [버그수정] players.length > 0 만으로 "완료"로 판단하던 것 → 진짜 완료 판별 함수로 교체.
+      // 순위 데이터가 일부 있어도 아직 진행중이면(완료됨 텍스트/전원순위 조건 미충족) 여기 안 들어감.
+      if (tournamentData && tournamentData.error !== "not_boako" && tournamentData.players?.length > 0
+          && isTournamentActuallyFinished(tournamentData.players)) {
         button.innerText = "🏆 기록 저장";
 
         // 결과가 확인되는 즉시 자동 저장 시도 (버튼이 이미 클릭 가능한 상태로 조립된 경우에만).
@@ -2703,11 +2706,20 @@ async function addTournamentRecordButton() {
       return;
     }
 
-    // 🎯 분기점: 순위 데이터가 있으면 → 기록 저장 (기존 그대로)
+    // 🎯 분기점: 순위 데이터가 있고, 진짜로 토너먼트가 완료됐을 때만 → 기록 저장
+    // 🌟 [버그수정] players.length > 0 만으로 저장하던 것 → 중간 스냅샷(예: 21명 중 2명만 순위 확정)이
+    // 최종 결과인 것처럼 잘못 저장되는 사고가 있었음. isTournamentActuallyFinished()로 진짜 종료 여부 확인.
     if (tournamentData && tournamentData.players.length > 0) {
-      console.log("[토너먼트 기록] 추출 데이터:", tournamentData);
-      sendTournamentToBackground(tournamentData, button, originalText);
-      return;
+      if (isTournamentActuallyFinished(tournamentData.players)) {
+        console.log("[토너먼트 기록] 추출 데이터:", tournamentData);
+        sendTournamentToBackground(tournamentData, button, originalText);
+        return;
+      } else {
+        resetButton(button, originalText);
+        button.classList.remove("disabled-button");
+        showPopupMessage("토너먼트가 아직 진행중입니다. 완전히 종료되면 다시 시도해주세요.", false, button);
+        return;
+      }
     }
 
     // 순위 데이터가 없는 경우 → 시작일 기준으로 "이미 시작함(끝나기 전)"인지 "시작 전"인지 판별
@@ -2806,6 +2818,43 @@ function extractTournamentData(reporter) {
     gameName:gameName
   };
 }
+
+// 🌟 [신규 - 버그수정] "순위 데이터가 1명이라도 있으면 완료로 간주"하던 문제 수정.
+// 토너먼트 시작 직후 대진표 첫 매치 하나만 끝나도 일부 순위가 뜨는데, 그걸 최종 결과로 착각해서
+// 중간 스냅샷을 저장해버리는 사고가 있었음(예: 21명 중 2명만 순위가 잡힌 상태로 전송됨).
+// 1순위: BGA가 직접 보여주는 "완료됨" 상태 텍스트를 찾아서 확인.
+// 2순위(폴백): "참가자 N명" 총원과 지금까지 추출된 순위 인원수를 비교해서 전원 순위가 잡혔는지 확인.
+// 둘 다 확인 못 하면 → 완료 아님으로 처리 (섣불리 완료로 판단하지 않는 게 원칙).
+function isTournamentActuallyFinished(players) {
+  // 1순위: "완료됨" 상태 텍스트 직접 탐색
+  const statusCandidates = document.querySelectorAll('.text-xl, .text-xl.truncate, .text-xl.text-center.leading-tight.line-clamp-2');
+  for (const el of statusCandidates) {
+    const text = (el.textContent || '').trim();
+    if (text === '완료됨' || /^(종료|완료|finished|ended|completed)$/i.test(text)) {
+      console.log('[토너먼트 완료판별] "완료됨" 상태 텍스트 발견 → 완료로 판단');
+      return true;
+    }
+  }
+
+  // 2순위(폴백): "참가자 N" 총원과 지금까지 순위가 잡힌 인원수 비교
+  const participantCandidates = document.querySelectorAll('.text-xl.truncate, .text-xl');
+  for (const el of participantCandidates) {
+    const match = (el.textContent || '').match(/참가자\s*(\d+)/);
+    if (match) {
+      const totalParticipants = parseInt(match[1], 10);
+      if (totalParticipants > 0) {
+        const isComplete = players.length >= totalParticipants;
+        console.log(`[토너먼트 완료판별] 참가자 총원 ${totalParticipants}명 vs 순위 확인된 ${players.length}명 → ${isComplete ? '완료' : '진행중'}로 판단`);
+        return isComplete;
+      }
+    }
+  }
+
+  // 둘 다 판별 못 하면 → 섣불리 완료로 보지 않음 (오염 방지가 우선)
+  console.log('[토너먼트 완료판별] 완료 신호를 못 찾음 → 안전하게 "완료 아님"으로 처리');
+  return false;
+}
+
 
 function extractTournamentId() {
   const url = window.location.href;
