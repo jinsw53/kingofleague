@@ -52,6 +52,9 @@
  *    ext_last_seen_at 갱신. 사이트만 왔다갔다 하고 확장은 안 켜본 사람을 구분하기 위한 용도.
  * 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이(사이트 js/rival_recommend.js와 동일 로직).
  *    여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
+ * 🌟 [신규] ④번 활성화 시나리오 — 확장 3일 이상 사용 + 게임기록 0건인 경우 "확장 사용에 어려움이
+ *    있으신가요?" 오버레이 표시. 수락 시 사이트 요청 게시판(요청 카테고리)으로 바로 이동시켜
+ *    소장님이 직접 확인할 수 있게 함.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -552,6 +555,8 @@
     // 🌟 [신규] ⑤번 활성화 시나리오(라이벌전 추천) — 여러 BGA 탭이 열려있어도 리더 탭에서만
     // 체크해서, 탭마다 각자 오버레이가 중복으로 뜨는 걸 방지
     checkRivalRecommendEligibility();
+    // 🌟 [신규] ④번 활성화 시나리오(확장 사용 어려움) — 마찬가지로 리더 탭에서만 체크
+    checkExtHelpEligibility();
   }
 
   function becomeFollower() {
@@ -1285,6 +1290,95 @@
           window.open('https://boakoarchive.co.kr/', '_blank');
         });
       }, 300);
+    });
+  }
+
+  // ========================================================================
+  // 🌟 [신규] ④번 활성화 시나리오 — 확장을 3일 이상 켰는데도 게임 기록이 0건인 경우,
+  // "확장 사용에 어려움이 있으신가요?" 오버레이 표시. DB(fn_check_ext_help_eligibility)가
+  // 대상 여부(3일 이상 사용 + 기록 0건 + 30일 쿨다운 통과)를 판단, 여기서는 그 결과만 받아 표시.
+  // 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
+  // ========================================================================
+  async function checkExtHelpEligibility() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_check_ext_help_eligibility`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({})
+      });
+      const isEligible = await res.json();
+      if (!isEligible) return; // 대상 아님
+      boakoOk('확장 사용 어려움 안내 대상 확인됨');
+      showExtHelpOverlay();
+    } catch (e) {
+      boakoErr('확장 사용 어려움 대상 확인 실패:', e);
+    }
+  }
+
+  function showExtHelpOverlay() {
+    const html = `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:380px;">
+        <div style="font-size:40px;">🤔</div>
+        <div style="font-size:19px; font-weight:900; color:#fff;">확장 사용에 어려움이 있으신가요?</div>
+        <p style="font-size:13px; font-weight:700; color:#cbd5e1; line-height:1.6; margin:0;">
+          기록기를 며칠째 사용 중이신데, 아직 저장된 게임 기록이 안 보이는 것 같아요.<br>
+          혹시 어려운 부분이 있으시면 알려주세요!
+        </p>
+        <div style="display:flex; gap:8px; width:100%; margin-top:8px;">
+          <button id="boako-ext-help-reject" style="flex:1; background:rgba(255,255,255,0.08); color:#cbd5e1; font-weight:800; font-size:13px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); cursor:pointer;">
+            괜찮아요
+          </button>
+          <button id="boako-ext-help-accept" style="flex:1.4; background:#fff; color:#0f172a; font-weight:900; font-size:13px; padding:12px; border-radius:12px; border:none; cursor:pointer;">
+            네, 도움이 필요해요
+          </button>
+        </div>
+      </div>
+    `;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed; inset:0; z-index:1000000; display:flex; align-items:center; justify-content:center;
+      background:rgba(15,23,42,0.75); backdrop-filter:blur(3px); opacity:0; transition:opacity .25s ease;
+    `;
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 250);
+    };
+
+    async function respondExtHelp(accept) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_respond_ext_help`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ p_accept: accept })
+      });
+      if (!res.ok) throw new Error(await res.text());
+    }
+
+    document.getElementById('boako-ext-help-accept').addEventListener('click', async () => {
+      try {
+        await respondExtHelp(true);
+      } catch (e) {
+        boakoErr('확장 도움 요청 응답 처리 실패:', e);
+      }
+      dismiss();
+      // 🌟 소장님이 눈으로 확인할 수 있게, 요청 게시판으로 바로 이동 (사이트 새 탭에서 카테고리 자동 선택)
+      window.open(`https://boakoarchive.co.kr/?open=BOARD_CATEGORY&id=${encodeURIComponent('요청')}`, '_blank');
+    });
+
+    document.getElementById('boako-ext-help-reject').addEventListener('click', async () => {
+      try {
+        await respondExtHelp(false);
+      } catch (e) {
+        boakoErr('확장 도움 요청 응답 처리 실패:', e);
+      }
+      dismiss();
     });
   }
 
