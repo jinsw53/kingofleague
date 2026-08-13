@@ -27,6 +27,15 @@
  * 🌟 [신규] 필러로 나오는 랜덤 게임 소개 카드 — bga_url 있으면 클릭 시 그 게임의 실제 BGA 페이지가
  *    새 탭으로 열리도록 함 (renderSupplementFiller / renderSupplementPadCard에 externalUrl 지원 추가).
  * 🌟 [수정] 랜덤 게임 소개 카드의 인원수 표기 — 최소/최대 인원이 같으면 "2-2인"이 아니라 "2인"으로 깔끔하게 표시.
+ * 🌟 [버그수정] 헌정 카드(헤드라인급 소식이 없을 때 그 자리를 대신하는 카드)가 hashSide를 안 써서 항상
+ *    왼쪽 고정이었음 — 헤드라인급 소식(임계값 5 이상)이 드물어서 실제로는 이 카드가 거의 항상 그 자리를
+ *    차지하고 있었고, 그래서 "헤드라인 좌우가 안 바뀐다"는 문제가 체감됐음. 날짜 기준 해시로 하루 단위
+ *    고정 + 날짜가 바뀌면 자리도 바뀌도록 수정.
+ * 🌟 [버그수정] 스몰 카드(이미지 없는 가장 작은 카드) 텍스트가 카드 경계를 뚫고 넘치던 문제 —
+ *    hoverTitle() 내부 span(.nf-hover-title-base)은 원래 white-space:nowrap+ellipsis로 한 줄
+ *    말줄임 처리를 하도록 설계돼있는데, 그걸 감싸는 바깥 <span>이 inline이라 min-width 제약이 안 먹혀서
+ *    ellipsis 기준 너비가 무한정 커지던 게 원인. block+w-full+min-w-0으로 실제 카드 너비만큼 제대로
+ *    제약을 걸어줘서 원래 의도대로 한 줄 말줄임(+ 호버 시 전체 텍스트 팝업)이 정상 동작하도록 수정.
  */
 Boako.NewsFeed = {
     items: [],
@@ -408,21 +417,29 @@ Boako.NewsFeed = {
             padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
         }
 
+        // 🌟 [버그수정] 헤드라인급 소식이 드물어서(임계값 5 이상) 이 헌정 카드가 실제로는
+        // 거의 항상 그 자리를 대신하고 있는데, 여긴 hashSide를 안 써서 항상 왼쪽 고정이었음
+        // — 그래서 "좌우가 안 바뀐다"는 문제가 실제로 체감되던 원인. 날짜 기준으로 해시해서
+        // 하루 단위로는 고정(같은 날엔 같은 자리), 날짜가 바뀌면 자리도 바뀔 수 있게 함.
+        const tributeSide = Boako.NewsFeed.hashSide(new Date().toDateString());
+        const tributeBlock = `
+            <div class="col-span-4 md:col-span-3 md:row-span-2 nf-tribute">
+                <div class="nf-tribute-photo">
+                    <img src="${Boako.Util.cdn(Boako.NewsFeed.TRIBUTE_IMAGE)}" alt="더스틴밤">
+                </div>
+                <div class="nf-tribute-body">
+                    <div class="nf-tribute-eyebrow">👑 BOAKO ARCHIVE 명예 회장</div>
+                    <h1 class="nf-tribute-name">더스틴밤 <span>님</span></h1>
+                    <p class="nf-tribute-quote">헤드라인이 될 만한 큰 소식은 없지만, 명예 회장님의 존재감만으로 이 자리는 결코 비어있지 않습니다.</p>
+                </div>
+            </div>
+        `;
+        const tributeSideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${fillerHtml}</div>`;
+        const tributeTopRowHtml = tributeSide === 'left' ? (tributeBlock + tributeSideBlock) : (tributeSideBlock + tributeBlock);
+
         return `
             <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
-                <div class="col-span-4 md:col-span-3 md:row-span-2 nf-tribute">
-                    <div class="nf-tribute-photo">
-                        <img src="${Boako.Util.cdn(Boako.NewsFeed.TRIBUTE_IMAGE)}" alt="더스틴밤">
-                    </div>
-                    <div class="nf-tribute-body">
-                        <div class="nf-tribute-eyebrow">👑 BOAKO ARCHIVE 명예 회장</div>
-                        <h1 class="nf-tribute-name">더스틴밤 <span>님</span></h1>
-                        <p class="nf-tribute-quote">헤드라인이 될 만한 큰 소식은 없지만, 명예 회장님의 존재감만으로 이 자리는 결코 비어있지 않습니다.</p>
-                    </div>
-                </div>
-                <div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">
-                    ${fillerHtml}
-                </div>
+                ${tributeTopRowHtml}
                 ${belowCardsHtml}
                 ${padHtml}
             </div>
@@ -558,9 +575,14 @@ Boako.NewsFeed = {
         }
 
         // small
+        // 🌟 [버그수정] hoverTitle()이 만드는 내부 span(.nf-hover-title-base)은 원래 white-space:nowrap +
+        // ellipsis로 한 줄 말줄임 처리를 하도록 설계돼있는데, 그걸 감싸는 이 <span>이 inline 요소라
+        // min-width 제약이 전혀 안 먹혀서 ellipsis 기준이 되는 "100% 너비"가 무한정 커져버렸음
+        // (그 결과 텍스트가 카드 밖으로 그냥 삐져나감). block+w-full+min-w-0으로 실제 카드 너비만큼
+        // 제대로 제약을 걸어주면 원래 의도대로 한 줄 말줄임(+ 호버 시 전체 텍스트 팝업)이 정상 동작함.
         return `
             <div class="col-span-2 md:col-span-1 min-h-[44px] bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 hover:bg-slate-100 transition-colors flex items-center min-w-0" ${clickable}>
-                <span class="text-[11px] font-bold text-slate-500">${Boako.NewsFeed.hoverTitle(item.title)}</span>
+                <span class="text-[11px] font-bold text-slate-500 block w-full min-w-0">${Boako.NewsFeed.hoverTitle(item.title)}</span>
             </div>
         `;
     },
