@@ -55,6 +55,10 @@
  * 🌟 [신규] ④번 활성화 시나리오 — 확장 3일 이상 사용 + 게임기록 0건인 경우 "확장 사용에 어려움이
  *    있으신가요?" 오버레이 표시. 수락 시 사이트 요청 게시판(요청 카테고리)으로 바로 이동시켜
  *    소장님이 직접 확인할 수 있게 함.
+ * 🌟 [버그수정] 쪽지함의 "액션 카드"(일정제안/라이벌도전장/팀가입신청/스카웃제안) 메시지가 그냥
+ *    텍스트로만 보여서 확장에서 수락/거절/날짜선택 버튼을 아예 누를 수 없던 문제 — 사이트
+ *    messenger.js와 동일한 카드+버튼을 그리고, 클릭은 handleThreadActionClick()이 위임 처리.
+ *    inline onclick은 콘텐츠 스크립트 격리 세계에서 안 먹히므로 data-action 속성 + 이벤트 위임 사용.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -407,7 +411,8 @@
   // before가 없으면 최신 30개, 있으면 그 시각 이전의 30개를 더 가져와서 앞쪽에 이어붙임.
   async function fetchThreadMessages(otherId, before) {
     try {
-      let url = `${SUPABASE_URL}/rest/v1/messages?or=(and(sender_id.eq.${State.session.user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${State.session.user.id}))&order=created_at.desc&limit=${THREAD_PAGE_SIZE}&select=message_id,sender_id,content,created_at`;
+      // 🌟 [신규] 일정제안/도전장/팀가입/스카웃 같은 "액션 카드" 메시지 렌더링에 필요한 컬럼 추가
+      let url = `${SUPABASE_URL}/rest/v1/messages?or=(and(sender_id.eq.${State.session.user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${State.session.user.id}))&order=created_at.desc&limit=${THREAD_PAGE_SIZE}&select=message_id,sender_id,content,created_at,action_type,action_status,metadata,match_id`;
       if (before) url += `&created_at=lt.${encodeURIComponent(before)}`;
 
       const res = await fetch(url, { headers: authHeaders() });
@@ -1493,6 +1498,11 @@
     panel.querySelectorAll('.boako-panel-tab').forEach(tabEl => {
       tabEl.addEventListener('click', () => showTab(tabEl.dataset.tab));
     });
+
+    // 🌟 [신규] 일정제안/도전장/팀가입/스카웃 "액션 카드" 버튼 클릭 위임 — #boako-panel-body는
+    // innerHTML만 매 렌더마다 바뀌고 이 div 자체는 재사용되므로, 여기서 딱 한 번만 바인딩하면
+    // 이후 렌더링되는 모든 액션 카드 버튼(동적으로 생김)에 대해 계속 작동함.
+    document.getElementById('boako-panel-body').addEventListener('click', handleThreadActionClick);
   }
 
   function clampToViewport(value, size, viewportSize) {
@@ -1704,10 +1714,20 @@
 
   // 🌟 [버그수정] 예전엔 실제 메시지 없이 고정 안내 문구만 보여주던 걸, 실제 대화 내역을
   // 말풍선(내 메시지는 우측/보라, 상대 메시지는 좌측/흰색)으로 그리도록 수정.
+  // 🌟 [버그수정] 사이트 messenger.js엔 "액션 카드"(일정제안/도전장/팀가입/스카웃) 메시지가
+  // 버튼이 달린 특수 카드로 렌더링되는데, 확장의 간이 쪽지함은 이걸 몰라서 그냥 텍스트로만
+  // 보여주고 있었음 — 그래서 "확장 대화창에서 클릭해야 하는 것들이 반응을 못 하는" 문제가 있었음.
+  // action_type별로 사이트와 동일한 카드+버튼을 그리고, 클릭은 handleThreadActionClick()이 위임 처리.
   function renderThread(conv) {
+    const myId = String(State.session.user.id);
     const bubbles = State.threadMessages.map(m => {
       const isMe = m.sender_id === State.session.user.id;
       const time = new Date(m.created_at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+
+      if (m.action_type === 'SCHEDULE_PROPOSE') return renderScheduleCard(m, isMe, time);
+      if (m.action_type === 'CHALLENGE_CARD') return renderChallengeCard(m, isMe, time);
+      if (m.action_type === 'TEAM_JOIN' || m.action_type === 'TEAM_INVITE') return renderTeamActionCard(m, isMe, time);
+
       return `
         <div style="display:flex; margin-bottom:8px; ${isMe ? 'justify-content:flex-end;' : 'justify-content:flex-start;'}">
           <div>
@@ -1729,6 +1749,227 @@
       ${State.threadHasMore ? `<div style="text-align:center; margin-bottom:10px;"><button id="boako-load-more-thread" style="background:#e2e8f0; color:#475569; border:none; border-radius:999px; padding:6px 14px; font-size:11px; font-weight:800; cursor:pointer;">↑ 이전 대화 더 보기</button></div>` : ''}
       ${bubbles || `<div style="font-size:11px;color:#94a3b8;text-align:center;padding:16px 0;">불러오는 중...</div>`}
     `;
+  }
+
+  // 🌟 [신규] 일정 제안 카드 — metadata.proposed_times(후보 시각 배열), action_status로 상태 판단.
+  function renderScheduleCard(m, isMe, time) {
+    const times = Array.isArray(m.metadata?.proposed_times) ? m.metadata.proposed_times : [];
+    const status = m.action_status || 'PENDING';
+    const fmt = (iso) => new Date(iso).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    let bodyHtml = '', statusBadge = '';
+    if (status === 'PENDING') {
+      if (!isMe) {
+        const optionButtons = times.map(t => `
+          <button class="boako-thread-action-btn" data-action="schedule-accept" data-msg-id="${m.message_id}" data-time="${escapeHtml(t)}"
+            style="width:100%; text-align:left; background:#fff; border:1px solid #c7d2fe; color:#334155; font-size:11.5px; font-weight:800; padding:8px 10px; border-radius:8px; margin-bottom:5px; cursor:pointer;">
+            🟢 ${fmt(t)}
+          </button>
+        `).join('');
+        bodyHtml = `
+          <div style="font-size:10.5px; color:#94a3b8; font-weight:700; margin-bottom:6px;">아래 후보 중 하나를 선택하면 바로 확정돼요.</div>
+          ${optionButtons}
+          <button class="boako-thread-action-btn" data-action="schedule-reject" data-msg-id="${m.message_id}"
+            style="width:100%; background:#f1f5f9; color:#64748b; font-size:11px; font-weight:800; padding:7px; border:none; border-radius:8px; margin-top:2px; cursor:pointer;">
+            ❌ 전부 거절
+          </button>
+        `;
+      } else {
+        bodyHtml = times.map(t => `<div style="font-size:12px; font-weight:800; color:#334155; background:#fff; padding:6px; border-radius:8px; border:1px solid #e0e7ff; text-align:center; margin-bottom:5px;">${fmt(t)}</div>`).join('');
+        statusBadge = `<div style="font-size:10.5px; color:#94a3b8; font-weight:800; text-align:center; background:rgba(255,255,255,0.5); padding:6px; border-radius:8px;">상대방의 선택 대기 중...</div>`;
+      }
+    } else if (status === 'ACCEPTED') {
+      const chosen = m.metadata?.chosen_time;
+      bodyHtml = `<div style="font-size:12.5px; font-weight:900; color:#065f46; background:#fff; padding:8px; border-radius:8px; border:1px solid #a7f3d0; text-align:center; margin-bottom:6px;">${chosen ? fmt(chosen) : '확정됨'}</div>`;
+      statusBadge = `<div style="font-size:10.5px; color:#059669; font-weight:800; text-align:center; background:#ecfdf5; padding:6px; border-radius:8px; border:1px solid #d1fae5;">✅ 수락됨 (캘린더 등록 완료)</div>`;
+    } else if (status === 'REJECTED') {
+      statusBadge = `<div style="font-size:10.5px; color:#e11d48; font-weight:800; text-align:center; background:#fff1f2; padding:6px; border-radius:8px; border:1px solid #fecdd3;">❌ 거절됨</div>`;
+    }
+
+    return `
+      <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
+        <div style="max-width:250px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:14px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,.05);">
+          <div style="font-size:12px; font-weight:900; color:#3730a3; margin-bottom:8px;">📅 일정 제안 (${times.length}개 후보)</div>
+          ${bodyHtml}${statusBadge}
+        </div>
+        <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0;">${time}</div>
+      </div>
+    `;
+  }
+
+  // 🌟 [신규] 라이벌전 도전장 카드 — metadata.game_name/reward_points, match_id, action_status
+  function renderChallengeCard(m, isMe, time) {
+    const gameName = m.metadata?.game_name || '종목미정';
+    const points = m.metadata?.reward_points || 0;
+    const status = m.action_status || 'PENDING';
+
+    let cardContent = '';
+    if (status === 'PENDING') {
+      if (!isMe) {
+        cardContent = `
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <button class="boako-thread-action-btn" data-action="challenge-accept" data-msg-id="${m.message_id}" data-match-id="${m.match_id || ''}"
+              style="flex:1; background:#ef4444; color:#fff; font-size:11px; font-weight:900; padding:8px; border:none; border-radius:8px; cursor:pointer;">🔥 수락</button>
+            <button class="boako-thread-action-btn" data-action="challenge-reject" data-msg-id="${m.message_id}" data-match-id="${m.match_id || ''}"
+              style="flex:1; background:#475569; color:#fff; font-size:11px; font-weight:800; padding:8px; border:none; border-radius:8px; cursor:pointer;">거절</button>
+          </div>
+        `;
+      } else {
+        cardContent = `<div style="margin-top:8px; font-size:10.5px; color:#94a3b8; font-weight:800; text-align:center; background:rgba(255,255,255,0.06); padding:6px; border-radius:8px;">응답 대기 중... ⏳</div>`;
+      }
+    } else if (status === 'ACCEPTED') {
+      cardContent = `<div style="margin-top:8px; font-size:11px; color:#fca5a5; font-weight:900; text-align:center; background:rgba(239,68,68,0.1); padding:6px; border-radius:8px; border:1px solid rgba(239,68,68,0.2);">🔥 매치 수락됨</div>`;
+    } else if (status === 'REJECTED') {
+      cardContent = `<div style="margin-top:8px; font-size:10.5px; color:#94a3b8; font-weight:800; text-align:center; background:rgba(255,255,255,0.06); padding:6px; border-radius:8px;">❌ 거절됨</div>`;
+    }
+
+    return `
+      <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
+        <div style="max-width:240px; background:linear-gradient(135deg,#1e293b,#0f172a); border:1px solid #334155; border-radius:14px; padding:12px; box-shadow:0 4px 10px rgba(0,0,0,.2); color:#fff;">
+          <div style="font-size:11px; font-weight:900; color:#f87171; margin-bottom:8px;">⚔️ 라이벌 매치 도착</div>
+          <div style="font-size:12.5px; font-weight:900; color:#0f172a; background:#fff; padding:7px; border-radius:8px; text-align:center; margin-bottom:6px;">${escapeHtml(gameName)}</div>
+          <div style="text-align:center; font-size:10.5px; font-weight:800; color:#fbbf24;">보상: <span style="font-size:13px;">${points} P</span></div>
+          ${cardContent}
+        </div>
+        <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0;">${time}</div>
+      </div>
+    `;
+  }
+
+  // 🌟 [신규] 팀 가입신청/스카웃제안 카드 — content가 JSON 문자열({team_name}), action_status
+  function renderTeamActionCard(m, isMe, time) {
+    const isJoin = m.action_type === 'TEAM_JOIN';
+    let pData = {};
+    try { pData = JSON.parse(m.content); } catch (e) { pData = { team_name: '오류' }; }
+    const status = m.action_status || 'PENDING';
+    const actionPrefix = isJoin ? 'teamjoin' : 'teaminvite';
+
+    let btnHtml = '';
+    if (status === 'PENDING' && !isMe) {
+      btnHtml = `
+        <div style="display:flex; gap:6px; margin-top:8px;">
+          <button class="boako-thread-action-btn" data-action="${actionPrefix}-accept" data-msg-id="${m.message_id}"
+            style="flex:1; background:#2563eb; color:#fff; font-size:11px; font-weight:900; padding:8px; border:none; border-radius:8px; cursor:pointer;">✅ 수락</button>
+          <button class="boako-thread-action-btn" data-action="${actionPrefix}-reject" data-msg-id="${m.message_id}"
+            style="flex:1; background:#e2e8f0; color:#475569; font-size:11px; font-weight:800; padding:8px; border:none; border-radius:8px; cursor:pointer;">거절</button>
+        </div>
+      `;
+    } else if (status === 'PENDING') {
+      btnHtml = `<div style="margin-top:8px; font-size:10.5px; color:#64748b; font-weight:800; text-align:center; background:#f1f5f9; padding:6px; border-radius:8px;">결재 대기 중...</div>`;
+    } else if (status === 'ACCEPTED') {
+      btnHtml = `<div style="margin-top:8px; font-size:10.5px; color:#2563eb; font-weight:900; text-align:center; background:#eff6ff; padding:6px; border-radius:8px;">✅ 승인됨</div>`;
+    } else {
+      btnHtml = `<div style="margin-top:8px; font-size:10.5px; color:#e11d48; font-weight:800; text-align:center; background:#fff1f2; padding:6px; border-radius:8px;">❌ 거절됨</div>`;
+    }
+
+    return `
+      <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
+        <div style="max-width:240px; background:#fff; border:1px solid #bfdbfe; border-radius:14px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,.05);">
+          <div style="font-size:11px; font-weight:900; color:#2563eb; margin-bottom:8px;">${isJoin ? '🛡️ 입단 지원' : '💌 스카웃 제안'}</div>
+          <div style="font-size:12px; font-weight:800; color:#334155; background:#f8fafc; padding:7px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">[${escapeHtml(pData.team_name || '')}] 합류</div>
+          ${btnHtml}
+        </div>
+        <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0;">${time}</div>
+      </div>
+    `;
+  }
+
+  // 🌟 [신규] 액션 카드 버튼 클릭 위임 처리 — ensureDom()에서 #boako-panel-body에 한 번만 바인딩됨
+  function handleThreadActionClick(e) {
+    const btn = e.target.closest('.boako-thread-action-btn');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const messageId = btn.dataset.msgId;
+
+    if (action === 'schedule-accept') replySchedule(messageId, 'ACCEPTED', btn.dataset.time);
+    else if (action === 'schedule-reject') replySchedule(messageId, 'REJECTED');
+    else if (action === 'challenge-accept') replyChallenge(messageId, btn.dataset.matchId, 'ACCEPTED');
+    else if (action === 'challenge-reject') replyChallenge(messageId, btn.dataset.matchId, 'REJECTED');
+    else if (action === 'teamjoin-accept') replyTeamJoin(messageId, 'ACCEPTED');
+    else if (action === 'teamjoin-reject') replyTeamJoin(messageId, 'REJECTED');
+    else if (action === 'teaminvite-accept') replyTeamInvite(messageId, 'ACCEPTED');
+    else if (action === 'teaminvite-reject') replyTeamInvite(messageId, 'REJECTED');
+  }
+
+  // 액션 처리 후 목록/스레드/배지를 전부 최신 상태로 다시 불러옴 (사이트 messenger.js와 동일한 후처리)
+  async function refreshAfterThreadAction() {
+    await fetchUnreadCount();
+    await fetchMessages();
+    if (State.activeConversation) await fetchThreadMessages(State.activeConversation.otherId);
+    render();
+  }
+
+  async function replySchedule(messageId, status, chosenTime) {
+    if (!confirm(`이 일정을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/messages?message_id=eq.${messageId}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ action_status: status })
+      });
+      if (status === 'ACCEPTED') {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/confirm_direct_match_schedule`, {
+          method: 'POST', headers: authHeaders(),
+          body: JSON.stringify({ p_message_id: messageId, p_chosen_time: chosenTime })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        boakoSfx.success();
+        showToast('system', '🎉', '일정 확정', '캘린더에 공식 등록되었어요!');
+      }
+    } catch (e) {
+      boakoErr('일정 응답 처리 실패:', e);
+      showToast('system', '❌', '처리 실패', '캘린더 등록에 실패했습니다.');
+    }
+    await refreshAfterThreadAction();
+  }
+
+  async function replyChallenge(messageId, matchId, status) {
+    if (!confirm(`라이벌 도전을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/respond_to_rival_match`, {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ p_match_id: matchId, p_action: status })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      if (status === 'ACCEPTED') boakoSfx.success();
+      showToast('system', '✅', '처리 완료', '라이벌 도전을 처리했어요!');
+    } catch (e) {
+      boakoErr('라이벌 도전 응답 처리 실패:', e);
+      showToast('system', '❌', '처리 실패', '오류가 발생했습니다.');
+    }
+    await refreshAfterThreadAction();
+  }
+
+  async function replyTeamJoin(messageId, status) {
+    if (!confirm(`가입 신청을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/respond_to_team_join`, {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ p_message_id: messageId, p_action: status })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('system', '✅', '처리 완료', '가입 신청을 처리했어요!');
+    } catch (e) {
+      boakoErr('가입신청 응답 처리 실패:', e);
+      showToast('system', '❌', '처리 실패', '오류가 발생했습니다.');
+    }
+    await refreshAfterThreadAction();
+  }
+
+  async function replyTeamInvite(messageId, status) {
+    if (!confirm(`스카웃 제안을 ${status === 'ACCEPTED' ? '수락' : '거절'}하시겠습니까?`)) return;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/respond_to_team_invite`, {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ p_message_id: messageId, p_action: status })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('system', '✅', '처리 완료', '영입 제안을 처리했어요!');
+    } catch (e) {
+      boakoErr('스카웃 응답 처리 실패:', e);
+      showToast('system', '❌', '처리 실패', '오류가 발생했습니다.');
+    }
+    await refreshAfterThreadAction();
   }
 
   function renderFooter() {
