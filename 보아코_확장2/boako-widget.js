@@ -54,6 +54,8 @@
  *    대기열(activation_overlay_queue) 방식으로 전환. checkActivationOverlayQueue() 하나만
  *    fn_get_my_activation_overlay()를 호출해서 대기열을 조회하고, overlay_type에 따라 렌더러를 호출함.
  *    업적/라이벌결과/추천보너스 실시간 오버레이(_fsOverlayShowing)가 떠 있으면 끝날 때까지 대기했다가 표시.
+ * 🌟 [수정] ⑥번 오버레이 아이콘을 사이트 메뉴바와 통일 — 토너먼트 🏅(메뉴바 "🏅 토너먼트"와 동일),
+ *    팀 🛡️(메뉴바 "🛡️ 팀 창단"과 동일). 기존 🏟️/🚩는 메뉴바와 따로 놀아서 교체.
  * 🌟 [버그수정] 쪽지함의 "액션 카드"(일정제안/라이벌도전장/팀가입신청/스카웃제안) 메시지가 그냥
  *    텍스트로만 보여서 확장에서 수락/거절/날짜선택 버튼을 아예 누를 수 없던 문제 — 사이트
  *    messenger.js와 동일한 카드+버튼을 그리고, 클릭은 handleThreadActionClick()이 위임 처리.
@@ -1313,8 +1315,8 @@
 
   function showSocialActivationOverlay(targetType) {
     const isTeam = targetType === 'team';
-    const badgeText = isTeam ? '🏆 팀 창단 제안' : '⚔️ 토너먼트 제안';
-    const emoji = isTeam ? '🚩' : '🏟️';
+    const badgeText = isTeam ? '🛡️ 팀 창단 제안' : '🏅 토너먼트 제안';
+    const emoji = isTeam ? '🛡️' : '🏅';
     const title = isTeam ? '이제 팀을 만들어보실래요?' : '토너먼트도 한번 참가해보실래요?';
     const bodyText = isTeam
       ? '라이벌전까지 즐기셨다면, 팀을 만들어서<br>동료들과 함께 리그에 도전해보는 건 어떠세요?'
