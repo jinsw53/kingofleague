@@ -55,6 +55,9 @@
  * 🌟 [신규] ④번 활성화 시나리오 — 확장 3일 이상 사용 + 게임기록 0건인 경우 "확장 사용에 어려움이
  *    있으신가요?" 오버레이 표시. 수락 시 사이트 요청 게시판(요청 카테고리)으로 바로 이동시켜
  *    소장님이 직접 확인할 수 있게 함.
+ * 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형(기록 있음+라이벌전 1건↑+팀 무소속) 유저에게 토너먼트
+ *    참가/팀 창단 제안 오버레이(사이트 js/social_activation.js와 동일 로직/문구). 여러 BGA 탭이 열려있어도
+ *    리더 탭에서만 체크. 수락 시 SPA 이동이 불가능하므로 아카이브 사이트를 새 탭으로 열어줌.
  * 🌟 [버그수정] 쪽지함의 "액션 카드"(일정제안/라이벌도전장/팀가입신청/스카웃제안) 메시지가 그냥
  *    텍스트로만 보여서 확장에서 수락/거절/날짜선택 버튼을 아예 누를 수 없던 문제 — 사이트
  *    messenger.js와 동일한 카드+버튼을 그리고, 클릭은 handleThreadActionClick()이 위임 처리.
@@ -562,6 +565,8 @@
     checkRivalRecommendEligibility();
     // 🌟 [신규] ④번 활성화 시나리오(확장 사용 어려움) — 마찬가지로 리더 탭에서만 체크
     checkExtHelpEligibility();
+    // 🌟 [신규] ⑥번 활성화 시나리오(개인 소셜형 — 토너먼트/팀 창단 제안) — 마찬가지로 리더 탭에서만 체크
+    checkSocialActivationEligibility();
   }
 
   function becomeFollower() {
@@ -1295,6 +1300,110 @@
           window.open('https://boakoarchive.co.kr/', '_blank');
         });
       }, 300);
+    });
+  }
+
+  // ========================================================================
+  // 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형(기록 있음, 라이벌전 1건↑, 팀 무소속) 유저에게
+  // 토너먼트 참가/팀 창단 제안 오버레이 (사이트 js/social_activation.js와 동일 로직/문구).
+  // 여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
+  // ========================================================================
+  async function checkSocialActivationEligibility() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_check_social_activation_eligibility`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({})
+      });
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) return; // 대상 아님
+      boakoOk('개인 소셜형 활성화 대상 확인됨:', rows[0]);
+      showSocialActivationOverlay(rows[0].target_type);
+    } catch (e) {
+      boakoErr('개인 소셜형 활성화 대상 확인 실패:', e);
+    }
+  }
+
+  function showSocialActivationOverlay(targetType) {
+    const isTeam = targetType === 'team';
+    const badgeText = isTeam ? '🏆 팀 창단 제안' : '⚔️ 토너먼트 제안';
+    const emoji = isTeam ? '🚩' : '🏟️';
+    const title = isTeam ? '이제 팀을 만들어보실래요?' : '토너먼트도 한번 참가해보실래요?';
+    const bodyText = isTeam
+      ? '라이벌전까지 즐기셨다면, 팀을 만들어서<br>동료들과 함께 리그에 도전해보는 건 어떠세요?'
+      : '라이벌전까지 즐기셨다면, 더 큰 무대인<br>토너먼트에서 다른 유저들과 실력을 겨뤄보세요!';
+    const acceptLabel = isTeam ? '팀 만들러 가기' : '토너먼트 둘러보기';
+
+    const html = `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:28px; max-width:400px;">
+        <div style="font-size:12px; font-weight:900; color:#94a3b8; letter-spacing:0.14em; text-transform:uppercase;">${badgeText}</div>
+
+        <div style="width:64px; height:64px; border-radius:16px; background:#fff; display:flex; align-items:center; justify-content:center;">
+          <span style="font-size:30px;">${emoji}</span>
+        </div>
+
+        <div style="font-size:19px; font-weight:900; color:#fff; line-height:1.4;">${title}</div>
+
+        <p style="font-size:13px; font-weight:700; color:#cbd5e1; line-height:1.6; margin:0;">
+          ${bodyText}
+        </p>
+
+        <div style="display:flex; gap:8px; width:100%; margin-top:8px;">
+          <button id="boako-social-activation-accept" style="flex:1.4; background:#fff; color:#0f172a; font-weight:900; font-size:13px; padding:12px; border-radius:12px; border:none; cursor:pointer;">
+            ${acceptLabel}
+          </button>
+          <button id="boako-social-activation-reject" style="flex:1; background:rgba(255,255,255,0.08); color:#cbd5e1; font-weight:800; font-size:13px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); cursor:pointer;">
+            다음에 할게요
+          </button>
+        </div>
+      </div>
+    `;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed; inset:0; z-index:1000000; display:flex; align-items:center; justify-content:center;
+      background:rgba(15,23,42,0.75); backdrop-filter:blur(3px); opacity:0; transition:opacity .25s ease;
+    `;
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 250);
+    };
+
+    async function respondSocialActivation() {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_respond_social_activation`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ p_target_type: targetType })
+      });
+      if (!res.ok) throw new Error(await res.text());
+    }
+
+    // 🌟 수락 = 30일 쿨다운 기록 후, 확장에선 SPA 이동이 불가능하니 아카이브 사이트를 새 탭으로 열어줌
+    // (사이트 쪽 social_activation.js는 같은 화면 안에서 render()로 바로 이동하지만, 확장은 별도 탭 오픈으로 대체)
+    document.getElementById('boako-social-activation-accept').addEventListener('click', async () => {
+      try {
+        await respondSocialActivation();
+      } catch (e) {
+        boakoErr('개인 소셜형 활성화 응답 처리 실패:', e);
+      }
+      dismiss();
+      window.open('https://boakoarchive.co.kr/', '_blank');
+    });
+
+    document.getElementById('boako-social-activation-reject').addEventListener('click', async () => {
+      try {
+        await respondSocialActivation();
+      } catch (e) {
+        boakoErr('개인 소셜형 활성화 응답 처리 실패:', e);
+      }
+      dismiss();
     });
   }
 
