@@ -1,29 +1,16 @@
 /**
  * [SOCIAL ACTIVATION] ⑥번 활성화 시나리오 — 개인 소셜형(기록 있음, 라이벌전 1건↑, 팀 무소속) 유저에게
  * 로그인 시점에 다음 단계(토너먼트 참가 또는 팀 창단)를 제안하는 풀스크린 오버레이.
- * 🌟 ⑤번(rival_recommend.js)과 동일한 패턴 — 크론이 아니라 로그인 시점에 사이트가 직접
- *    fn_check_social_activation_eligibility()를 호출 (오버레이는 UI라 DB 크론이 직접 못 띄움).
- * 🌟 대상 조건(DB 쪽에서 판단): 게임 기록 있음 + 라이벌전 참여 이력 1건↑ + 팀 무소속 + 30일 쿨다운 통과.
+ * 🌟 [리팩토링] 로그인 시점 실시간 계산(fn_check_social_activation_eligibility) 방식에서
+ *    크론(fn_enqueue_social_activation_overlays) + 대기열(activation_overlay_queue) 방식으로 전환.
+ *    이 모듈은 이제 순수 렌더러(showOverlay)만 담당 — 언제/누구에게 보여줄지는
+ *    js/activation_dispatch.js가 fn_get_my_activation_overlay()로 대기열을 조회해서 호출해줌.
+ * 🌟 대상 조건(DB 쪽에서 판단, 배치 찾기 함수 fn_find_social_activation_targets): 게임 기록 있음 +
+ *    라이벌전 참여 이력 1건↑ + 팀 무소속 + 30일 쿨다운 통과.
  * 🌟 토너먼트 참가 이력 유무로 분기: 없으면 'tournament' 타입(토너먼트 유도), 있으면 'team' 타입(팀 창단 유도).
  * 🌟 실제 참가/창단은 시스템이 대신 못 하므로, "수락"은 해당 페이지로 이동만 함 — ⑤번(자동 도전장 전송)과 다름.
- * 🌟 수락/거절 어느 쪽이든 DB에서 해당 타입의 30일 쿨다운이 시작되므로, 이 모듈은 로그인 시점 1회만 체크하면 됨
- *    (season_splash.js / rival_recommend.js와 동일 패턴 — 페이지 이동마다 재확인 안 함).
  */
 Boako.SocialActivation = {
-    // 🌟 로그인 시점(auth.js)에서 1회 호출. 대상이면 오버레이를 띄우고, 아니면 조용히 넘어감.
-    checkAndShow: async () => {
-        if (!Boako.state.user || !Boako.db) return;
-        try {
-            const { data, error } = await Boako.db.rpc('fn_check_social_activation_eligibility');
-            if (error) throw error;
-            if (!data || data.length === 0) return; // 대상 아님
-
-            Boako.SocialActivation.showOverlay(data[0].target_type);
-        } catch (e) {
-            console.error('개인 소셜형 활성화 대상 확인 실패:', e);
-        }
-    },
-
     // 🌟 사이트의 다른 풀스크린 오버레이(⑤번 라이벌전 추천 등)와 동일한 톤 — 어두운 배경 + 중앙 카드.
     showOverlay: (targetType) => {
         return new Promise((resolve) => {
