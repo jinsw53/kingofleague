@@ -14,10 +14,10 @@
  * 🌟 [버그수정] Boako.db.rpc(...) 호출 뒤에 .then()/await를 안 붙이면 supabase-js가 실제 요청을
  *    아예 안 보내는(lazy thenable) 문제로, 매일 로그인해도 visit_count/last_seen_at이 계속 그대로였음.
  *    .then()을 붙여서 실제로 요청이 발사되도록 수정.
- * 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이(rival_recommend.js) 로드/체크. 대상 여부와
- *    30일 쿨다운은 DB(fn_check_rival_recommend_eligibility)가 판단, 로그인 시점에 1회만 체크.
- * 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형 오버레이(social_activation.js) 로드/체크. ⑤번 바로 뒤에
- *    이어서 체크. 대상 여부/타입(토너먼트 vs 팀)/30일 쿨다운은 DB(fn_check_social_activation_eligibility)가 판단.
+ * 🌟 [리팩토링] ④⑤⑥⑦번 활성화 오버레이 — 로그인 시점 실시간 계산 방식에서 크론(fn_enqueue_*) +
+ *    대기열(activation_overlay_queue) 방식으로 전환. js/activation_dispatch.js가
+ *    fn_get_my_activation_overlay() 하나만 호출해서 대기열을 조회하고, overlay_type에 따라
+ *    rival_recommend.js/social_activation.js의 렌더러(showOverlay)를 호출함.
  */
 Boako.Auth = {
     init: async () => {
@@ -65,17 +65,12 @@ Boako.Auth = {
                 if (!Boako.SeasonSplash) await Boako.Util.loadScript('js/season_splash.js');
                 Boako.SeasonSplash.maybeShow('global');
             })();
-            // 🌟 [신규] ⑤번 활성화 시나리오 — 개인 기록형(기록 있음, 라이벌전 0건, 팀 무소속) 유저에게
-            // 실제 추천 상대 오버레이 표시. 대상 여부/쿨다운은 DB(fn_check_rival_recommend_eligibility)가 판단.
+            // 🌟 [리팩토링] ④⑤⑥⑦번 활성화 오버레이 통합 대기열 디스패처 — 크론이 미리 계산해둔
+            // activation_overlay_queue를 조회만 함(실시간 계산 없음). 다른 온보딩 모달이 떠 있으면
+            // 알아서 대기했다가 표시하므로 이 자리(순서 맨 끝)에서 호출하면 됨.
             (async () => {
-                if (!Boako.RivalRecommend) await Boako.Util.loadScript('js/rival_recommend.js');
-                Boako.RivalRecommend.checkAndShow();
-            })();
-            // 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형(기록 있음, 라이벌전 1건↑, 팀 무소속) 유저에게
-            // 토너먼트 참가/팀 창단 제안 오버레이 표시. 대상 여부/쿨다운은 DB(fn_check_social_activation_eligibility)가 판단.
-            (async () => {
-                if (!Boako.SocialActivation) await Boako.Util.loadScript('js/social_activation.js');
-                Boako.SocialActivation.checkAndShow();
+                if (!Boako.ActivationDispatch) await Boako.Util.loadScript('js/activation_dispatch.js');
+                Boako.ActivationDispatch.checkAndShow();
             })();
         } else {
             // 🌟 로그인 안 한 방문객은 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준으로만 판단
@@ -147,15 +142,10 @@ Boako.Auth = {
                     if (!Boako.SeasonSplash) await Boako.Util.loadScript('js/season_splash.js');
                     Boako.SeasonSplash.maybeShow('global');
                 })();
-                // 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이
+                // 🌟 [리팩토링] ④⑤⑥⑦번 활성화 오버레이 통합 대기열 디스패처
                 (async () => {
-                    if (!Boako.RivalRecommend) await Boako.Util.loadScript('js/rival_recommend.js');
-                    Boako.RivalRecommend.checkAndShow();
-                })();
-                // 🌟 [신규] ⑥번 활성화 시나리오 — 토너먼트 참가/팀 창단 제안 오버레이
-                (async () => {
-                    if (!Boako.SocialActivation) await Boako.Util.loadScript('js/social_activation.js');
-                    Boako.SocialActivation.checkAndShow();
+                    if (!Boako.ActivationDispatch) await Boako.Util.loadScript('js/activation_dispatch.js');
+                    Boako.ActivationDispatch.checkAndShow();
                 })();
                 
             } else {
