@@ -9,14 +9,16 @@
  *    라이벌전 참여 이력 1건↑ + 팀 무소속 + 30일 쿨다운 통과.
  * 🌟 토너먼트 참가 이력 유무로 분기: 없으면 'tournament' 타입(토너먼트 유도), 있으면 'team' 타입(팀 창단 유도).
  * 🌟 실제 참가/창단은 시스템이 대신 못 하므로, "수락"은 해당 페이지로 이동만 함 — ⑤번(자동 도전장 전송)과 다름.
+ * 🌟 [수정] 오버레이 아이콘을 사이트 메뉴바와 통일 — 토너먼트 🏅(메뉴바 "🏅 토너먼트"와 동일),
+ *    팀 🛡️(메뉴바 "🛡️ 팀 창단"과 동일). 기존 🏟️/🚩는 메뉴바와 따로 놀아서 교체.
  */
 Boako.SocialActivation = {
     // 🌟 사이트의 다른 풀스크린 오버레이(⑤번 라이벌전 추천 등)와 동일한 톤 — 어두운 배경 + 중앙 카드.
     showOverlay: (targetType) => {
         return new Promise((resolve) => {
             const isTeam = targetType === 'team';
-            const badgeText = isTeam ? '🏆 팀 창단 제안' : '⚔️ 토너먼트 제안';
-            const emoji = isTeam ? '🚩' : '🏟️';
+            const badgeText = isTeam ? '🛡️ 팀 창단 제안' : '🏅 토너먼트 제안';
+            const emoji = isTeam ? '🛡️' : '🏅';
             const title = isTeam ? '이제 팀을 만들어보실래요?' : '토너먼트도 한번 참가해보실래요?';
             const bodyText = isTeam
                 ? '라이벌전까지 즐기셨다면, 팀을 만들어서<br>동료들과 함께 리그에 도전해보는 건 어떠세요?'
