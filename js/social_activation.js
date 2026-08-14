@@ -58,11 +58,11 @@ Boako.SocialActivation = {
                     </p>
 
                     <div style="display:flex; gap:8px; width:100%; margin-top:8px;">
-                        <button id="social-activation-reject-btn" style="flex:1; background:rgba(255,255,255,0.08); color:#cbd5e1; font-weight:800; font-size:13px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); cursor:pointer;">
-                            다음에 할게요
-                        </button>
                         <button id="social-activation-accept-btn" style="flex:1.4; background:#fff; color:#0f172a; font-weight:900; font-size:13px; padding:12px; border-radius:12px; border:none; cursor:pointer;">
                             ${acceptLabel}
+                        </button>
+                        <button id="social-activation-reject-btn" style="flex:1; background:rgba(255,255,255,0.08); color:#cbd5e1; font-weight:800; font-size:13px; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); cursor:pointer;">
+                            다음에 할게요
                         </button>
                     </div>
                 </div>
