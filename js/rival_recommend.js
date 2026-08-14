@@ -1,29 +1,16 @@
 /**
  * [RIVAL RECOMMEND] ⑤번 활성화 시나리오 — 개인 기록형(기록 있음, 라이벌전 0건, 팀 무소속) 유저에게
  * 로그인 시점에 실제 상대를 추천하는 풀스크린 오버레이.
- * 🌟 크론이 아니라 로그인 시점에 사이트가 직접 fn_check_rival_recommend_eligibility()를 호출하는 방식
- *    (오버레이는 브라우저에 떠야 하는 UI라 DB 크론이 직접 못 띄움).
- * 🌟 대상 조건(DB 쪽에서 판단): 게임 기록 있음 + 라이벌전 참여 이력 0건 + 팀 무소속 + 30일 쿨다운 통과.
+ * 🌟 [리팩토링] 로그인 시점 실시간 계산(fn_check_rival_recommend_eligibility) 방식에서
+ *    크론(fn_enqueue_rival_recommend_overlays) + 대기열(activation_overlay_queue) 방식으로 전환.
+ *    이 모듈은 이제 순수 렌더러(showOverlay)만 담당 — 언제/누구에게 보여줄지는
+ *    js/activation_dispatch.js가 fn_get_my_activation_overlay()로 대기열을 조회해서 호출해줌.
+ * 🌟 대상 조건(DB 쪽에서 판단, 배치 찾기 함수 fn_find_rival_recommend_targets): 게임 기록 있음 +
+ *    라이벌전 참여 이력 0건 + 팀 무소속 + 30일 쿨다운 통과.
  * 🌟 "쪽지로 강요하는 느낌" 대신, 실제 추천 상대(가장 많이 한 게임 기준)를 자연스럽게 보여주고
  *    수락(도전장 실제 전송)/거절(라이벌전 메뉴로 이동, 다른 상대 둘러보게 유도) 두 선택지 제공.
- * 🌟 수락/거절 어느 쪽이든 DB에서 30일 쿨다운이 시작되므로, 이 모듈은 로그인 시점 1회만 체크하면 됨
- *    (season_splash.js와 동일 패턴 — 페이지 이동마다 재확인 안 함).
  */
 Boako.RivalRecommend = {
-    // 🌟 로그인 시점(auth.js)에서 1회 호출. 대상이면 오버레이를 띄우고, 아니면 조용히 넘어감.
-    checkAndShow: async () => {
-        if (!Boako.state.user || !Boako.db) return;
-        try {
-            const { data, error } = await Boako.db.rpc('fn_check_rival_recommend_eligibility');
-            if (error) throw error;
-            if (!data || data.length === 0) return; // 대상 아님
-
-            Boako.RivalRecommend.showOverlay(data[0]);
-        } catch (e) {
-            console.error('라이벌전 추천 대상 확인 실패:', e);
-        }
-    },
-
     // 🌟 사이트의 다른 풀스크린 오버레이(업적/라이벌전결과 등)와 동일한 톤 — 어두운 배경 + 중앙 카드.
     showOverlay: (rec) => {
         return new Promise((resolve) => {
