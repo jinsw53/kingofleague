@@ -31,11 +31,10 @@
  *    왼쪽 고정이었음 — 헤드라인급 소식(임계값 5 이상)이 드물어서 실제로는 이 카드가 거의 항상 그 자리를
  *    차지하고 있었고, 그래서 "헤드라인 좌우가 안 바뀐다"는 문제가 체감됐음. 날짜 기준 해시로 하루 단위
  *    고정 + 날짜가 바뀌면 자리도 바뀌도록 수정.
- * 🌟 [버그수정] 스몰 카드(이미지 없는 가장 작은 카드) 텍스트가 카드 경계를 뚫고 넘치던 문제 —
- *    hoverTitle() 내부 span(.nf-hover-title-base)은 원래 white-space:nowrap+ellipsis로 한 줄
- *    말줄임 처리를 하도록 설계돼있는데, 그걸 감싸는 바깥 <span>이 inline이라 min-width 제약이 안 먹혀서
- *    ellipsis 기준 너비가 무한정 커지던 게 원인. block+w-full+min-w-0으로 실제 카드 너비만큼 제대로
- *    제약을 걸어줘서 원래 의도대로 한 줄 말줄임(+ 호버 시 전체 텍스트 팝업)이 정상 동작하도록 수정.
+ * 🌟 [수정] 스몰 카드(이미지 없는 가장 작은 카드) — 처음엔 텍스트가 카드 밖으로 넘치던 버그가 있었고,
+ *    그다음 한 줄 말줄임(...)으로 고쳤었는데, 말줄임보다 줄바꿈이 낫다는 피드백을 받아 다시 변경.
+ *    hoverTitle()의 강제 한 줄(white-space:nowrap) 대신 직접 break-words + line-clamp(2줄)를 써서
+ *    자연스럽게 줄바꿈되도록 함 (이 카드에서는 hoverTitle의 호버 팝업 기능은 더 이상 안 씀).
  */
 Boako.NewsFeed = {
     items: [],
@@ -419,7 +418,7 @@ Boako.NewsFeed = {
 
         // 🌟 [버그수정] 헤드라인급 소식이 드물어서(임계값 5 이상) 이 헌정 카드가 실제로는
         // 거의 항상 그 자리를 대신하고 있는데, 여긴 hashSide를 안 써서 항상 왼쪽 고정이었음
-        // — 그래서 "좌우가 안 바뀐다"는 문제가 실제로 체감되던 원인. 날짜 기준으로 해시해서
+        // — 그래서 "좌우가 안 바뀐다"는 문제가 실제로 체감됐음. 날짜 기준으로 해시해서
         // 하루 단위로는 고정(같은 날엔 같은 자리), 날짜가 바뀌면 자리도 바뀔 수 있게 함.
         const tributeSide = Boako.NewsFeed.hashSide(new Date().toDateString());
         const tributeBlock = `
@@ -575,14 +574,12 @@ Boako.NewsFeed = {
         }
 
         // small
-        // 🌟 [버그수정] hoverTitle()이 만드는 내부 span(.nf-hover-title-base)은 원래 white-space:nowrap +
-        // ellipsis로 한 줄 말줄임 처리를 하도록 설계돼있는데, 그걸 감싸는 이 <span>이 inline 요소라
-        // min-width 제약이 전혀 안 먹혀서 ellipsis 기준이 되는 "100% 너비"가 무한정 커져버렸음
-        // (그 결과 텍스트가 카드 밖으로 그냥 삐져나감). block+w-full+min-w-0으로 실제 카드 너비만큼
-        // 제대로 제약을 걸어주면 원래 의도대로 한 줄 말줄임(+ 호버 시 전체 텍스트 팝업)이 정상 동작함.
+        // 🌟 [수정] 말줄임(...)보다 줄바꿈이 낫겠다는 피드백 반영 — hoverTitle()의 강제 한 줄
+        // 처리(white-space:nowrap) 대신, 직접 break-words + line-clamp(2줄)로 자연스럽게
+        // 줄바꿈되도록 변경 (이 카드에서는 호버 팝업이 더 이상 필요 없어져서 hoverTitle을 안 씀).
         return `
             <div class="col-span-2 md:col-span-1 min-h-[44px] bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 hover:bg-slate-100 transition-colors flex items-center min-w-0" ${clickable}>
-                <span class="text-[11px] font-bold text-slate-500 block w-full min-w-0">${Boako.NewsFeed.hoverTitle(item.title)}</span>
+                <span class="text-[11px] font-bold text-slate-500 break-words leading-snug" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${Boako.NewsFeed.escapeHtml(item.title)}</span>
             </div>
         `;
     },
