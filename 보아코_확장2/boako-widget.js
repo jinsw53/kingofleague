@@ -50,14 +50,10 @@
  *    끊김 또는 beforeunload로 즉시 통지) 남은 탭 중 하나가 자동 승격.
  * 🌟 [신규] 확장 방문 카운트 기록(fn_record_ext_visit) — 세션 확인마다 profiles.ext_visit_count,
  *    ext_last_seen_at 갱신. 사이트만 왔다갔다 하고 확장은 안 켜본 사람을 구분하기 위한 용도.
- * 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이(사이트 js/rival_recommend.js와 동일 로직).
- *    여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
- * 🌟 [신규] ④번 활성화 시나리오 — 확장 3일 이상 사용 + 게임기록 0건인 경우 "확장 사용에 어려움이
- *    있으신가요?" 오버레이 표시. 수락 시 사이트 요청 게시판(요청 카테고리)으로 바로 이동시켜
- *    소장님이 직접 확인할 수 있게 함.
- * 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형(기록 있음+라이벌전 1건↑+팀 무소속) 유저에게 토너먼트
- *    참가/팀 창단 제안 오버레이(사이트 js/social_activation.js와 동일 로직/문구). 여러 BGA 탭이 열려있어도
- *    리더 탭에서만 체크. 수락 시 SPA 이동이 불가능하므로 아카이브 사이트를 새 탭으로 열어줌.
+ * 🌟 [리팩토링] ④⑤⑥번 활성화 오버레이 — 로그인 시점 실시간 계산(fn_check_*) 방식에서 크론(fn_enqueue_*) +
+ *    대기열(activation_overlay_queue) 방식으로 전환. checkActivationOverlayQueue() 하나만
+ *    fn_get_my_activation_overlay()를 호출해서 대기열을 조회하고, overlay_type에 따라 렌더러를 호출함.
+ *    업적/라이벌결과/추천보너스 실시간 오버레이(_fsOverlayShowing)가 떠 있으면 끝날 때까지 대기했다가 표시.
  * 🌟 [버그수정] 쪽지함의 "액션 카드"(일정제안/라이벌도전장/팀가입신청/스카웃제안) 메시지가 그냥
  *    텍스트로만 보여서 확장에서 수락/거절/날짜선택 버튼을 아예 누를 수 없던 문제 — 사이트
  *    messenger.js와 동일한 카드+버튼을 그리고, 클릭은 handleThreadActionClick()이 위임 처리.
@@ -560,13 +556,9 @@
     leaderHeartbeatTimer = setInterval(() => {
       localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
     }, HEARTBEAT_INTERVAL_MS);
-    // 🌟 [신규] ⑤번 활성화 시나리오(라이벌전 추천) — 여러 BGA 탭이 열려있어도 리더 탭에서만
-    // 체크해서, 탭마다 각자 오버레이가 중복으로 뜨는 걸 방지
-    checkRivalRecommendEligibility();
-    // 🌟 [신규] ④번 활성화 시나리오(확장 사용 어려움) — 마찬가지로 리더 탭에서만 체크
-    checkExtHelpEligibility();
-    // 🌟 [신규] ⑥번 활성화 시나리오(개인 소셜형 — 토너먼트/팀 창단 제안) — 마찬가지로 리더 탭에서만 체크
-    checkSocialActivationEligibility();
+    // 🌟 [리팩토링] ④⑤⑥번 활성화 오버레이 통합 대기열 체크 — 여러 BGA 탭이 열려있어도
+    // 리더 탭에서만 체크해서 중복 방지. 크론이 미리 계산해둔 대기열을 조회만 함.
+    checkActivationOverlayQueue();
   }
 
   function becomeFollower() {
@@ -1176,24 +1168,40 @@
   }
 
   // ========================================================================
-  // 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이 (사이트 js/rival_recommend.js와 동일 로직/문구).
-  // 여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
-  // 기존 achievements/rival결과/추천보너스 큐(_fsOverlayQueue)와는 별개로 독립 표시 —
-  // 수락/거절 버튼마다 다른 비동기 동작(도전장 전송 vs 그냥 닫기)이 필요해서 공용 큐 형식(html만 반환)과 안 맞음.
+  // 🌟 [리팩토링] ④⑤⑥번 활성화 오버레이 — 로그인 시점 실시간 계산(fn_check_*) 방식에서
+  // 크론(fn_enqueue_*) + 대기열(activation_overlay_queue) 방식으로 전환.
+  // checkActivationOverlayQueue() 하나만 fn_get_my_activation_overlay()를 호출해서 대기열을 조회하고,
+  // overlay_type에 따라 아래 세 렌더러(showRivalRecommendOverlay/showSocialActivationOverlay/showExtHelpOverlay)
+  // 중 하나만 호출. 여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 방지.
+  // 🌟 업적/라이벌결과/추천보너스 실시간 오버레이(_fsOverlayShowing)가 떠 있으면 그게 끝날 때까지
+  // 짧은 간격으로 대기했다가 표시 — 로그인 직후 실시간 이벤트와 겹쳐서 오버레이 두 개가 동시에
+  // 뜨는 걸 방지 (사이트 activation_dispatch.js의 대기 패턴과 동일한 개념).
   // ========================================================================
-  async function checkRivalRecommendEligibility() {
+  async function checkActivationOverlayQueue() {
+    if (_fsOverlayShowing) {
+      setTimeout(checkActivationOverlayQueue, 300);
+      return;
+    }
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_check_rival_recommend_eligibility`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_get_my_activation_overlay`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({})
       });
       const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return; // 대상 아님
-      boakoOk('라이벌전 추천 대상 확인됨:', rows[0]);
-      showRivalRecommendOverlay(rows[0]);
+      if (!Array.isArray(rows) || rows.length === 0) return; // 대기열에 없음
+
+      const row = rows[0];
+      boakoOk('활성화 오버레이 대기열 확인됨:', row);
+      if (row.overlay_type === 'rival_recommend') {
+        showRivalRecommendOverlay(row.meta || {});
+      } else if (row.overlay_type === 'social_activation') {
+        showSocialActivationOverlay((row.meta || {}).target_type);
+      } else if (row.overlay_type === 'ext_help') {
+        showExtHelpOverlay();
+      }
     } catch (e) {
-      boakoErr('라이벌전 추천 대상 확인 실패:', e);
+      boakoErr('활성화 오버레이 대기열 확인 실패:', e);
     }
   }
 
@@ -1303,27 +1311,6 @@
     });
   }
 
-  // ========================================================================
-  // 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형(기록 있음, 라이벌전 1건↑, 팀 무소속) 유저에게
-  // 토너먼트 참가/팀 창단 제안 오버레이 (사이트 js/social_activation.js와 동일 로직/문구).
-  // 여러 BGA 탭이 열려있어도 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
-  // ========================================================================
-  async function checkSocialActivationEligibility() {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_check_social_activation_eligibility`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({})
-      });
-      const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return; // 대상 아님
-      boakoOk('개인 소셜형 활성화 대상 확인됨:', rows[0]);
-      showSocialActivationOverlay(rows[0].target_type);
-    } catch (e) {
-      boakoErr('개인 소셜형 활성화 대상 확인 실패:', e);
-    }
-  }
-
   function showSocialActivationOverlay(targetType) {
     const isTeam = targetType === 'team';
     const badgeText = isTeam ? '🏆 팀 창단 제안' : '⚔️ 토너먼트 제안';
@@ -1405,28 +1392,6 @@
       }
       dismiss();
     });
-  }
-
-  // ========================================================================
-  // 🌟 [신규] ④번 활성화 시나리오 — 확장을 3일 이상 켰는데도 게임 기록이 0건인 경우,
-  // "확장 사용에 어려움이 있으신가요?" 오버레이 표시. DB(fn_check_ext_help_eligibility)가
-  // 대상 여부(3일 이상 사용 + 기록 0건 + 30일 쿨다운 통과)를 판단, 여기서는 그 결과만 받아 표시.
-  // 리더 탭에서만 체크(claimLeadership() 참조)해서 중복 오버레이 방지.
-  // ========================================================================
-  async function checkExtHelpEligibility() {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_check_ext_help_eligibility`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({})
-      });
-      const isEligible = await res.json();
-      if (!isEligible) return; // 대상 아님
-      boakoOk('확장 사용 어려움 안내 대상 확인됨');
-      showExtHelpOverlay();
-    } catch (e) {
-      boakoErr('확장 사용 어려움 대상 확인 실패:', e);
-    }
   }
 
   function showExtHelpOverlay() {
