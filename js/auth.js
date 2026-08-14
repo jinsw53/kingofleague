@@ -16,6 +16,8 @@
  *    .then()을 붙여서 실제로 요청이 발사되도록 수정.
  * 🌟 [신규] ⑤번 활성화 시나리오 — 라이벌전 추천 오버레이(rival_recommend.js) 로드/체크. 대상 여부와
  *    30일 쿨다운은 DB(fn_check_rival_recommend_eligibility)가 판단, 로그인 시점에 1회만 체크.
+ * 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형 오버레이(social_activation.js) 로드/체크. ⑤번 바로 뒤에
+ *    이어서 체크. 대상 여부/타입(토너먼트 vs 팀)/30일 쿨다운은 DB(fn_check_social_activation_eligibility)가 판단.
  */
 Boako.Auth = {
     init: async () => {
@@ -68,6 +70,12 @@ Boako.Auth = {
             (async () => {
                 if (!Boako.RivalRecommend) await Boako.Util.loadScript('js/rival_recommend.js');
                 Boako.RivalRecommend.checkAndShow();
+            })();
+            // 🌟 [신규] ⑥번 활성화 시나리오 — 개인 소셜형(기록 있음, 라이벌전 1건↑, 팀 무소속) 유저에게
+            // 토너먼트 참가/팀 창단 제안 오버레이 표시. 대상 여부/쿨다운은 DB(fn_check_social_activation_eligibility)가 판단.
+            (async () => {
+                if (!Boako.SocialActivation) await Boako.Util.loadScript('js/social_activation.js');
+                Boako.SocialActivation.checkAndShow();
             })();
         } else {
             // 🌟 로그인 안 한 방문객은 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준으로만 판단
@@ -143,6 +151,11 @@ Boako.Auth = {
                 (async () => {
                     if (!Boako.RivalRecommend) await Boako.Util.loadScript('js/rival_recommend.js');
                     Boako.RivalRecommend.checkAndShow();
+                })();
+                // 🌟 [신규] ⑥번 활성화 시나리오 — 토너먼트 참가/팀 창단 제안 오버레이
+                (async () => {
+                    if (!Boako.SocialActivation) await Boako.Util.loadScript('js/social_activation.js');
+                    Boako.SocialActivation.checkAndShow();
                 })();
                 
             } else {
