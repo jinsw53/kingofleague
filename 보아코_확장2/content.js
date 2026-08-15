@@ -3419,6 +3419,9 @@ console.log("[게임 기록] 쌩쌩한 신규 데이터 발견! 슈파베이스�
       // 서버에서 제공한 메시지가 있으면 그것을 사용, 없으면 기본 메시지 사용
       const successMessage = response.message || "게임 기록 성공";
       showPopupMessage(successMessage, true, buttonElement);
+      // 🌟 [신규] 게임 기록 저장은 확장 로그인 여부와 무관하게 항상 성공하는 유일한 지점이라,
+      // 로그인 안 한 유저에게 접근할 수 있는 사실상 유일한 통로. 3일에 한 번만 유도(방해 최소화).
+      maybeShowExtLoginNudge();
     } else {
       let errorMessage = "저장 실패: ";
       if (response?.error) {
@@ -3539,6 +3542,89 @@ function showPopupMessage(message, isSuccess = true, buttonElement = null) {
   setTimeout(() => {
     popup.remove();
   }, 3500);
+}
+
+// ============================================================================
+// 🌟 [신규] 확장 로그인 유도 팝업 — 게임 기록 저장(saveGameRecord)은 아카이브 로그인 세션과
+// 완전히 무관하게(anon key로 raw_ingest_buffer에 직접 INSERT) 항상 성공하는 경로라, "기록은
+// 쌓이는데 확장에 로그인은 한 번도 안 한" 유저가 실제로 존재함(쪽지/업적알림/활성화오버레이 등
+// 로그인 필요한 기능을 전혀 못 받아봄). 저장 성공 시점이 이런 유저에게 닿을 수 있는 사실상 유일한
+// 통로라, 여기서 로그인을 가볍게 유도. localStorage 기준 3일에 한 번만 떠서 방해 최소화(계정별
+// DB 쿨다운은 로그인 전이라 애초에 기록할 수 없으므로, 사이트의 비로그인 방문객 안내 패턴과
+// 동일하게 브라우저 기준 쿨다운 사용).
+// ============================================================================
+function maybeShowExtLoginNudge() {
+  try {
+    const STORAGE_KEY = 'boako_ext_login_nudge_last_shown';
+    const last = localStorage.getItem(STORAGE_KEY);
+    const now = Date.now();
+    if (last && (now - Number(last)) < 3 * 24 * 60 * 60 * 1000) return; // 3일 쿨다운
+
+    chrome.runtime.sendMessage({ action: 'getArchiveSession' }, (res) => {
+      if (chrome.runtime.lastError) return;
+      if (!res || !res.session) {
+        localStorage.setItem(STORAGE_KEY, String(now));
+        showExtLoginNudge();
+      }
+    });
+  } catch (e) {
+    console.log('[확장 프로그램] 로그인 유도 확인 실패:', e);
+  }
+}
+
+function showExtLoginNudge() {
+  let targetDocument = document;
+  try {
+    if (window.top && window.top.document) targetDocument = window.top.document;
+  } catch (e) {
+    targetDocument = document;
+  }
+
+  if (targetDocument.getElementById('boako-login-nudge')) return; // 이미 떠 있으면 중복 방지
+
+  const nudge = targetDocument.createElement('div');
+  nudge.id = 'boako-login-nudge';
+  nudge.style.cssText = `
+    position: fixed; bottom: 24px; right: 24px; z-index: 999998;
+    background: #1e293b; color: #fff; border-radius: 12px; padding: 14px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.3); max-width: 300px; font-family: -apple-system, "Malgun Gothic", sans-serif;
+    display: flex; flex-direction: column; gap: 8px; opacity: 0; transform: translateY(10px); transition: all .25s ease;
+  `;
+  nudge.innerHTML = `
+    <div style="font-size:12px; font-weight:900; color:#fbbf24;">📬 기록은 잘 저장되고 있어요!</div>
+    <div style="font-size:12.5px; font-weight:600; line-height:1.5; color:#e2e8f0;">
+      로그인하시면 쪽지·업적 알림·라이벌전 제안 같은 기능도 확장에서 바로 받아보실 수 있어요.
+    </div>
+    <div style="display:flex; gap:6px; margin-top:2px;">
+      <button id="boako-login-nudge-dismiss" style="flex:1; background:rgba(255,255,255,.08); color:#cbd5e1; font-size:11.5px; font-weight:700; padding:8px; border-radius:8px; border:none; cursor:pointer;">다음에요</button>
+      <button id="boako-login-nudge-login" style="flex:1.4; background:#fff; color:#0f172a; font-size:11.5px; font-weight:900; padding:8px; border-radius:8px; border:none; cursor:pointer;">🟡 로그인하기</button>
+    </div>
+  `;
+  targetDocument.body.appendChild(nudge);
+  requestAnimationFrame(() => { nudge.style.opacity = '1'; nudge.style.transform = 'translateY(0)'; });
+
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    nudge.style.opacity = '0';
+    nudge.style.transform = 'translateY(10px)';
+    setTimeout(() => nudge.remove(), 250);
+  };
+
+  targetDocument.getElementById('boako-login-nudge-dismiss')?.addEventListener('click', dismiss);
+  targetDocument.getElementById('boako-login-nudge-login')?.addEventListener('click', () => {
+    dismiss();
+    chrome.runtime.sendMessage({ action: 'archiveLogin' }, (res) => {
+      if (res && res.success) {
+        showPopupMessage('🎉 로그인 완료! 이제 쪽지·알림도 받아보실 수 있어요.', true);
+      } else {
+        showPopupMessage('로그인에 실패했어요. 다시 시도해주세요.', false);
+      }
+    });
+  });
+
+  setTimeout(dismiss, 12000); // 12초 후 자동으로 사라짐(안 눌러도 방해 안 되게)
 }
 
 // 모든 Observer들을 통합 관리하는 함수
