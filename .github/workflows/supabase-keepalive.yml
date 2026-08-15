@@ -1,0 +1,31 @@
+# 🌟 [신규] Supabase 프로젝트 비활성 정지(7일 무활동 시 자동 정지) 방지용 핏비트(heartbeat).
+# 실제 유저 트래픽(사이트 로그인/확장 사용)이 있으면 사실상 불필요하지만, 비시즌 공백기 등
+# 만약을 대비한 안전장치. 매주 2회(일요일/수요일) PostgREST 루트 엔드포인트(/rest/v1/)에
+# 가벼운 GET 요청만 보냄 — 어떤 테이블 데이터도 조회하지 않고 RLS와도 무관해서 가장 안전한 방식.
+# apikey는 Supabase anon key로, 원래도 클라이언트(보아코_확장2/boako-widget.js, js/config.js 등)에
+# 공개적으로 포함되는 값이라 워크플로우 파일에 직접 넣어도 보안상 문제 없음(RLS가 실제 데이터를 보호함).
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # 🌟 UTC 기준 — 일요일 03:00, 수요일 03:00 (주 2회로 여유를 둬서 7일 한도 안에 확실히 걸리게 함)
+    - cron: '0 3 * * 0'
+    - cron: '0 3 * * 3'
+  workflow_dispatch: {} # 필요하면 Actions 탭에서 수동 실행도 가능
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API (keepalive)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://qrredwrxdnvqwdxzanba.supabase.co/rest/v1/" \
+            -H "apikey: ${SUPABASE_ANON_KEY}")
+          echo "Supabase keepalive ping 응답 코드: $STATUS"
+          if [ "$STATUS" -ge 500 ]; then
+            echo "⚠️ 서버 오류 응답 — 프로젝트 상태를 확인해보세요."
+            exit 1
+          fi
+        env:
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY
