@@ -35,6 +35,11 @@
  *    그다음 한 줄 말줄임(...)으로 고쳤었는데, 말줄임보다 줄바꿈이 낫다는 피드백을 받아 다시 변경.
  *    hoverTitle()의 강제 한 줄(white-space:nowrap) 대신 직접 break-words + line-clamp(2줄)를 써서
  *    자연스럽게 줄바꿈되도록 함 (이 카드에서는 hoverTitle의 호버 팝업 기능은 더 이상 안 씀).
+ * 🌟 [수정] 나머지 카드(headline/large/medium/filler)의 "제목"도 동일 요청으로 말줄임+호버팝업
+ *    대신 줄바꿈으로 통일 — clampTitle() 헬퍼 신설(break-words + line-clamp, 카드 크기별로 2~3줄).
+ *    부제목(subtitle)은 이번 요청 범위 밖이라 기존 hoverTitle 그대로 유지.
+ * 🌟 [신규] 공략글이 아닌 일반 게시글도 본문에 스크린샷이 포함된 경우 소식지에 노출되도록 DB 트리거
+ *    (trg_fn_board_guide_notify) 확장 — AI 생성 없이 본문 첫 <img> 원본을 대표 이미지로 사용.
  */
 Boako.NewsFeed = {
     items: [],
@@ -173,6 +178,15 @@ Boako.NewsFeed = {
     hoverTitle: (text) => {
         const escaped = Boako.NewsFeed.escapeHtml(text);
         return `<span class="nf-hover-title-wrap"><span class="nf-hover-title-base">${escaped}</span></span>`;
+    },
+
+    // 🌟 [신규] 카드 제목 전용 — 말줄임(...)+호버팝업 대신 자연스러운 줄바꿈으로 표시.
+    // small 카드에만 적용돼있던 break-words + line-clamp 방식을 headline/large/medium/filler
+    // 카드의 제목(h2/h3/h4)에도 동일하게 적용 ("카드에서만큼은 줄임표 대신 줄바뀜" 요청 반영).
+    // lines: 카드 크기에 맞춰 몇 줄까지 허용할지 (기본 2줄, 여유 있는 헤드라인은 3줄).
+    clampTitle: (text, lines = 2) => {
+        const escaped = Boako.NewsFeed.escapeHtml(text);
+        return `<span class="break-words leading-snug" style="display:-webkit-box; -webkit-line-clamp:${lines}; -webkit-box-orient:vertical; overflow:hidden;">${escaped}</span>`;
     },
 
     // 🌟 [수정] 팀 목록 / 실시간 랭킹 / 최근 게시글 / 랜덤 보드게임에서 각각 여러 개씩 가져와
@@ -456,7 +470,7 @@ Boako.NewsFeed = {
                 <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
                 <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
                     <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 block">HEADLINE</span>
-                    <h2 class="text-xl md:text-2xl font-black text-white leading-snug mb-2">${Boako.NewsFeed.hoverTitle(item.title)}</h2>
+                    <h2 class="text-xl md:text-2xl font-black text-white leading-snug mb-2">${Boako.NewsFeed.clampTitle(item.title, 3)}</h2>
                     ${item.subtitle ? `<p class="text-sm text-slate-200 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
                 </div>
             </div>
@@ -491,7 +505,7 @@ Boako.NewsFeed = {
         return `
             <div class="nf-filler-card" ${clickable}>
                 <div class="thumb">${img ? `<img src="${img}">` : '📰'}</div>
-                <div class="txt"><h4>${Boako.NewsFeed.hoverTitle(item.title)}</h4></div>
+                <div class="txt"><h4>${Boako.NewsFeed.clampTitle(item.title)}</h4></div>
             </div>
         `;
     },
@@ -506,7 +520,7 @@ Boako.NewsFeed = {
         return `
             <div class="nf-filler-card" ${clickable}>
                 <div class="thumb">${img ? `<img src="${img}">` : filler.icon}</div>
-                <div class="txt"><h4>${Boako.NewsFeed.hoverTitle(filler.title)}</h4></div>
+                <div class="txt"><h4>${Boako.NewsFeed.clampTitle(filler.title)}</h4></div>
             </div>
         `;
     },
@@ -524,7 +538,7 @@ Boako.NewsFeed = {
             <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                 ${img ? `<div class="h-24 overflow-hidden bg-slate-50 flex items-center justify-center p-3"><img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;"></div>` : ''}
                 <div class="p-3 min-w-0">
-                    <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.hoverTitle(filler.title)}</h4>
+                    <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.clampTitle(filler.title)}</h4>
                 </div>
             </div>
         `;
@@ -543,7 +557,7 @@ Boako.NewsFeed = {
                     <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
                     <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
                         <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 block">HEADLINE</span>
-                        <h2 class="text-xl md:text-2xl font-black text-white leading-snug mb-2">${Boako.NewsFeed.hoverTitle(item.title)}</h2>
+                        <h2 class="text-xl md:text-2xl font-black text-white leading-snug mb-2">${Boako.NewsFeed.clampTitle(item.title, 3)}</h2>
                         ${item.subtitle ? `<p class="text-sm text-slate-200 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
                     </div>
                 </div>
@@ -555,7 +569,7 @@ Boako.NewsFeed = {
                 <div class="col-span-4 md:col-span-2 bg-white rounded-xl overflow-hidden shadow-md border border-slate-200 flex flex-col hover:shadow-lg transition-shadow" ${clickable}>
                     ${img ? `<div class="h-36 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : `<div class="h-36 bg-slate-100 flex items-center justify-center text-4xl">📰</div>`}
                     <div class="p-4 min-w-0">
-                        <h3 class="text-base font-black text-slate-900 leading-snug mb-1">${Boako.NewsFeed.hoverTitle(item.title)}</h3>
+                        <h3 class="text-base font-black text-slate-900 leading-snug mb-1">${Boako.NewsFeed.clampTitle(item.title)}</h3>
                         ${item.subtitle ? `<p class="text-xs text-slate-500 font-bold">${Boako.NewsFeed.hoverTitle(item.subtitle)}</p>` : ''}
                     </div>
                 </div>
@@ -567,7 +581,7 @@ Boako.NewsFeed = {
                 <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                     ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
                     <div class="p-3 min-w-0">
-                        <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.hoverTitle(item.title)}</h4>
+                        <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.clampTitle(item.title)}</h4>
                     </div>
                 </div>
             `;
