@@ -2819,14 +2819,14 @@ function extractTournamentData(reporter) {
   };
 }
 
-// 🌟 [신규 - 버그수정] "순위 데이터가 1명이라도 있으면 완료로 간주"하던 문제 수정.
-// 토너먼트 시작 직후 대진표 첫 매치 하나만 끝나도 일부 순위가 뜨는데, 그걸 최종 결과로 착각해서
-// 중간 스냅샷을 저장해버리는 사고가 있었음(예: 21명 중 2명만 순위가 잡힌 상태로 전송됨).
-// 1순위: BGA가 직접 보여주는 "완료됨" 상태 텍스트를 찾아서 확인.
-// 2순위(폴백): "참가자 N명" 총원과 지금까지 추출된 순위 인원수를 비교해서 전원 순위가 잡혔는지 확인.
-// 둘 다 확인 못 하면 → 완료 아님으로 처리 (섣불리 완료로 판단하지 않는 게 원칙).
+// 🌟 [버그수정 v3.12] "순위 데이터가 있으면 완료로 간주"하던 참가자수 비교 폴백을 완전히 제거.
+// 스위스(리그전) 방식은 1라운드만 끝나도 참가자 전원의 임시 순위표가 이미 다 보이기 때문에,
+// "참가자 N명 vs 순위 잡힌 인원수"로 비교하면 몇 라운드가 남았어도 항상 "전원 순위 있음"으로 오판해서
+// 진행 중인 토너먼트를 최종 결과인 것처럼 저장해버리는 사고가 있었음(엘리미네이션에서만 유효한 판별법).
+// BGA가 직접 보여주는 상태 텍스트(예: <span class="text-xl text-center leading-tight line-clamp-2">완료됨</span>
+// / "진행 중...")만으로 판별하도록 변경 — 순위 존재 여부는 더 이상 완료 판단 근거로 쓰지 않음.
+// "완료됨"이 아니면(텍스트가 없거나 "진행 중..." 등 그 외 전부) 무조건 완료 아님으로 처리.
 function isTournamentActuallyFinished(players) {
-  // 1순위: "완료됨" 상태 텍스트 직접 탐색
   const statusCandidates = document.querySelectorAll('.text-xl, .text-xl.truncate, .text-xl.text-center.leading-tight.line-clamp-2');
   for (const el of statusCandidates) {
     const text = (el.textContent || '').trim();
@@ -2836,22 +2836,8 @@ function isTournamentActuallyFinished(players) {
     }
   }
 
-  // 2순위(폴백): "참가자 N" 총원과 지금까지 순위가 잡힌 인원수 비교
-  const participantCandidates = document.querySelectorAll('.text-xl.truncate, .text-xl');
-  for (const el of participantCandidates) {
-    const match = (el.textContent || '').match(/참가자\s*(\d+)/);
-    if (match) {
-      const totalParticipants = parseInt(match[1], 10);
-      if (totalParticipants > 0) {
-        const isComplete = players.length >= totalParticipants;
-        console.log(`[토너먼트 완료판별] 참가자 총원 ${totalParticipants}명 vs 순위 확인된 ${players.length}명 → ${isComplete ? '완료' : '진행중'}로 판단`);
-        return isComplete;
-      }
-    }
-  }
-
-  // 둘 다 판별 못 하면 → 섣불리 완료로 보지 않음 (오염 방지가 우선)
-  console.log('[토너먼트 완료판별] 완료 신호를 못 찾음 → 안전하게 "완료 아님"으로 처리');
+  // "완료됨" 텍스트를 못 찾으면(비어있거나 "진행 중..." 등) → 무조건 완료 아님으로 처리
+  console.log('[토너먼트 완료판별] "완료됨" 상태 텍스트를 못 찾음(진행 중이거나 상태 미표시) → "완료 아님"으로 처리');
   return false;
 }
 
