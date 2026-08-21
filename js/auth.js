@@ -24,6 +24,7 @@
  *    반영(자기추천/중복설정 DB에서 방지). 초대된 친구가 BTLDB에 진짜 첫 기록을 남기는 순간
  *    fn_award_referral_bonus() 트리거가 추천인에게 100P 지급(초대 인원 제한 없음). 알림은 확장과 달리
  *    빈도가 낮고 무게감도 가벼워 풀스크린 오버레이 대신 Boako.Util.toast()만 사용, 사이트 로그인 시에만 노출.
+ *    사운드는 기록 인증(record_verify.js) 포인트 지급 토스트와 동일한 window.sfx.buy()로 통일.
  */
 Boako.Auth = {
     init: async () => {
@@ -259,6 +260,7 @@ Boako.Auth = {
                 filter: `user_id=eq.${Boako.state.user.id}`
             }, async (payload) => {
                 if (!String(payload.new.description || '').startsWith('🎉 친구 추천 보상')) return;
+                if (window.sfx && window.sfx.buy) window.sfx.buy(); // 🌟 기록 인증 포인트 지급 토스트와 동일한 사운드로 통일
                 Boako.Util.toast(`${payload.new.description} +${payload.new.point_change}P`);
                 await Boako.Auth.markReferralBonusSeen(payload.new.id);
             })
@@ -293,6 +295,7 @@ Boako.Auth = {
 
             if (!rows || rows.length === 0) return;
 
+            if (window.sfx && window.sfx.buy) window.sfx.buy(); // 🌟 기록 인증 포인트 지급 토스트와 동일한 사운드로 통일 (여러 건 몰아서 봐도 한 번만)
             rows.forEach(row => Boako.Util.toast(`${row.description} +${row.point_change}P`));
             await Boako.Auth.markReferralBonusSeen(rows[rows.length - 1].id);
         } catch (e) {
