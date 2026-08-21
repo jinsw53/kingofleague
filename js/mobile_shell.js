@@ -7,8 +7,11 @@
  *    프로필/안읽은쪽지 조회만 독립적으로 수행함. PC 전용 온보딩 모달(닉네임/공지사항/시즌스플래시/
  *    활성화오버레이 등)은 화면별 포팅 단계에서 모바일에 맞게 하나씩 다시 붙일 예정 — 지금 단계에서
  *    그대로 부르면 PC 전용 DOM(#login-widget-area 등)이 없어서 에러가 남.
- * 🌟 [2단계: 화면별 포팅 시작] team 탭에 실제 화면(mobile_team.js) 연결. 더보기 시트를
+ * 🌟 [2단계: 화면별 포팅 시작] "랭킹" 탭에 실제 화면(mobile_team.js) 연결. 더보기 시트를
  *    다른 화면(시즌 선택 등)이 재사용할 수 있도록 openMoreSheet/openCustomSheet 추가.
+ * 🌟 [명칭 정정] 하단 탭/더보기 시트의 항목 라벨을 PC 상단 메뉴바(index.html #boako-main-nav-bar)와
+ *    완전히 통일 — 처음에 "팀"이라는 이름을 임의로 붙였던 걸 PC의 실제 메뉴명("🏆 랭킹")으로 수정,
+ *    더보기 시트도 PC 나머지 메뉴 항목을 라벨/순서 그대로(임의 작명 없이) 채움.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -52,8 +55,8 @@ Boako.MobileShell = {
         const area = document.getElementById('mobile-content-area');
         if (!area) return;
 
-        // 🌟 [2단계: 화면별 포팅] team 탭부터 실제 화면 연결. 나머지는 아직 placeholder.
-        if (tab === 'team') {
+        // 🌟 [2단계: 화면별 포팅] "랭킹" 탭(PC의 "🏆 랭킹" 메뉴와 동일한 화면) 먼저 연결. 나머지는 아직 placeholder.
+        if (tab === 'ranking') {
             (async () => {
                 area.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
                 if (!Boako.MobileTeam) await Boako.Util.loadScript('/js/mobile_team.js');
@@ -167,16 +170,25 @@ Boako.MobileShell = {
     },
 
     // ========== 더보기 시트 내용 ==========
+    // 🌟 [수정] PC 상단 메뉴바(index.html #boako-main-nav-bar)의 나머지 항목을 라벨/순서 그대로 반영.
+    // (하단 탭바에 이미 있는 소식지/토너먼트/랭킹만 제외) — 임의로 이름 짓지 않고 PC와 완전히 통일.
+    // 관리자 전용(검수센터)/팀장 전용(기록 인증) 메뉴는 권한 체크 로직을 아직 안 붙여서 우선 제외.
     renderSheet: () => {
         const wrap = document.getElementById('mobile-sheet-content');
         if (!wrap) return;
         wrap.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:2px;">
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 기록 검수센터</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">✅ 기록 인증</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚡ 라이벌 매치</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚔️ 대항전</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🎯 리그 콘텐츠</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 전적기록</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🤝 같이 하자</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🛡️ 팀 창단</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">👥 팀 목록</div>
+                <div onclick="window.open('https://cafe.naver.com/boardgamearena', '_blank')" style="padding:12px 4px; font-size:14px; font-weight:700;">☕ 카페</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">📝 게시판</div>
+                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🛒 포인트 샵</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">📅 일정표</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🙋 같이하자</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">💬 게시판</div>
             </div>
         `;
     }
