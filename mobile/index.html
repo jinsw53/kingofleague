@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BOAKO ARCHIVE</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+    <!-- 🌟 [신규] 모바일 전용 진입점. PC용 index.html과 완전히 분리된 파일이며,
+         Boako.db/Boako.Auth 같은 로직(core.js/util.js)은 그대로 공유하되,
+         화면을 그리는 부분(js/mobile_*.js)만 모바일 전용으로 새로 만든다.
+         지금은 1단계(뾼대 테스트) 단계라 본문은 placeholder만 있고, 하단 탭바/
+         아바타 드로어/더보기 시트만 실제로 동작하는지 확인하는 용도. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --primary: #7c3aed; --bg-body: #f0f2f5; --bg-card: #ffffff;
+            --text-main: #1e293b; --text-sub: #64748b; --border-color: #e2e8f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-body); font-family: 'Noto Sans KR', sans-serif;
+            color: var(--text-main); line-height: 1.6; word-break: keep-all;
+            /* 🌟 하단 탭바(56px) + 아이폰 홈 인디케이터 안전영역만큼 본문 아래 여백 확보 */
+            padding-bottom: calc(56px + env(safe-area-inset-bottom));
+        }
+        button { cursor: pointer; border: none; background: none; font-family: inherit; }
+    </style>
+</head>
+<body>
+
+    <!-- 상단바: 로고 + 알림 아이콘 + 프로필 아바타(클릭 시 드로어) -->
+    <header id="mobile-topbar" style="position:sticky; top:0; z-index:40; background:#fff; border-bottom:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; padding:14px 16px;">
+        <span style="font-size:16px; font-weight:900;">BOAKO</span>
+        <div style="display:flex; align-items:center; gap:16px;">
+            <span style="font-size:20px;">🔔</span>
+            <div id="mobile-avatar-btn" onclick="Boako.MobileShell.openDrawer()" style="width:30px; height:30px; border-radius:50%; background:#e2e8f0; cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:16px;">
+                👤
+                <span id="mobile-avatar-dot" class="hidden" style="position:absolute; top:0px; right:0px; width:9px; height:9px; border-radius:50%; background:#ef4444; border:1.5px solid #fff;"></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 본문: 1단계에선 placeholder만. 이후 화면별 포팅 시 js/mobile_*.js가 여기 그림 -->
+    <main id="mobile-content-area" style="padding:16px; min-height:60vh; display:flex; align-items:center; justify-content:center; color:var(--text-sub); font-weight:700; font-size:13px;">
+        뾼대 테스트 중 — 본문 영역
+    </main>
+
+    <!-- 어둡게 깔리는 배경 (드로어/시트 열렸을 때) -->
+    <div id="mobile-dim" onclick="Boako.MobileShell.closeAll()" style="position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:50; opacity:0; pointer-events:none; transition:opacity .2s;"></div>
+
+    <!-- 아바타 드로어 (PC 로그인 박스 내용이 여기로 들어옴) -->
+    <aside id="mobile-drawer" style="position:fixed; top:0; right:0; bottom:0; width:78%; max-width:300px; background:#fff; z-index:51; transform:translateX(100%); transition:transform .22s ease; padding:20px 16px; padding-top: calc(20px + env(safe-area-inset-top)); overflow-y:auto;">
+        <div id="mobile-drawer-content"></div>
+    </aside>
+
+    <!-- 더보기 시트 -->
+    <div id="mobile-sheet" style="position:fixed; left:0; right:0; bottom:0; background:#fff; z-index:51; border-top-left-radius:18px; border-top-right-radius:18px; transform:translateY(100%); transition:transform .22s ease; padding:14px 16px; padding-bottom: calc(20px + env(safe-area-inset-bottom));">
+        <div style="width:36px; height:4px; background:#e2e8f0; border-radius:2px; margin:0 auto 14px;"></div>
+        <div id="mobile-sheet-content"></div>
+    </div>
+
+    <!-- 하단 고정 탭바 -->
+    <nav id="mobile-tabbar" style="position:fixed; left:0; right:0; bottom:0; z-index:45; background:#fff; border-top:1px solid var(--border-color); display:flex; padding-bottom:env(safe-area-inset-bottom);">
+        <button data-tab="feed" class="mobile-tab-btn" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0; font-size:11px; font-weight:700;">
+            <span style="font-size:20px;">📰</span>소식지
+        </button>
+        <button data-tab="tournament" class="mobile-tab-btn" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0; font-size:11px; font-weight:700;">
+            <span style="font-size:20px;">🏆</span>토너먼트
+        </button>
+        <button data-tab="team" class="mobile-tab-btn" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0; font-size:11px; font-weight:700;">
+            <span style="font-size:20px;">🛡️</span>팀
+        </button>
+        <button onclick="Boako.MobileShell.openSheet()" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0; font-size:11px; font-weight:700;">
+            <span style="font-size:20px;">☰</span>더보기
+        </button>
+    </nav>
+
+    <!--
+      [JS 파일 분할 로드]
+      core.js/util.js/auth.js는 PC와 완전히 동일한 파일을 그대로 재사용 (로그인/DB 로직 공유).
+      mobile_shell.js/mobile_main.js만 모바일 전용 신규 파일.
+    -->
+    <script src="js/core.js"></script>
+    <script src="js/util.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/mobile_shell.js"></script>
+    <script src="js/mobile_main.js"></script>
+
+</body>
+</html>
