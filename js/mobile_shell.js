@@ -30,6 +30,10 @@
  *    Boako.Auth.renderWidget()을 불러 PC 전용 DOM(#login-widget-area)에서 에러가 나므로 그대로
  *    재사용 불가. 같은 조회/저장 로직(profiles.is_nick_changed, full_name)을 유지하되 화면은
  *    모바일 원칙대로 중앙 모달 대신 풀스크린 시트로 새로 작성.
+ * 🌟 [신규] 실시간 알림 4종(쪽지/업적/라이벌결과/추천보너스) 구독 — achievements.js/rival_notify.js/
+ *    recommend_notify.js는 자기 완결형 풀스크린 오버레이만 그려서 PC DOM 의존이 없어 그대로 재사용.
+ *    messenger.js만 예외 — startRealtime() 콜백이 Boako.Auth.renderWidget()을 무조건 불러서 모바일에서
+ *    에러가 나(토스트까지 못 뜨고 멈춤), 안읽은 개수 갱신+토스트만 필요한 부분을 모바일 전용으로 새로 작성.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -69,6 +73,21 @@ Boako.MobileShell = {
             // PC의 requireBgaNickname()/saveInitialNick()은 마지막에 Boako.Auth.renderWidget()을
             // 불러 PC 전용 DOM(#login-widget-area)에서 에러가 나서, 모바일 전용으로 새로 작성.
             await Boako.MobileShell.requireBgaNickname();
+
+            // 🌟 [신규] 실시간 알림 4종 구독. achievements/rival_notify/recommend_notify는
+            // 자기 완결형 풀스크린 오버레이만 그려서 PC 전용 DOM 의존이 없어 그대로 재사용 가능.
+            // messenger.js만 예외 — startRealtime() 콜백이 Boako.Auth.renderWidget()을 무조건
+            // 불러서 모바일에서 에러가 나(토스트까지 못 뜨고 멈춤), 그 부분만 모바일 전용으로 새로 작성.
+            Boako.MobileShell.startMessengerRealtime();
+            if (!Boako.Achievements) await Boako.Util.loadScript('/js/achievements.js');
+            Boako.Achievements.startRealtime();
+            Boako.Achievements.checkUnseenAchievements();
+            if (!Boako.RivalNotify) await Boako.Util.loadScript('/js/rival_notify.js');
+            Boako.RivalNotify.startRealtime();
+            Boako.RivalNotify.checkUnseenResults();
+            if (!Boako.RecommendNotify) await Boako.Util.loadScript('/js/recommend_notify.js');
+            Boako.RecommendNotify.startRealtime();
+            Boako.RecommendNotify.checkUnseenResults();
         }
 
         Boako.MobileShell.bindTabBar();
@@ -89,8 +108,23 @@ Boako.MobileShell = {
                 await Boako.Team.syncStatus();
                 await Boako.Auth.applyPendingReferral();
                 await Boako.MobileShell.requireBgaNickname();
+
+                Boako.MobileShell.startMessengerRealtime();
+                if (!Boako.Achievements) await Boako.Util.loadScript('/js/achievements.js');
+                Boako.Achievements.startRealtime();
+                Boako.Achievements.checkUnseenAchievements();
+                if (!Boako.RivalNotify) await Boako.Util.loadScript('/js/rival_notify.js');
+                Boako.RivalNotify.startRealtime();
+                Boako.RivalNotify.checkUnseenResults();
+                if (!Boako.RecommendNotify) await Boako.Util.loadScript('/js/recommend_notify.js');
+                Boako.RecommendNotify.startRealtime();
+                Boako.RecommendNotify.checkUnseenResults();
             } else {
                 Boako.state.team = null;
+                Boako.MobileShell.stopMessengerRealtime();
+                if (Boako.Achievements?.stopRealtime) Boako.Achievements.stopRealtime();
+                if (Boako.RivalNotify?.stopRealtime) Boako.RivalNotify.stopRealtime();
+                if (Boako.RecommendNotify?.stopRealtime) Boako.RecommendNotify.stopRealtime();
             }
             await Boako.MobileShell.renderDrawer();
         });
@@ -155,6 +189,33 @@ Boako.MobileShell = {
             Boako.Util.toast('🎉 BGA 닉네임이 완벽하게 연동되었습니다!');
         } catch (e) {
             Boako.Util.toast('수정 실패: ' + e.message);
+        }
+    },
+
+    // ========== 🌟 [신규] 쪽지 실시간 알림 (모바일 전용 — messenger.js의 startRealtime()을
+    // 그대로 재사용하지 않는 유일한 예외). PC 버전은 새 쪽지 도착 시 Boako.Auth.renderWidget()과
+    // Boako.Messenger.View.refreshRoomList()를 무조건 부르는데, 둘 다 PC 전용 DOM(#login-widget-area,
+    // #chat-room-list 등)이 없으면 에러가 나서 그 뒤에 있는 토스트 코드까지 실행이 안 됨.
+    // 안읽은 개수 갱신(=아바타 드로어 재렌더)과 토스트만 필요한 부분이라 가볍게 새로 작성.
+    _messengerChannel: null,
+
+    startMessengerRealtime: () => {
+        if (!Boako.state.user || Boako.MobileShell._messengerChannel) return;
+        Boako.MobileShell._messengerChannel = Boako.db.channel('mobile-messages-changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+                const newMsg = payload.new;
+                const myId = Boako.state.user.id;
+                if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
+                    await Boako.MobileShell.renderDrawer(); // 안읽은 쪽지 수 재조회 + 상단바/드로어 배지 갱신
+                    if (newMsg.receiver_id === myId) Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 쪽지가 도착했습니다!`);
+                }
+            }).subscribe();
+    },
+
+    stopMessengerRealtime: () => {
+        if (Boako.MobileShell._messengerChannel) {
+            Boako.db.removeChannel(Boako.MobileShell._messengerChannel);
+            Boako.MobileShell._messengerChannel = null;
         }
     },
 
