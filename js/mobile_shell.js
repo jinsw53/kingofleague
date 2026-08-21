@@ -9,6 +9,9 @@
  *    onAuthStateChange 양쪽에서 호출하도록 수정. 팀 소속 여부(Boako.state.team)도 같은 함수가
  *    채움 — PC 전용 DOM 참조는 전부 null 가드돼있어 모바일에서 그대로 불러도 안전해서 재구현 없이
  *    그대로 재사용(드로어에 팀 소속 배지도 같이 추가).
+ * 🌟 [버그수정] 상단바 아바타가 항상 👤 고정 이모지였던 문제 — 드로어의 프사 계산(커스텀/카카오)과
+ *    같은 값으로 상단바 이미지도 함께 갱신하도록 renderDrawer()에서 한 번에 처리(두 곳이 따로
+ *    놀지 않도록 단일 지점에서 동기화).
  * 🌟 [2단계: 화면별 포팅 시작] "랭킹" 탭에 실제 화면(mobile_team.js) 연결. 더보기 시트를
  *    다른 화면(시즌 선택 등)이 재사용할 수 있도록 openMoreSheet/openCustomSheet 추가.
  * 🌟 [명칭 정정] 하단 탭/더보기 시트의 항목 라벨을 PC 상단 메뉴바(index.html #boako-main-nav-bar)와
@@ -173,6 +176,18 @@ Boako.MobileShell = {
         // 상단바의 알림 점(unread 뱃지)도 같이 갱신
         const dot = document.getElementById('mobile-avatar-dot');
         if (dot) dot.classList.toggle('hidden', unreadCount === 0);
+
+        // 🌟 [버그수정] 상단바 아바타가 항상 👤 이모지 고정이었던 문제 — 드로어 계산과 같은
+        // displayAvatarUrl로 상단바 이미지도 동시에 갱신 (두 군데 로직이 따로 놀지 않도록 한 곳에서 처리)
+        const topbarImg = document.getElementById('mobile-avatar-img');
+        const topbarEmoji = document.getElementById('mobile-avatar-emoji');
+        if (displayAvatarUrl) {
+            if (topbarImg) { topbarImg.src = displayAvatarUrl; topbarImg.classList.remove('hidden'); }
+            if (topbarEmoji) topbarEmoji.classList.add('hidden');
+        } else {
+            if (topbarImg) topbarImg.classList.add('hidden');
+            if (topbarEmoji) topbarEmoji.classList.remove('hidden');
+        }
 
         // 🌟 [신규] PC renderWidget()의 팀 소속 배지와 동일 — Boako.state.team은 이제
         // init()/onAuthStateChange에서 부른 Team.syncStatus()가 채워둠
