@@ -8,8 +8,6 @@
     <!-- 🌟 [신규] 모바일 전용 진입점. PC용 index.html과 완전히 분리된 파일이며,
          Boako.db/Boako.Auth 같은 로직(core.js/util.js)은 그대로 공유하되,
          화면을 그리는 부분(js/mobile_*.js)만 모바일 전용으로 새로 만든다.
-         지금은 1단계(뼈대 테스트) 단계라 본문은 placeholder만 있고, 하단 탭바/
-         아바타 드로어/더보기 시트만 실제로 동작하는지 확인하는 용도.
          🌟 [버그수정] 이 파일이 mobile/ 하위 폴더에 있어서 <script src="js/...">가
          상대경로로 /mobile/js/...를 가리켜 전부 404가 나던 문제 — 실제 js 폴더는 루트(/js/...)에
          있으므로 절대경로(/js/...)로 수정. 이 때문에 Boako 객체 자체가 안 만들어져서
@@ -46,7 +44,7 @@
         </div>
     </header>
 
-    <!-- 본문: 1단계에선 placeholder만. 이후 화면별 포팅 시 js/mobile_*.js가 여기 그림 -->
+    <!-- 본문: 이후 화면별 포팅 시 js/mobile_*.js가 여기 그림 -->
     <main id="mobile-content-area" style="padding:16px; min-height:60vh; display:flex; align-items:center; justify-content:center; color:var(--text-sub); font-weight:700; font-size:13px;">
         뼈대 테스트 중 — 본문 영역
     </main>
@@ -76,7 +74,7 @@
         <button data-tab="team" class="mobile-tab-btn" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0; font-size:11px; font-weight:700;">
             <span style="font-size:20px;">🛡️</span>팀
         </button>
-        <button onclick="Boako.MobileShell.openSheet()" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0; font-size:11px; font-weight:700;">
+        <button onclick="Boako.MobileShell.openMoreSheet()" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0; font-size:11px; font-weight:700;">
             <span style="font-size:20px;">☰</span>더보기
         </button>
     </nav>
@@ -84,8 +82,8 @@
     <!--
       [JS 파일 분할 로드]
       core.js/util.js/auth.js는 PC와 완전히 동일한 파일을 그대로 재사용 (로그인/DB 로직 공유).
-      mobile_shell.js/mobile_main.js만 모바일 전용 신규 파일.
-      🌟 [버그수정] 이 페이지가 /mobile/ 하위에 있으므로 절대경로(/js/...)로 로드해야 함.
+      mobile_shell.js/mobile_main.js/mobile_team.js만 모바일 전용 신규 파일.
+      🌟 이 페이지가 /mobile/ 하위에 있으므로 절대경로(/js/...)로 로드해야 함.
     -->
     <script src="/js/core.js"></script>
     <script src="/js/util.js"></script>
