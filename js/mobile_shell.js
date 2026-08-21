@@ -12,8 +12,9 @@
  * 🌟 [버그수정] 상단바 아바타가 항상 👤 고정 이모지였던 문제 — 드로어의 프사 계산(커스텀/카카오)과
  *    같은 값으로 상단바 이미지도 함께 갱신하도록 renderDrawer()에서 한 번에 처리(두 곳이 따로
  *    놀지 않도록 단일 지점에서 동기화).
- * 🌟 [2단계: 화면별 포팅 시작] "랭킹" 탭에 실제 화면(mobile_team.js) 연결. 더보기 시트를
- *    다른 화면(시즌 선택 등)이 재사용할 수 있도록 openMoreSheet/openCustomSheet 추가.
+ * 🌟 [2단계: 화면별 포팅] "랭킹"(mobile_team.js), "소식지"(mobile_newsfeed.js) 연결 완료.
+ *    더보기 시트를 다른 화면(시즌 선택 등)이 재사용할 수 있도록 openMoreSheet/openCustomSheet 추가.
+ *    앱 최초 로드 시 PC의 View.render('main')과 동일하게 소식지 탭을 기본으로 자동 로드.
  * 🌟 [명칭 정정] 하단 탭/더보기 시트의 항목 라벨을 PC 상단 메뉴바(index.html #boako-main-nav-bar)와
  *    완전히 통일 — 처음에 "팀"이라는 이름을 임의로 붙였던 걸 PC의 실제 메뉴명("🏆 랭킹")으로 수정,
  *    더보기 시트도 PC 나머지 메뉴 항목을 라벨/순서 그대로(임의 작명 없이) 채움.
@@ -98,6 +99,10 @@ Boako.MobileShell = {
         // 클릭을 유도. PC의 checkTogetherBadge/checkBoardRequestBadge와 동일한 조회 로직 재사용.
         Boako.MobileShell.refreshMoreBadge();
         Boako.MobileShell.subscribeMoreBadge();
+
+        // 🌟 [신규] PC가 첫 로드 시 View.render('main')(=소식지)을 그리는 것과 동일하게,
+        // 모바일도 앱을 열자마자 하단 탭바의 기본 탭(소식지)을 자동으로 로드
+        Boako.MobileShell.switchTab('feed');
 
         // 로그인 상태 변화(로그아웃 등)에도 드로어 내용이 갱신되도록
         Boako.db.auth.onAuthStateChange(async (e, s) => {
@@ -233,12 +238,18 @@ Boako.MobileShell = {
         const area = document.getElementById('mobile-content-area');
         if (!area) return;
 
-        // 🌟 [2단계: 화면별 포팅] "랭킹" 탭(PC의 "🏆 랭킹" 메뉴와 동일한 화면) 먼저 연결. 나머지는 아직 placeholder.
+        // 🌟 [2단계: 화면별 포팅] "랭킹"에 이어 "소식지"(PC의 "📰 소식지" 메뉴와 동일한 화면)도 연결. 나머지는 아직 placeholder.
         if (tab === 'ranking') {
             (async () => {
                 area.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
                 if (!Boako.MobileTeam) await Boako.Util.loadScript('/js/mobile_team.js');
                 Boako.MobileTeam.render(area);
+            })();
+        } else if (tab === 'feed') {
+            (async () => {
+                area.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
+                if (!Boako.MobileNewsfeed) await Boako.Util.loadScript('/js/mobile_newsfeed.js');
+                Boako.MobileNewsfeed.render(area);
             })();
         } else {
             area.innerText = `"${tab}" 탭 선택됨 (화면 포팅 예정)`;
