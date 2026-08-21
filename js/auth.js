@@ -18,9 +18,19 @@
  *    대기열(activation_overlay_queue) 방식으로 전환. js/activation_dispatch.js가
  *    fn_get_my_activation_overlay() 하나만 호출해서 대기열을 조회하고, overlay_type에 따라
  *    rival_recommend.js/social_activation.js의 렌더러(showOverlay)를 호출함.
+ * 🌟 [신규] 친구 초대 시스템 — 로그인 박스에 "내 초대 링크" 버튼(profiles.id를 그대로 ?ref=값으로 사용,
+ *    별도 코드 발급 없음). 초대 링크로 들어온 방문객은 captureReferralParam()이 localStorage에
+ *    잠시 저장해뒀다가, 실제 로그인 완료 시점에 fn_apply_referral() RPC로 profiles.referred_by에 1회만
+ *    반영(자기추천/중복설정 DB에서 방지). 초대된 친구가 BTLDB에 진짜 첫 기록을 남기는 순간
+ *    fn_award_referral_bonus() 트리거가 추천인에게 100P 지급(초대 인원 제한 없음). 알림은 확장과 달리
+ *    빈도가 낮고 무게감도 가벼워 풀스크린 오버레이 대신 Boako.Util.toast()만 사용, 사이트 로그인 시에만 노출.
  */
 Boako.Auth = {
     init: async () => {
+        // 🌟 [신규] 친구 초대 링크(?ref=추천인id)로 들어온 경우, 아직 비로그인 상태일 수 있으므로
+        // 일단 localStorage에 저장해두고, 실제 로그인이 완료되는 시점(아래 applyPendingReferral)에 적용함.
+        Boako.Auth.captureReferralParam();
+
         Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
 
         // 1. 최초 접속 시 정상 로드
@@ -56,6 +66,11 @@ Boako.Auth = {
             if (Boako.RecommendNotify.startRealtime) Boako.RecommendNotify.startRealtime();
             // 🌟 오프라인 중 지급된(=놓친) 보너스도 로그인 시점에 확인
             if (Boako.RecommendNotify.checkUnseenResults) Boako.RecommendNotify.checkUnseenResults();
+
+            // 🌟 [신규] 친구 초대 보상 — 대기 중인 추천인이 있으면 적용(1회성, 이미 있으면 무시), 실시간 알림 구독 시작
+            Boako.Auth.applyPendingReferral();
+            Boako.Auth.startReferralRealtime();
+            Boako.Auth.checkUnseenReferralBonuses();
 
             // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달 → 시즌 스플래시(팀 소속자만)
             await Boako.Auth.requireBgaNickname();
@@ -133,6 +148,11 @@ Boako.Auth = {
                 if (Boako.RecommendNotify.startRealtime) Boako.RecommendNotify.startRealtime();
                 if (Boako.RecommendNotify.checkUnseenResults) Boako.RecommendNotify.checkUnseenResults();
 
+                // 🌟 [신규] 친구 초대 보상 — 대기 중인 추천인이 있으면 적용, 실시간 알림 구독 시작
+                Boako.Auth.applyPendingReferral();
+                Boako.Auth.startReferralRealtime();
+                Boako.Auth.checkUnseenReferralBonuses();
+
                 await Boako.Auth.renderWidget();
                 // 🌟 순서: 닉네임 모달 → 기록기 설치 가이드 → 공지사항 모달 → 시즌 스플래시(팀 소속자만)
                 await Boako.Auth.requireBgaNickname();
@@ -154,6 +174,7 @@ Boako.Auth = {
                 if (Boako.Achievements && Boako.Achievements.stopRealtime) Boako.Achievements.stopRealtime();
                 if (Boako.RivalNotify && Boako.RivalNotify.stopRealtime) Boako.RivalNotify.stopRealtime();
                 if (Boako.RecommendNotify && Boako.RecommendNotify.stopRealtime) Boako.RecommendNotify.stopRealtime();
+                Boako.Auth.stopReferralRealtime();
                 const adminMenu = document.getElementById('menu-admin-review');
                 if (adminMenu) adminMenu.style.display = 'none';
                 const verifyMenu = document.getElementById('menu-record-verify');
@@ -187,7 +208,127 @@ Boako.Auth = {
         }, 200);
     },
 
-    // 🌟 카카오 액세스/리프레시 토큰을 DB에 저장 (톡캘린더 API 호출용)
+    // 🌟 [신규] 친구 초대 링크(?ref=추천인id) 파라미터를 페이지 로드 시점에 캡처해서 localStorage에 저장.
+    // 로그인 전(카카오 OAuth 리다이렉트 전)에 호출되므로, 로그인 여부와 무관하게 항상 먼저 실행돼야 함.
+    // OAuth 콜백으로 돌아온 뒤에도 URL이 유지되는 케이스를 감안해, ?ref가 있으면 매번 최신 값으로 덮어씀.
+    captureReferralParam: () => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const refId = params.get('ref');
+            if (!refId) return;
+            localStorage.setItem('boako_pending_referral', refId);
+            // ?open= 딥링크 파라미터는 handleDeepLinkFromExtension이 별도로 처리하므로 여기선 ref만 제거
+            params.delete('ref');
+            const rest = params.toString();
+            const cleanUrl = window.location.origin + window.location.pathname + (rest ? '?' + rest : '');
+            window.history.replaceState({}, document.title, cleanUrl);
+        } catch (e) {
+            console.error('초대 링크 파라미터 캡처 실패:', e);
+        }
+    },
+
+    // 🌟 [신규] 로그인 완료 시점에 대기 중인 추천인이 있으면 적용. fn_apply_referral()이
+    // 이미 referred_by가 있으면 아무 것도 안 하는 1회성 RPC라 여러 번 호출돼도 안전함.
+    applyPendingReferral: async () => {
+        try {
+            const pending = localStorage.getItem('boako_pending_referral');
+            if (!pending) return;
+            await Boako.db.rpc('fn_apply_referral', { p_referrer_id: pending });
+            localStorage.removeItem('boako_pending_referral'); // 성공/실패 여부와 무관하게 1회 시도 후 제거(반복 방지)
+        } catch (e) {
+            console.error('초대 링크 적용 실패:', e);
+            localStorage.removeItem('boako_pending_referral');
+        }
+    },
+
+    // ========== 🌟 [신규] 친구 초대 보상 실시간 알림 (가벼운 토스트) ==========
+    // achievements.js/rival_notify.js/recommend_notify.js와 같은 실시간 구독 패턴이되,
+    // 발생 빈도가 낮고 중요도도 낮아서 풀스크린 오버레이 대신 가벼운 Boako.Util.toast()만 사용.
+    _referralChannel: null,
+
+    startReferralRealtime: () => {
+        if (!Boako.state.user || !Boako.db) return;
+        if (Boako.Auth._referralChannel) return; // 중복 구독 방지
+
+        Boako.Auth._referralChannel = Boako.db
+            .channel(`referral-bonus-${Boako.state.user.id}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'point_history',
+                filter: `user_id=eq.${Boako.state.user.id}`
+            }, async (payload) => {
+                if (!String(payload.new.description || '').startsWith('🎉 친구 추천 보상')) return;
+                Boako.Util.toast(`${payload.new.description} +${payload.new.point_change}P`);
+                await Boako.Auth.markReferralBonusSeen(payload.new.id);
+            })
+            .subscribe();
+    },
+
+    stopReferralRealtime: () => {
+        if (Boako.Auth._referralChannel && Boako.db) {
+            Boako.db.removeChannel(Boako.Auth._referralChannel);
+            Boako.Auth._referralChannel = null;
+        }
+    },
+
+    // 🌟 오프라인 중 지급된(=놓친) 친구 초대 보상도 로그인 시점에 확인.
+    // profiles.tutorial_status.last_seen_referral_point_id로 "이미 본 것" 추적 (업적/투표 확인 로직과 동일 패턴)
+    checkUnseenReferralBonuses: async () => {
+        if (!Boako.state.user || !Boako.db) return;
+        try {
+            const { data: profile } = await Boako.db.from('profiles')
+                .select('tutorial_status')
+                .eq('id', Boako.state.user.id)
+                .single();
+            const lastSeenId = profile?.tutorial_status?.last_seen_referral_point_id || 0;
+
+            const { data: rows } = await Boako.db
+                .from('point_history')
+                .select('*')
+                .eq('user_id', Boako.state.user.id)
+                .like('description', '🎉 친구 추천 보상%')
+                .gt('id', lastSeenId)
+                .order('id', { ascending: true });
+
+            if (!rows || rows.length === 0) return;
+
+            rows.forEach(row => Boako.Util.toast(`${row.description} +${row.point_change}P`));
+            await Boako.Auth.markReferralBonusSeen(rows[rows.length - 1].id);
+        } catch (e) {
+            console.error('미확인 친구 초대 보상 체크 실패:', e);
+        }
+    },
+
+    markReferralBonusSeen: async (pointHistoryId) => {
+        if (!Boako.state.user) return;
+        try {
+            const { data: profile } = await Boako.db.from('profiles')
+                .select('tutorial_status')
+                .eq('id', Boako.state.user.id)
+                .single();
+            let status = profile?.tutorial_status || {};
+            status.last_seen_referral_point_id = pointHistoryId;
+            await Boako.db.from('profiles').update({ tutorial_status: status }).eq('id', Boako.state.user.id);
+        } catch (e) {
+            console.error('친구 초대 보상 확인 상태 저장 실패:', e);
+        }
+    },
+
+    // 🌟 [신규] 로그인 박스의 "내 초대 링크" 버튼 클릭 시 — 링크를 클립보드로 복사
+    copyReferralLink: async () => {
+        if (!Boako.state.user) return;
+        const link = `${window.location.origin}${window.location.pathname}?ref=${Boako.state.user.id}`;
+        try {
+            await navigator.clipboard.writeText(link);
+            Boako.Util.toast('초대 링크가 복사됐어요! 친구에게 공유해보세요 🎉');
+        } catch (e) {
+            console.error('초대 링크 복사 실패:', e);
+            Boako.Util.toast('복사에 실패했어요. 다시 시도해주세요.');
+        }
+    },
+
+
     saveKakaoToken: async (session) => {
         if (!session?.provider_token) return;
         try {
@@ -275,7 +416,9 @@ Boako.Auth = {
             </div>
             
             ${membershipBadgeHtml}
-            
+
+            <button class="btn-referral" onclick="Boako.Auth.copyReferralLink()" style="width:100%; margin-top:10px; padding:9px; border-radius:8px; border:1px dashed #fbbf24; background:#fffbeb; color:#92400e; font-size:12px; font-weight:800; cursor:pointer;">🎁 내 초대 링크 복사 (친구 기록하면 100P)</button>
+
             <div id="widget-badge-area" style="margin-top: 12px; min-height: 28px; display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;">
                 </div>
 
