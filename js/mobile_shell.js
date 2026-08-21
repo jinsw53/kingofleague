@@ -12,6 +12,11 @@
  * 🌟 [명칭 정정] 하단 탭/더보기 시트의 항목 라벨을 PC 상단 메뉴바(index.html #boako-main-nav-bar)와
  *    완전히 통일 — 처음에 "팀"이라는 이름을 임의로 붙였던 걸 PC의 실제 메뉴명("🏆 랭킹")으로 수정,
  *    더보기 시트도 PC 나머지 메뉴 항목을 라벨/순서 그대로(임의 작명 없이) 채움.
+ * 🌟 [신규] 더보기 버튼/개별 시트 항목에 알림 배지 — PC의 checkTogetherBadge/checkBoardRequestBadge와
+ *    동일한 조회 로직 재사용. "더보기" 안에 숨은 항목에 뭔가 있으면 더보기 버튼 자체에 점을 찍어서
+ *    열어보도록 유도(집계 점) + 시트를 열면 각 항목 옆에 실제 숫자 표시. realtime 구독으로 항상 최신 유지.
+ *    팀챗 안읽음은 PC에서도 세션 중 증가하는 방식(DB 단순 COUNT 불가)이라 아직 집계에 안 넣음 —
+ *    팀챗 화면을 모바일로 포팅할 때 실시간 구독과 함께 추가 예정.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -32,6 +37,11 @@ Boako.MobileShell = {
         Boako.MobileShell.bindTabBar();
         await Boako.MobileShell.renderDrawer();
         Boako.MobileShell.renderSheet();
+
+        // 🌟 [신규] "더보기" 안에 숨은 항목 중 알림이 있으면, 더보기 버튼 자체에 점을 찍어서
+        // 클릭을 유도. PC의 checkTogetherBadge/checkBoardRequestBadge와 동일한 조회 로직 재사용.
+        Boako.MobileShell.refreshMoreBadge();
+        Boako.MobileShell.subscribeMoreBadge();
 
         // 로그인 상태 변화(로그아웃 등)에도 드로어 내용이 갱신되도록
         Boako.db.auth.onAuthStateChange(async (e, s) => {
@@ -173,23 +183,74 @@ Boako.MobileShell = {
     // 🌟 [수정] PC 상단 메뉴바(index.html #boako-main-nav-bar)의 나머지 항목을 라벨/순서 그대로 반영.
     // (하단 탭바에 이미 있는 소식지/토너먼트/랭킹만 제외) — 임의로 이름 짓지 않고 PC와 완전히 통일.
     // 관리자 전용(검수센터)/팀장 전용(기록 인증) 메뉴는 권한 체크 로직을 아직 안 붙여서 우선 제외.
+    // 🌟 [신규] 같이 하자/게시판 항목에 PC와 동일한 배지 숫자(moreBadgeCounts)를 같이 표시.
     renderSheet: () => {
         const wrap = document.getElementById('mobile-sheet-content');
         if (!wrap) return;
+        const c = Boako.MobileShell.moreBadgeCounts;
+        const badge = (n) => n > 0 ? `<span style="background:#ef4444; color:#fff; font-size:11px; font-weight:900; min-width:18px; height:18px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; padding:0 5px;">${n}</span>` : '';
         wrap.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:2px;">
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚡ 라이벌 매치</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚔️ 대항전</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">🎯 리그 콘텐츠</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 전적기록</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🤝 같이 하자</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
+                    <span>🤝 같이 하자</span>${badge(c.together)}
+                </div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">🛡️ 팀 창단</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">👥 팀 목록</div>
                 <div onclick="window.open('https://cafe.naver.com/boardgamearena', '_blank')" style="padding:12px 4px; font-size:14px; font-weight:700;">☕ 카페</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">📝 게시판</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
+                    <span>📝 게시판</span>${badge(c.boardRequest)}
+                </div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">🛒 포인트 샵</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">📅 일정표</div>
             </div>
         `;
+    },
+
+    // ========== 🌟 [신규] "더보기" 안에 숨은 항목의 알림 집계 (더보기 버튼 자체에 점 찍기) ==========
+    // PC auth.js의 checkTogetherBadge/checkBoardRequestBadge와 완전히 동일한 조회 로직 재사용,
+    // 마크업(개별 시트 행 배지 + 더보기 버튼 점)만 모바일 전용으로 새로 그림.
+    // 🌟 팀챗 안읽음은 PC에서도 realtime 세션 중 증가하는 방식(DB로 단순 COUNT 불가)이라
+    // 아직 여기 집계에 안 넣음 — 팀챗 화면을 모바일로 포팅할 때 실시간 구독과 함께 추가 예정.
+    moreBadgeCounts: { together: 0, boardRequest: 0 },
+
+    refreshMoreBadge: async () => {
+        try {
+            const { count } = await Boako.db.from('together_posts')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'RECRUITING')
+                .gt('scheduled_date', new Date().toISOString());
+            Boako.MobileShell.moreBadgeCounts.together = count || 0;
+        } catch (e) { console.error('같이하자 배지 조회 실패:', e); }
+
+        try {
+            const { data: posts } = await Boako.db.from('board_posts')
+                .select('id').eq('category', '요청').eq('is_deleted', false).eq('is_draft', false);
+            const postIds = (posts || []).map(p => p.id);
+            let unanswered = 0;
+            if (postIds.length > 0) {
+                const { data: comments } = await Boako.db.from('board_comments')
+                    .select('post_id').eq('is_deleted', false).in('post_id', postIds);
+                const answeredIds = new Set((comments || []).map(c => c.post_id));
+                unanswered = postIds.filter(id => !answeredIds.has(id)).length;
+            }
+            Boako.MobileShell.moreBadgeCounts.boardRequest = unanswered;
+        } catch (e) { console.error('게시판 요청 배지 조회 실패:', e); }
+
+        const total = Boako.MobileShell.moreBadgeCounts.together + Boako.MobileShell.moreBadgeCounts.boardRequest;
+        const dot = document.getElementById('mobile-more-dot');
+        if (dot) dot.classList.toggle('hidden', total === 0);
+    },
+
+    subscribeMoreBadge: () => {
+        if (Boako.MobileShell._moreBadgeChannel) return; // 중복 구독 방지
+        Boako.MobileShell._moreBadgeChannel = Boako.db.channel('mobile-more-badge-global')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.MobileShell.refreshMoreBadge())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => Boako.MobileShell.refreshMoreBadge())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => Boako.MobileShell.refreshMoreBadge())
+            .subscribe();
     }
 };
