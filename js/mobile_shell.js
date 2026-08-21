@@ -7,6 +7,8 @@
  *    프로필/안읽은쪽지 조회만 독립적으로 수행함. PC 전용 온보딩 모달(닉네임/공지사항/시즌스플래시/
  *    활성화오버레이 등)은 화면별 포팅 단계에서 모바일에 맞게 하나씩 다시 붙일 예정 — 지금 단계에서
  *    그대로 부르면 PC 전용 DOM(#login-widget-area 등)이 없어서 에러가 남.
+ * 🌟 [2단계: 화면별 포팅 시작] team 탭에 실제 화면(mobile_team.js) 연결. 더보기 시트를
+ *    다른 화면(시즌 선택 등)이 재사용할 수 있도록 openMoreSheet/openCustomSheet 추가.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -47,10 +49,19 @@ Boako.MobileShell = {
     switchTab: (tab) => {
         Boako.MobileShell.activeTab = tab;
         Boako.MobileShell.updateTabBarStyle();
-        // 🌟 [2단계 예정] 여기서 js/mobile_newsfeed.js, js/mobile_tournament.js, js/mobile_team.js
-        // 같은 화면별 렌더 함수를 불러오게 될 자리. 1단계 뼈대 테스트에선 placeholder 텍스트만 교체.
         const area = document.getElementById('mobile-content-area');
-        if (area) area.innerText = `"${tab}" 탭 선택됨 (화면 포팅 예정)`;
+        if (!area) return;
+
+        // 🌟 [2단계: 화면별 포팅] team 탭부터 실제 화면 연결. 나머지는 아직 placeholder.
+        if (tab === 'team') {
+            (async () => {
+                area.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
+                if (!Boako.MobileTeam) await Boako.Util.loadScript('/js/mobile_team.js');
+                Boako.MobileTeam.render(area);
+            })();
+        } else {
+            area.innerText = `"${tab}" 탭 선택됨 (화면 포팅 예정)`;
+        }
     },
 
     updateTabBarStyle: () => {
@@ -68,6 +79,19 @@ Boako.MobileShell = {
     openSheet: () => {
         document.getElementById('mobile-sheet').style.transform = 'translateY(0)';
         Boako.MobileShell._showDim();
+    },
+    // 🌟 [신규] 하단 탭바 "더보기" 전용 — 다른 화면(예: mobile_team.js 시즌 선택)이 같은 시트 껍데기를
+    // 빌려 쓴 뒤 남겨둔 내용이 있을 수 있으므로, 열기 전에 항상 기본 메뉴로 다시 그림
+    openMoreSheet: () => {
+        Boako.MobileShell.renderSheet();
+        Boako.MobileShell.openSheet();
+    },
+    // 🌟 [신규] 화면별 포팅 단계에서 시트 컴포넌트를 재사용하기 위한 범용 열기 함수
+    // (예: mobile_team.js의 시즌 선택 목록). 별도 UI를 새로 안 만들고 이 시트 껍데기를 빌려 씀.
+    openCustomSheet: (html) => {
+        const wrap = document.getElementById('mobile-sheet-content');
+        if (wrap) wrap.innerHTML = html;
+        Boako.MobileShell.openSheet();
     },
     closeAll: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(100%)';
