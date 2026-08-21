@@ -22,6 +22,14 @@
  *    열어보도록 유도(집계 점) + 시트를 열면 각 항목 옆에 실제 숫자 표시. realtime 구독으로 항상 최신 유지.
  *    팀챗 안읽음은 PC에서도 세션 중 증가하는 방식(DB 단순 COUNT 불가)이라 아직 집계에 안 넣음 —
  *    팀챗 화면을 모바일로 포팅할 때 실시간 구독과 함께 추가 예정.
+ * 🌟 [신규] 친구 초대 링크 적용 — captureReferralParam()/applyPendingReferral()이 이 파일 자체엔
+ *    없었고 auth.js에만 정의돼있어서 로드는 되지만 아무도 안 부르고 있었음(초대 링크로 모바일에서
+ *    가입해도 추천인 연결이 안 됐던 문제). 두 함수 다 DOM 의존이 없어 그대로 재사용해서 init()/
+ *    onAuthStateChange 양쪽에서 호출하도록 추가.
+ * 🌟 [신규] BGA 닉네임 설정 — PC의 requireBgaNickname()/saveInitialNick()은 마지막에
+ *    Boako.Auth.renderWidget()을 불러 PC 전용 DOM(#login-widget-area)에서 에러가 나므로 그대로
+ *    재사용 불가. 같은 조회/저장 로직(profiles.is_nick_changed, full_name)을 유지하되 화면은
+ *    모바일 원칙대로 중앙 모달 대신 풀스크린 시트로 새로 작성.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -29,6 +37,11 @@ Boako.MobileShell = {
     activeTab: 'feed',
 
     init: async () => {
+        // 🌟 [신규] 친구 초대 링크(?ref=추천인id) 캡처 — PC auth.js와 동일하게, Boako.db 생성보다도
+        // 먼저(로그인 여부 무관하게) 실행돼야 함. Boako.Auth.captureReferralParam은 DOM 의존이
+        // 전혀 없어(localStorage만 다룸) 그대로 재사용 가능.
+        Boako.Auth.captureReferralParam();
+
         // core.js가 Boako.db를 만들지 않으므로(원래 auth.js의 init 초반부가 하던 일) 여기서 직접 생성
         if (!Boako.db) {
             Boako.db = supabase.createClient(Boako.config.url, Boako.config.key);
@@ -47,6 +60,15 @@ Boako.MobileShell = {
         if (Boako.state.user) {
             if (!Boako.Team.syncStatus) await Boako.Util.loadScript('/js/team.js');
             await Boako.Team.syncStatus();
+
+            // 🌟 [신규] 대기 중인 추천인이 있으면 적용(1회성, 이미 있으면 무시) —
+            // Boako.Auth.applyPendingReferral도 DOM 의존 없이 RPC만 부르므로 그대로 재사용.
+            await Boako.Auth.applyPendingReferral();
+
+            // 🌟 [신규] BGA 닉네임 미설정 유저는 기록이 영원히 매칭 안 되므로 최우선으로 확인.
+            // PC의 requireBgaNickname()/saveInitialNick()은 마지막에 Boako.Auth.renderWidget()을
+            // 불러 PC 전용 DOM(#login-widget-area)에서 에러가 나서, 모바일 전용으로 새로 작성.
+            await Boako.MobileShell.requireBgaNickname();
         }
 
         Boako.MobileShell.bindTabBar();
@@ -65,11 +87,75 @@ Boako.MobileShell = {
             if (Boako.state.user) {
                 if (!Boako.Team.syncStatus) await Boako.Util.loadScript('/js/team.js');
                 await Boako.Team.syncStatus();
+                await Boako.Auth.applyPendingReferral();
+                await Boako.MobileShell.requireBgaNickname();
             } else {
                 Boako.state.team = null;
             }
             await Boako.MobileShell.renderDrawer();
         });
+    },
+
+    // ========== 🌟 [신규] BGA 닉네임 설정 (PC requireBgaNickname/saveInitialNick과 동일 로직,
+    // 모달 대신 모바일 원칙에 따라 풀스크린 시트로 새로 작성) ==========
+    requireBgaNickname: async () => {
+        if (document.getElementById('mobile-nick-modal')) return;
+
+        try {
+            const { data: profile } = await Boako.db.from('profiles')
+                .select('is_nick_changed')
+                .eq('id', Boako.state.user.id)
+                .single();
+            if (profile && profile.is_nick_changed === 1) return; // 이미 설정한 유저 — 다시 안 띄움
+        } catch (e) {
+            console.error('닉네임 변경 여부 확인 실패:', e);
+            return; // 확인 자체가 실패하면 억지로 안 띄움 (PC와 달리 재시도 없이 조용히 넘어감)
+        }
+
+        const modalHtml = `
+            <div id="mobile-nick-modal" style="position:fixed; inset:0; z-index:9999; background:#fff; display:flex; flex-direction:column; padding:24px 20px; padding-top:calc(24px + env(safe-area-inset-top));">
+                <div style="text-align:center; margin-top:24px;">
+                    <div style="font-size:40px; margin-bottom:10px;">🎮</div>
+                    <div style="font-size:18px; font-weight:900; color:#1e293b;">BGA 닉네임 설정</div>
+                    <div style="font-size:12px; color:#94a3b8; font-weight:700; margin-top:6px;">리그 기록 연동을 위해 꼭 필요해요!</div>
+                </div>
+                <div style="margin-top:28px;">
+                    <div style="font-size:12.5px; color:#64748b; font-weight:700; text-align:center; line-height:1.6; margin-bottom:14px;">
+                        보드게임 아레나에서 사용 중인<br><span style="color:#ef4444;">정확한 닉네임</span>을 입력해주세요.
+                    </div>
+                    <a href="https://boardgamearena.com/" target="_blank" rel="noopener" style="display:block; text-align:center; font-size:12px; font-weight:900; color:#4f46e5; margin-bottom:16px;">BGA에서 내 닉네임 확인하러 가기 →</a>
+                    <input type="text" id="mobile-nick-input" value="${Boako.state.user.nickname || ''}" placeholder="대소문자 구별하여 정확히 입력" style="width:100%; border:2px solid #e2e8f0; border-radius:12px; padding:14px; text-align:center; font-weight:900; font-size:16px; color:#1e293b;">
+                </div>
+                <div style="flex:1;"></div>
+                <button onclick="Boako.MobileShell.saveInitialNick()" style="width:100%; background:#1e293b; color:#fff; font-weight:900; font-size:14px; padding:15px; border-radius:12px;">확인 및 설정 완료</button>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    saveInitialNick: async () => {
+        const inputEl = document.getElementById('mobile-nick-input');
+        const newValue = inputEl.value.trim();
+        if (!newValue) {
+            Boako.Util.toast('닉네임을 입력해 주세요!');
+            inputEl.focus();
+            return;
+        }
+
+        try {
+            const { error } = await Boako.db.from('profiles').update({
+                full_name: newValue,
+                is_nick_changed: 1
+            }).eq('id', Boako.state.user.id);
+            if (error) throw new Error(error.message);
+
+            Boako.state.user.nickname = newValue;
+            document.getElementById('mobile-nick-modal')?.remove();
+            await Boako.MobileShell.renderDrawer(); // 🌟 PC의 renderWidget() 대신 모바일 드로어 갱신
+            Boako.Util.toast('🎉 BGA 닉네임이 완벽하게 연동되었습니다!');
+        } catch (e) {
+            Boako.Util.toast('수정 실패: ' + e.message);
+        }
     },
 
     // ========== 하단 탭바 ==========
