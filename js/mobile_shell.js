@@ -1,9 +1,9 @@
 /**
- * [MOBILE SHELL] 모바일 전용 공통 뾼대 — 하단 고정 탭바 + 아바타 드로어 + 더보기 시트
+ * [MOBILE SHELL] 모바일 전용 공통 뼈대 — 하단 고정 탭바 + 아바타 드로어 + 더보기 시트
  * 🌟 [신규] PC index.html의 로그인 박스(auth.js renderWidget)를 그대로 재사용하지 않고,
  *    "데이터 조회 로직은 동일하게, 화면 마크업만 모바일 전용으로 새로 작성"하는 원칙으로 만듦.
  *    Boako.db/Boako.state는 core.js를 그대로 공유하므로 PC와 로그인 세션이 완전히 동일하게 유지됨.
- * 🌟 [1단계: 뾼대 테스트] 지금은 Boako.Auth.init() 전체를 부르지 않고, 세션 확인 + 최소한의
+ * 🌟 [1단계: 뼈대 테스트] 지금은 Boako.Auth.init() 전체를 부르지 않고, 세션 확인 + 최소한의
  *    프로필/안읽은쪽지 조회만 독립적으로 수행함. PC 전용 온보딩 모달(닉네임/공지사항/시즌스플래시/
  *    활성화오버레이 등)은 화면별 포팅 단계에서 모바일에 맞게 하나씩 다시 붙일 예정 — 지금 단계에서
  *    그대로 부르면 PC 전용 DOM(#login-widget-area 등)이 없어서 에러가 남.
@@ -48,7 +48,7 @@ Boako.MobileShell = {
         Boako.MobileShell.activeTab = tab;
         Boako.MobileShell.updateTabBarStyle();
         // 🌟 [2단계 예정] 여기서 js/mobile_newsfeed.js, js/mobile_tournament.js, js/mobile_team.js
-        // 같은 화면별 렌더 함수를 불러오게 될 자리. 1단계 뾼대 테스트에선 placeholder 텍스트만 교체.
+        // 같은 화면별 렌더 함수를 불러오게 될 자리. 1단계 뼈대 테스트에선 placeholder 텍스트만 교체.
         const area = document.getElementById('mobile-content-area');
         if (area) area.innerText = `"${tab}" 탭 선택됨 (화면 포팅 예정)`;
     },
@@ -115,7 +115,7 @@ Boako.MobileShell = {
         const kakaoAvatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://') || null;
         const displayAvatarUrl = customAvatarUrl || kakaoAvatarUrl;
 
-        // 상단바의 알림 점(unread 백지)도 같이 갱신
+        // 상단바의 알림 점(unread 뱃지)도 같이 갱신
         const dot = document.getElementById('mobile-avatar-dot');
         if (dot) dot.classList.toggle('hidden', unreadCount === 0);
 
