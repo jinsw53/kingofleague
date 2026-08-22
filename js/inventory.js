@@ -12,6 +12,9 @@
  *    (시즌 로고/게임 로고 합성, 정사각형 강제 없이 배경 원본 비율 유지)
  * 6. 🌟 [전체 배지 통일] 일반 아이템 아이콘/서포터즈 유니폼 배지도 정사각형·원형 강제 없이
  *    높이만 고정하고 폭은 원본 비율 그대로(auto) — 업적 배지와 동일한 원칙 적용
+ * 7. 🌟 [버그수정] 만료된 서포터즈 배지가 "장착하기" 버튼을 눌러 그대로 장착되던 문제 —
+ *    화면에는 "만료됨" 표시만 하고 실제 클릭은 막지 않고 있었음. 만료된 서포터즈는 버튼 자체를
+ *    비활성화하고, useItem() 안에서도 DB의 최신 expires_at을 다시 확인해서 이중으로 차단.
  */
 
 Boako.Inventory = {
@@ -276,10 +279,12 @@ Boako.Inventory = {
                             ${item.name}
                         </div>
                         ${expiryLabel}
-                        <button style="width:100%; padding:9px; font-size:12px; font-weight:800; background:${item.isSupporter ? '#8b5cf6' : (item.type === 'BADGE' ? '#10b981' : '#f59e0b')}; color:white; border:none; border-radius:8px; cursor:pointer;"
+                        ${item.isSupporter && item.isExpired
+                            ? `<button disabled style="width:100%; padding:9px; font-size:12px; font-weight:800; background:#e2e8f0; color:#94a3b8; border:none; border-radius:8px; cursor:not-allowed;">만료됨</button>`
+                            : `<button style="width:100%; padding:9px; font-size:12px; font-weight:800; background:${item.isSupporter ? '#8b5cf6' : (item.type === 'BADGE' ? '#10b981' : '#f59e0b')}; color:white; border:none; border-radius:8px; cursor:pointer;"
                                 onclick="Boako.Inventory.useItem('${item.inv_id}', '${item.type}')">
                             ${item.isSupporter || item.type === 'BADGE' ? '장착하기' : '사용하기'}
-                        </button>
+                        </button>`}
                     </div>
                 `}).join('');
                 bagHTML += `</div>`;
@@ -299,6 +304,21 @@ Boako.Inventory = {
         if (itemType !== 'BADGE' && itemType !== 'SUPPORTER') {
             alert("소모성 아이템은 현재 사용할 수 없습니다.");
             return;
+        }
+
+        // 🌟 [버그수정] 만료된 서포터즈 배지가 그대로 장착되던 문제 — 화면 목록은 로드 시점 스냅샷이라
+        // 오래 열어두면 그 사이 만료될 수 있으므로, 장착 직전에 DB에서 만료 시각을 다시 한번 확인.
+        if (itemType === 'SUPPORTER') {
+            try {
+                const { data: invRow } = await Boako.db.from('inventory').select('expires_at').eq('id', inventoryId).single();
+                if (invRow?.expires_at && new Date(invRow.expires_at) < new Date()) {
+                    alert("만료된 배지는 장착할 수 없습니다.");
+                    this.loadItems(); // 화면을 새로고침해서 만료 상태(비활성 버튼)를 반영
+                    return;
+                }
+            } catch (e) {
+                console.error('배지 만료 여부 재확인 실패:', e);
+            }
         }
 
         // 🌟 확인 창 띄우기
