@@ -25,6 +25,8 @@
  *    fn_award_referral_bonus() 트리거가 추천인에게 100P 지급(초대 인원 제한 없음). 알림은 확장과 달리
  *    빈도가 낮고 무게감도 가벼워 풀스크린 오버레이 대신 Boako.Util.toast()만 사용, 사이트 로그인 시에만 노출.
  *    사운드는 기록 인증(record_verify.js) 포인트 지급 토스트와 동일한 window.sfx.buy()로 통일.
+ * 🌟 [리팩토링] 초대보상 채널 + 토너먼트/게시판요청/같이하자 전역 배지 채널을 js/realtime_coordinator.js
+ *    탭 리더 선출 방식으로 전환 — 사이트를 여러 탭으로 띄워도 이 채널들이 탭 수만큼 소켓을 열지 않도록 함.
  */
 Boako.Auth = {
     init: async () => {
@@ -247,9 +249,21 @@ Boako.Auth = {
     // 발생 빈도가 낮고 중요도도 낮아서 풀스크린 오버레이 대신 가벼운 Boako.Util.toast()만 사용.
     _referralChannel: null,
 
-    startReferralRealtime: () => {
+    // 🌟 [리팩토링] 사이트를 여러 탭으로 띄워두면 탭마다 각자 이 채널을 구독해서 Realtime 동시연결
+    // 한도를 탭 수만큼 잡아먹는 문제 방지 — js/realtime_coordinator.js의 탭 리더 선출 패턴 적용.
+    // 채널 필터에 user_id가 들어가 있어(로그인 계정별) 로그아웃→재로그인(다른 계정) 시에도
+    // 올바른 필터로 재구독돼야 하므로, _subscribeReferralAsLeader()는 매번 재진입 허용.
+    async _onReferralBonusInsert(newRow) {
+        if (!String(newRow.description || '').startsWith('🎉 친구 추천 보상')) return;
+        if (window.sfx && window.sfx.buy) window.sfx.buy(); // 🌟 기록 인증 포인트 지급 토스트와 동일한 사운드로 통일
+        Boako.Util.toast(`${newRow.description} +${newRow.point_change}P`);
+        await Boako.Auth.markReferralBonusSeen(newRow.id);
+    },
+
+    _subscribeReferralAsLeader: () => {
+        if (!Boako.RealtimeCoordinator.isLeader()) return;
         if (!Boako.state.user || !Boako.db) return;
-        if (Boako.Auth._referralChannel) return; // 중복 구독 방지
+        if (Boako.Auth._referralChannel) return; // 이미 구독 중이면 중복 방지
 
         Boako.Auth._referralChannel = Boako.db
             .channel(`referral-bonus-${Boako.state.user.id}`)
@@ -258,13 +272,22 @@ Boako.Auth = {
                 schema: 'public',
                 table: 'point_history',
                 filter: `user_id=eq.${Boako.state.user.id}`
-            }, async (payload) => {
-                if (!String(payload.new.description || '').startsWith('🎉 친구 추천 보상')) return;
-                if (window.sfx && window.sfx.buy) window.sfx.buy(); // 🌟 기록 인증 포인트 지급 토스트와 동일한 사운드로 통일
-                Boako.Util.toast(`${payload.new.description} +${payload.new.point_change}P`);
-                await Boako.Auth.markReferralBonusSeen(payload.new.id);
+            }, (payload) => {
+                Boako.Auth._onReferralBonusInsert(payload.new);
+                Boako.RealtimeCoordinator.broadcast('auth:referral-bonus-insert', payload.new);
             })
             .subscribe();
+    },
+
+    startReferralRealtime: () => {
+        if (!Boako.state.user || !Boako.db) return;
+
+        if (!Boako.Auth._referralCoordinatorInited) {
+            Boako.Auth._referralCoordinatorInited = true;
+            Boako.RealtimeCoordinator.onRelay('auth:referral-bonus-insert', (p) => Boako.Auth._onReferralBonusInsert(p));
+            Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.Auth._subscribeReferralAsLeader());
+        }
+        Boako.Auth._subscribeReferralAsLeader();
     },
 
     stopReferralRealtime: () => {
@@ -747,11 +770,23 @@ Boako.Auth = {
         } catch (err) { console.error("토너먼트 배지 갱신 실패:", err); }
     },
 
+    // 🌟 [리팩토링] 로그인 여부와 무관하게 모든 탭에서 무조건 구독되던 전역 배지 채널 —
+    // 사이트를 여러 탭으로 띄워두면 탭마다 각자 소켓을 열게 되는 원인 중 하나였음.
+    // js/realtime_coordinator.js의 탭 리더 선출 패턴 적용, user 필터가 없어 재로그인과 무관하게
+    // 한 번만 등록하면 됨.
     subscribeTournamentBadge: function() {
-        if (Boako.Auth._tournamentBadgeChannel) return; // 중복 구독 방지
+        if (Boako.Auth._tournamentBadgeCoordinatorInited) return;
+        Boako.Auth._tournamentBadgeCoordinatorInited = true;
+        Boako.RealtimeCoordinator.onRelay('auth:tournament-badge-change', () => Boako.Auth.checkTournamentBadge());
+        Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.Auth._subscribeTournamentBadgeAsLeader());
+    },
+
+    _subscribeTournamentBadgeAsLeader: function() {
+        if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._tournamentBadgeChannel) return;
         Boako.Auth._tournamentBadgeChannel = Boako.db.channel('tournament-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
                 Boako.Auth.checkTournamentBadge();
+                Boako.RealtimeCoordinator.broadcast('auth:tournament-badge-change', null);
             })
             .subscribe();
     },
@@ -792,13 +827,22 @@ Boako.Auth = {
     },
 
     subscribeBoardRequestBadge: function() {
-        if (Boako.Auth._boardRequestBadgeChannel) return;
+        if (Boako.Auth._boardRequestBadgeCoordinatorInited) return;
+        Boako.Auth._boardRequestBadgeCoordinatorInited = true;
+        Boako.RealtimeCoordinator.onRelay('auth:board-request-badge-change', () => Boako.Auth.checkBoardRequestBadge());
+        Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.Auth._subscribeBoardRequestBadgeAsLeader());
+    },
+
+    _subscribeBoardRequestBadgeAsLeader: function() {
+        if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._boardRequestBadgeChannel) return;
         Boako.Auth._boardRequestBadgeChannel = Boako.db.channel('board-request-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
                 Boako.Auth.checkBoardRequestBadge();
+                Boako.RealtimeCoordinator.broadcast('auth:board-request-badge-change', null);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => {
                 Boako.Auth.checkBoardRequestBadge();
+                Boako.RealtimeCoordinator.broadcast('auth:board-request-badge-change', null);
             })
             .subscribe();
     },
@@ -822,10 +866,18 @@ Boako.Auth = {
     },
 
     subscribeTogetherBadge: function() {
-        if (Boako.Auth._togetherBadgeChannel) return; // 중복 구독 방지
+        if (Boako.Auth._togetherBadgeCoordinatorInited) return;
+        Boako.Auth._togetherBadgeCoordinatorInited = true;
+        Boako.RealtimeCoordinator.onRelay('auth:together-badge-change', () => Boako.Auth.checkTogetherBadge());
+        Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.Auth._subscribeTogetherBadgeAsLeader());
+    },
+
+    _subscribeTogetherBadgeAsLeader: function() {
+        if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._togetherBadgeChannel) return;
         Boako.Auth._togetherBadgeChannel = Boako.db.channel('together-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
                 Boako.Auth.checkTogetherBadge();
+                Boako.RealtimeCoordinator.broadcast('auth:together-badge-change', null);
             })
             .subscribe();
     },
