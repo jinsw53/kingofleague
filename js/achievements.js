@@ -11,6 +11,8 @@
  *    폭은 내용(배경 이미지/게임 로고/이모지)의 실제 비율에 맞춰 자동으로 늘어남.
  * 🌟 [수정] 알림 라벨에서 이모지 제거("업적 달성!"만 표시) + util.js의 sfx.achievementUnlock
  *    (업적 전용 4음 상승 아르페지오)로 사운드 교체. achievementUnlock이 없는 구버전 대비 success로 폴백.
+ * 🌟 [리팩토링] startRealtime()을 js/realtime_coordinator.js 탭 리더 선출 방식으로 전환 — 사이트를
+ *    여러 탭으로 띄워도 Realtime 소켓은 리더 탭 1개만 유지하도록 함 (자세한 설명은 아래 주석 참고).
  */
 Boako.Achievements = {
     channel: null,
@@ -38,7 +40,31 @@ Boako.Achievements = {
         return { bg: 'linear-gradient(135deg,#8b5cf6,#4f46e5)', ring: '#8b5cf6', label: null };
     },
 
-    startRealtime: () => {
+    // 🌟 [리팩토링] 사이트를 여러 탭으로 띄워두면 탭마다 각자 이 채널을 구독해서 Realtime 동시연결
+    // 한도를 탭 수만큼 잡아먹는 문제 방지 — js/realtime_coordinator.js의 탭 리더 선출 패턴 적용.
+    // 채널 필터에 user_id가 들어가 있어(로그인 계정별) 로그아웃→재로그인(다른 계정) 시에도
+    // 올바른 필터로 재구독돼야 하므로, _subscribeAsLeader()는 매번 startRealtime() 호출 시
+    // (그리고 로그아웃 시 stopRealtime()으로 channel을 비운 뒤) 다시 실행 가능하도록 재진입 허용.
+    async _onInsert(newRow) {
+        try {
+            const { data: achievement } = await Boako.db
+                .from('achievements')
+                .select('*')
+                .eq('id', newRow.achievement_id)
+                .single();
+            if (achievement) {
+                Boako.Achievements.enqueueOverlay(achievement, newRow.meta, newRow.season_no, newRow.id);
+                // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
+                await Boako.Achievements.markConfirmed([newRow.id]);
+            }
+        } catch (e) {
+            console.error('업적 알림 표시 실패:', e);
+        }
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeAsLeader: () => {
+        if (!Boako.RealtimeCoordinator.isLeader()) return;
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.Achievements.channel) return; // 이미 구독 중이면 중복 방지
 
@@ -49,23 +75,25 @@ Boako.Achievements = {
                 schema: 'public',
                 table: 'user_achievements',
                 filter: `user_id=eq.${Boako.state.user.id}`
-            }, async (payload) => {
-                try {
-                    const { data: achievement } = await Boako.db
-                        .from('achievements')
-                        .select('*')
-                        .eq('id', payload.new.achievement_id)
-                        .single();
-                    if (achievement) {
-                        Boako.Achievements.enqueueOverlay(achievement, payload.new.meta, payload.new.season_no, payload.new.id);
-                        // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
-                        await Boako.Achievements.markConfirmed([payload.new.id]);
-                    }
-                } catch (e) {
-                    console.error('업적 알림 표시 실패:', e);
-                }
+            }, (payload) => {
+                Boako.Achievements._onInsert(payload.new);
+                Boako.RealtimeCoordinator.broadcast('achievements:insert', payload.new);
             })
             .subscribe();
+    },
+
+    startRealtime: () => {
+        if (!Boako.state.user || !Boako.db) return;
+
+        // 🌟 팔로워 탭(및 리더 자신 아닌 중계 경로)에서 받은 이벤트도 동일한 반응 함수로 처리 —
+        // 여러 로그인 세션에 걸쳐 중복 등록되지 않도록 최초 1회만 등록
+        if (!Boako.Achievements._coordinatorInited) {
+            Boako.Achievements._coordinatorInited = true;
+            Boako.RealtimeCoordinator.onRelay('achievements:insert', (p) => Boako.Achievements._onInsert(p));
+            Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.Achievements._subscribeAsLeader());
+        }
+        // 🌟 이미 리더인 탭에서 로그인/재로그인(다른 계정) 시에도 새 필터로 즉시 재구독 시도
+        Boako.Achievements._subscribeAsLeader();
     },
 
     // 🌟 [신규] 오프라인 중에 획득한 업적(=접속 안 했을 때 트리거로 지급된 것)을 로그인 시점에 체크해서 놓치지 않고 보여줌.
