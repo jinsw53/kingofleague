@@ -16,7 +16,13 @@
          방식으로 리팩토링되며 Boako.RealtimeCoordinator를 참조하게 됐는데, 모바일 진입점엔
          js/realtime_coordinator.js가 로드되지 않아 로그인 시 "Cannot read properties of
          undefined (reading 'onRelay')"로 멈추던 문제 — PC index.html과 동일하게 core.js 직후에
-         추가. -->
+         추가.
+         🌟 [버그수정] #mobile-content-area에 display:flex(기본 row 방향)가 걸려있어서, 화면
+         렌더러(mobile_tournament.js/mobile_team.js 등)가 innerHTML로 여러 최상위 형제 요소
+         (탭바/버튼/목록 div 등)를 한꺼번에 주입하면 세로로 쌓이지 않고 가로로 눌려 배치되는
+         문제 — 예: 토너먼트 화면의 "공지하기" 버튼이 좁게 눌려 화면 왼쪽에 삐져나와 보임.
+         이 컨테이너는 정상적인 블록(세로 쌓임) 레이아웃으로 되돌리고, flex 중앙정렬이 필요했던
+         건 로딩 전 placeholder 텍스트 하나뿐이라 그 부분만 별도 div로 감싸 처리. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -57,8 +63,8 @@
     </header>
 
     <!-- 본문: 이후 화면별 포팅 시 js/mobile_*.js가 여기 그림 -->
-    <main id="mobile-content-area" style="padding:16px; min-height:60vh; display:flex; align-items:center; justify-content:center; color:var(--text-sub); font-weight:700; font-size:13px;">
-        뼈대 테스트 중 — 본문 영역
+    <main id="mobile-content-area" style="padding:16px; min-height:60vh;">
+        <div style="display:flex; align-items:center; justify-content:center; min-height:60vh; color:var(--text-sub); font-weight:700; font-size:13px;">뼈대 테스트 중 — 본문 영역</div>
     </main>
 
     <!-- 어둡게 깔리는 배경 (드로어/시트 열렸을 때) -->
