@@ -27,6 +27,7 @@
  *    사운드는 기록 인증(record_verify.js) 포인트 지급 토스트와 동일한 window.sfx.buy()로 통일.
  * 🌟 [리팩토링] 초대보상 채널 + 토너먼트/게시판요청/같이하자 전역 배지 채널을 js/realtime_coordinator.js
  *    탭 리더 선출 방식으로 전환 — 사이트를 여러 탭으로 띄워도 이 채널들이 탭 수만큼 소켓을 열지 않도록 함.
+ * 🌟 [오타수정] 초대 링크 버튼 문구 "친구 기록하면" → "친구가 기록하면"
  */
 Boako.Auth = {
     init: async () => {
@@ -443,7 +444,7 @@ Boako.Auth = {
             
             ${membershipBadgeHtml}
 
-            <button class="btn-referral" onclick="Boako.Auth.copyReferralLink()" style="width:100%; margin-top:10px; padding:9px; border-radius:8px; border:1px dashed #fbbf24; background:#fffbeb; color:#92400e; font-size:12px; font-weight:800; cursor:pointer;">🎁 내 초대 링크 복사 (친구 기록하면 100P)</button>
+            <button class="btn-referral" onclick="Boako.Auth.copyReferralLink()" style="width:100%; margin-top:10px; padding:9px; border-radius:8px; border:1px dashed #fbbf24; background:#fffbeb; color:#92400e; font-size:12px; font-weight:800; cursor:pointer;">🎁 내 초대 링크 복사 (친구가 기록하면 100P)</button>
 
             <div id="widget-badge-area" style="margin-top: 12px; min-height: 28px; display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;">
                 </div>
