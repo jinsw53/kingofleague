@@ -11,7 +11,12 @@
          🌟 이 페이지가 /mobile/ 하위에 있으므로 절대경로(/js/...)로 로드해야 함.
          🌟 [버그수정] 상단바 아바타가 항상 👤 고정 이모지였던 문제 — 드로어와 같은 데이터(커스텀
          프사/카카오 프사)로 함께 갱신되도록 img 요소 추가 (mobile_shell.js renderDrawer 참고).
-         🌟 [버그수정] 가로 스크롤이 생기던 문제 — html/body에 overflow-x:hidden 전역 적용. -->
+         🌟 [버그수정] 가로 스크롤이 생기던 문제 — html/body에 overflow-x:hidden 전역 적용.
+         🌟 [버그수정] achievements.js/rival_notify.js/recommend_notify.js/auth.js가 탭 리더 선출
+         방식으로 리팩토링되며 Boako.RealtimeCoordinator를 참조하게 됐는데, 모바일 진입점엔
+         js/realtime_coordinator.js가 로드되지 않아 로그인 시 "Cannot read properties of
+         undefined (reading 'onRelay')"로 멈추던 문제 — PC index.html과 동일하게 core.js 직후에
+         추가. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -95,6 +100,7 @@
       mobile_shell.js/mobile_main.js/mobile_team.js만 모바일 전용 신규 파일.
     -->
     <script src="/js/core.js"></script>
+    <script src="/js/realtime_coordinator.js"></script>
     <script src="/js/util.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/mobile_shell.js"></script>
