@@ -5,11 +5,31 @@
  *    그 아래 내 예측 결과(적중/미적중 + 받은 포인트), 하단 "확인" 버튼으로만 닫힘(배경 클릭 닫힘 없음).
  *    포인트 지급 자체는 DB(complete_rival_match)가 원자적으로 처리하므로, 이 모듈은 순수 "알림 표시"만 담당.
  *    여러 개가 한꺼번에 뜰 수 있어서(오프라인 중 결과가 나온 경우 등) 큐로 순서대로 하나씩 보여줌.
+ * 🌟 [리팩토링] startRealtime()을 js/realtime_coordinator.js 탭 리더 선출 방식으로 전환.
  */
 Boako.RivalNotify = {
     channel: null,
 
-    startRealtime: () => {
+    // 🌟 [리팩토링] 사이트를 여러 탭으로 띄워두면 탭마다 각자 이 채널을 구독해서 Realtime 동시연결
+    // 한도를 탭 수만큼 잡아먹는 문제 방지 — js/realtime_coordinator.js의 탭 리더 선출 패턴 적용.
+    // 채널 필터에 voter_id(user_id)가 들어가 있어(로그인 계정별) 로그아웃→재로그인(다른 계정) 시에도
+    // 올바른 필터로 재구독돼야 하므로, _subscribeAsLeader()는 startRealtime() 호출마다 재진입 허용.
+    // 🌟 UPDATE 이벤트의 payload.old/payload.new 비교(resolved_at이 이번에 새로 채워졌는지)는
+    // 리더 탭의 원본 콜백에서만 가능하므로(팔로워는 old를 못 받음), 필터링을 리더 쪽에서 미리 끝내고
+    // 통과한 payload.new만 중계/로컬반응 함수로 넘김.
+    async _onResolved(newRow) {
+        try {
+            Boako.RivalNotify.enqueueOverlay(newRow);
+            // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
+            await Boako.RivalNotify.markConfirmed([newRow.id]);
+        } catch (e) {
+            console.error('라이벌전 투표 결과 알림 표시 실패:', e);
+        }
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeAsLeader: () => {
+        if (!Boako.RealtimeCoordinator.isLeader()) return;
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.RivalNotify.channel) return; // 이미 구독 중이면 중복 방지
 
@@ -20,19 +40,27 @@ Boako.RivalNotify = {
                 schema: 'public',
                 table: 'rival_match_votes',
                 filter: `voter_id=eq.${Boako.state.user.id}`
-            }, async (payload) => {
-                try {
-                    // resolved_at이 이번에 새로 채워진 경우만(=방금 결과가 확정된 경우만) 알림
-                    if (!payload.new.resolved_at || payload.old.resolved_at) return;
-
-                    Boako.RivalNotify.enqueueOverlay(payload.new);
-                    // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
-                    await Boako.RivalNotify.markConfirmed([payload.new.id]);
-                } catch (e) {
-                    console.error('라이벌전 투표 결과 알림 표시 실패:', e);
-                }
+            }, (payload) => {
+                // resolved_at이 이번에 새로 채워진 경우만(=방금 결과가 확정된 경우만) 알림
+                if (!payload.new.resolved_at || payload.old.resolved_at) return;
+                Boako.RivalNotify._onResolved(payload.new);
+                Boako.RealtimeCoordinator.broadcast('rival-notify:resolved', payload.new);
             })
             .subscribe();
+    },
+
+    startRealtime: () => {
+        if (!Boako.state.user || !Boako.db) return;
+
+        // 🌟 팔로워 탭(및 리더 자신 아닌 중계 경로)에서 받은 이벤트도 동일한 반응 함수로 처리 —
+        // 여러 로그인 세션에 걸쳐 중복 등록되지 않도록 최초 1회만 등록
+        if (!Boako.RivalNotify._coordinatorInited) {
+            Boako.RivalNotify._coordinatorInited = true;
+            Boako.RealtimeCoordinator.onRelay('rival-notify:resolved', (p) => Boako.RivalNotify._onResolved(p));
+            Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.RivalNotify._subscribeAsLeader());
+        }
+        // 🌟 이미 리더인 탭에서 로그인/재로그인(다른 계정) 시에도 새 필터로 즉시 재구독 시도
+        Boako.RivalNotify._subscribeAsLeader();
     },
 
     // 🌟 오프라인 중에 결과가 확정된 투표(=접속 안 했을 때 매치가 완료된 것)를 로그인 시점에 체크해서 놓치지 않고 보여줌.
