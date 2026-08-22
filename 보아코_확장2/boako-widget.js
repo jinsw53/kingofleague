@@ -68,6 +68,12 @@
  *    텍스트로만 보여서 확장에서 수락/거절/날짜선택 버튼을 아예 누를 수 없던 문제 — 사이트
  *    messenger.js와 동일한 카드+버튼을 그리고, 클릭은 handleThreadActionClick()이 위임 처리.
  *    inline onclick은 콘텐츠 스크립트 격리 세계에서 안 먹히므로 data-action 속성 + 이벤트 위임 사용.
+ * 🌟 [버그수정] _doConnect()가 새 소켓을 만들 때 이전 연결을 확실히 안 끊고 시작해서, 타이밍이
+ *    겹치면(끊김 감지+탭 재활성화 거의 동시 발생 등) 옛 소켓이 안 닫힌 채 새 소켓이 하나 더 생기는
+ *    경합이 발생 — 게다가 onClose가 "이 소켓이 지금 진짜 현재 연결인지" 확인 없이 무조건
+ *    State.realtimeClient를 비워서, 이미 새 연결로 교체된 뒤 뒤늦게 도착한 옛 소켓의 끊김 신호가
+ *    멀쩡한 새 연결까지 지워버리고 불필요한 재연결을 유발함 (Supabase Realtime 동시연결 폭증의 원인).
+ *    이전 연결을 명시적으로 disconnect() 후 시작하고, onClose에서 자기 자신의 소켓일 때만 정리하도록 수정.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -677,6 +683,12 @@
       return;
     }
 
+    // 🌟 [버그수정] 이전 연결을 확실히 끊고 시작 (경합 방지, Realtime 연결 폭증 원인)
+    if (State.realtimeClient) {
+      try { State.realtimeClient.disconnect(); } catch (e) { /* noop */ }
+      State.realtimeClient = null;
+    }
+
     const wsUrl = `${SUPABASE_URL.replace('https://', 'wss://')}/realtime/v1`;
     boakoLog('웹소켓 연결 시도:', wsUrl);
 
@@ -692,8 +704,11 @@
     });
     client.socketAdapter.onClose((e) => {
       boakoWarn('웹소켓 연결 종료됨:', e);
-      State.realtimeClient = null;
-      _scheduleReconnect();
+      // 🌟 [버그수정] 자기 자신의 소켓일 때만 정리 (새 연결로 교체된 뒤 뒤늦은 신호가 덮어쓰는 것 방지)
+      if (State.realtimeClient === client) {
+        State.realtimeClient = null;
+        _scheduleReconnect();
+      }
     });
     client.socketAdapter.onError((e) => boakoErr('웹소켓 연결 오류 발생 — BGA 페이지의 CSP가 Supabase 연결을 막고 있을 가능성이 있음. 개발자 도구 콘솔에 "Refused to connect" 또는 "violates the following Content Security Policy" 에러가 같이 떠 있는지 확인해보세요.', e));
 
