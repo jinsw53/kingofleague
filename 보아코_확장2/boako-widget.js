@@ -74,6 +74,12 @@
  *    State.realtimeClient를 비워서, 이미 새 연결로 교체된 뒤 뒤늦게 도착한 옛 소켓의 끊김 신호가
  *    멀쩡한 새 연결까지 지워버리고 불필요한 재연결을 유발함 (Supabase Realtime 동시연결 폭증의 원인).
  *    이전 연결을 명시적으로 disconnect() 후 시작하고, onClose에서 자기 자신의 소켓일 때만 정리하도록 수정.
+ * 🌟 [버그수정] 팀챗에서 나 말고 다른 팀원이 전부 "팀원"으로만 표기되던 문제 — fetchTeamChats()가
+ *    sender_id만 가져오고 이름을 안 가져오고 있었음. PC team.js Chat.init()과 동일하게 PostgREST
+ *    임베드(profiles(full_name))로 실제 발신자 이름을 조회해서 표시.
+ * 🌟 [버그수정] 위젯 아이콘의 안읽음 빨간 배지가 DM(State.unread)만 반영하고 팀챗 메시지는 무시하던
+ *    문제 — team_chats엔 읽음 여부 컬럼이 없어 별도 카운터(State.teamChatUnread)로 관리하고,
+ *    렌더링 시 두 카운터를 합산해서 표시. 팀챗 탭을 열면 그 카운터만 리셋.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -219,7 +225,8 @@
   const State = {
     session: null,       // { access_token, refresh_token, expires_at, user: {id, nickname, avatar} }
     teamId: null,
-    unread: 0,
+    unread: 0,            // DM(쪽지) 안읽음 — messages.is_read 기준으로 fetchUnreadCount()가 실측
+    teamChatUnread: 0,     // 🌟 [신규] 팀챗 안읽음 — team_chats엔 읽음 여부 컬럼이 없어 별도 카운터로 관리, teamchat 탭 열면 0으로 리셋
     panelOpen: false,
     activeTab: 'messages',
     activeConversation: null, // { otherId, otherName }
@@ -408,7 +415,9 @@
     if (!State.teamId) return;
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/team_chats?team_id=eq.${State.teamId}&order=created_at.desc&limit=30&select=id,sender_id,content,created_at`,
+        // 🌟 [버그수정] sender_id만 가져와서 본인 외엔 전부 "팀원"으로만 표기되던 문제 —
+        // PC team.js Chat.init()과 동일한 PostgREST 임베드(profiles(full_name))로 실제 이름을 조회
+        `${SUPABASE_URL}/rest/v1/team_chats?team_id=eq.${State.teamId}&order=created_at.desc&limit=30&select=id,sender_id,content,created_at,profiles(full_name)`,
         { headers: authHeaders() }
       );
       const rows = await res.json();
@@ -740,6 +749,9 @@
   function onTeamChatInsert(payload) {
     if (payload.new.sender_id === State.session.user.id) return;
     boakoOk('새 팀챗 실시간 수신:', payload.new);
+    // 🌟 [버그수정] 여태 DM(onMessageInsert)만 안읽음 배지를 올려서, 팀챗이 와도 위젯 아이콘의
+    // 빨간 숫자 배지가 반응하지 않던 문제 — team_chats엔 읽음 여부 컬럼이 없어 별도 카운터로 관리
+    State.teamChatUnread += 1;
     fetchTeamChats().then(render);
     handleIncomingToast('message', payload.new, true);
   }
@@ -1991,6 +2003,8 @@
     State.activeTab = tab;
     State.activeConversation = null;
     State.panelOpen = true;
+    // 🌟 [버그수정] 팀챗 탭을 열어서 실제로 확인했으면 그 안읽음 카운터는 리셋 (DM은 방을 열 때 markThreadAsRead가 별도 처리)
+    if (tab === 'teamchat') State.teamChatUnread = 0;
     render();
   }
 
@@ -1999,8 +2013,11 @@
     const icon = document.getElementById('boako-widget-icon');
     if (!badge || !icon) return;
     icon.classList.toggle('boako-logged-out', !State.session);
-    if (State.unread > 0) {
-      badge.textContent = State.unread > 99 ? '99+' : String(State.unread);
+    // 🌟 [버그수정] 위젯 아이콘의 배지 숫자가 DM(State.unread)만 반영하고 팀챗은 무시하던 문제 —
+    // 팀챗 안읽음(State.teamChatUnread)도 합산해서 표시
+    const totalUnread = State.unread + State.teamChatUnread;
+    if (totalUnread > 0) {
+      badge.textContent = totalUnread > 99 ? '99+' : String(totalUnread);
       badge.classList.remove('hidden');
     } else {
       badge.classList.add('hidden');
@@ -2083,7 +2100,7 @@
       }
       body.innerHTML = State.teamChats.map(m => `
         <div class="boako-msg-item">
-          <div class="boako-sender">${escapeHtml(m.sender_id === State.session.user.id ? '나' : '팀원')}</div>
+          <div class="boako-sender">${escapeHtml(m.sender_id === State.session.user.id ? '나' : (m.profiles?.full_name || '팀원'))}</div>
           <div class="boako-preview">${escapeHtml(m.content)}</div>
         </div>
       `).join('') || `<div style="text-align:center;padding:30px;color:#94a3b8;font-size:12px;font-weight:700;">아직 팀챗 메시지가 없어요</div>`;
