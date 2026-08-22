@@ -5,11 +5,31 @@
  *    사이트 어느 화면에 있든 풀스크린 오버레이로 게임 로고 + 게임명 + 받은 포인트를 보여줌.
  *    포인트 지급 자체는 DB(fn_award_daily_recommend_bonus)가 원자적으로 처리하므로,
  *    이 모듈은 순수 "알림 표시"만 담당. 오프라인 중 지급된 것도 로그인 시점에 확인해서 놓치지 않음.
+ * 🌟 [리팩토링] startRealtime()을 js/realtime_coordinator.js 탭 리더 선출 방식으로 전환.
  */
 Boako.RecommendNotify = {
     channel: null,
 
-    startRealtime: () => {
+    // 🌟 [리팩토링] 사이트를 여러 탭으로 띄워두면 탭마다 각자 이 채널을 구독해서 Realtime 동시연결
+    // 한도를 탭 수만큼 잡아먹는 문제 방지 — js/realtime_coordinator.js의 탭 리더 선출 패턴 적용.
+    // 채널 필터에 user_id가 들어가 있어(로그인 계정별) 로그아웃→재로그인(다른 계정) 시에도
+    // 올바른 필터로 재구독돼야 하므로, _subscribeAsLeader()는 startRealtime() 호출마다 재진입 허용.
+    // 🌟 UPDATE 이벤트의 payload.old/payload.new 비교(bonus_point가 이번에 새로 채워졌는지)는
+    // 리더 탭의 원본 콜백에서만 가능하므로(팔로워는 old를 못 받음), 필터링을 리더 쪽에서 미리 끝내고
+    // 통과한 payload.new만 중계/로컬반응 함수로 넘김.
+    async _onAwarded(newRow) {
+        try {
+            Boako.RecommendNotify.enqueueOverlay(newRow);
+            // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
+            await Boako.RecommendNotify.markConfirmed([newRow.claim_date]);
+        } catch (e) {
+            console.error('오늘의 추천 게임 보너스 알림 표시 실패:', e);
+        }
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeAsLeader: () => {
+        if (!Boako.RealtimeCoordinator.isLeader()) return;
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.RecommendNotify.channel) return; // 이미 구독 중이면 중복 방지
 
@@ -20,20 +40,28 @@ Boako.RecommendNotify = {
                 schema: 'public',
                 table: 'daily_recommend_bonus_claims',
                 filter: `user_id=eq.${Boako.state.user.id}`
-            }, async (payload) => {
-                try {
-                    // bonus_point가 이번에 새로 채워진 경우만(=방금 지급 확정된 경우만) 알림. 0점 지급(플레이타임 매칭 실패 등)은 표시 안 함.
-                    if (!payload.new.bonus_point || payload.new.bonus_point <= 0) return;
-                    if (payload.old.bonus_point > 0) return;
-
-                    Boako.RecommendNotify.enqueueOverlay(payload.new);
-                    // 🌟 실시간으로 이미 보여줬으니, 다음 로그인 때 다시 안 뜨도록 즉시 확인 처리
-                    await Boako.RecommendNotify.markConfirmed([payload.new.claim_date]);
-                } catch (e) {
-                    console.error('오늘의 추천 게임 보너스 알림 표시 실패:', e);
-                }
+            }, (payload) => {
+                // bonus_point가 이번에 새로 채워진 경우만(=방금 지급 확정된 경우만) 알림. 0점 지급은 표시 안 함.
+                if (!payload.new.bonus_point || payload.new.bonus_point <= 0) return;
+                if (payload.old.bonus_point > 0) return;
+                Boako.RecommendNotify._onAwarded(payload.new);
+                Boako.RealtimeCoordinator.broadcast('recommend-notify:awarded', payload.new);
             })
             .subscribe();
+    },
+
+    startRealtime: () => {
+        if (!Boako.state.user || !Boako.db) return;
+
+        // 🌟 팔로워 탭(및 리더 자신 아닌 중계 경로)에서 받은 이벤트도 동일한 반응 함수로 처리 —
+        // 여러 로그인 세션에 걸쳐 중복 등록되지 않도록 최초 1회만 등록
+        if (!Boako.RecommendNotify._coordinatorInited) {
+            Boako.RecommendNotify._coordinatorInited = true;
+            Boako.RealtimeCoordinator.onRelay('recommend-notify:awarded', (p) => Boako.RecommendNotify._onAwarded(p));
+            Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.RecommendNotify._subscribeAsLeader());
+        }
+        // 🌟 이미 리더인 탭에서 로그인/재로그인(다른 계정) 시에도 새 필터로 즉시 재구독 시도
+        Boako.RecommendNotify._subscribeAsLeader();
     },
 
     // 🌟 오프라인 중에 지급된(=접속 안 했을 때 기록을 남겨 보너스가 확정된) 건을 로그인 시점에 체크해서 놓치지 않고 보여줌.
