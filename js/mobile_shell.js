@@ -36,6 +36,9 @@
  *    recommend_notify.js는 자기 완결형 풀스크린 오버레이만 그려서 PC DOM 의존이 없어 그대로 재사용.
  *    messenger.js만 예외 — startRealtime() 콜백이 Boako.Auth.renderWidget()을 무조건 불러서 모바일에서
  *    에러가 나(토스트까지 못 뜨고 멈춤), 안읽은 개수 갱신+토스트만 필요한 부분을 모바일 전용으로 새로 작성.
+ * 🌟 [3단계: 화면별 포팅] 더보기 시트의 "🛡️ 팀 창단"(무소속이면 "팀 창단", 소속이면 "팀 관리"로
+ *    라벨 자동 전환)과 드로어의 "💬 팀챗"에 openTeamHub() 연결 — js/mobile_team_hub.js(팀 본부+
+ *    작전회의실)로 진입. 팀챗은 별도 배지 없이도 바로 채팅 탭으로 들어갈 수 있게 tab 인자로 구분.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -270,6 +273,18 @@ Boako.MobileShell = {
         });
     },
 
+    // 🌟 [신규] "🛡️ 팀 창단"(시트)/"💬 팀챗"(드로어) 공통 진입점 — 열려있던 시트/드로어를 닫고
+    // 본문 영역에 팀 본부 화면(js/mobile_team_hub.js)을 그림. tab 인자로 시작 탭(info/chat) 지정.
+    // 팀 화면은 하단 고정 4탭(소식지/토너먼트/랭킹/더보기)에 없는 화면이라, 탭바 활성 표시는
+    // 건드리지 않고(더보기가 눌린 상태 그대로 두는 것도 부자연스러워서) 그대로 둠.
+    openTeamHub: async (tab) => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileTeamHub) await Boako.Util.loadScript('/js/mobile_team_hub.js');
+        Boako.MobileTeamHub.activeTab = tab || 'info';
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileTeamHub.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -376,7 +391,7 @@ Boako.MobileShell = {
                     <span style="font-size:13px; font-weight:700;">📬 쪽지</span>
                     ${unreadCount > 0 ? `<span style="font-size:12px; color:#ef4444; font-weight:900;">${unreadCount}</span>` : ''}
                 </div>
-                <div style="padding:11px 4px; font-size:13px; font-weight:700;">💬 팀챗</div>
+                <div onclick="Boako.MobileShell.openTeamHub('chat')" style="padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer;">💬 팀챗</div>
                 <div style="padding:11px 4px; font-size:13px; font-weight:700;">🔬 전력분석실</div>
                 <div style="padding:11px 4px; font-size:13px; font-weight:700;">🎒 인벤토리</div>
                 <div onclick="Boako.Auth.copyReferralLink && Boako.Auth.copyReferralLink()" style="padding:11px 4px; font-size:13px; font-weight:700; color:#92400e;">🎁 내 초대 링크 복사</div>
@@ -406,7 +421,7 @@ Boako.MobileShell = {
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
                     <span>🤝 같이 하자</span>${badge(c.together)}
                 </div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🛡️ 팀 창단</div>
+                <div onclick="Boako.MobileShell.openTeamHub('info')" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛡️ ${Boako.state.team ? '팀 관리' : '팀 창단'}</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">👥 팀 목록</div>
                 <div onclick="window.open('https://cafe.naver.com/boardgamearena', '_blank')" style="padding:12px 4px; font-size:14px; font-weight:700;">☕ 카페</div>
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
