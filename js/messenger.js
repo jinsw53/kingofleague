@@ -399,82 +399,138 @@ Boako.Messenger = {
         Boako.Messenger.View.refreshRoomList();
     },
 
-    startRealtime: () => {
+    // 🌟 [리팩토링] 사이트를 여러 탭으로 띄워두면 탭마다 각자 이 7개 채널을 구독해서
+    // Supabase Realtime 동시연결 한도를 탭 수만큼 잡아먹는 문제 방지 — 확장(boako-widget.js)과
+    // 동일한 탭 리더 선출 패턴을 js/realtime_coordinator.js로 공용화해서 적용.
+    // 실제 구독(_subscribeChannelsAsLeader)은 리더 탭에서만 한 번 일어나고, 각 채널의 실제
+    // 반응 로직은 아래 _onXxx 공용 함수로 분리해서 리더(직접 호출) + 팔로워(중계 수신) 모두
+    // 완전히 동일한 화면 반응(토스트/배지/방 목록 갱신)을 보이도록 함.
+    async _onMessageInsert(newMsg) {
+        const myId = Boako.state.user.id;
+        if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
+            await Boako.Messenger.fetchUnreadCount();
+            // 🌟 새 쪽지가 오면 로그인 위젯의 안 읽은 쪽지 배지도 실시간으로 갱신
+            if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget();
+            await Boako.Messenger.View.refreshRoomList();
+            const roomId = newMsg.match_id || (newMsg.sender_id === myId ? newMsg.receiver_id : newMsg.sender_id);
+            if (Boako.Messenger.currentRoomId === roomId) Boako.Messenger.View.openRoom(roomId);
+            else if (newMsg.receiver_id === myId) Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 쪽지가 도착했습니다!`);
+        }
+    },
+
+    async _onMatchChatInsert(newMsg) {
+        const uiRoomId = `match_channel_${newMsg.room_id}`;
+        if (Boako.Messenger.chatRooms[uiRoomId]) {
+            await Boako.Messenger.View.refreshRoomList();
+            if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
+            else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`📣 [대항전] 채널에 새 메시지가 도착했습니다!`);
+        }
+    },
+
+    async _onPollChange(newPoll) {
+        const uiRoomId = `match_channel_${newPoll.target_id}`;
+        if (Boako.Messenger.chatRooms[uiRoomId]) {
+            await Boako.Messenger.loadChatRooms(); // 데이터 리로드
+            if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
+        }
+    },
+
+    async _onTogetherChatInsert(newMsg) {
+        const uiRoomId = `together_${newMsg.post_id}`;
+        if (Boako.Messenger.chatRooms[uiRoomId]) {
+            await Boako.Messenger.View.refreshRoomList();
+            if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
+            else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`🎲 [같이하자] 채팅방에 새 메시지가 도착했습니다!`);
+        }
+    },
+
+    async _onTogetherPostsChange() {
+        await Boako.Messenger.View.refreshRoomList();
+    },
+
+    async _onChallengeChatInsert(newMsg) {
+        const uiRoomId = `challenge_${newMsg.challenge_id}`;
+        if (Boako.Messenger.chatRooms[uiRoomId]) {
+            await Boako.Messenger.View.refreshRoomList();
+            if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
+            else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`🔥 [챌린지] 채팅방에 새 메시지가 도착했습니다!`);
+        }
+    },
+
+    async _onChallengesChange() {
+        await Boako.Messenger.View.refreshRoomList();
+    },
+
+    // 🌟 리더 탭에서만 호출됨 — 실제 Boako.db.channel(...).subscribe()가 여기 안에만 존재
+    _subscribeChannelsAsLeader: () => {
         if (!Boako.state.user || Boako.Messenger.realtimeChannels.length > 0) return;
 
         const msgChannel = Boako.db.channel('messages-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-                const newMsg = payload.new;
-                const myId = Boako.state.user.id;
-                if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
-                    await Boako.Messenger.fetchUnreadCount();
-                    // 🌟 새 쪽지가 오면 로그인 위젯의 안 읽은 쪽지 배지도 실시간으로 갱신
-                    if (Boako.Auth && Boako.Auth.renderWidget) Boako.Auth.renderWidget();
-                    await Boako.Messenger.View.refreshRoomList();
-                    const roomId = newMsg.match_id || (newMsg.sender_id === myId ? newMsg.receiver_id : newMsg.sender_id);
-                    if (Boako.Messenger.currentRoomId === roomId) Boako.Messenger.View.openRoom(roomId);
-                    else if (newMsg.receiver_id === myId) Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 쪽지가 도착했습니다!`);
-                }
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+                Boako.Messenger._onMessageInsert(payload.new);
+                Boako.RealtimeCoordinator.broadcast('messenger:message-insert', payload.new);
             }).subscribe();
 
         const matchChannel = Boako.db.channel('grandprix-chats-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, async (payload) => {
-                const newMsg = payload.new;
-                const uiRoomId = `match_channel_${newMsg.room_id}`;
-                if (Boako.Messenger.chatRooms[uiRoomId]) {
-                    await Boako.Messenger.View.refreshRoomList();
-                    if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
-                    else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`📣 [대항전] 채널에 새 메시지가 도착했습니다!`);
-                }
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, (payload) => {
+                Boako.Messenger._onMatchChatInsert(payload.new);
+                Boako.RealtimeCoordinator.broadcast('messenger:match-chat-insert', payload.new);
             }).subscribe();
 
         // 🌟 [추가] 투표 데이터 리얼타임 감지
         const pollChannel = Boako.db.channel('grandprix-polls-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls' }, async (payload) => {
-                const uiRoomId = `match_channel_${payload.new.target_id}`;
-                if (Boako.Messenger.chatRooms[uiRoomId]) {
-                    await Boako.Messenger.loadChatRooms(); // 데이터 리로드
-                    if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
-                }
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls' }, (payload) => {
+                Boako.Messenger._onPollChange(payload.new);
+                Boako.RealtimeCoordinator.broadcast('messenger:poll-change', payload.new);
             }).subscribe();
 
         // 🌟 [추가] 같이하자 채팅 리얼타임 감지
         const togetherChannel = Boako.db.channel('together-chats-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'together_chats' }, async (payload) => {
-                const newMsg = payload.new;
-                const uiRoomId = `together_${newMsg.post_id}`;
-                if (Boako.Messenger.chatRooms[uiRoomId]) {
-                    await Boako.Messenger.View.refreshRoomList();
-                    if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
-                    else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`🎲 [같이하자] 채팅방에 새 메시지가 도착했습니다!`);
-                }
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'together_chats' }, (payload) => {
+                Boako.Messenger._onTogetherChatInsert(payload.new);
+                Boako.RealtimeCoordinator.broadcast('messenger:together-chat-insert', payload.new);
             }).subscribe();
 
         // 🌟 [추가] 같이하자 모집글 상태 변화(확정/취소) 감지 → 방 목록 자체가 새로 생기거나 사라짐
         const togetherPostsChannel = Boako.db.channel('together-posts-status-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, async () => {
-                await Boako.Messenger.View.refreshRoomList();
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
+                Boako.Messenger._onTogetherPostsChange();
+                Boako.RealtimeCoordinator.broadcast('messenger:together-posts-change', null);
             }).subscribe();
 
         // 🌟 [신규] 챌린지 그룹채팅 리얼타임 감지
         const challengeChatChannel = Boako.db.channel('challenge-chats-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chats' }, async (payload) => {
-                const newMsg = payload.new;
-                const uiRoomId = `challenge_${newMsg.challenge_id}`;
-                if (Boako.Messenger.chatRooms[uiRoomId]) {
-                    await Boako.Messenger.View.refreshRoomList();
-                    if (Boako.Messenger.currentRoomId === uiRoomId) Boako.Messenger.View.openRoom(uiRoomId);
-                    else if (newMsg.sender_id !== Boako.state.user.id) Boako.Util.toast(`🔥 [챌린지] 채팅방에 새 메시지가 도착했습니다!`);
-                }
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chats' }, (payload) => {
+                Boako.Messenger._onChallengeChatInsert(payload.new);
+                Boako.RealtimeCoordinator.broadcast('messenger:challenge-chat-insert', payload.new);
             }).subscribe();
 
         // 🌟 [신규] 챌린지 매칭 상태 변화 감지 → 방 목록 자체가 새로 생기거나 사라짐
         const challengesChannel = Boako.db.channel('challenges-status-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, async () => {
-                await Boako.Messenger.View.refreshRoomList();
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, () => {
+                Boako.Messenger._onChallengesChange();
+                Boako.RealtimeCoordinator.broadcast('messenger:challenges-change', null);
             }).subscribe();
 
         Boako.Messenger.realtimeChannels.push(msgChannel, matchChannel, pollChannel, togetherChannel, togetherPostsChannel, challengeChatChannel, challengesChannel);
+    },
+
+    startRealtime: () => {
+        if (!Boako.state.user || Boako.Messenger._realtimeStarted) return;
+        Boako.Messenger._realtimeStarted = true;
+
+        // 🌟 팔로워 탭(및 리더 탭 스스로도 아닌 중계 경로)에서 리더가 방송하는 이벤트를 받아서
+        // 실제 구독 로직과 완전히 동일한 반응 함수를 호출 — 화면(토스트/배지/방 목록)은 각 탭이 알아서 그림
+        Boako.RealtimeCoordinator.onRelay('messenger:message-insert', (p) => Boako.Messenger._onMessageInsert(p));
+        Boako.RealtimeCoordinator.onRelay('messenger:match-chat-insert', (p) => Boako.Messenger._onMatchChatInsert(p));
+        Boako.RealtimeCoordinator.onRelay('messenger:poll-change', (p) => Boako.Messenger._onPollChange(p));
+        Boako.RealtimeCoordinator.onRelay('messenger:together-chat-insert', (p) => Boako.Messenger._onTogetherChatInsert(p));
+        Boako.RealtimeCoordinator.onRelay('messenger:together-posts-change', () => Boako.Messenger._onTogetherPostsChange());
+        Boako.RealtimeCoordinator.onRelay('messenger:challenge-chat-insert', (p) => Boako.Messenger._onChallengeChatInsert(p));
+        Boako.RealtimeCoordinator.onRelay('messenger:challenges-change', () => Boako.Messenger._onChallengesChange());
+
+        // 🌟 이 탭이 리더가 될 때(최초 선출 or 승격)만 실제 채널 구독 시작
+        Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.Messenger._subscribeChannelsAsLeader());
     },
 
     // 🌟 [신규] 라이벌/승자연전 1:1 일정 제안용 달력 모달 (다중 날짜 선택)
