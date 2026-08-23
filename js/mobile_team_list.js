@@ -9,12 +9,20 @@
  *    .section-card, .card-header, .card-body)를 쓰고 있어서, 이 부분만 모바일 인라인 스타일로
  *    새로 작성함 — 내부에 같은 id(team-search-input/team-grid-container/team-pagination-container/
  *    total-team-count)만 정확히 넣어주면 loadTeams() 등은 수정 없이 그대로 동작함.
+ * 🌟 [버그수정] core.js가 페이지 로드 시점에 미래 모듈들을 전부 빈 객체({})로 미리 선언해둠
+ *    (window.Boako.TeamList = {};) — 그래서 team_list.js가 로드되기 전에도 Boako.TeamList는
+ *    이미 truthy라서 !Boako.TeamList 체크가 항상 false로 나와 스크립트가 영원히 로드되지 않고,
+ *    빈 객체에 loadTeams가 없어 "Boako.TeamList.loadTeams is not a function" 에러가 났음.
+ *    반드시 구체적 메서드(.loadTeams) 존재 여부로 체크해야 함 — 다른 모바일 화면들(팀 본부의
+ *    .syncStatus/.renderChallenges, 쪽지함의 Object.keys 길이, 검색의 .init)은 이미 이 방식으로
+ *    안전하게 체크하고 있었음.
+ * 🌟 [수정] 헤더 라벨 "방명록 및 로스터" → "등록된 팀 목록" (PC team_list.js와 동일하게 통일)
  */
 window.Boako = window.Boako || {};
 Boako.MobileTeamList = {
 
     render: async (container) => {
-        if (!Boako.TeamList) await Boako.Util.loadScript('/js/team_list.js');
+        if (!Boako.TeamList || !Boako.TeamList.loadTeams) await Boako.Util.loadScript('/js/team_list.js');
 
         container.innerHTML = `
             <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
@@ -23,7 +31,7 @@ Boako.MobileTeamList = {
             </div>
 
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-                <span style="font-size:13px; font-weight:900; color:#1e293b;">방명록 및 로스터</span>
+                <span style="font-size:13px; font-weight:900; color:#1e293b;">등록된 팀 목록</span>
                 <span id="total-team-count" style="background:#dbeafe; color:#1d4ed8; font-size:10.5px; font-weight:900; padding:3px 10px; border-radius:999px;">총 0개 팀</span>
             </div>
 
