@@ -42,6 +42,7 @@
  * 🌟 [4단계: 화면별 포팅] 드로어의 "📬 쪽지"에 openMessenger() 연결 — js/mobile_messenger.js로
  *    진입. 실시간 쪽지 채널(startMessengerRealtime)이 이미 안읽은 배지 갱신용으로 구독 중이므로,
  *    쪽지함 화면이 별도 채널을 새로 만들지 않고 이 채널의 콜백에 편승(handleRealtimeInsert 호출).
+ * 🌟 [5단계: 화면별 포팅] 상단바 🔍 아이콘에 openSearch() 연결 — js/mobile_search.js(통합검색)로 진입.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -298,6 +299,14 @@ Boako.MobileShell = {
         if (!Boako.MobileMessenger) await Boako.Util.loadScript('/js/mobile_messenger.js');
         const area = document.getElementById('mobile-content-area');
         if (area) await Boako.MobileMessenger.render(area);
+    },
+
+    // 🌟 [신규] 상단바 🔍 아이콘 진입점 — 본문 영역에 통합검색(js/mobile_search.js)을 그림
+    openSearch: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileSearch) await Boako.Util.loadScript('/js/mobile_search.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileSearch.render(area);
     },
 
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
