@@ -45,6 +45,8 @@
  * 🌟 [5단계: 화면별 포팅] 상단바 🔍 아이콘에 openSearch() 연결 — js/mobile_search.js(통합검색)로 진입.
  * 🌟 [6단계: 화면별 포팅] 드로어의 "🔬 전력분석실"에 openPowerAnalysis() 연결 —
  *    js/mobile_power_analysis.js로 진입.
+ * 🌟 [7단계: 화면별 포팅] 더보기 시트의 "👥 팀 목록"에 openTeamList() 연결 —
+ *    js/mobile_team_list.js로 진입.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -319,6 +321,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobilePowerAnalysis.render(area);
     },
 
+    // 🌟 [신규] 더보기 시트의 "👥 팀 목록" 진입점 — 본문 영역에 팀 목록(js/mobile_team_list.js)을 그림
+    openTeamList: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileTeamList) await Boako.Util.loadScript('/js/mobile_team_list.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileTeamList.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -456,7 +466,7 @@ Boako.MobileShell = {
                     <span>🤝 같이 하자</span>${badge(c.together)}
                 </div>
                 <div onclick="Boako.MobileShell.openTeamHub('info')" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛡️ ${Boako.state.team ? '팀 관리' : '팀 창단'}</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">👥 팀 목록</div>
+                <div onclick="Boako.MobileShell.openTeamList()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">👥 팀 목록</div>
                 <div onclick="window.open('https://cafe.naver.com/boardgamearena', '_blank')" style="padding:12px 4px; font-size:14px; font-weight:700;">☕ 카페</div>
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
                     <span>📝 게시판</span>${badge(c.boardRequest)}
