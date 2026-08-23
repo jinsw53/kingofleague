@@ -5,7 +5,10 @@
  *    전부 단계적으로 포팅 완료. 각 단계:
  *    1단계: 팀 본부(정보+로스터+초대/강퇴/탈퇴) + 작전 회의실(팀챗)
  *    2단계: 대항전 기록·일정(시즌 페이즈별 밴투표/엔트리작전판/경기일정) + 팀 본부에 포인트 이용 내역
- *    3단계(이번): 포인트 환전 지갑(드롭다운 방식), 우승 별 붙이기, 챌린지 탭 — 모두 완료.
+ *    3단계: 포인트 환전 지갑(드롭다운 방식), 우승 별 붙이기, 챌린지 탭.
+ * 🌟 [버그수정] 지갑 지급 대상 드롭다운에서 팀장 본인을 무심코 제외했었음 — PC는 팀원 카드
+ *    드래그 조건이 isDraggable = isLeader뿐이라(isMe 배제 없음) 팀장 본인도 대상이 될 수 있었음.
+ *    PC와 동일하게 본인도 목록에 포함하도록 수정(선택 시 "(나)" 표기 추가).
  * 🌟 [재사용 원칙] Boako.Team.searchUser/executeInvite/addMember(멤버 스카웃 모달)/openBanVote/
  *    openEntryForm/loadTeamPointHistory/updateWalletPreview/_compositeStars/_uploadStarLogo/
  *    _makeDraggableStar/_renderStarModalMode는 PC 전용 DOM에 의존하지 않고 Tailwind 유틸리티
@@ -321,8 +324,10 @@ Boako.MobileTeamHub = {
             const feeRate = realFeeRate != null ? realFeeRate : 0.2;
             const feeRatePercent = Math.round(feeRate * 100);
 
+            // 🌟 [버그수정] PC는 팀장 본인 카드도 드래그 가능한 대상이었음(isDraggable = isLeader,
+            // isMe 배제 없음) — 드롭다운으로 옮기면서 본인을 무심코 제외했던 것을 PC 동작과 동일하게 되돌림.
             const targetOptions = isLeader
-                ? `<option value="">💱 팀 금고로 환전</option>${(members || []).filter(m => m.player_name !== Boako.state.user.nickname).map(m => `<option value="${Boako.MobileTeamHub.escapeHtml(m.player_name)}">👑 ${Boako.MobileTeamHub.escapeHtml(m.player_name)} 님에게 지급</option>`).join('')}`
+                ? `<option value="">💱 팀 금고로 환전</option>${(members || []).map(m => `<option value="${Boako.MobileTeamHub.escapeHtml(m.player_name)}">👑 ${Boako.MobileTeamHub.escapeHtml(m.player_name)}${m.player_name === Boako.state.user.nickname ? ' (나)' : ''} 님에게 지급</option>`).join('')}`
                 : '';
 
             wrap.innerHTML = `
