@@ -1,26 +1,31 @@
 /**
- * [MOBILE TEAM HUB] 모바일 전용 — 팀 창단 / 팀 본부(정보+로스터+지갑내역) / 작전 회의실(팀챗) /
- * 대항전 기록·일정
- * 🌟 [1단계 범위] PC js/team.js는 팀 본부/작전회의실/대항전 기록·일정/챌린지 4개 탭 + 우승 별
- *    붙이기(캔버스 로고 합성)까지 포함된 거대한 화면이라, 소장님과 합의한 대로 단계를 나눠서 포팅함.
+ * [MOBILE TEAM HUB] 모바일 전용 — 팀 창단 / 팀 본부(정보+로스터+지갑+포인트내역+우승별) /
+ * 작전 회의실(팀챗) / 대항전 기록·일정 / 챌린지
+ * 🌟 PC js/team.js의 팀 본부/작전회의실/대항전 기록·일정/챌린지 4개 탭 + 우승 별 붙이기까지
+ *    전부 단계적으로 포팅 완료. 각 단계:
  *    1단계: 팀 본부(정보+로스터+초대/강퇴/탈퇴) + 작전 회의실(팀챗)
- *    2단계(이번): 대항전 기록·일정(시즌 페이즈별 밴투표/엔트리작전판/경기일정) + 팀 본부에
- *    포인트 이용 내역 추가.
- *    🔥챌린지(league.js 별도 시스템 의존) / 💰포인트 환전 지갑(PC는 마우스 드래그 방식이라 터치
- *    UI 재설계 필요) / ⭐우승 별 붙이기(캔버스 드래그 배치, 터치 UI 재설계 필요)는 다음 단계로 미룸.
+ *    2단계: 대항전 기록·일정(시즌 페이즈별 밴투표/엔트리작전판/경기일정) + 팀 본부에 포인트 이용 내역
+ *    3단계(이번): 포인트 환전 지갑(드롭다운 방식), 우승 별 붙이기, 챌린지 탭 — 모두 완료.
  * 🌟 [재사용 원칙] Boako.Team.searchUser/executeInvite/addMember(멤버 스카웃 모달)/openBanVote/
- *    openEntryForm/loadTeamPointHistory는 PC 전용 DOM에 의존하지 않고 Tailwind 유틸리티 클래스만
- *    쓰거나 특정 컨테이너 id만 참조하는 자기완결형 함수라 모바일에서도 안전하게 그대로 재사용함
- *    (모바일도 Tailwind CDN을 로드하므로 동일 클래스가 그대로 먹힘).
- * 🌟 [버그 회피] Boako.Team.create()/kick()은 마지막에 PC 전용 화면 전환 시스템인
- *    Boako.View.render('team')을 호출해서 모바일에서 그대로 쓰면 에러남(messenger.js의
- *    startRealtime 콜백이 Boako.Auth.renderWidget()을 부르던 것과 동일한 문제 패턴).
- *    동일한 DB 로직을 이 파일에 그대로 옮기고, 마무리만 모바일 재렌더로 바꿔서 재구현함.
- * 🌟 [버그 회피] Boako.Team.loadMatchSchedule()도 마찬가지로 진행 예정 경기 클릭 시
- *    Boako.Team.openMatchRoom()을 거쳐 Boako.View.render('messenger')를 호출해서 모바일에서
- *    에러남 — 모바일 쪽지함(messenger)이 아직 포팅 전이라, 동일한 조회/렌더 로직을 이 파일에
- *    재구현하되 진행 예정 경기 클릭 시엔 "쪽지함 포팅 후 연결 예정" 토스트로 대체(완료된 경기의
- *    외부 토너먼트 결과 링크는 그대로 동작).
+ *    openEntryForm/loadTeamPointHistory/updateWalletPreview/_compositeStars/_uploadStarLogo/
+ *    _makeDraggableStar/_renderStarModalMode는 PC 전용 DOM에 의존하지 않고 Tailwind 유틸리티
+ *    클래스만 쓰거나 특정 컨테이너 id만 참조하는 자기완결형 함수라 모바일에서도 안전하게 그대로
+ *    재사용함(모바일도 Tailwind CDN을 로드하므로 동일 클래스가 그대로 먹힘). 우승 별 드래그는
+ *    Pointer Events 기반이라 터치에서도 원래부터 동작함 — 별도 터치 UI 재설계가 필요 없었음.
+ * 🌟 [버그 회피] Boako.Team.create()/kick()/confirmStarPlacement()/confirmStarReset()과
+ *    Boako.Team.submitWalletExchange()는 마지막에 PC 전용 화면 전환/DOM(Boako.View.render('team')
+ *    또는 '#team-wallet-container')을 건드려서 모바일에서 그대로 쓰면 에러나거나 조용히 무시됨
+ *    (messenger.js의 startRealtime 콜백이 Boako.Auth.renderWidget()을 부르던 것과 동일한 문제
+ *    패턴). create/kick/confirmStar*는 동일한 DB 로직을 이 파일에 재구현하고 마무리만 모바일
+ *    재렌더로 대체. submitWalletExchange는 PC 함수를 그대로 호출한 뒤(RPC/사운드/토스트 재사용)
+ *    모바일 지갑만 명시적으로 다시 그려줌. 우승 별의 "확정하고 저장" 버튼은 PC의 모달 마크업/
+ *    드래그 로직을 그대로 쓰되, _renderStarModalMode를 모바일 세션에서만 런타임 래핑해서 클릭
+ *    핸들러만 모바일 안전 버전으로 매번 다시 연결함(team.js 파일 자체는 절대 수정하지 않음).
+ * 🌟 [버그 회피] Boako.Team.loadMatchSchedule()/Boako.League.openChallengeChat()도 진행 예정
+ *    경기/챌린지 채팅방 열기 시 Boako.View.render('messenger')를 호출해서 모바일에서 에러남 —
+ *    모바일 쪽지함(messenger)이 아직 포팅 전이라, 경기 일정은 조회/렌더 로직을 이 파일에
+ *    재구현하고 진행 예정 경기 클릭 시 토스트로 대체(완료 경기는 외부 링크 그대로 동작), 챌린지
+ *    쪽은 openChallengeChat 함수 자체를 모바일 세션에서 토스트로 안전하게 덮어씀.
  * 🌟 [알려진 제한] 팀챗 실시간 채널(subscribeChat)은 PC의 Boako.Team.Chat과 마찬가지로 아직
  *    js/realtime_coordinator.js 탭 리더 선출을 적용하지 않음 — 화면을 벗어날 때(teardownChat)
  *    확실히 구독 해제해서 최소한 "떠나 있는 동안 계속 열려있는" 것만 방지함. 사이트 전역 실시간
@@ -142,7 +147,7 @@ Boako.MobileTeamHub = {
             const { data: members } = await Boako.db.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
             if (members) members.sort((a, b) => (a.role === 'LEADER' ? -1 : 1));
 
-            let bannerStats = { currentSeasonRank: null, currentSeasonTeamCount: 0, totalChampionships: 0, bestRank: null, supporterCount: 0, liveSeasonNo: null };
+            let bannerStats = { currentSeasonRank: null, currentSeasonTeamCount: 0, totalChampionships: 0, bestRank: null, supporterCount: 0, liveSeasonNo: null, starEligible: false, latestWinSeasonNo: null };
             try {
                 const nowIso = new Date().toISOString();
                 const { data: liveSeason } = await Boako.db.from('seasons').select('season_no').lte('start_date', nowIso).gte('end_date', nowIso).maybeSingle();
@@ -154,11 +159,15 @@ Boako.MobileTeamHub = {
                         if (myIdx !== -1) { bannerStats.currentSeasonRank = myIdx + 1; bannerStats.liveSeasonNo = liveSeason.season_no; }
                     }
                 }
-                const { data: historyRows } = await Boako.db.from('season_final_rankings').select('final_rank').eq('team_name', team.team_name);
+                const { data: historyRows } = await Boako.db.from('season_final_rankings').select('final_rank, season_no').eq('team_name', team.team_name);
                 if (historyRows && historyRows.length > 0) {
                     bannerStats.totalChampionships = historyRows.filter(r => r.final_rank === 1).length;
                     bannerStats.bestRank = Math.min(...historyRows.map(r => r.final_rank));
                 }
+                // 🌟 우승 별 붙이기 자격 판별 — 우승한 시즌 중 아직 별을 안 붙인 가장 최근 시즌 (PC view.js와 동일 공식)
+                const winSeasonNos = (historyRows || []).filter(r => r.final_rank === 1).map(r => r.season_no);
+                bannerStats.latestWinSeasonNo = winSeasonNos.length > 0 ? Math.max(...winSeasonNos) : null;
+                bannerStats.starEligible = bannerStats.latestWinSeasonNo !== null && team.last_star_season_no !== bannerStats.latestWinSeasonNo;
                 const { count: supporterCount } = await Boako.db.from('inventory').select('id', { count: 'exact', head: true }).like('item_id', `item_supporter_badge_${team.id}`).gt('expires_at', nowIso);
                 bannerStats.supporterCount = supporterCount || 0;
             } catch (bannerErr) { console.error('팀 배너 통계 로드 실패:', bannerErr); }
@@ -212,6 +221,7 @@ Boako.MobileTeamHub = {
                 ${tabBtn('info', '🛡️ 팀 본부')}
                 ${tabBtn('chat', '💬 작전 회의실')}
                 ${tabBtn('record', '⚔️ 대항전')}
+                ${tabBtn('challenge', '🔥 챌린지')}
             </div>
             <div id="mobile-team-tab-content"></div>
         `;
@@ -220,6 +230,8 @@ Boako.MobileTeamHub = {
             Boako.MobileTeamHub.renderChatTab();
         } else if (activeTab === 'record') {
             Boako.MobileTeamHub.renderRecordTab();
+        } else if (activeTab === 'challenge') {
+            Boako.MobileTeamHub.renderChallengeTab();
         } else {
             Boako.MobileTeamHub.renderInfoTab();
         }
@@ -234,10 +246,10 @@ Boako.MobileTeamHub = {
     },
 
     // ========== 🌟 팀 본부 탭 (정보 + 로스터) ==========
-    renderInfoTab: () => {
+    renderInfoTab: async () => {
         const wrap = document.getElementById('mobile-team-tab-content');
         if (!wrap) return;
-        const { team, members, isLeader } = Boako.MobileTeamHub;
+        const { team, members, isLeader, bannerStats } = Boako.MobileTeamHub;
 
         const rosterHtml = (members || []).map(m => {
             const isMe = m.player_name === Boako.state.user.nickname;
@@ -254,12 +266,21 @@ Boako.MobileTeamHub = {
             `;
         }).join('');
 
+        // 🌟 우승 별 버튼 — PC view.js와 동일 조건(자격 있거나 기존 별이 있으면 노출)
+        const starBtnHtml = (isLeader && (bannerStats.starEligible || team.champion_star_count > 0))
+            ? `<button onclick="Boako.MobileTeamHub.openStarModal(${bannerStats.starEligible ? bannerStats.latestWinSeasonNo : 'null'})" style="margin-top:10px; font-size:11.5px; font-weight:900; color:#fff; background:#f59e0b; padding:8px 14px; border-radius:8px;">${bannerStats.starEligible ? '🌟 우승 별 붙이기' : '⭐ 별 위치 관리'}</button>`
+            : '';
+
         wrap.innerHTML = `
             <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:16px; margin-bottom:12px;">
                 <div style="font-size:14px; font-weight:900; color:#7c3aed; font-style:italic;">"${Boako.MobileTeamHub.escapeHtml(team.team_motto || '전설의 서막')}"</div>
                 <div style="font-size:12px; color:#64748b; font-weight:600; margin-top:10px; white-space:pre-wrap; line-height:1.6;">${Boako.MobileTeamHub.escapeHtml(team.team_desc || '소개가 없습니다.')}</div>
+                ${starBtnHtml}
             </div>
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+
+            <div id="mobile-team-wallet"></div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; margin-top:16px;">
                 <div style="font-size:13.5px; font-weight:900; color:#1e293b;">👥 팀 멤버 (${(members || []).length}/4)</div>
                 ${isLeader ? `<button onclick="Boako.Team.addMember()" style="font-size:11.5px; font-weight:900; color:#fff; background:#7c3aed; padding:7px 12px; border-radius:8px;">+ 멤버 추가</button>` : ''}
             </div>
@@ -270,6 +291,77 @@ Boako.MobileTeamHub = {
         // 🌟 PC와 동일한 함수를 그대로 재사용 — '#team-point-history-container' id만 참조하는
         // 자기완결형 함수라 모바일에서도 안전. (Boako.Team은 이미 render()에서 로드됨)
         if (Boako.Team && Boako.Team.loadTeamPointHistory) Boako.Team.loadTeamPointHistory();
+
+        await Boako.MobileTeamHub.renderWallet();
+    },
+
+    // ========== 🌟 포인트 환전 지갑 — PC는 팀원을 카드 위로 "드래그"해서 지급 대상을 바꾸는 방식인데
+    // 터치 화면에선 그대로 안 먹혀서, 동일한 대상 선택을 드롭다운으로 대체. 실제 환전 로직(수수료
+    // 계산/RPC 호출/사운드/토스트)은 PC의 Boako.Team.updateWalletPreview/submitWalletExchange를
+    // 그대로 재사용 — 두 함수 다 'wallet-amount-input' 등 컨테이너 id만 참조하는 자기완결형이라
+    // 모바일에서도 안전. 대상만 Boako.Team.walletDragTarget에 미리 세팅해서 넘겨줌.
+    // ==========
+    renderWallet: async () => {
+        const wrap = document.getElementById('mobile-team-wallet');
+        if (!wrap) return;
+        wrap.innerHTML = `<div style="text-align:center; padding:20px; color:#94a3b8; font-weight:700; font-size:12px;">지갑 정보 로드 중...</div>`;
+
+        try {
+            const { team, members, isLeader } = Boako.MobileTeamHub;
+            const userId = Boako.state.user.id;
+            const teamId = team.id;
+            const teamName = team.team_name;
+
+            const { data: profile } = await Boako.db.from('profiles').select('points').eq('id', userId).single();
+            const { data: teamInfo } = await Boako.db.from('teams').select('tpoint').eq('id', teamId).single();
+            const myPoints = profile?.points || 0;
+            const teamPoints = teamInfo?.tpoint || 0;
+
+            const { data: realFeeRate } = await Boako.db.rpc('fn_get_team_fee_rate', { p_team_name: teamName });
+            const feeRate = realFeeRate != null ? realFeeRate : 0.2;
+            const feeRatePercent = Math.round(feeRate * 100);
+
+            const targetOptions = isLeader
+                ? `<option value="">💱 팀 금고로 환전</option>${(members || []).filter(m => m.player_name !== Boako.state.user.nickname).map(m => `<option value="${Boako.MobileTeamHub.escapeHtml(m.player_name)}">👑 ${Boako.MobileTeamHub.escapeHtml(m.player_name)} 님에게 지급</option>`).join('')}`
+                : '';
+
+            wrap.innerHTML = `
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <div style="flex:1; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
+                        <div style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase;">내 개인 포인트</div>
+                        <div style="font-size:17px; font-weight:900; color:#1e293b; margin-top:2px;">${myPoints.toLocaleString()} <span style="font-size:11px; color:#94a3b8;">P</span></div>
+                    </div>
+                    <div style="flex:1; background:linear-gradient(135deg,#eef2ff,#f5f3ff); border:1px solid #ddd6fe; border-radius:12px; padding:12px;">
+                        <div style="font-size:10px; font-weight:900; color:#7c3aed; text-transform:uppercase;">우리 팀 금고</div>
+                        <div style="font-size:17px; font-weight:900; color:#5b21b6; margin-top:2px;">${teamPoints.toLocaleString()} <span style="font-size:11px; color:#a78bfa;">P</span></div>
+                    </div>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+                    <div style="font-size:11.5px; font-weight:800; color:#64748b; margin-bottom:8px;">💱 포인트 환전 <span style="color:#f43f5e;">(수수료 ${feeRatePercent}%)</span></div>
+                    ${isLeader ? `<select id="mobile-wallet-target" style="width:100%; border:1px solid #e2e8f0; border-radius:8px; padding:9px; font-size:12.5px; font-weight:700; margin-bottom:8px; background:#fff;">${targetOptions}</select>` : ''}
+                    <div style="display:flex; gap:8px;">
+                        <input type="number" id="wallet-amount-input" min="100" step="100" placeholder="100 단위로 입력" oninput="Boako.Team.updateWalletPreview(${feeRate})" style="flex:1; border:1px solid #e2e8f0; border-radius:8px; padding:9px; font-size:12.5px;">
+                        <button id="wallet-submit-btn" onclick="Boako.MobileTeamHub.submitWalletExchange(${feeRate})" style="background:#7c3aed; color:#fff; font-weight:900; font-size:12px; padding:0 16px; border-radius:8px;">환전하기</button>
+                    </div>
+                    <div id="wallet-preview" class="hidden" style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:8px;">
+                        수수료 <span id="wallet-preview-fee" style="color:#f43f5e;">0</span> P 차감 → <span id="wallet-preview-target">팀에</span> <span id="wallet-preview-net" style="color:#7c3aed;">0</span> P 지급
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            console.error('모바일 지갑 로드 실패:', e);
+            wrap.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444; font-weight:700; font-size:12px;">오류: ${e.message}</div>`;
+        }
+    },
+
+    // 🌟 [버그 회피] PC의 submitWalletExchange()는 성공 후 '#team-wallet-container'(PC 전용 id)를
+    // 다시 그리려 하는데 모바일엔 그 id가 없어 조용히 무시됨(에러는 안 남) — 로직/RPC/사운드/토스트는
+    // 100% 동일하게 재사용하고, 그 뒤에 모바일 지갑만 명시적으로 다시 그려줌.
+    submitWalletExchange: async (feeRate) => {
+        const targetSelect = document.getElementById('mobile-wallet-target');
+        Boako.Team.walletDragTarget = targetSelect?.value || null;
+        await Boako.Team.submitWalletExchange(feeRate);
+        await Boako.MobileTeamHub.renderWallet();
     },
 
     // 🌟 Boako.Team.kick()과 완전히 동일한 DB 로직 — 마지막만 모바일 재렌더로 대체
@@ -427,6 +519,132 @@ Boako.MobileTeamHub = {
         } catch (e) {
             console.error('대항전 일정 로드 실패:', e);
             container.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700; font-size:12px;">일정 로드 실패: ${e.message}</div>`;
+        }
+    },
+
+    // ========== 🌟 우승 별 붙이기 — PC의 모달 마크업/드래그 UI(Pointer Events 기반이라 터치도
+    // 원래 지원됨)는 그대로 재사용하고, "확정하고 저장" 버튼의 최종 저장 로직만 모바일 안전 버전으로
+    // 바꿔치기함. Boako.Team.confirmStarPlacement/confirmStarReset은 마지막에 PC 전용
+    // Boako.View.render('team')을 호출해서 모바일에서 에러나므로, _renderStarModalMode가
+    // 매번 새로 그리는 confirm 버튼 클릭 핸들러를 그때마다 다시 가로채서 모바일 버전으로 연결함
+    // (팀.js 파일 자체는 절대 수정하지 않고, 모바일 세션 안에서만 런타임에 재정의).
+    openStarModal: (winSeasonNo) => {
+        if (!Boako.Team._mobileStarPatched) {
+            const original = Boako.Team._renderStarModalMode;
+            Boako.Team._renderStarModalMode = function (mode, seasonNo) {
+                original(mode, seasonNo);
+                const confirmBtn = document.getElementById('star-modal-confirm');
+                if (confirmBtn) {
+                    confirmBtn.onclick = mode === 'add'
+                        ? () => Boako.MobileTeamHub.confirmStarPlacement(seasonNo)
+                        : () => Boako.MobileTeamHub.confirmStarReset();
+                }
+            };
+            Boako.Team._mobileStarPatched = true;
+        }
+        Boako.Team.openStarModal(winSeasonNo);
+    },
+
+    // 🌟 Boako.Team.confirmStarPlacement()와 완전히 동일한 DB 로직 — 마지막만 모바일 재렌더로 대체
+    confirmStarPlacement: async (winSeasonNo) => {
+        const team = Boako.state.team.info;
+        const wrap = document.getElementById('star-canvas-wrap');
+        const starEl = wrap.querySelector('.star-drag');
+        const relX = parseFloat(starEl.dataset.relX);
+        const relY = parseFloat(starEl.dataset.relY);
+
+        const btn = document.getElementById('star-modal-confirm');
+        btn.disabled = true; btn.innerText = '저장 중...';
+
+        try {
+            const blob = await Boako.Team._compositeStars(team.logo_url, [{ relX, relY, relSize: 0.16 }]);
+            const newLogoUrl = await Boako.Team._uploadStarLogo(blob);
+
+            const { error } = await Boako.db.from('teams').update({
+                logo_url: newLogoUrl,
+                champion_star_count: (team.champion_star_count || 0) + 1,
+                last_star_season_no: winSeasonNo
+            }).eq('id', team.id);
+            if (error) throw error;
+
+            document.getElementById('boako-star-modal')?.remove();
+            Boako.Util.toast('🌟 우승 별이 로고에 새겨졌습니다!');
+            if (window.sfx && window.sfx.success) window.sfx.success();
+            await Boako.MobileTeamHub.render(document.getElementById('mobile-content-area'));
+        } catch (err) {
+            console.error('우승 별 저장 실패:', err);
+            Boako.Util.toast('❌ ' + (err.message || '저장에 실패했습니다.'));
+            btn.disabled = false; btn.innerText = '확정하고 저장';
+        }
+    },
+
+    // 🌟 Boako.Team.confirmStarReset()와 완전히 동일한 DB 로직 — 마지막만 모바일 재렌더로 대체
+    confirmStarReset: async () => {
+        const team = Boako.state.team.info;
+        const wrap = document.getElementById('star-canvas-wrap');
+        const starEls = [...wrap.querySelectorAll('.star-drag')];
+        const positions = starEls.map(el => ({
+            relX: parseFloat(el.dataset.relX),
+            relY: parseFloat(el.dataset.relY),
+            relSize: 0.16
+        }));
+
+        const btn = document.getElementById('star-modal-confirm');
+        btn.disabled = true; btn.innerText = '저장 중...';
+
+        try {
+            const blob = await Boako.Team._compositeStars(team.logo_url_origin, positions);
+            const newLogoUrl = await Boako.Team._uploadStarLogo(blob);
+
+            const { error } = await Boako.db.from('teams').update({ logo_url: newLogoUrl }).eq('id', team.id);
+            if (error) throw error;
+
+            document.getElementById('boako-star-modal')?.remove();
+            Boako.Util.toast('✅ 별 위치가 초기화되었습니다.');
+            await Boako.MobileTeamHub.render(document.getElementById('mobile-content-area'));
+        } catch (err) {
+            console.error('별 위치 초기화 실패:', err);
+            Boako.Util.toast('❌ ' + (err.message || '저장에 실패했습니다.'));
+            btn.disabled = false; btn.innerText = '확정하고 저장';
+        }
+    },
+
+    // ========== 🌟 챌린지 탭 — PC js/league.js를 그대로 재사용. 파일 전체(177KB)에서 PC 전용
+    // 화면 전환(Boako.View.render)을 부르는 곳은 openChallengeChat() 딱 한 곳뿐이라(챌린지
+    // 그룹채팅방 열기), 그 함수만 모바일 세션에서 토스트로 안전하게 덮어씀. 나머지 렌더링/모달/
+    // 팝업은 challenge-list/challenge-modal-root/challenge-popup-root 컨테이너 id만 참조하는
+    // 자기완결형이라 수정 없이 그대로 동작함.
+    renderChallengeTab: async () => {
+        const wrap = document.getElementById('mobile-team-tab-content');
+        if (!wrap) return;
+        wrap.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">챌린지 데이터 로드 중...</div>`;
+
+        try {
+            if (!Boako.League || !Boako.League.renderChallenges) await Boako.Util.loadScript('/js/league.js');
+
+            // 🌟 [버그 회피] 모바일 쪽지함이 아직 없어서 챌린지 그룹채팅 이동 함수만 안전하게 교체
+            Boako.League.openChallengeChat = async () => {
+                Boako.Util.toast('💬 챌린지 채팅은 쪽지함 포팅 후 연결될 예정이에요!');
+            };
+
+            const teamId = Boako.state.team.info.id;
+            const { data: challenges, error } = await Boako.db
+                .from('challenges')
+                .select('*')
+                .or(`attacker_team_id.eq.${teamId},defender_team_id.eq.${teamId}`)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+
+            const { data: games } = await Boako.db.from('games').select('game_name, game_logo_url:image_url');
+            Boako.League.State.availableGames = games || [];
+            Boako.League.State.challenges = challenges || [];
+
+            wrap.innerHTML = `<div id="challenge-list" style="display:flex; flex-direction:column; gap:12px;"></div><div id="challenge-modal-root"></div><div id="challenge-popup-root"></div>`;
+            Boako.League.renderChallenges();
+            if (window.lucide) window.lucide.createIcons();
+        } catch (e) {
+            console.error('챌린지 탭 로드 실패:', e);
+            wrap.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700; font-size:12px;">오류: ${e.message}</div>`;
         }
     },
 
