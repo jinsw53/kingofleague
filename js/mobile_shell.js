@@ -39,6 +39,9 @@
  * 🌟 [3단계: 화면별 포팅] 더보기 시트의 "🛡️ 팀 창단"(무소속이면 "팀 창단", 소속이면 "팀 관리"로
  *    라벨 자동 전환)과 드로어의 "💬 팀챗"에 openTeamHub() 연결 — js/mobile_team_hub.js(팀 본부+
  *    작전회의실)로 진입. 팀챗은 별도 배지 없이도 바로 채팅 탭으로 들어갈 수 있게 tab 인자로 구분.
+ * 🌟 [4단계: 화면별 포팅] 드로어의 "📬 쪽지"에 openMessenger() 연결 — js/mobile_messenger.js로
+ *    진입. 실시간 쪽지 채널(startMessengerRealtime)이 이미 안읽은 배지 갱신용으로 구독 중이므로,
+ *    쪽지함 화면이 별도 채널을 새로 만들지 않고 이 채널의 콜백에 편승(handleRealtimeInsert 호출).
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -216,6 +219,10 @@ Boako.MobileShell = {
                 const myId = Boako.state.user.id;
                 if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
                     await Boako.MobileShell.renderDrawer(); // 안읽은 쪽지 수 재조회 + 상단바/드로어 배지 갱신
+                    // 🌟 [신규] 쪽지함 화면이 지금 열려있으면 그 화면도 실시간으로 갱신 (모듈이 로드 안 됐으면 조용히 무시)
+                    if (Boako.MobileMessenger && Boako.MobileMessenger.handleRealtimeInsert) {
+                        Boako.MobileMessenger.handleRealtimeInsert(newMsg);
+                    }
                     if (newMsg.receiver_id === myId) Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 쪽지가 도착했습니다!`);
                 }
             }).subscribe();
@@ -283,6 +290,14 @@ Boako.MobileShell = {
         Boako.MobileTeamHub.activeTab = tab || 'info';
         const area = document.getElementById('mobile-content-area');
         if (area) await Boako.MobileTeamHub.render(area);
+    },
+
+    // 🌟 [신규] 드로어의 "📬 쪽지" 진입점 — 열려있던 드로어를 닫고 본문 영역에 쪽지함(js/mobile_messenger.js)을 그림
+    openMessenger: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileMessenger) await Boako.Util.loadScript('/js/mobile_messenger.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileMessenger.render(area);
     },
 
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
@@ -387,7 +402,7 @@ Boako.MobileShell = {
                 ${teamBadgeHtml}
             </div>
             <div style="display:flex; flex-direction:column; gap:2px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 4px;">
+                <div onclick="Boako.MobileShell.openMessenger()" style="display:flex; align-items:center; justify-content:space-between; padding:11px 4px; cursor:pointer;">
                     <span style="font-size:13px; font-weight:700;">📬 쪽지</span>
                     ${unreadCount > 0 ? `<span style="font-size:12px; color:#ef4444; font-weight:900;">${unreadCount}</span>` : ''}
                 </div>
