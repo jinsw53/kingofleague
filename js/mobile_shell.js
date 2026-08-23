@@ -43,6 +43,8 @@
  *    진입. 실시간 쪽지 채널(startMessengerRealtime)이 이미 안읽은 배지 갱신용으로 구독 중이므로,
  *    쪽지함 화면이 별도 채널을 새로 만들지 않고 이 채널의 콜백에 편승(handleRealtimeInsert 호출).
  * 🌟 [5단계: 화면별 포팅] 상단바 🔍 아이콘에 openSearch() 연결 — js/mobile_search.js(통합검색)로 진입.
+ * 🌟 [6단계: 화면별 포팅] 드로어의 "🔬 전력분석실"에 openPowerAnalysis() 연결 —
+ *    js/mobile_power_analysis.js로 진입.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -309,6 +311,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileSearch.render(area);
     },
 
+    // 🌟 [신규] 드로어의 "🔬 전력분석실" 진입점 — 본문 영역에 전력분석실(js/mobile_power_analysis.js)을 그림
+    openPowerAnalysis: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobilePowerAnalysis) await Boako.Util.loadScript('/js/mobile_power_analysis.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobilePowerAnalysis.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -416,7 +426,7 @@ Boako.MobileShell = {
                     ${unreadCount > 0 ? `<span style="font-size:12px; color:#ef4444; font-weight:900;">${unreadCount}</span>` : ''}
                 </div>
                 <div onclick="Boako.MobileShell.openTeamHub('chat')" style="padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer;">💬 팀챗</div>
-                <div style="padding:11px 4px; font-size:13px; font-weight:700;">🔬 전력분석실</div>
+                <div onclick="Boako.MobileShell.openPowerAnalysis()" style="padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer;">🔬 전력분석실</div>
                 <div style="padding:11px 4px; font-size:13px; font-weight:700;">🎒 인벤토리</div>
                 <div onclick="Boako.Auth.copyReferralLink && Boako.Auth.copyReferralLink()" style="padding:11px 4px; font-size:13px; font-weight:700; color:#92400e;">🎁 내 초대 링크 복사</div>
             </div>
