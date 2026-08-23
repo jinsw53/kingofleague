@@ -2,6 +2,7 @@
  * [TEAM LIST] 생성된 팀 목록 및 현황 대시보드
  * - 정렬 알고리즘: 1순위(전원 활동 중) -> 2순위(결원 많은 팀) -> 3순위(최신 창단 팀)
  * 🌟 가입 신청 쪽지에 sender_name_override/receiver_name_override 채우도록 수정 (안 채우면 대화방 제목이 "null 님과의 대화"로 표시되던 버그)
+ * 🌟 [수정] 섹션 헤더 문구 "방명록 및 로스터" → "등록된 팀 목록" (위 배너 제목과 안 맞고 의미도 어색했음)
  */
 Boako.TeamList = {
     currentPage: 1,
@@ -20,7 +21,7 @@ Boako.TeamList = {
             <section class="section-card">
                 <div class="card-header flex justify-between items-center">
                     <div class="flex items-center gap-3">
-                        <span>방명록 및 로스터</span>
+                        <span>등록된 팀 목록</span>
                         <span id="total-team-count" class="bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full font-black shadow-inner">총 0개 팀</span>
                     </div>
                 </div>
