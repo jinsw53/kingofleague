@@ -3,6 +3,13 @@
  * 🌟 [수정] 팀챗 배지가 하드코딩된 'N' 글자만 뜨던 버그 수정 — Chat.unreadCount로 실제 개수 표시
  * 🌟 [신규] 팀챗에 카카오톡 스타일 "안읽음 인원수" 추가 — team_chat_reads 테이블 기반,
  *    채팅방 입장 시점 기준으로 읽음 처리, 내 메시지 옆에 아직 안 읽은 팀원 수 표시
+ * 🌟 [리팩토링] Chat 네임스페이스의 실시간 채널(team-chat-*, team-chat-reads-*)을 탭 리더 선출
+ *    방식으로 전환 — 사이트를 여러 탭으로 띄우고 팀챗을 각 탭에서 열면 탭 수만큼 소켓이 늘어나던
+ *    문제 방지. 단, messenger.js 등과 달리 이 채널은 로그인 시 항상 켜져있는 전역 채널이 아니라
+ *    "팀챗 화면을 실제로 열어본 탭"에서만 필요한 lazy 채널이라, js/realtime_coordinator.js의
+ *    전역 리더 선출을 그대로 재사용하면 안 됨(전역 리더가 팀챗을 한 번도 안 열어봤으면 다른 탭이
+ *    영원히 이벤트를 못 받는 문제 발생) — 그래서 "지금 팀챗을 열어본 탭들"끼리만 별도로 리더를
+ *    선출하는 전용 미니 코디네이터를 팀 id별로 둠(localStorage 하트비트 + BroadcastChannel).
  */
 Boako.Team = {
     syncStatus: async () => {
@@ -1456,12 +1463,142 @@ const isLeader = Boako.state.team.type === 'LEADER';
         }
     },
 
+    // 🌟 [리팩토링] 팀챗 화면을 여러 탭에서 동시에 열어두면 탭마다 각자 채널을 구독해서 Realtime
+    // 동시연결 한도를 탭 수만큼 잡아먹는 문제 방지. 다만 이 채널은 messenger.js/achievements.js처럼
+    // "로그인하면 항상 켜져있는" 전역 채널이 아니라 "팀챗 화면을 실제로 열어본 탭"에서만 필요한
+    // lazy 채널이라, js/realtime_coordinator.js의 전역 리더 선출을 그대로 재사용하면 안 됨 —
+    // 전역 리더로 뽑힌 탭이 팀챗 화면을 한 번도 안 열어봤으면, 다른 탭에서 팀챗을 열어도 실제
+    // 구독을 아무도 안 하고 있어서 실시간 이벤트 자체가 영원히 발생하지 않는 문제가 생김.
+    // 그래서 "지금 이 세션에서 팀챗 화면을 열어본 탭들"끼리만 별도로 리더를 선출하는 전용
+    // 미니 코디네이터를 팀 id별로 둠(localStorage 하트비트 + BroadcastChannel, 확장의 패턴과 동일).
     Chat: {
         channel: null,
         readsChannel: null,
-        unreadCount: 0, // 🌟 [신규] 안 읽은 메시지 개수 — 배지에 실제 숫자를 표시하기 위해 추가
-        activeMemberCount: 0, // 🌟 [신규] 안읽음 인원수 계산에 필요한 팀 전체 활성 인원 수
-        readRows: [], // 🌟 [신규] { user_id, last_read_message_id }[] — 팀원별 읽음 상태
+        unreadCount: 0, // 🌟 안 읽은 메시지 개수 — 배지에 실제 숫자를 표시하기 위해 추가
+        activeMemberCount: 0, // 🌟 안읽음 인원수 계산에 필요한 팀 전체 활성 인원 수
+        readRows: [], // 🌟 { user_id, last_read_message_id }[] — 팀원별 읽음 상태
+
+        // ---- 🌟 팀챗 전용 미니 리더 선출 (teamId별로 격리) ----
+        _tabId: (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
+        _isLeader: false,
+        _leaderKey: null,
+        _heartbeatTimer: null,
+        _followerTimer: null,
+        _bc: null,
+        _coordTeamId: null,
+
+        _getLeaderInfo: function() {
+            try { return JSON.parse(localStorage.getItem(Boako.Team.Chat._leaderKey)); } catch (e) { return null; }
+        },
+        _isLeaderInfoAlive: function(info) {
+            return !!info && (Date.now() - info.ts) < 6000;
+        },
+        _claimLeadership: function(teamId) {
+            if (Boako.Team.Chat._followerTimer) { clearInterval(Boako.Team.Chat._followerTimer); Boako.Team.Chat._followerTimer = null; }
+            localStorage.setItem(Boako.Team.Chat._leaderKey, JSON.stringify({ tabId: Boako.Team.Chat._tabId, ts: Date.now() }));
+            Boako.Team.Chat._isLeader = true;
+            Boako.Team.Chat._heartbeatTimer = setInterval(() => {
+                localStorage.setItem(Boako.Team.Chat._leaderKey, JSON.stringify({ tabId: Boako.Team.Chat._tabId, ts: Date.now() }));
+            }, 2000);
+            Boako.Team.Chat._subscribeAsLeader(teamId);
+        },
+        _becomeFollower: function(teamId) {
+            Boako.Team.Chat._isLeader = false;
+            if (!Boako.Team.Chat._followerTimer) {
+                Boako.Team.Chat._followerTimer = setInterval(() => {
+                    const info = Boako.Team.Chat._getLeaderInfo();
+                    if (!Boako.Team.Chat._isLeaderInfoAlive(info)) Boako.Team.Chat._tryClaimWithJitter(teamId);
+                }, 2000);
+            }
+        },
+        _tryClaimWithJitter: function(teamId) {
+            const jitter = Math.random() * 400;
+            setTimeout(() => {
+                const info = Boako.Team.Chat._getLeaderInfo();
+                if (!Boako.Team.Chat._isLeaderInfoAlive(info)) Boako.Team.Chat._claimLeadership(teamId);
+                else Boako.Team.Chat._becomeFollower(teamId);
+            }, jitter);
+        },
+        _startCoordination: function(teamId) {
+            // 팀을 바꿔서(=다른 teamId로) 다시 들어온 경우 이전 코디네이터를 확실히 정리하고 새로 시작
+            if (Boako.Team.Chat._coordTeamId && Boako.Team.Chat._coordTeamId !== teamId) {
+                Boako.Team.Chat._teardownCoordination();
+            }
+            if (Boako.Team.Chat._coordTeamId === teamId) return; // 이미 이 팀으로 코디네이션 진행 중
+
+            Boako.Team.Chat._coordTeamId = teamId;
+            Boako.Team.Chat._leaderKey = `boako_teamchat_leader_${teamId}`;
+            Boako.Team.Chat._bc = new BroadcastChannel(`boako-teamchat-relay-${teamId}`);
+            Boako.Team.Chat._bc.onmessage = (e) => {
+                if (Boako.Team.Chat._isLeader) return; // 리더는 자기 방송을 무시
+                const { type, payload } = e.data || {};
+                if (type === 'chat-insert') Boako.Team.Chat._onChatInsert(payload);
+                else if (type === 'reads-change') Boako.Team.Chat._onReadsChange(teamId);
+            };
+            Boako.Team.Chat._tryClaimWithJitter(teamId);
+        },
+        _teardownCoordination: function() {
+            if (Boako.Team.Chat._heartbeatTimer) { clearInterval(Boako.Team.Chat._heartbeatTimer); Boako.Team.Chat._heartbeatTimer = null; }
+            if (Boako.Team.Chat._followerTimer) { clearInterval(Boako.Team.Chat._followerTimer); Boako.Team.Chat._followerTimer = null; }
+            if (Boako.Team.Chat._isLeader && Boako.Team.Chat._leaderKey) {
+                try {
+                    const info = Boako.Team.Chat._getLeaderInfo();
+                    if (info && info.tabId === Boako.Team.Chat._tabId) localStorage.removeItem(Boako.Team.Chat._leaderKey);
+                } catch (e) { /* noop */ }
+            }
+            if (Boako.Team.Chat.channel && Boako.db) { Boako.db.removeChannel(Boako.Team.Chat.channel); Boako.Team.Chat.channel = null; }
+            if (Boako.Team.Chat.readsChannel && Boako.db) { Boako.db.removeChannel(Boako.Team.Chat.readsChannel); Boako.Team.Chat.readsChannel = null; }
+            if (Boako.Team.Chat._bc) { try { Boako.Team.Chat._bc.close(); } catch (e) {} Boako.Team.Chat._bc = null; }
+            Boako.Team.Chat._isLeader = false;
+            Boako.Team.Chat._coordTeamId = null;
+        },
+
+        // ---- 🌟 실제 반응 로직(리더의 로컬 콜백/팔로워의 중계 수신 양쪽에서 동일하게 호출) ----
+        async _onChatInsert(newMsg) {
+            if (newMsg.sender_id === Boako.state.user.id) return;
+            newMsg.profiles = { full_name: "팀원" };
+            Boako.Team.Chat.renderMessage(newMsg);
+            Boako.Team.Chat.scrollToBottom();
+            Boako.Team.Chat.showNotification();
+            Boako.Util.toast("💬 팀 작전 회의실에 새로운 메시지가 있습니다!");
+            // 🌟 방을 계속 보고 있는 동안 온 메시지도 곧바로 읽음 처리 (카카오톡과 동일한 체감)
+            await Boako.Team.Chat.markRead(Boako.Team.Chat._coordTeamId);
+        },
+        async _onReadsChange(teamId) {
+            await Boako.Team.Chat.fetchReadRows(teamId);
+            Boako.Team.Chat.updateAllUnreadBadges();
+        },
+
+        // 🌟 이 탭이 리더일 때만 실제 채널 구독
+        _subscribeAsLeader: function(teamId) {
+            if (!Boako.Team.Chat._isLeader) return;
+            if (Boako.Team.Chat.channel) return; // 이미 구독 중이면 중복 방지
+
+            Boako.Team.Chat.channel = Boako.db.channel(`team-chat-${teamId}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'team_chats',
+                    filter: `team_id=eq.${teamId}`
+                }, (payload) => {
+                    Boako.Team.Chat._onChatInsert(payload.new);
+                    if (Boako.Team.Chat._bc) Boako.Team.Chat._bc.postMessage({ type: 'chat-insert', payload: payload.new });
+                })
+                .subscribe();
+
+            Boako.Team.Chat.readsChannel = Boako.db.channel(`team-chat-reads-${teamId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'team_chat_reads',
+                    filter: `team_id=eq.${teamId}`
+                }, () => {
+                    Boako.Team.Chat._onReadsChange(teamId);
+                    if (Boako.Team.Chat._bc) Boako.Team.Chat._bc.postMessage({ type: 'reads-change' });
+                })
+                .subscribe();
+        },
+
         showNotification: () => {
             const badge = document.getElementById('team-chat-badge');
             if (badge) {
@@ -1481,7 +1618,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
             }
         },
 
-        // 🌟 [신규] 팀 전체 활성 인원 수 (안읽음 계산의 분모)
+        // 🌟 팀 전체 활성 인원 수 (안읽음 계산의 분모)
         fetchActiveMemberCount: async (teamId) => {
             const { count } = await Boako.db
                 .from('team_members')
@@ -1491,7 +1628,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
             Boako.Team.Chat.activeMemberCount = count || 0;
         },
 
-        // 🌟 [신규] 팀원별 읽음 상태 전체를 다시 가져와 State에 채움
+        // 🌟 팀원별 읽음 상태 전체를 다시 가져와 State에 채움
         fetchReadRows: async (teamId) => {
             const { data } = await Boako.db
                 .from('team_chat_reads')
@@ -1500,7 +1637,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
             Boako.Team.Chat.readRows = data || [];
         },
 
-        // 🌟 [신규] 채팅방 입장(또는 방을 보고 있는 동안 새 메시지 수신) 시 "여기까지 읽었다" 갱신 —
+        // 🌟 채팅방 입장(또는 방을 보고 있는 동안 새 메시지 수신) 시 "여기까지 읽었다" 갱신 —
         // 카카오톡처럼 스크롤 위치가 아니라 "입장 시점"에 그때까지의 메시지를 한 번에 읽음 처리
         markRead: async (teamId) => {
             try {
@@ -1513,7 +1650,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
             }
         },
 
-        // 🌟 [신규] 특정 메시지 id 기준 "아직 안 읽은 사람 수" 계산 (발신자 본인 제외)
+        // 🌟 특정 메시지 id 기준 "아직 안 읽은 사람 수" 계산 (발신자 본인 제외)
         computeUnreadCount: (msgId, senderId) => {
             const others = (Boako.Team.Chat.readRows || []).filter(r => r.user_id !== senderId);
             const readCount = others.filter(r => r.last_read_message_id != null && r.last_read_message_id >= msgId).length;
@@ -1521,7 +1658,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
             return Math.max(0, totalOthers - readCount);
         },
 
-        // 🌟 [신규] 화면에 이미 그려진 내 메시지들의 안읽음 숫자를 전부 다시 계산해서 갱신
+        // 🌟 화면에 이미 그려진 내 메시지들의 안읽음 숫자를 전부 다시 계산해서 갱신
         updateAllUnreadBadges: () => {
             document.querySelectorAll('.own-msg-wrap').forEach(el => {
                 const msgId = Number(el.dataset.msgId);
@@ -1575,41 +1712,8 @@ const isLeader = Boako.state.team.type === 'LEADER';
             // 🌟 입장 = 지금까지의 메시지를 전부 읽음 처리 (카카오톡 방식)
             await Boako.Team.Chat.markRead(teamId);
 
-            if (Boako.Team.Chat.channel) Boako.db.removeChannel(Boako.Team.Chat.channel);
-            if (Boako.Team.Chat.readsChannel) Boako.db.removeChannel(Boako.Team.Chat.readsChannel);
-
-            Boako.Team.Chat.channel = Boako.db.channel(`team-chat-${teamId}`)
-                .on('postgres_changes', { 
-                    event: 'INSERT', 
-                    schema: 'public', 
-                    table: 'team_chats',
-                    filter: `team_id=eq.${teamId}`
-                }, async (payload) => {
-                    const newMsg = payload.new;
-                    if (newMsg.sender_id !== Boako.state.user.id) {
-                         newMsg.profiles = { full_name: "팀원" }; 
-                         Boako.Team.Chat.renderMessage(newMsg);
-                         Boako.Team.Chat.scrollToBottom();
-                         Boako.Team.Chat.showNotification();
-                         Boako.Util.toast("💬 팀 작전 회의실에 새로운 메시지가 있습니다!");
-                         // 🌟 방을 계속 보고 있는 동안 온 메시지도 곧바로 읽음 처리 (카카오톡과 동일한 체감)
-                         await Boako.Team.Chat.markRead(teamId);
-                    }
-                })
-                .subscribe();
-
-            // 🌟 [신규] 다른 팀원이 읽으면(=team_chat_reads 갱신되면) 내 메시지 옆 숫자가 실시간으로 줄어들도록 구독
-            Boako.Team.Chat.readsChannel = Boako.db.channel(`team-chat-reads-${teamId}`)
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'team_chat_reads',
-                    filter: `team_id=eq.${teamId}`
-                }, async () => {
-                    await Boako.Team.Chat.fetchReadRows(teamId);
-                    Boako.Team.Chat.updateAllUnreadBadges();
-                })
-                .subscribe();
+            // 🌟 팀챗 전용 리더 선출 시작 — 실제 소켓은 리더 탭에서만 생성됨
+            Boako.Team.Chat._startCoordination(teamId);
         },
         renderMessage: (msg) => {
             const container = document.getElementById('chat-messages');
