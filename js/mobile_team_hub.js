@@ -1,16 +1,26 @@
 /**
- * [MOBILE TEAM HUB] 모바일 전용 — 팀 창단 / 팀 본부(정보+로스터) / 작전 회의실(팀챗)
+ * [MOBILE TEAM HUB] 모바일 전용 — 팀 창단 / 팀 본부(정보+로스터+지갑내역) / 작전 회의실(팀챗) /
+ * 대항전 기록·일정
  * 🌟 [1단계 범위] PC js/team.js는 팀 본부/작전회의실/대항전 기록·일정/챌린지 4개 탭 + 우승 별
- *    붙이기(캔버스 로고 합성)까지 포함된 거대한 화면이라, 이번 포팅은 소장님과 합의한 대로
- *    "팀 본부(정보+로스터+초대/강퇴/탈퇴)"와 "작전 회의실(팀챗)" 두 탭만 우선 구현함.
- *    ⚔️대항전 기록·일정 / 🔥챌린지 / ⭐우승 별 관리는 다음 단계로 미룸.
- * 🌟 [재사용 원칙] Boako.Team.searchUser/executeInvite/addMember(멤버 스카웃 모달)는 PC 전용
- *    DOM에 의존하지 않고 Tailwind 유틸리티 클래스만 쓰는 자기완결형 함수라 모바일에서도 안전하게
- *    그대로 재사용함(모바일도 Tailwind CDN을 로드하므로 동일 클래스가 그대로 먹힘).
+ *    붙이기(캔버스 로고 합성)까지 포함된 거대한 화면이라, 소장님과 합의한 대로 단계를 나눠서 포팅함.
+ *    1단계: 팀 본부(정보+로스터+초대/강퇴/탈퇴) + 작전 회의실(팀챗)
+ *    2단계(이번): 대항전 기록·일정(시즌 페이즈별 밴투표/엔트리작전판/경기일정) + 팀 본부에
+ *    포인트 이용 내역 추가.
+ *    🔥챌린지(league.js 별도 시스템 의존) / 💰포인트 환전 지갑(PC는 마우스 드래그 방식이라 터치
+ *    UI 재설계 필요) / ⭐우승 별 붙이기(캔버스 드래그 배치, 터치 UI 재설계 필요)는 다음 단계로 미룸.
+ * 🌟 [재사용 원칙] Boako.Team.searchUser/executeInvite/addMember(멤버 스카웃 모달)/openBanVote/
+ *    openEntryForm/loadTeamPointHistory는 PC 전용 DOM에 의존하지 않고 Tailwind 유틸리티 클래스만
+ *    쓰거나 특정 컨테이너 id만 참조하는 자기완결형 함수라 모바일에서도 안전하게 그대로 재사용함
+ *    (모바일도 Tailwind CDN을 로드하므로 동일 클래스가 그대로 먹힘).
  * 🌟 [버그 회피] Boako.Team.create()/kick()은 마지막에 PC 전용 화면 전환 시스템인
  *    Boako.View.render('team')을 호출해서 모바일에서 그대로 쓰면 에러남(messenger.js의
  *    startRealtime 콜백이 Boako.Auth.renderWidget()을 부르던 것과 동일한 문제 패턴).
  *    동일한 DB 로직을 이 파일에 그대로 옮기고, 마무리만 모바일 재렌더로 바꿔서 재구현함.
+ * 🌟 [버그 회피] Boako.Team.loadMatchSchedule()도 마찬가지로 진행 예정 경기 클릭 시
+ *    Boako.Team.openMatchRoom()을 거쳐 Boako.View.render('messenger')를 호출해서 모바일에서
+ *    에러남 — 모바일 쪽지함(messenger)이 아직 포팅 전이라, 동일한 조회/렌더 로직을 이 파일에
+ *    재구현하되 진행 예정 경기 클릭 시엔 "쪽지함 포팅 후 연결 예정" 토스트로 대체(완료된 경기의
+ *    외부 토너먼트 결과 링크는 그대로 동작).
  * 🌟 [알려진 제한] 팀챗 실시간 채널(subscribeChat)은 PC의 Boako.Team.Chat과 마찬가지로 아직
  *    js/realtime_coordinator.js 탭 리더 선출을 적용하지 않음 — 화면을 벗어날 때(teardownChat)
  *    확실히 구독 해제해서 최소한 "떠나 있는 동안 계속 열려있는" 것만 방지함. 사이트 전역 실시간
@@ -201,12 +211,15 @@ Boako.MobileTeamHub = {
             <div style="display:flex; gap:6px; margin-bottom:12px;">
                 ${tabBtn('info', '🛡️ 팀 본부')}
                 ${tabBtn('chat', '💬 작전 회의실')}
+                ${tabBtn('record', '⚔️ 대항전')}
             </div>
             <div id="mobile-team-tab-content"></div>
         `;
 
         if (activeTab === 'chat') {
             Boako.MobileTeamHub.renderChatTab();
+        } else if (activeTab === 'record') {
+            Boako.MobileTeamHub.renderRecordTab();
         } else {
             Boako.MobileTeamHub.renderInfoTab();
         }
@@ -251,7 +264,12 @@ Boako.MobileTeamHub = {
                 ${isLeader ? `<button onclick="Boako.Team.addMember()" style="font-size:11.5px; font-weight:900; color:#fff; background:#7c3aed; padding:7px 12px; border-radius:8px;">+ 멤버 추가</button>` : ''}
             </div>
             ${rosterHtml}
+            <div id="team-point-history-container" style="margin-top:16px;"></div>
         `;
+
+        // 🌟 PC와 동일한 함수를 그대로 재사용 — '#team-point-history-container' id만 참조하는
+        // 자기완결형 함수라 모바일에서도 안전. (Boako.Team은 이미 render()에서 로드됨)
+        if (Boako.Team && Boako.Team.loadTeamPointHistory) Boako.Team.loadTeamPointHistory();
     },
 
     // 🌟 Boako.Team.kick()과 완전히 동일한 DB 로직 — 마지막만 모바일 재렌더로 대체
@@ -260,6 +278,156 @@ Boako.MobileTeamHub = {
         await Boako.db.from('team_members').update({ is_active: false, left_at: new Date().toISOString() })
             .eq('team_id', Boako.state.team.info.id).eq('player_name', name).eq('is_active', true);
         await Boako.MobileTeamHub.render(document.getElementById('mobile-content-area'));
+    },
+
+    // ========== 🌟 대항전 기록·일정 (시즌 페이즈별 안내 + 밴투표/엔트리작전판 + 경기일정) ==========
+    renderRecordTab: async () => {
+        const wrap = document.getElementById('mobile-team-tab-content');
+        if (!wrap) return;
+        wrap.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
+
+        let seasonStatus = { current_phase: 0, title: '비시즌', day_count: 0 };
+        try {
+            const { data } = await Boako.db.rpc('get_current_season_status');
+            if (data) seasonStatus = data;
+        } catch (e) {
+            console.error('시즌 상태 로드 실패:', e);
+        }
+
+        let bodyHtml = '';
+        switch (seasonStatus.current_phase) {
+            case 1: // 준비기
+                bodyHtml = `
+                    <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:40px 16px; background:#fff; border:1px solid #e2e8f0; border-radius:14px;">
+                        <span style="font-size:32px;">⚔️</span>
+                        <div style="font-size:15px; font-weight:900; color:#1e293b;">시즌 ${seasonStatus.season_no} 준비 기간</div>
+                        <div style="font-size:12px; font-weight:700; color:#94a3b8;">후보 종목 선발을 위한 데이터가 집계 중입니다. (현재 ${seasonStatus.day_count}일 차)</div>
+                    </div>`;
+                break;
+            case 2: // 밴 투표 기간
+                bodyHtml = `
+                    <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:40px 16px; background:#fef2f2; border:1px solid #fecaca; border-radius:14px;">
+                        <span style="font-size:32px;">🚫</span>
+                        <div style="font-size:15px; font-weight:900; color:#dc2626;">시즌 ${seasonStatus.season_no} 밴(Ban) 투표 진행 중</div>
+                        <div style="font-size:12px; font-weight:700; color:#f87171;">우리 팀의 밴 투표 권한을 행사하세요! (마감까지 D-${52 - seasonStatus.day_count}일)</div>
+                        <button onclick="Boako.Team.openBanVote()" style="margin-top:8px; background:#dc2626; color:#fff; font-weight:900; font-size:13px; padding:11px 20px; border-radius:10px;">투표소 입장하기</button>
+                    </div>`;
+                break;
+            case 3: // 엔트리 등록 기간
+                bodyHtml = `
+                    <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:40px 16px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:14px;">
+                        <span style="font-size:32px;">📝</span>
+                        <div style="font-size:15px; font-weight:900; color:#047857;">시즌 ${seasonStatus.season_no} 출전 엔트리 마감 임박</div>
+                        <div style="font-size:12px; font-weight:700; color:#34d399;">최종 확정된 종목에 출전할 선수를 등록하세요. (마감까지 D-${60 - seasonStatus.day_count}일)</div>
+                        <button onclick="Boako.Team.openEntryForm()" style="margin-top:8px; background:#059669; color:#fff; font-weight:900; font-size:13px; padding:11px 20px; border-radius:10px;">엔트리 작전판 열기</button>
+                    </div>`;
+                break;
+            case 4: // 본게임 진행 중
+                bodyHtml = `
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px; background:linear-gradient(135deg,#eff6ff,#eef2ff); border:1px solid #bfdbfe; border-radius:14px; margin-bottom:12px;">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                            ${seasonStatus.logo_url ? `<img src="${Boako.Util.cdn(seasonStatus.logo_url)}" style="height:32px; width:auto;">` : `<span style="font-size:22px;">🏆</span>`}
+                            <div style="min-width:0;">
+                                <div style="font-size:12.5px; font-weight:900; color:#1e293b;">시즌 ${seasonStatus.season_no}</div>
+                                <div style="font-size:10.5px; font-weight:700; color:#2563eb;">${seasonStatus.day_count}일차 · 본게임 진행 중</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="mobile-team-match-schedule"><div style="text-align:center; padding:24px; color:#94a3b8; font-weight:700; font-size:12.5px;">일정 데이터 로드 중...</div></div>
+                `;
+                break;
+            default: // 비시즌
+                bodyHtml = `
+                    <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:50px 16px; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:14px;">
+                        <span style="font-size:24px;">🏆</span>
+                        <div style="font-size:12.5px; font-weight:700;">현재 진행 중인 대항전 일정이 없습니다. (비시즌)</div>
+                    </div>`;
+                break;
+        }
+
+        wrap.innerHTML = bodyHtml;
+
+        if (seasonStatus.current_phase === 4) {
+            await Boako.MobileTeamHub.loadMatchSchedule();
+        }
+    },
+
+    // 🌟 [버그 회피] PC의 Boako.Team.loadMatchSchedule()과 동일한 조회 로직이되, 진행 예정 경기
+    // 클릭 시 Boako.Team.openMatchRoom()(내부에서 Boako.View.render('messenger') 호출)을 타지
+    // 않도록 모바일 전용으로 재구현 — 모바일 쪽지함이 아직 없어서 토스트로 안내만 함.
+    loadMatchSchedule: async () => {
+        const container = document.getElementById('mobile-team-match-schedule');
+        if (!container) return;
+
+        try {
+            const teamName = Boako.state.team.info.team_name;
+
+            const { data: gameList } = await Boako.db.from('games').select('game_name, image_url');
+            const gameLogoMap = {};
+            (gameList || []).forEach(g => { gameLogoMap[g.game_name] = g.image_url; });
+
+            const { data: gameScores } = await Boako.db.from('grandprix_game_scores').select('game_name, scores, source_url');
+            const gameScoreMap = {};
+            (gameScores || []).forEach(gs => { gameScoreMap[gs.game_name] = gs; });
+
+            const { data: schedules } = await Boako.db
+                .from('match_schedules')
+                .select('*')
+                .filter('participants', 'cs', `[{"team_name":"${teamName}"}]`)
+                .eq('match_type', 'GRANDPRIX')
+                .order('scheduled_time', { ascending: true });
+
+            if (!schedules || schedules.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding:24px 16px; color:#94a3b8; font-weight:700; font-size:12px; border:1px dashed #e2e8f0; border-radius:12px; background:#f8fafc;">아직 확정된 대항전 경기 일정이 없습니다.<br><span style="font-size:11px;">소통 채널에서 일정 조율을 진행해주세요.</span></div>`;
+                return;
+            }
+
+            const statusMap = {
+                UPCOMING: { label: '예정', bg: '#dbeafe', color: '#1d4ed8' },
+                IN_PROGRESS: { label: '진행 중', bg: '#fef3c7', color: '#b45309' },
+                COMPLETED: { label: '완료', bg: '#d1fae5', color: '#047857' }
+            };
+
+            container.innerHTML = schedules.map(s => {
+                const dt = new Date(s.scheduled_time).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const st = statusMap[s.status] || { label: s.status, bg: '#f1f5f9', color: '#64748b' };
+                const logoUrl = gameLogoMap[s.game_name];
+                const logoHtml = logoUrl
+                    ? `<img src="${Boako.Util.cdn(logoUrl)}" style="width:40px; height:40px; border-radius:10px; object-fit:contain; background:#f8fafc; padding:4px; flex-shrink:0;">`
+                    : `<div style="width:40px; height:40px; border-radius:10px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">🎲</div>`;
+
+                const opponent = (s.participants || []).find(p => p.team_name !== teamName);
+                const opponentHtml = opponent ? `<div style="font-size:10.5px; color:#94a3b8; font-weight:700;">vs ${Boako.MobileTeamHub.escapeHtml(opponent.team_name)}</div>` : '';
+
+                const isCompleted = s.status === 'COMPLETED';
+                const scoreInfo = gameScoreMap[s.game_name];
+                const lpEarned = isCompleted && scoreInfo ? (scoreInfo.scores?.[teamName] ?? null) : null;
+                const tournamentUrl = isCompleted && scoreInfo ? scoreInfo.source_url : null;
+                const lpBadge = isCompleted && lpEarned !== null
+                    ? `<div style="font-size:10.5px; font-weight:900; color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; padding:1px 7px; border-radius:8px; display:inline-block; margin-top:3px;">🏆 ${lpEarned} LP</div>`
+                    : '';
+
+                const clickAttr = isCompleted && tournamentUrl
+                    ? `onclick="window.open('${tournamentUrl}', '_blank')"`
+                    : `onclick="Boako.Util.toast('💬 일정 조율은 쪽지함 포팅 후 연결될 예정이에요!')"`;
+
+                return `
+                    <div ${clickAttr} style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:10px; margin-bottom:8px;">
+                        ${logoHtml}
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:12.5px; font-weight:900; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.MobileTeamHub.escapeHtml(s.game_name)}</div>
+                            ${opponentHtml}
+                            <div style="font-size:10.5px; color:#94a3b8; font-weight:700; margin-top:2px;">📅 ${dt}</div>
+                            ${lpBadge}
+                        </div>
+                        <span style="font-size:10.5px; font-weight:900; padding:4px 9px; border-radius:8px; background:${st.bg}; color:${st.color}; flex-shrink:0;">${st.label}</span>
+                    </div>`;
+            }).join('');
+
+        } catch (e) {
+            console.error('대항전 일정 로드 실패:', e);
+            container.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700; font-size:12px;">일정 로드 실패: ${e.message}</div>`;
+        }
     },
 
     // ========== 🌟 작전 회의실(팀챗) — PC Boako.Team.Chat과 동일한 데이터/RPC를 그대로 재사용 ==========
