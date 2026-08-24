@@ -33,6 +33,11 @@
  *    js/realtime_coordinator.js 탭 리더 선출을 적용하지 않음 — 화면을 벗어날 때(teardownChat)
  *    확실히 구독 해제해서 최소한 "떠나 있는 동안 계속 열려있는" 것만 방지함. 사이트 전역 실시간
  *    최적화 작업 때 PC/모바일 팀챗을 함께 코디네이터 방식으로 옮기는 걸 백로그로 남겨둠.
+ * 🌟 [버그수정] 팀 배너 색을 임의로 남색(#1e293b→#0f172a)으로 지정했었는데, PC team.js는 이
+ *    배너에 배경색을 따로 안 주고 .main-banner 기본값(보라색 #8b5cf6→#6d28d9)을 그대로 씀 —
+ *    PC와 동일하게 수정. 서포터즈 배지 아이콘도 🎽 이모지로 대충 넣었던 걸 PC와 동일하게
+ *    "시즌 유니폼 이미지(없으면 저지 실루엣 SVG)"로, 도전권 배지도 🎟️ 이모지 대신 실제
+ *    CHALLENGE_TOKEN_ICON 이미지로 교체. PC 배너엔 팀 로고 이미지가 없어 마찬가지로 제거.
  */
 window.Boako = window.Boako || {};
 Boako.MobileTeamHub = {
@@ -150,11 +155,12 @@ Boako.MobileTeamHub = {
             const { data: members } = await Boako.db.from('team_members').select('*').eq('team_id', team.id).eq('is_active', true);
             if (members) members.sort((a, b) => (a.role === 'LEADER' ? -1 : 1));
 
-            let bannerStats = { currentSeasonRank: null, currentSeasonTeamCount: 0, totalChampionships: 0, bestRank: null, supporterCount: 0, liveSeasonNo: null, starEligible: false, latestWinSeasonNo: null };
+            let bannerStats = { currentSeasonRank: null, currentSeasonTeamCount: 0, totalChampionships: 0, bestRank: null, supporterCount: 0, liveSeasonNo: null, starEligible: false, latestWinSeasonNo: null, uniformImageUrl: null };
             try {
                 const nowIso = new Date().toISOString();
-                const { data: liveSeason } = await Boako.db.from('seasons').select('season_no').lte('start_date', nowIso).gte('end_date', nowIso).maybeSingle();
+                const { data: liveSeason } = await Boako.db.from('seasons').select('season_no, uniform_image_url').lte('start_date', nowIso).gte('end_date', nowIso).maybeSingle();
                 if (liveSeason) {
+                    bannerStats.uniformImageUrl = liveSeason.uniform_image_url;
                     const { data: currentRanking } = await Boako.db.from('v_season_current_ranking').select('team_name, total_lp').eq('season_no', liveSeason.season_no).order('total_lp', { ascending: false });
                     if (currentRanking) {
                         bannerStats.currentSeasonTeamCount = currentRanking.length;
@@ -197,19 +203,26 @@ Boako.MobileTeamHub = {
             ? `🏆 통산 ${bannerStats.totalChampionships}회 우승 · 최고 순위 ${bannerStats.bestRank}위`
             : `🏆 아직 종료된 시즌 기록이 없습니다`;
 
+        // 🌟 PC view.js와 완전히 동일한 아이콘 소스 사용 — 서포터즈는 시즌 유니폼 이미지(없으면 저지
+        // 실루엣 SVG), 도전권은 CHALLENGE_TOKEN_ICON 이미지. 임의 이모지로 대체하지 않음.
+        const CHALLENGE_TOKEN_ICON = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challengetoken.png';
+        const uniformIconHtml = bannerStats.uniformImageUrl
+            ? `<img src="${Boako.Util.cdn(bannerStats.uniformImageUrl)}" style="width:18px; height:18px; object-fit:contain;">`
+            : `<svg width="18" height="18" viewBox="0 0 100 100"><path d="M50 22 L60 22 L74 30 L68 42 L60 37 L60 78 L40 78 L40 37 L32 42 L26 30 L40 22 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="3"/></svg>`;
+
+        // 🌟 [버그수정] PC team.js는 이 페이지에서 .main-banner 배경색을 따로 지정하지 않아
+        // 기본값(보라색 #8b5cf6→#6d28d9)을 그대로 씀 — 임의로 남색을 넣었던 걸 PC와 동일하게 수정.
+        // PC 배너에는 팀 로고 이미지가 없어 마찬가지로 제거.
         const bannerHtml = `
-            <div style="background:linear-gradient(135deg,#1e293b,#0f172a); border-radius:16px; padding:18px 20px; margin-bottom:12px;">
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <img src="${team.logo_url ? Boako.Util.cdn(team.logo_url) : ''}" style="width:48px; height:48px; border-radius:10px; background:#fff; object-fit:contain; padding:4px; flex-shrink:0;">
-                    <div style="min-width:0;">
-                        <div style="font-size:16px; font-weight:900; color:#fff;">${Boako.MobileTeamHub.escapeHtml(team.team_name)}</div>
-                        <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:2px;">${currentSeasonLine}</div>
-                    </div>
+            <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:20px; padding:18px 20px; margin-bottom:12px; color:#fff;">
+                <div style="font-size:18px; font-weight:900;">${Boako.MobileTeamHub.escapeHtml(team.team_name)}</div>
+                <div style="font-size:12px; font-weight:800; opacity:0.9; margin-top:8px; display:flex; flex-direction:column; gap:4px;">
+                    <div>${currentSeasonLine}</div>
+                    <div>${historyLine}</div>
                 </div>
-                <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:8px;">${historyLine}</div>
                 <div style="display:flex; gap:8px; margin-top:10px;">
-                    <div style="background:rgba(255,255,255,0.12); padding:5px 10px; border-radius:999px; font-size:11px; font-weight:900; color:#fff;">🎽 서포터즈 ${bannerStats.supporterCount}명</div>
-                    <div style="background:rgba(255,255,255,0.12); padding:5px 10px; border-radius:999px; font-size:11px; font-weight:900; color:#fff;">🎟️ 도전권 ${team.challengetokens || 0}개</div>
+                    <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:900;">${uniformIconHtml} 서포터즈 ${bannerStats.supporterCount}명</div>
+                    <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:900;"><img src="${Boako.Util.cdn(CHALLENGE_TOKEN_ICON)}" style="width:18px; height:18px; object-fit:contain;"> 도전권 ${team.challengetokens || 0}개</div>
                 </div>
             </div>
         `;
