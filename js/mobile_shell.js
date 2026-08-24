@@ -49,6 +49,8 @@
  *    js/mobile_team_list.js로 진입.
  * 🌟 [8단계: 화면별 포팅] 드로어의 "🎒 인벤토리"에 openInventory() 연결 —
  *    js/mobile_inventory.js로 진입.
+ * 🌟 [9단계: 화면별 포팅] 더보기 시트의 "🤝 같이 하자"에 openTogether() 연결 —
+ *    js/mobile_together.js로 진입.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -339,6 +341,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileInventory.render(area);
     },
 
+    // 🌟 [신규] 더보기 시트의 "🤝 같이 하자" 진입점 — 본문 영역에 같이하자(js/mobile_together.js)를 그림
+    openTogether: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileTogether) await Boako.Util.loadScript('/js/mobile_together.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileTogether.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -472,7 +482,7 @@ Boako.MobileShell = {
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚔️ 대항전</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">🎯 리그 콘텐츠</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 전적기록</div>
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
+                <div onclick="Boako.MobileShell.openTogether()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">
                     <span>🤝 같이 하자</span>${badge(c.together)}
                 </div>
                 <div onclick="Boako.MobileShell.openTeamHub('info')" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛡️ ${Boako.state.team ? '팀 관리' : '팀 창단'}</div>
