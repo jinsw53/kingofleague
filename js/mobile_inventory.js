@@ -7,6 +7,9 @@
  * 🌟 [수정 범위] PC 페이지의 바깥 틀(2단 레이아웃: 왼쪽 장착슬롯 카드 + 오른쪽 가방 그리드)만
  *    모바일 1단 레이아웃(위: 장착 슬롯 / 아래: 가방 목록)으로 새로 그림 — 내부에 같은 id
  *    (equipped-badges/inventory-list)만 정확히 넣어주면 loadItems() 등은 수정 없이 동작함.
+ * 🌟 [버그수정] 배너 색을 임의로 초록색으로 지정했었는데, PC는 이 페이지만 배너 색을 따로
+ *    지정하지 않고 .main-banner 기본값(보라색 #8b5cf6→#6d28d9)을 그대로 씀 — PC와 동일하게 수정.
+ *    소제목("✨ 장착 중인 배지"/"📦 내 가방")도 PC 문구 그대로 통일.
  */
 window.Boako = window.Boako || {};
 Boako.MobileInventory = {
@@ -22,16 +25,16 @@ Boako.MobileInventory = {
         if (!Boako.Inventory || !Boako.Inventory.loadItems) await Boako.Util.loadScript('/js/inventory.js');
 
         container.innerHTML = `
-            <div style="background:linear-gradient(135deg,#059669,#047857); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
-                <div style="font-size:17px; font-weight:900;">🎒 인벤토리</div>
-                <div style="font-size:11.5px; font-weight:700; opacity:0.9; margin-top:4px;">보유한 아이템과 배지를 확인하고 장착해보세요.</div>
+            <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
+                <div style="font-size:17px; font-weight:900;">🎒 내 인벤토리</div>
             </div>
 
             <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:16px; margin-bottom:14px;">
+                <div style="font-size:13.5px; font-weight:900; color:#1e293b; margin-bottom:10px;">✨ 장착 중인 배지</div>
                 <div id="equipped-badges"></div>
             </div>
 
-            <div style="font-size:13.5px; font-weight:900; color:#1e293b; margin-bottom:10px;">🛍️ 가방</div>
+            <div style="font-size:13.5px; font-weight:900; color:#1e293b; margin-bottom:10px;">📦 내 가방</div>
             <div id="inventory-list"></div>
         `;
 
