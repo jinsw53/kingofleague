@@ -47,6 +47,8 @@
  *    js/mobile_power_analysis.js로 진입.
  * 🌟 [7단계: 화면별 포팅] 더보기 시트의 "👥 팀 목록"에 openTeamList() 연결 —
  *    js/mobile_team_list.js로 진입.
+ * 🌟 [8단계: 화면별 포팅] 드로어의 "🎒 인벤토리"에 openInventory() 연결 —
+ *    js/mobile_inventory.js로 진입.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -329,6 +331,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileTeamList.render(area);
     },
 
+    // 🌟 [신규] 드로어의 "🎒 인벤토리" 진입점 — 본문 영역에 인벤토리(js/mobile_inventory.js)를 그림
+    openInventory: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileInventory) await Boako.Util.loadScript('/js/mobile_inventory.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileInventory.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -437,7 +447,7 @@ Boako.MobileShell = {
                 </div>
                 <div onclick="Boako.MobileShell.openTeamHub('chat')" style="padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer;">💬 팀챗</div>
                 <div onclick="Boako.MobileShell.openPowerAnalysis()" style="padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer;">🔬 전력분석실</div>
-                <div style="padding:11px 4px; font-size:13px; font-weight:700;">🎒 인벤토리</div>
+                <div onclick="Boako.MobileShell.openInventory()" style="padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer;">🎒 인벤토리</div>
                 <div onclick="Boako.Auth.copyReferralLink && Boako.Auth.copyReferralLink()" style="padding:11px 4px; font-size:13px; font-weight:700; color:#92400e;">🎁 내 초대 링크 복사</div>
             </div>
             <div style="margin-top:16px; padding-top:12px; border-top:1px solid #e2e8f0;">
