@@ -53,6 +53,8 @@
  *    js/mobile_together.js로 진입.
  * 🌟 [10단계: 화면별 포팅] 더보기 시트의 "📅 일정표"에 openSchedule() 연결 —
  *    js/mobile_schedule.js로 진입.
+ * 🌟 [11단계: 화면별 포팅] 더보기 시트의 "⚡ 라이벌 매치"에 openRival() 연결 —
+ *    js/mobile_rival.js로 진입.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -359,6 +361,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileSchedule.render(area);
     },
 
+    // 🌟 [신규] 더보기 시트의 "⚡ 라이벌 매치" 진입점 — 본문 영역에 라이벌 매치(js/mobile_rival.js)를 그림
+    openRival: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileRival) await Boako.Util.loadScript('/js/mobile_rival.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileRival.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -488,7 +498,7 @@ Boako.MobileShell = {
         const badge = (n) => n > 0 ? `<span style="background:#ef4444; color:#fff; font-size:11px; font-weight:900; min-width:18px; height:18px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; padding:0 5px;">${n}</span>` : '';
         wrap.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:2px;">
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚡ 라이벌 매치</div>
+                <div onclick="Boako.MobileShell.openRival()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">⚡ 라이벌 매치</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚔️ 대항전</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">🎯 리그 콘텐츠</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 전적기록</div>
