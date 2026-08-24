@@ -51,6 +51,8 @@
  *    js/mobile_inventory.js로 진입.
  * 🌟 [9단계: 화면별 포팅] 더보기 시트의 "🤝 같이 하자"에 openTogether() 연결 —
  *    js/mobile_together.js로 진입.
+ * 🌟 [10단계: 화면별 포팅] 더보기 시트의 "📅 일정표"에 openSchedule() 연결 —
+ *    js/mobile_schedule.js로 진입.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -349,6 +351,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileTogether.render(area);
     },
 
+    // 🌟 [신규] 더보기 시트의 "📅 일정표" 진입점 — 본문 영역에 일정표(js/mobile_schedule.js)를 그림
+    openSchedule: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileSchedule) await Boako.Util.loadScript('/js/mobile_schedule.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileSchedule.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -492,7 +502,7 @@ Boako.MobileShell = {
                     <span>📝 게시판</span>${badge(c.boardRequest)}
                 </div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">🛒 포인트 샵</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">📅 일정표</div>
+                <div onclick="Boako.MobileShell.openSchedule()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">📅 일정표</div>
             </div>
         `;
     },
