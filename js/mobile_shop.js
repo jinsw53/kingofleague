@@ -10,6 +10,9 @@
  *    재정의해뒀음(드로어 갱신 / 조용히 무시) — 이 화면에서 개별적으로 우회할 필요가 없음. 다만
  *    Boako.View.render는 "현재 화면을 새로고침"하는 역할이었으므로, 구매 후 목록에 즉시 반영되게
  *    하려면 이 화면 자신의 render()를 다시 호출해주는 게 좋아 여기서만 별도로 재호출을 붙여둠.
+ * 🌟 [버그수정] 배너 텍스트가 왼쪽 정렬돼있었음 — PC .main-banner는 가운데 정렬인데 그 클래스가
+ *    모바일엔 정의돼있지 않아 정렬이 다르게 보임. 인라인으로 직접 가운데 정렬 속성을 추가(로그인
+ *    전 배너, 실제 상점 배너 두 곳 모두).
  */
 window.Boako = window.Boako || {};
 Boako.MobileShop = {
@@ -17,7 +20,7 @@ Boako.MobileShop = {
     render: async (container) => {
         if (!Boako.state.user) {
             container.innerHTML = `
-                <div style="background:linear-gradient(135deg,#f59e0b,#d97706); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
+                <div style="background:linear-gradient(135deg,#f59e0b,#d97706); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
                     <div style="font-size:17px; font-weight:900;">🛒 포인트 샵</div>
                 </div>
                 <div style="padding:60px 16px; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">🔒 로그인 후 이용할 수 있어요.</div>
@@ -129,7 +132,7 @@ Boako.MobileShop = {
                 }).join('');
 
             container.innerHTML = `
-                <div style="background:linear-gradient(135deg,#f59e0b,#d97706); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
+                <div style="background:linear-gradient(135deg,#f59e0b,#d97706); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
                     <div style="font-size:17px; font-weight:900;">🛒 프리미엄 포인트 샵</div>
                     <div style="margin-top:10px; font-size:14px; font-weight:800; background:rgba(0,0,0,0.2); padding:6px 14px; border-radius:20px; display:inline-block;">
                         내 지갑: <span style="color:#fde047;">${myPoints.toLocaleString()} P</span>
