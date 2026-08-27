@@ -17,6 +17,8 @@
  *    Tailwind 클래스를 그대로 부여해야 함(인라인 스타일이면 우선순위 때문에 클래스 토글이 씹힘).
  * 🌟 [알려진 제한] subscribeRealtime()의 'together-board-realtime' 채널은 아직 탭 리더 선출이
  *    적용 안 된 상태(PC도 마찬가지) — 사이트 전역 실시간 최적화 라운드에서 함께 정리할 백로그로 남김.
+ * 🌟 [버그수정] 배너 텍스트가 왼쪽 정렬돼있었음 — PC .main-banner는 가운데 정렬인데 그 클래스가
+ *    모바일엔 정의돼있지 않아 정렬이 다르게 보임. 인라인으로 직접 가운데 정렬 속성을 추가.
  */
 window.Boako = window.Boako || {};
 Boako.MobileTogether = {
@@ -45,7 +47,7 @@ Boako.MobileTogether = {
         Boako.MobileTogether._ensurePatched();
 
         container.innerHTML = `
-            <div style="background:linear-gradient(135deg,#0ea5e9,#0369a1); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
+            <div style="background:linear-gradient(135deg,#0ea5e9,#0369a1); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
                 <div style="font-size:17px; font-weight:900;">🎲 같이하자</div>
                 <div style="font-size:11.5px; font-weight:700; opacity:0.9; margin-top:4px;">지금 같이 놀 사람을 모아보세요. 참가는 선착순, 승인 없이 바로 확정돼요.</div>
             </div>
