@@ -55,6 +55,9 @@
  *    js/mobile_schedule.js로 진입.
  * 🌟 [11단계: 화면별 포팅] 더보기 시트의 "⚡ 라이벌 매치"에 openRival() 연결 —
  *    js/mobile_rival.js로 진입.
+ * 🌟 [전역 패치] Boako.Auth.renderWidget()과 Boako.View.render(...)를 모바일 세션 전체에서
+ *    안전한 버전으로 재정의(init() 최상단) — shop.js/league.js 등 앞으로 재사용할 PC 모듈들이
+ *    구매·처리 완료 후 관용적으로 부르는 이 두 함수를 화면마다 개별 우회할 필요가 없어짐.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -66,6 +69,18 @@ Boako.MobileShell = {
         // 먼저(로그인 여부 무관하게) 실행돼야 함. Boako.Auth.captureReferralParam은 DOM 의존이
         // 전혀 없어(localStorage만 다룸) 그대로 재사용 가능.
         Boako.Auth.captureReferralParam();
+
+        // 🌟 [전역 버그 회피] 여러 PC 모듈(shop.js/team.js/league.js 등)이 구매·처리 완료 후
+        // 관용적으로 Boako.Auth.renderWidget()(로그인 위젯 갱신)과 Boako.View.render(...)(PC
+        // 화면 전환)를 호출하는데, 모바일엔 둘 다 대응하는 게 없어서 에러가 남 — Boako.View는
+        // core.js가 페이지 로드 시 미리 빈 객체({})로 선언해둬서 .render 자체가 없어 즉시 에러.
+        // 매 화면(mobile_*.js)마다 개별적으로 이 두 함수를 우회하는 대신, 모바일 세션 전체에서
+        // 한 번만 안전한 버전으로 재정의해서 앞으로 재사용할 모든 PC 모듈이 자동으로 안전해지도록 함.
+        Boako.Auth.renderWidget = () => Boako.MobileShell.renderDrawer();
+        Boako.View.render = async () => {
+            // 모바일은 화면 갱신을 각 mobile_*.js 자신의 재렌더 함수가 담당하므로,
+            // PC 모듈이 관용적으로 부르는 이 호출은 에러만 나지 않게 조용히 무시함
+        };
 
         // core.js가 Boako.db를 만들지 않으므로(원래 auth.js의 init 초반부가 하던 일) 여기서 직접 생성
         if (!Boako.db) {
@@ -511,10 +526,18 @@ Boako.MobileShell = {
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
                     <span>📝 게시판</span>${badge(c.boardRequest)}
                 </div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🛒 포인트 샵</div>
+                <div onclick="Boako.MobileShell.openShop()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛒 포인트 샵</div>
                 <div onclick="Boako.MobileShell.openSchedule()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">📅 일정표</div>
             </div>
         `;
+    },
+
+    // 🌟 [신규] 더보기 시트의 "🛒 포인트 샵" 진입점 — 본문 영역에 포인트 샵(js/mobile_shop.js)을 그림
+    openShop: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileShop) await Boako.Util.loadScript('/js/mobile_shop.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileShop.render(area);
     },
 
     // ========== 🌟 [신규] "더보기" 안에 숨은 항목의 알림 집계 (더보기 버튼 자체에 점 찍기) ==========
