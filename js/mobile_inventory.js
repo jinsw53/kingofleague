@@ -10,6 +10,9 @@
  * 🌟 [버그수정] 배너 색을 임의로 초록색으로 지정했었는데, PC는 이 페이지만 배너 색을 따로
  *    지정하지 않고 .main-banner 기본값(보라색 #8b5cf6→#6d28d9)을 그대로 씀 — PC와 동일하게 수정.
  *    소제목("✨ 장착 중인 배지"/"📦 내 가방")도 PC 문구 그대로 통일.
+ * 🌟 [버그수정] 배너 텍스트가 왼쪽 정렬돼있었음 — PC .main-banner는 가운데 정렬(align-items:
+ *    center, text-align:center)인데 그 클래스가 모바일엔 정의돼있지 않아 정렬이 다르게 보임.
+ *    이 화면은 인라인 스타일이라 클래스 정의 없이 직접 가운데 정렬 속성을 추가.
  */
 window.Boako = window.Boako || {};
 Boako.MobileInventory = {
@@ -25,7 +28,7 @@ Boako.MobileInventory = {
         if (!Boako.Inventory || !Boako.Inventory.loadItems) await Boako.Util.loadScript('/js/inventory.js');
 
         container.innerHTML = `
-            <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
+            <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
                 <div style="font-size:17px; font-weight:900;">🎒 내 인벤토리</div>
             </div>
 
