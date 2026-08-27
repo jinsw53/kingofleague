@@ -17,6 +17,8 @@
  *    .syncStatus/.renderChallenges, 쪽지함의 Object.keys 길이, 검색의 .init)은 이미 이 방식으로
  *    안전하게 체크하고 있었음.
  * 🌟 [수정] 헤더 라벨 "방명록 및 로스터" → "등록된 팀 목록" (PC team_list.js와 동일하게 통일)
+ * 🌟 [버그수정] 배너 텍스트가 왼쪽 정렬돼있었음 — PC .main-banner는 가운데 정렬인데 그 클래스가
+ *    모바일엔 정의돼있지 않아 정렬이 다르게 보임. 인라인으로 직접 가운데 정렬 속성을 추가.
  */
 window.Boako = window.Boako || {};
 Boako.MobileTeamList = {
@@ -25,7 +27,7 @@ Boako.MobileTeamList = {
         if (!Boako.TeamList || !Boako.TeamList.loadTeams) await Boako.Util.loadScript('/js/team_list.js');
 
         container.innerHTML = `
-            <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
+            <div style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
                 <div style="font-size:17px; font-weight:900;">👥 리그 참여 팀 목록</div>
                 <div style="font-size:11.5px; font-weight:700; opacity:0.9; margin-top:4px;">BOAKO 아카이브에 등록된 전설적인 팀들을 확인하고 합류하세요!</div>
             </div>
