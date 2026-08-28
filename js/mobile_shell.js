@@ -55,6 +55,8 @@
  *    js/mobile_schedule.js로 진입.
  * 🌟 [11단계: 화면별 포팅] 더보기 시트의 "⚡ 라이벌 매치"에 openRival() 연결 —
  *    js/mobile_rival.js로 진입.
+ * 🌟 [12단계: 화면별 포팅] 더보기 시트의 "📝 게시판"에 openBoard() 연결 —
+ *    js/mobile_board.js로 진입.
  * 🌟 [전역 패치] Boako.Auth.renderWidget()과 Boako.View.render(...)를 모바일 세션 전체에서
  *    안전한 버전으로 재정의(init() 최상단) — shop.js/league.js 등 앞으로 재사용할 PC 모듈들이
  *    구매·처리 완료 후 관용적으로 부르는 이 두 함수를 화면마다 개별 우회할 필요가 없어짐.
@@ -384,6 +386,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileRival.render(area);
     },
 
+    // 🌟 [12단계: 신규] 더보기 시트의 "📝 게시판" 진입점 — 본문 영역에 게시판(js/mobile_board.js)을 그림
+    openBoard: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileBoard) await Boako.Util.loadScript('/js/mobile_board.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileBoard.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -523,7 +533,7 @@ Boako.MobileShell = {
                 <div onclick="Boako.MobileShell.openTeamHub('info')" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛡️ ${Boako.state.team ? '팀 관리' : '팀 창단'}</div>
                 <div onclick="Boako.MobileShell.openTeamList()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">👥 팀 목록</div>
                 <div onclick="window.open('https://cafe.naver.com/boardgamearena', '_blank')" style="padding:12px 4px; font-size:14px; font-weight:700;">☕ 카페</div>
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700;">
+                <div onclick="Boako.MobileShell.openBoard()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">
                     <span>📝 게시판</span>${badge(c.boardRequest)}
                 </div>
                 <div onclick="Boako.MobileShell.openShop()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛒 포인트 샵</div>
