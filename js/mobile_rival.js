@@ -23,6 +23,11 @@
  *    명시적으로 강제하고, 뱃지 영역은 margin-left:auto로 우측에 확실히 고정. 종목명은 말줄임
  *    대신(소장님 지시: 줄임표시보다 글자 축소·줄바꿈이 낫다는 원칙) 글자 크기를 살짝 줄이고
  *    필요시 두 줄로 자연스럽게 줄바꿈되도록 변경.
+ * 🌟 [버그수정 2차] 위 수정 후에도 뱃지가 우측 끝에 붙지 않고 종목명 텍스트 바로 뒤에 붙어버림 —
+ *    원인은 종목명 wrapper에 flex-basis를 auto로 준 것. 종목명이 줄바꿈 가능해지면서(word-break)
+ *    "auto" 기준 크기 계산이 브라우저에서 애매해져 실제 남는 공간만큼 안 늘어났음. flex-basis를
+ *    0%로 강제해서(flex:1 1 0%) 내용물 크기와 무관하게 무조건 남는 공간을 전부 차지하도록 수정 —
+ *    이러면 뱃지(flex-shrink:0)가 항상 행의 진짜 우측 끝에 붙는다.
  */
 window.Boako = window.Boako || {};
 Boako.MobileRival = {
@@ -59,11 +64,13 @@ Boako.MobileRival = {
                 /* 🌟 [버그수정] 라이벌 찾기 결과 행에서 "내 기록" 뱃지+화살표가 카드 우측 끝에
                    확실히 밀착되지 않아 종목명 공간이 좁게 계산되고, 그로 인해 짧은 종목명까지
                    불필요하게 말줄임(…) 처리되던 문제 — 행 레이아웃을 명시적으로 강제하고, 종목명은
-                   말줄임 대신 글자 크기 축소 + 두 줄 줄바꿈 허용으로 변경. */
+                   말줄임 대신 글자 크기 축소 + 두 줄 줄바꿈 허용으로 변경.
+                   [2차 수정] 종목명 wrapper의 flex-basis를 0%로 고정해 내용물 크기와 무관하게
+                   무조건 남는 공간을 다 차지하도록 강제 — 이래야 뱃지가 항상 진짜 우측 끝에 붙음. */
                 #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] {
                     display: flex !important; flex-wrap: nowrap; justify-content: space-between !important; gap: 8px;
                 }
-                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:first-child { min-width: 0; flex: 1 1 auto; }
+                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:first-child { min-width: 0; flex: 1 1 0%; }
                 #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:first-child > span:last-child {
                     white-space: normal; word-break: keep-all; font-size: 13px; line-height: 1.3; min-width: 0;
                 }
