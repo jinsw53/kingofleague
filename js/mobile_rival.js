@@ -11,9 +11,18 @@
  *    가볍게 정의해줌(schedule.js 포팅 때와 동일 패턴, PC 원본 값과 무관하게 합리적 기본값만 보정).
  * 🌟 [버그수정] .main-banner가 PC index.html에만 정의돼있어(가운데 정렬/고정 높이/둥근 모서리)
  *    모바일엔 배경색만 남고 나머지 레이아웃이 다 빠져서 이상하게 보였음 — PC와 동일한 값으로 정의.
- * 🌟 [버그수정] 라이벌 찾기 결과 행이 좁은 화면에서 잘리던 걸 처음엔 줄바꿈으로 미봉했다가
- *    PC와 다른 2줄 모양이 돼서 다시 수정 — PC처럼 한 줄에 맞도록 종목명은 말줄임, 오른쪽
- *    뱃지는 폰트/여백을 압축해서 같은 줄에 들어가게 함.
+ * 🌟 [버그수정] 배너 h1/p가 flex column의 align-items:center 아래서 "내용물 크기만큼만" 박스가
+ *    잡혀 text-align:center가 사실상 무력화되고, 두 줄 문구는 줄마다 폭이 달라 미묘하게 어긋나
+ *    보였음 — h1/p에 width:100%를 줘서 배너 폭 전체를 기준으로 확실히 가운데 정렬되게 수정.
+ * 🌟 [버그수정] 검색창 옆 "검색" 버튼이 고정폭을 차지해 입력창이 좁아지면서 placeholder
+ *    "다른 종목 검색 (예: 쿼리도)"가 끝까지 안 보이고 잘렸음 — placeholder 전용 글자 크기를
+ *    줄여서(::placeholder) 잘리지 않고 전부 보이게 수정.
+ * 🌟 [버그수정] 라이벌 찾기 결과 행에서 "내 기록" 뱃지+화살표 영역이 카드 우측 끝에 확실히
+ *    밀착되지 않아 왼쪽 종목명 공간이 실제보다 좁게 계산되고, 그로 인해 짧은 종목명까지
+ *    불필요하게 말줄임(…) 처리되던 문제 수정 — 행에 display:flex+justify-content:space-between을
+ *    명시적으로 강제하고, 뱃지 영역은 margin-left:auto로 우측에 확실히 고정. 종목명은 말줄임
+ *    대신(소장님 지시: 줄임표시보다 글자 축소·줄바꿈이 낫다는 원칙) 글자 크기를 살짝 줄이고
+ *    필요시 두 줄로 자연스럽게 줄바꿈되도록 변경.
  */
 window.Boako = window.Boako || {};
 Boako.MobileRival = {
@@ -38,18 +47,29 @@ Boako.MobileRival = {
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     color: #fff; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.15);
                 }
-                #mobile-rival-root .main-banner h1 { font-size: 19px; font-weight: 900; margin: 0 0 8px; }
-                #mobile-rival-root .main-banner p { font-size: 12px; font-weight: 700; margin: 4px 0 0; opacity: 0.95; }
-                /* 🌟 [버그수정] 라이벌 찾기 결과 행(순위+로고+종목명 / 내 기록 뱃지+화살표)이 PC에서는
-                   한 줄에 다 들어가는데, 처음엔 그냥 잘렸었고 → 줄바꿈으로 미봉했더니 PC와 다른
-                   2줄 모양이 됐음. PC처럼 한 줄에 맞도록: 종목명은 말줄임 처리로 줄여주고,
-                   오른쪽 뱃지는 폰트/여백을 살짝 압축해서 같은 줄에 들어가게 함. */
-                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] { flex-wrap: nowrap; gap: 8px; }
-                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:first-child { min-width: 0; flex: 1 1 auto; overflow: hidden; }
-                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:first-child > span:last-child {
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+                /* 🌟 [버그수정] width:100%가 없으면 flex 아이템이 내용물 크기만큼만 박스가 잡혀서
+                   text-align:center가 무력화됨 — 배너 폭 전체 기준으로 확실히 가운데 정렬되게 함. */
+                #mobile-rival-root .main-banner h1 { font-size: 19px; font-weight: 900; margin: 0 0 8px; width: 100%; }
+                #mobile-rival-root .main-banner p { font-size: 12px; font-weight: 700; margin: 4px 0 0; opacity: 0.95; width: 100%; }
+
+                /* 🌟 [버그수정] 검색 버튼이 폭을 차지해 입력창이 좁아지면서 placeholder 전체가 안
+                   보이고 잘렸음 — placeholder 전용 글자 크기만 줄여서 끝까지 보이게 함. */
+                #mobile-rival-root #rival-search-input::placeholder { font-size: 11.5px; }
+
+                /* 🌟 [버그수정] 라이벌 찾기 결과 행에서 "내 기록" 뱃지+화살표가 카드 우측 끝에
+                   확실히 밀착되지 않아 종목명 공간이 좁게 계산되고, 그로 인해 짧은 종목명까지
+                   불필요하게 말줄임(…) 처리되던 문제 — 행 레이아웃을 명시적으로 강제하고, 종목명은
+                   말줄임 대신 글자 크기 축소 + 두 줄 줄바꿈 허용으로 변경. */
+                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] {
+                    display: flex !important; flex-wrap: nowrap; justify-content: space-between !important; gap: 8px;
                 }
-                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:last-child { flex-shrink: 0; gap: 6px !important; }
+                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:first-child { min-width: 0; flex: 1 1 auto; }
+                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:first-child > span:last-child {
+                    white-space: normal; word-break: keep-all; font-size: 13px; line-height: 1.3; min-width: 0;
+                }
+                #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:last-child {
+                    flex-shrink: 0; gap: 6px !important; margin-left: auto;
+                }
                 #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:last-child span {
                     font-size: 10px !important; padding: 4px 7px !important; white-space: nowrap;
                 }
