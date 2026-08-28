@@ -24,10 +24,18 @@
          이 컨테이너는 정상적인 블록(세로 쌓임) 레이아웃으로 되돌리고, flex 중앙정렬이 필요했던
          건 로딩 전 placeholder 텍스트 하나뿐이라 그 부분만 별도 div로 감싸 처리.
          🌟 [신규] 상단바에 🔍 검색 아이콘 추가 — js/mobile_search.js(js/search.js를 그대로 재사용,
-         검색 결과 클릭 시 이동만 모바일 안전 버전으로 대체)로 진입. -->
+         검색 결과 클릭 시 이동만 모바일 안전 버전으로 대체)로 진입.
+         🌟 [버그수정] lucide 아이콘 라이브러리 스크립트가 아예 로드되지 않고 있었음 — PC
+         index.html은 로드하는데 이 파일엔 빠져있어서, rival.js/team.js/league.js 등 PC 스크립트를
+         그대로 재사용하는 모든 모바일 화면에서 <i data-lucide="..."> 아이콘이 전부 빈 채로 남고,
+         Tailwind가 지정한 크기(w-4 h-4, w-5 h-5 등)만큼 투명한 빈 공간만 차지해서 레이아웃이
+         미묘하게 어긋나 보이는 문제(예: 라이벌 매치 검색창 아이콘 자리, 결과 행 화살표 아이콘
+         자리)의 근본 원인이었음. PC와 동일한 CDN을 추가해서 모든 모바일 화면에서 lucide 아이콘이
+         정상적으로 그려지도록 수정. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
             --primary: #7c3aed; --bg-body: #f0f2f5; --bg-card: #ffffff;
