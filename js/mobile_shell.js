@@ -61,6 +61,8 @@
  *    js/mobile_match.js로 진입. 이와 함께, match.js 밴 후보 카드의 "투표하러 가기" 버튼이 유일하게
  *    부르는 Boako.View.render('team')이 실제로 팀 본부의 "대항전" 탭(record)까지 연결되도록
  *    전역 View.render 패치를 확장(그 외 인자는 기존처럼 조용히 무시).
+ * 🌟 [14단계: 화면별 포팅] 더보기 시트의 "🎯 리그 콘텐츠"에 openLeague() 연결 —
+ *    js/mobile_league.js로 진입. 모바일 화면 포팅 전체 예정 목록의 마지막 단계.
  * 🌟 [전역 패치] Boako.Auth.renderWidget()과 Boako.View.render(...)를 모바일 세션 전체에서
  *    안전한 버전으로 재정의(init() 최상단) — shop.js/league.js 등 앞으로 재사용할 PC 모듈들이
  *    구매·처리 완료 후 관용적으로 부르는 이 두 함수를 화면마다 개별 우회할 필요가 없어짐.
@@ -417,6 +419,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileMatch.render(area);
     },
 
+    // 🌟 [14단계: 신규] 더보기 시트의 "🎯 리그 콘텐츠" 진입점 — 본문 영역에 리그 콘텐츠(js/mobile_league.js)를 그림
+    openLeague: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileLeague) await Boako.Util.loadScript('/js/mobile_league.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileLeague.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -548,7 +558,7 @@ Boako.MobileShell = {
             <div style="display:flex; flex-direction:column; gap:2px;">
                 <div onclick="Boako.MobileShell.openRival()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">⚡ 라이벌 매치</div>
                 <div onclick="Boako.MobileShell.openMatch()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">⚔️ 대항전</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">🎯 리그 콘텐츠</div>
+                <div onclick="Boako.MobileShell.openLeague()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🎯 리그 콘텐츠</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 전적기록</div>
                 <div onclick="Boako.MobileShell.openTogether()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">
                     <span>🤝 같이 하자</span>${badge(c.together)}
