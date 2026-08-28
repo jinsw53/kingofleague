@@ -28,6 +28,11 @@
  *    "auto" 기준 크기 계산이 브라우저에서 애매해져 실제 남는 공간만큼 안 늘어났음. flex-basis를
  *    0%로 강제해서(flex:1 1 0%) 내용물 크기와 무관하게 무조건 남는 공간을 전부 차지하도록 수정 —
  *    이러면 뱃지(flex-shrink:0)가 항상 행의 진짜 우측 끝에 붙는다.
+ * 🌟 [버그수정 3차] 상세 펼침의 "프로필 원 + 닉네임(기록)" 영역 — PC rival.js 마크업 자체에
+ *    닉네임 텍스트 블록에 text-align이 없어서, 좁은 화면에서 "닉네임"/"(N회)"가 두 줄로 줄바꿈될 때
+ *    줄마다 다른 폭으로 왼쪽 정렬되어 위 프로필 원 중심과 어긋나 보였음. PC 파일은 건드리지 않고
+ *    모바일 CSS로 해당 텍스트 블록만 text-align:center + width:100% 추가해서 프로필 원과
+ *    항상 중심이 맞도록 수정.
  */
 window.Boako = window.Boako || {};
 Boako.MobileRival = {
@@ -79,6 +84,14 @@ Boako.MobileRival = {
                 }
                 #mobile-rival-root [onclick^="Boako.Rival.toggleDetail"] > div:last-child span {
                     font-size: 10px !important; padding: 4px 7px !important; white-space: nowrap;
+                }
+
+                /* 🌟 [버그수정 3차] "프로필 원 + 닉네임(기록)" 텍스트가 PC 마크업엔 text-align이
+                   없어서, 좁은 화면에서 두 줄로 줄바꿈되면 줄마다 다른 폭으로 왼쪽 정렬되어 위
+                   프로필 원 중심과 어긋나 보였음 — 텍스트 블록을 가운데 정렬 + 폭 100%로 고정해서
+                   항상 프로필 원과 중심이 맞도록 함. (rival.js는 건드리지 않고 모바일 CSS로만 보정) */
+                #mobile-rival-root .flex.flex-col.items-center.gap-2.flex-1 > div:last-child {
+                    text-align: center; width: 100%;
                 }
             `;
             document.head.appendChild(style);
