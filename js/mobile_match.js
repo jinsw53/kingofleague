@@ -38,6 +38,12 @@ Boako.MobileMatch = {
                     padding: 16px !important;
                 }
 
+                /* 🌟 [버그수정] 로고/날짜/스폰서 배지 영역이 flex-col인데 정렬 속성이 없어서
+                   날짜 배지(w-max)가 왼쪽으로 붙어보이던 문제 — 가운데 정렬 추가. */
+                #mobile-match-root #match-season-logo-area {
+                    align-items: center !important;
+                }
+
                 /* ========== 🌟 [전면 재설계] 진행상태 바 ==========
                    "지금 진행 중인 단계"만 위에 크게, 나머지 두 단계는 아래 절반 크기 2열로 배치.
                    활성 단계 판별은 match.js가 이미 붙여주는 원본 클래스(bg-blue-600)를
