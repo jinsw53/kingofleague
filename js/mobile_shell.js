@@ -57,6 +57,10 @@
  *    js/mobile_rival.js로 진입.
  * 🌟 [12단계: 화면별 포팅] 더보기 시트의 "📝 게시판"에 openBoard() 연결 —
  *    js/mobile_board.js로 진입.
+ * 🌟 [13단계: 화면별 포팅] 더보기 시트의 "⚔️ 대항전"에 openMatch() 연결 —
+ *    js/mobile_match.js로 진입. 이와 함께, match.js 밴 후보 카드의 "투표하러 가기" 버튼이 유일하게
+ *    부르는 Boako.View.render('team')이 실제로 팀 본부의 "대항전" 탭(record)까지 연결되도록
+ *    전역 View.render 패치를 확장(그 외 인자는 기존처럼 조용히 무시).
  * 🌟 [전역 패치] Boako.Auth.renderWidget()과 Boako.View.render(...)를 모바일 세션 전체에서
  *    안전한 버전으로 재정의(init() 최상단) — shop.js/league.js 등 앞으로 재사용할 PC 모듈들이
  *    구매·처리 완료 후 관용적으로 부르는 이 두 함수를 화면마다 개별 우회할 필요가 없어짐.
@@ -72,17 +76,28 @@ Boako.MobileShell = {
         // 전혀 없어(localStorage만 다룸) 그대로 재사용 가능.
         Boako.Auth.captureReferralParam();
 
-        // 🌟 [전역 버그 회피] 여러 PC 모듈(shop.js/team.js/league.js 등)이 구매·처리 완료 후
+        // 🌟 [전역 버그 회피] 여러 PC 모듈(shop.js/league.js/match.js 등)이 구매·처리 완료 후
         // 관용적으로 Boako.Auth.renderWidget()(로그인 위젯 갱신)과 Boako.View.render(...)(PC
         // 화면 전환)를 호출하는데, 모바일엔 둘 다 대응하는 게 없어서 에러가 남 — Boako.View는
         // core.js가 페이지 로드 시 미리 빈 객체({})로 선언해둬서 .render 자체가 없어 즉시 에러.
         // 매 화면(mobile_*.js)마다 개별적으로 이 두 함수를 우회하는 대신, 모바일 세션 전체에서
         // 한 번만 안전한 버전으로 재정의해서 앞으로 재사용할 모든 PC 모듈이 자동으로 안전해지도록 함.
         Boako.Auth.renderWidget = () => Boako.MobileShell.renderDrawer();
-        Boako.View.render = async () => {
-            // 모바일은 화면 갱신을 각 mobile_*.js 자신의 재렌더 함수가 담당하므로,
+        Boako.View.render = async (page) => {
+            // 🌟 [13단계] match.js의 밴 후보 카드가 "투표하러 가기" 클릭 시
+            // Boako.View.render('team').then(() => Boako.View.switchTeamTab('record'))를 부름 —
+            // match.js 파일은 건드리지 않고, 이 경로만 실제로 모바일 팀 본부의 "대항전" 탭으로 연결.
+            if (page === 'team') {
+                await Boako.MobileShell.openTeamHub('record');
+                return;
+            }
+            // 그 외 페이지는 모바일이 각 mobile_*.js 자신의 재렌더 함수로 갱신을 담당하므로,
             // PC 모듈이 관용적으로 부르는 이 호출은 에러만 나지 않게 조용히 무시함
         };
+        // 🌟 [13단계] PC 전용 팀 페이지 내부 탭 전환 함수 — 위에서 render('team')이 이미
+        // openTeamHub('record')로 목적지 탭까지 확정해서 보여주므로, 뒤이어 불리는 이 함수는
+        // 할 일이 없어 조용히 무시(없으면 .then() 체인에서 함수 없음 에러가 남).
+        Boako.View.switchTeamTab = () => {};
 
         // core.js가 Boako.db를 만들지 않으므로(원래 auth.js의 init 초반부가 하던 일) 여기서 직접 생성
         if (!Boako.db) {
@@ -394,6 +409,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileBoard.render(area);
     },
 
+    // 🌟 [13단계: 신규] 더보기 시트의 "⚔️ 대항전" 진입점 — 본문 영역에 대항전(js/mobile_match.js)을 그림
+    openMatch: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileMatch) await Boako.Util.loadScript('/js/mobile_match.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileMatch.render(area);
+    },
+
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
     openDrawer: () => {
         document.getElementById('mobile-drawer').style.transform = 'translateX(0)';
@@ -524,7 +547,7 @@ Boako.MobileShell = {
         wrap.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:2px;">
                 <div onclick="Boako.MobileShell.openRival()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">⚡ 라이벌 매치</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">⚔️ 대항전</div>
+                <div onclick="Boako.MobileShell.openMatch()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">⚔️ 대항전</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">🎯 리그 콘텐츠</div>
                 <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 전적기록</div>
                 <div onclick="Boako.MobileShell.openTogether()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">
