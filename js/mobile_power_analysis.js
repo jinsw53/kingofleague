@@ -10,6 +10,8 @@
  *    this.render(stats)를 호출하면, 교체된 이 함수가 대신 실행되어 동일한 stats 데이터를
  *    모바일 카드 UI로 그림. init()/buildUI() 자체는 건드리지 않고, buildUI() 대신 이 파일에서
  *    직접 배너+placeholder를 그린 뒤 init()만 호출함(배너도 PC 전용 클래스를 쓰므로 재사용 불가).
+ * 🌟 [버그수정] 배너 텍스트가 왼쪽 정렬돼있었음 — PC .main-banner는 가운데 정렬인데 그 클래스가
+ *    모바일엔 정의돼있지 않아 정렬이 다르게 보임. 인라인으로 직접 가운데 정렬 속성을 추가함.
  */
 window.Boako = window.Boako || {};
 Boako.MobilePowerAnalysis = {
@@ -29,7 +31,7 @@ Boako.MobilePowerAnalysis = {
         Boako.MobilePowerAnalysis._ensurePatched();
 
         container.innerHTML = `
-            <div style="background:linear-gradient(135deg,#4338ca,#1e1b4b); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff;">
+            <div style="background:linear-gradient(135deg,#4338ca,#1e1b4b); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
                 <div style="font-size:17px; font-weight:900;">🔬 전력분석실</div>
                 <div style="font-size:11.5px; font-weight:700; opacity:0.85; margin-top:4px;">${Boako.MobilePowerAnalysis.escapeHtml(Boako.state.user?.nickname || '')} 님의 개인 활동 리포트</div>
             </div>
