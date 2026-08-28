@@ -18,15 +18,13 @@
  *    세로 리스트로 덮어씀. 데이터 조회(fetchAndRenderChampions)와 검색(filterChampions)은
  *    컨테이너 id(champion-tbody/champion-search)만 참조하는 자기완결형이라 그대로 재사용 —
  *    같은 id를 가진 div/input을 그대로 마련해두면 별도 손댈 필요가 없음.
- * 🌟 [버그수정] 빙고 탭 상단 "시즌 드롭다운(고정폭 180px) + 동기화 버튼"이 좁은 화면에서
- *    넘치던 문제 — CSS로 드롭다운을 flex:1로 바꿔서 남은 공간을 채우도록 수정(마크업은 그대로,
- *    CSS만 보정).
- * 🌟 [전면 재설계] 5x5 빙고판 각 칸의 게임명이 1줄+말줄임(line-clamp-1)이라 대부분 한 글자만
- *    보이고 잘리던 문제 — league.js는 건드리지 않고 Boako.League.renderBingoBoard를 모바일
- *    전용으로 덮어써서: 1) 게임명을 2줄까지 자연스럽게 줄바꿈, 2) 그래도 잘릴 수 있으니 칸을
- *    탭하면 전체 게임명(+점유 팀)을 토스트로 보여주는 기능 추가. 나머지 로직(승리 라인 계산,
- *    난이도 배지, 점유 팀 오버레이, 스코어보드 갱신)은 league.js의 State/calculateWinningCells/
- *    updateStats를 그대로 재사용.
+ * 🌟 [버그수정] 빙고 탭 상단 "시즌 드롭다운 + 동기화 버튼"이 가로 배치라 좁은 화면에서 계속
+ *    넘치던 문제 — 소장님 지시로 아예 세로로 쌓는 방향으로 정리(각각 폭 전체 사용).
+ * 🌟 [보정] 5x5 빙고판은 원래 형태(게임 로고+게임명 라벨+난이도 배지+점유 팀 로고+왕관)를 그대로
+ *    유지하되(소장님 지시: "가독성은 떨어져도 색으로 구분되니 형태는 그대로"), 칸 밖으로 넘치거나
+ *    서로 겹치던 요소들(점유 팀 로고, 난이도 배지, 왕관)의 크기만 축소해서 칸 안에 깔끔히
+ *    들어가도록 보정. 게임명은 여전히 2줄 줄바꿈 + 탭하면 토스트로 전체 확인 가능.
+ *    나머지 로직(승리 라인 계산, 스코어보드 갱신)은 league.js의 State/함수를 그대로 재사용.
  */
 window.Boako = window.Boako || {};
 Boako.MobileLeague = {
@@ -38,11 +36,21 @@ Boako.MobileLeague = {
             const style = document.createElement('style');
             style.id = 'mobile-league-style';
             style.textContent = `
-                /* 🌟 [버그수정] 빙고 시즌 드롭다운(고정폭 180px)이 동기화 버튼과 함께 넘치던 문제 —
-                   남은 공간을 채우도록 flex:1로 변경 */
+                /* 🌟 [버그수정] 빙고 시즌 드롭다운 + 동기화 버튼이 가로 배치라 좁은 화면에서
+                   계속 넘치던 문제 — 세로로 쌓아서 각각 폭 전체를 쓰게 정리 */
+                #mobile-league-root div:has(> #bingo-sync-btn) {
+                    flex-direction: column !important;
+                    align-items: stretch !important;
+                    width: 100%;
+                    gap: 8px !important;
+                }
                 #mobile-league-root #bingo-season-dropdown-container {
-                    width: auto !important;
-                    flex: 1 1 auto !important;
+                    width: 100% !important;
+                    flex: none !important;
+                }
+                #mobile-league-root #bingo-sync-btn {
+                    width: 100%;
+                    justify-content: center;
                 }
             `;
             document.head.appendChild(style);
@@ -112,9 +120,10 @@ Boako.MobileLeague = {
             }).join('');
         };
 
-        // 🌟 [전면 재설계] 5x5 빙고판 — 게임명 1줄+말줄임 대신 2줄 줄바꿈 + 탭하면 전체 게임명을
-        // 토스트로 확인 가능하게 함. 승리 라인 계산/난이도 배지/점유 팀 오버레이/스코어보드 갱신은
-        // league.js의 State와 함수(calculateWinningCells/updateStats)를 그대로 재사용.
+        // 🌟 [보정] 5x5 빙고판 — 원래 형태(게임 로고+게임명 라벨+난이도 배지+점유 팀 로고+왕관)는
+        // 그대로 유지하고, 칸 밖으로 넘치거나 서로 겹치던 요소들(점유 팀 로고/난이도 배지/왕관)의
+        // 크기만 축소. 게임명 2줄 줄바꿈 + 탭하면 토스트로 전체 확인은 유지. 승리 라인 계산/
+        // 스코어보드 갱신은 league.js의 State와 함수를 그대로 재사용.
         Boako.League.renderBingoBoard = function() {
             const grid = document.getElementById('bingo-grid'); if (!grid) return; grid.innerHTML = '';
             const winCells = Boako.League.calculateWinningCells();
@@ -140,36 +149,37 @@ Boako.MobileLeague = {
                 }
                 if (diffStatus === 'HARD_CENTER_PENALTY') bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
 
-                // 🌟 h-24 → h-28로 살짝 키워서 2줄 라벨이 들어갈 여유 확보
                 cell.className = `h-28 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group cursor-pointer ${bgClass}`;
 
                 const gameLogoOpacity = ownerTeam ? "opacity-20 grayscale transition-all duration-300 group-hover:opacity-10" : "opacity-100 drop-shadow-md";
                 const gameImageHtml = gameLogoUrl
-                    ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-5"><img src="${Boako.Util.cdn(gameLogoUrl)}" alt="${gameName}" class="w-[60%] h-auto max-h-full object-contain ${gameLogoOpacity}"></div>`
-                    : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-5 z-10 ${gameLogoOpacity}">🎲</div>`;
+                    ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-5"><img src="${Boako.Util.cdn(gameLogoUrl)}" alt="${gameName}" class="w-[55%] h-auto max-h-full object-contain ${gameLogoOpacity}"></div>`
+                    : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-2xl pb-5 z-10 ${gameLogoOpacity}">🎲</div>`;
 
+                // 🌟 [축소] 점유 팀 로고 오버레이 — 칸 밖으로 넘치던 것을 코너 배지 크기로 축소
                 let massiveOverlayHtml = '';
                 if (ownerTeam) {
                     const teamLogoUrl = Boako.Util.cdn(Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
-                    massiveOverlayHtml = `<div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-2 pointer-events-none"><img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-12 h-12 object-contain drop-shadow-xl"></div>`;
+                    massiveOverlayHtml = `<div class="absolute top-1 left-1 z-20 pointer-events-none"><img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-6 h-6 object-contain rounded-full bg-white/90 border border-white shadow"></div>`;
                 }
 
+                // 🌟 [축소] 난이도 배지 — 패딩/글자 더 작게
                 let diffBadgeHtml = '';
                 if (diffStatus === 'HARD_CENTER_PENALTY') {
-                    diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[7px] px-1.5 py-0.5 rounded shadow-sm pointer-events-none">🔥 CENTER</span>`;
+                    diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[6px] px-1 py-0.5 rounded shadow-sm pointer-events-none">🔥</span>`;
                 } else {
                     const diffColors = { EASY: "bg-emerald-500/90 text-white", NORMAL: "bg-blue-500/90 text-white", HARD: "bg-rose-500/90 text-white" };
-                    diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm pointer-events-none">${diffStatus}</span>`;
+                    diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[6px] px-1 py-0.5 rounded shadow-sm pointer-events-none">${diffStatus}</span>`;
                 }
 
-                const crownHtml = isWinner ? `<span class="absolute top-1 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-12' : 'right-8'} text-xs text-amber-400 z-30 pointer-events-none">👑</span>` : '';
+                // 🌟 [축소] 왕관 — 팀 로고 배지와 겹치지 않게 우측 상단(난이도 배지 바로 아래)으로 이동
+                const crownHtml = isWinner ? `<span class="absolute top-5 right-1 text-[10px] text-amber-400 z-30 pointer-events-none">👑</span>` : '';
 
-                // 🌟 [버그수정] 말줄임(line-clamp-1 truncate) 대신 2줄 줄바꿈 허용
                 const gameLabelHtml = `<div class="absolute bottom-1 left-0 w-full px-1 z-30 pointer-events-none"><div class="w-full px-1 bg-white/90 backdrop-blur-md py-1 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[26px]"><span class="text-[8px] font-black text-slate-800 leading-tight" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:keep-all;">${gameName}</span></div></div>`;
 
                 cell.innerHTML = `${gameImageHtml}${massiveOverlayHtml}${diffBadgeHtml}${crownHtml}${gameLabelHtml}`;
 
-                // 🌟 [신규] 2줄로도 잘릴 수 있는 긴 게임명을 탭하면 전체 이름(+점유 팀)을 토스트로 확인
+                // 🌟 긴 게임명을 탭하면 전체 이름(+점유 팀)을 토스트로 확인
                 cell.addEventListener('click', () => {
                     const msg = ownerTeam ? `🎲 ${gameName} · 점유: ${ownerTeam}` : `🎲 ${gameName}`;
                     Boako.Util.toast(msg);
