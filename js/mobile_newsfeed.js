@@ -20,6 +20,9 @@
  * 🌟 [알려진 제한] 카드 클릭 시 이동은 아직 안 붙임 — PC의 Boako.Util.navigateToLink()는
  *    Boako.View.render()라는 PC 전용 화면 전환 시스템을 불러서 모바일에서 그대로 쓰면 에러남.
  *    게시판/토너먼트/팀 등 목적지 화면들을 모바일로 포팅한 뒤에 이어서 연결할 예정.
+ * 🌟 [버그수정] 상단 배너가 다른 화면들(팀 목록/인벤토리/같이하자/라이벌 등)과 달리 PC
+ *    .main-banner 패턴을 쓰지 않고 독자적으로 만든 마크업이라, 애초에 가운데 정렬 스타일 자체가
+ *    빠져있어 왼쪽 정렬로 보였음 — 다른 화면들과 통일되게 flex 가운데 정렬 추가.
  */
 window.Boako = window.Boako || {};
 Boako.MobileNewsfeed = {
@@ -75,12 +78,13 @@ Boako.MobileNewsfeed = {
     },
 
     // 🌟 PC와 동일한 톤의 상단 배너 (어두운 그라데이션 + 오늘 날짜)
+    // 🌟 [버그수정] 다른 화면들과 달리 가운데 정렬 스타일이 빠져있어 왼쪽 정렬로 보였음 — 통일.
     renderBanner: () => {
         const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
         return `
-            <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius:16px; padding:18px 20px; margin-bottom:12px;">
-                <div style="font-size:16px; font-weight:900; color:#fff;">📰 아카이브 소식지</div>
-                <div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin-top:4px;">${todayStr}</div>
+            <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius:16px; padding:18px 20px; margin-bottom:12px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+                <div style="font-size:16px; font-weight:900; color:#fff; width:100%;">📰 아카이브 소식지</div>
+                <div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin-top:4px; width:100%;">${todayStr}</div>
             </div>
         `;
     },
