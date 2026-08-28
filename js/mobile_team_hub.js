@@ -33,11 +33,11 @@
  *    js/realtime_coordinator.js 탭 리더 선출을 적용하지 않음 — 화면을 벗어날 때(teardownChat)
  *    확실히 구독 해제해서 최소한 "떠나 있는 동안 계속 열려있는" 것만 방지함. 사이트 전역 실시간
  *    최적화 작업 때 PC/모바일 팀챗을 함께 코디네이터 방식으로 옮기는 걸 백로그로 남겨둠.
- * 🌟 [버그수정] 팀 배너 색을 임의로 남색(#1e293b→#0f172a)으로 지정했었는데, PC team.js는 이
- *    배너에 배경색을 따로 안 주고 .main-banner 기본값(보라색 #8b5cf6→#6d28d9)을 그대로 씀 —
- *    PC와 동일하게 수정. 서포터즈 배지 아이콘도 🎽 이모지로 대충 넣었던 걸 PC와 동일하게
- *    "시즌 유니폼 이미지(없으면 저지 실루엣 SVG)"로, 도전권 배지도 🎟️ 이모지 대신 실제
- *    CHALLENGE_TOKEN_ICON 이미지로 교체. PC 배너엔 팀 로고 이미지가 없어 마찬가지로 제거.
+ * 🌟 [버그수정] 팀 창단 폼과 팀 본부 메인 배너 모두 PC .main-banner 기본값(가운데 정렬, 보라색
+ *    #8b5cf6→#6d28d9)과 통일. 이전에는 팀 창단 폼에 임의로 남색(#1e293b→#0f172a) 배경 + 없는
+ *    부제목 "전설의 팀을 만들어보세요"를 넣었었는데, PC team.js는 이 배너에 배경색을 따로
+ *    지정하지 않아 기본값(보라색)을 그대로 쓰고 부제목도 없음 — PC와 동일하게 "🛡️ 팀 창단"
+ *    제목만 남기고 가운데 정렬로 수정. 팀 본부 메인 배너도 가운데 정렬 속성을 추가.
  */
 window.Boako = window.Boako || {};
 Boako.MobileTeamHub = {
@@ -71,9 +71,8 @@ Boako.MobileTeamHub = {
     // ========== 🌟 팀 창단 폼 (무소속 유저) ==========
     renderCreateForm: (container) => {
         container.innerHTML = `
-            <div style="background:linear-gradient(135deg,#1e293b,#0f172a); border-radius:16px; padding:18px 20px; margin-bottom:14px;">
+            <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:20px; padding:18px 20px; margin-bottom:14px; display:flex; flex-direction:column; align-items:center; text-align:center;">
                 <div style="font-size:16px; font-weight:900; color:#fff;">🛡️ 팀 창단</div>
-                <div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin-top:4px;">전설의 팀을 만들어보세요</div>
             </div>
             <form onsubmit="Boako.MobileTeamHub.create(event)" style="display:flex; flex-direction:column; gap:14px;">
                 <div>
@@ -212,9 +211,10 @@ Boako.MobileTeamHub = {
 
         // 🌟 [버그수정] PC team.js는 이 페이지에서 .main-banner 배경색을 따로 지정하지 않아
         // 기본값(보라색 #8b5cf6→#6d28d9)을 그대로 씀 — 임의로 남색을 넣었던 걸 PC와 동일하게 수정.
-        // PC 배너에는 팀 로고 이미지가 없어 마찬가지로 제거.
+        // PC 배너에는 팀 로고 이미지가 없어 마찬가지로 제거. 가운데 정렬도 PC .main-banner
+        // 기본값과 통일함.
         const bannerHtml = `
-            <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:20px; padding:18px 20px; margin-bottom:12px; color:#fff;">
+            <div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-radius:20px; padding:18px 20px; margin-bottom:12px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
                 <div style="font-size:18px; font-weight:900;">${Boako.MobileTeamHub.escapeHtml(team.team_name)}</div>
                 <div style="font-size:12px; font-weight:800; opacity:0.9; margin-top:8px; display:flex; flex-direction:column; gap:4px;">
                     <div>${currentSeasonLine}</div>
