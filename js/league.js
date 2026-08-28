@@ -2086,8 +2086,26 @@ Boako.League.fetchAndRenderChampions = async function() {
     const tbody = document.getElementById('champion-tbody'); if (!tbody) return;
     try {
         if (!Boako.db) { tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-slate-400 font-bold">⚠️ Supabase 인스턴스가 발견되지 않았습니다.</td></tr>`; return; }
-        const { data, error } = await Boako.db.from('v_game_popularity_mvp').select('*').limit(10); if (error) throw error;
-        Boako.League.State.champions = data || []; Boako.League.drawChampionRows(Boako.League.State.champions);
+        // 🌟 [버그수정] 인기 순위가 동률이면 v_game_popularity_mvp에 같은 게임이 공동 챔피언 수만큼
+        // 여러 행으로 나옴(예: 동일 RP로 2명이 공동 1위) — 예전엔 정렬 없이 그냥 행 10개만
+        // 잘라와서(limit(10)), 한 게임이 2행을 쓰면 다른 게임 하나가 밀려나 실제로는 게임 9개만
+        // 표시되던 문제. game_popularity_rank로 명시적으로 정렬해 넉넉히(50행) 가져온 뒤,
+        // "서로 다른 게임이 10개" 채워질 때까지만 담되, 이미 포함된 게임의 공동 챔피언 행은
+        // 계속 포함시킴(11번째로 새로운 게임이 나오는 시점에만 멈춤) — 게임은 항상 정확히 10개,
+        // 챔피언 수는 공동 챔피언 때문에 10명을 넘을 수 있음(의도된 동작).
+        const { data, error } = await Boako.db.from('v_game_popularity_mvp').select('*').order('game_popularity_rank', { ascending: true }).limit(50);
+        if (error) throw error;
+
+        const rows = data || [];
+        const seenGames = new Set();
+        const trimmed = [];
+        for (const row of rows) {
+            if (seenGames.size >= 10 && !seenGames.has(row.game_name)) break;
+            seenGames.add(row.game_name);
+            trimmed.push(row);
+        }
+
+        Boako.League.State.champions = trimmed; Boako.League.drawChampionRows(Boako.League.State.champions);
     } catch (err) { tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-red-400 font-bold">❌ 가상 뷰 연동 실패</td></tr>`; }
 };
 
