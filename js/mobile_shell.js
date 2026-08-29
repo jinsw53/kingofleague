@@ -66,6 +66,9 @@
  * 🌟 [전역 패치] Boako.Auth.renderWidget()과 Boako.View.render(...)를 모바일 세션 전체에서
  *    안전한 버전으로 재정의(init() 최상단) — shop.js/league.js 등 앞으로 재사용할 PC 모듈들이
  *    구매·처리 완료 후 관용적으로 부르는 이 두 함수를 화면마다 개별 우회할 필요가 없어짐.
+ * 🌟 [버그수정] refreshMoreBadge — 관리자 공지(is_notice=true)가 "요청" 카테고리에 등록돼있으면
+ *    댓글이 안 달리는 게 당연한데도 "미답변 요청"으로 잘못 집계되던 문제. PC auth.js와 동일하게
+ *    공지글은 제외.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -600,8 +603,10 @@ Boako.MobileShell = {
         } catch (e) { console.error('같이하자 배지 조회 실패:', e); }
 
         try {
+            // 🌟 [버그수정] 관리자 공지(is_notice=true)가 "요청" 카테고리에 등록돼있으면 댓글이
+            // 안 달리는 게 당연한데도 "미답변 요청"으로 잘못 집계되던 문제 — PC auth.js와 동일하게 제외.
             const { data: posts } = await Boako.db.from('board_posts')
-                .select('id').eq('category', '요청').eq('is_deleted', false).eq('is_draft', false);
+                .select('id').eq('category', '요청').eq('is_deleted', false).eq('is_draft', false).eq('is_notice', false);
             const postIds = (posts || []).map(p => p.id);
             let unanswered = 0;
             if (postIds.length > 0) {
