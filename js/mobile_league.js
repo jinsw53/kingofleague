@@ -27,7 +27,7 @@
  *    승리 라인 계산/스코어보드 갱신은 league.js의 State/함수를 그대로 재사용.
  * 🌟 [수정] 빙고칸 탭 시 Boako.Util.toast() 대신 "탭한 칸 바로 위에 뜨는 말풍선 팝업"으로
  *    변경(소장님 지시) — PC의 마우스 호버 툴팁과 유사한 느낌을 터치 환경에서 재현. 게임 로고도
- *    같이 표시(소장님 지시 — 팝업에 로고가 빠져있던 걸 추가).
+ *    같이 표시(소장님 지시 — 팝업에 로고가 빠져있던 걸 추가, 이후 2배로 확대: 36px→72px).
  */
 window.Boako = window.Boako || {};
 Boako.MobileLeague = {
@@ -139,9 +139,10 @@ Boako.MobileLeague = {
             dim.addEventListener('click', () => { popup.remove(); dim.remove(); });
             document.body.appendChild(dim);
 
+            // 🌟 [2배 확대] 소장님 지시로 로고 크기를 36px → 72px로 확대
             const logoHtml = gameLogoUrl
-                ? `<img src="${Boako.Util.cdn(gameLogoUrl)}" style="width:36px; height:36px; object-fit:contain; background:#fff; border-radius:8px; padding:3px; margin:0 auto 6px; display:block;">`
-                : `<div style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 6px;">🎲</div>`;
+                ? `<img src="${Boako.Util.cdn(gameLogoUrl)}" style="width:72px; height:72px; object-fit:contain; background:#fff; border-radius:10px; padding:4px; margin:0 auto 8px; display:block;">`
+                : `<div style="width:72px; height:72px; display:flex; align-items:center; justify-content:center; font-size:40px; margin:0 auto 8px;">🎲</div>`;
 
             const popup = document.createElement('div');
             popup.id = 'mobile-bingo-cell-popup';
