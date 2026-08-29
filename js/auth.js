@@ -28,6 +28,9 @@
  * 🌟 [리팩토링] 초대보상 채널 + 토너먼트/게시판요청/같이하자 전역 배지 채널을 js/realtime_coordinator.js
  *    탭 리더 선출 방식으로 전환 — 사이트를 여러 탭으로 띄워도 이 채널들이 탭 수만큼 소켓을 열지 않도록 함.
  * 🌟 [오타수정] 초대 링크 버튼 문구 "친구 기록하면" → "친구가 기록하면"
+ * 🌟 [버그수정] checkBoardRequestBadge — 관리자 공지(is_notice=true)가 "요청" 카테고리에 등록돼있으면
+ *    댓글이 안 달리는 게 당연한데도 "미답변 요청"으로 잘못 집계되던 문제. 공지글은 애초에 답변이
+ *    필요 없으므로 제외.
  */
 Boako.Auth = {
     init: async () => {
@@ -793,13 +796,16 @@ Boako.Auth = {
     },
 
     // 🌟 [추가] 요청 게시판 중 아직 답변(댓글) 안 달린 글 개수 배지
+    // 🌟 [버그수정] 관리자 공지(is_notice=true)가 "요청" 카테고리에 등록돼있으면 댓글이 안 달리는 게
+    // 당연한데도 "미답변 요청"으로 잘못 집계되던 문제 — 공지글은 애초에 답변이 필요 없으므로 제외.
     checkBoardRequestBadge: async function() {
         try {
             const { data: posts } = await Boako.db.from('board_posts')
                 .select('id')
                 .eq('category', '요청')
                 .eq('is_deleted', false)
-                .eq('is_draft', false);
+                .eq('is_draft', false)
+                .eq('is_notice', false);
 
             const postIds = (posts || []).map(p => p.id);
             if (postIds.length === 0) {
