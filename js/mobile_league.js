@@ -26,7 +26,8 @@
  *    칸 안에 다 못 넣으므로 그리드 아래 "칸 상세 리스트"를 별도로 붙여서 번호로 매치업.
  *    승리 라인 계산/스코어보드 갱신은 league.js의 State/함수를 그대로 재사용.
  * 🌟 [수정] 빙고칸 탭 시 Boako.Util.toast() 대신 "탭한 칸 바로 위에 뜨는 말풍선 팝업"으로
- *    변경(소장님 지시) — PC의 마우스 호버 툴팁과 유사한 느낌을 터치 환경에서 재현.
+ *    변경(소장님 지시) — PC의 마우스 호버 툴팁과 유사한 느낌을 터치 환경에서 재현. 게임 로고도
+ *    같이 표시(소장님 지시 — 팝업에 로고가 빠져있던 걸 추가).
  */
 window.Boako = window.Boako || {};
 Boako.MobileLeague = {
@@ -126,7 +127,7 @@ Boako.MobileLeague = {
         // (소장님 지시: 토스트 대신 이 방식으로). 화면 밖으로 나가지 않게 위치를 보정하고,
         // 화면 위쪽 칸이라 위에 공간이 부족하면 아래쪽에 뜨도록 자동 반전. 바깥 탭 또는
         // 4초 후 자동으로 닫힘. 동시에 하나만 떠 있도록 매번 이전 팝업을 먼저 제거.
-        Boako.MobileLeague.showBingoCellPopup = (cellEl, gameName, diffInfo, ownerTeam) => {
+        Boako.MobileLeague.showBingoCellPopup = (cellEl, gameName, diffInfo, ownerTeam, gameLogoUrl) => {
             document.getElementById('mobile-bingo-cell-popup')?.remove();
             document.getElementById('mobile-bingo-cell-popup-dim')?.remove();
 
@@ -138,10 +139,15 @@ Boako.MobileLeague = {
             dim.addEventListener('click', () => { popup.remove(); dim.remove(); });
             document.body.appendChild(dim);
 
+            const logoHtml = gameLogoUrl
+                ? `<img src="${Boako.Util.cdn(gameLogoUrl)}" style="width:36px; height:36px; object-fit:contain; background:#fff; border-radius:8px; padding:3px; margin:0 auto 6px; display:block;">`
+                : `<div style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 6px;">🎲</div>`;
+
             const popup = document.createElement('div');
             popup.id = 'mobile-bingo-cell-popup';
-            popup.style.cssText = 'position:fixed; z-index:9999; background:#1e293b; color:#fff; border-radius:12px; padding:10px 14px; font-size:12.5px; max-width:220px; text-align:center; box-shadow:0 10px 24px rgba(0,0,0,0.3); visibility:hidden;';
+            popup.style.cssText = 'position:fixed; z-index:9999; background:#1e293b; color:#fff; border-radius:12px; padding:12px 14px; font-size:12.5px; max-width:220px; text-align:center; box-shadow:0 10px 24px rgba(0,0,0,0.3); visibility:hidden;';
             popup.innerHTML = `
+                ${logoHtml}
                 <div style="font-weight:900; margin-bottom:4px;">${gameName}</div>
                 <div style="display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px; opacity:0.9;">
                     <span style="background:${diffInfo.bg}; color:${diffInfo.fg}; padding:1px 6px; border-radius:5px; font-weight:900;">${diffInfo.label}</span>
@@ -202,6 +208,7 @@ Boako.MobileLeague = {
                 const diffStatus = difficulties[idx] || "EASY";
                 const diffInfo = diffColors[diffStatus] || diffColors.EASY;
                 const gameName = Boako.League.State.boardGames25[idx] || "지정 미정";
+                const gameLogoUrl = Boako.League.State.boardLogos25[idx];
 
                 cell.style.cssText = `position:relative; aspect-ratio:1; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer; ${isWinner ? 'box-shadow:0 0 0 2px #f59e0b;' : ''}`;
 
@@ -223,7 +230,7 @@ Boako.MobileLeague = {
 
                 cell.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    Boako.MobileLeague.showBingoCellPopup(cell, gameName, diffInfo, ownerTeam);
+                    Boako.MobileLeague.showBingoCellPopup(cell, gameName, diffInfo, ownerTeam, gameLogoUrl);
                 });
 
                 grid.appendChild(cell);
