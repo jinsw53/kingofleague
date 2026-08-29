@@ -31,7 +31,11 @@
          Tailwind가 지정한 크기(w-4 h-4, w-5 h-5 등)만큼 투명한 빈 공간만 차지해서 레이아웃이
          미묘하게 어긋나 보이는 문제(예: 라이벌 매치 검색창 아이콘 자리, 결과 행 화살표 아이콘
          자리)의 근본 원인이었음. PC와 동일한 CDN을 추가해서 모든 모바일 화면에서 lucide 아이콘이
-         정상적으로 그려지도록 수정. -->
+         정상적으로 그려지도록 수정.
+         🌟 [버그수정] Boako.Util.toast()가 document.getElementById('boako-toast')를 찾아서
+         띄우는 방식인데, 이 요소 자체가 PC index.html에만 있고 이 파일엔 빠져있어서 모바일에서
+         호출되는 모든 토스트(빙고칸 탭, 각종 성공/실패 안내 등)가 계속 조용히 무시되고 있었음 —
+         PC와 완전히 동일한 마크업/CSS로 추가. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -55,6 +59,11 @@
             padding-bottom: calc(56px + env(safe-area-inset-bottom));
         }
         button { cursor: pointer; border: none; background: none; font-family: inherit; }
+
+        /* 🌟 [버그수정] PC index.html과 완전히 동일한 토스트 스타일 — 이 정의가 없어서
+           Boako.Util.toast()가 계속 조용히 무시되고 있었음 */
+        #boako-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 16px 32px; border-radius: 50px; font-weight: 700; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 10000; box-shadow: 0 10px 25px rgba(0,0,0,0.3); max-width: calc(100vw - 32px); text-align: center; }
+        #boako-toast.show { opacity: 1; bottom: 50px; }
     </style>
 </head>
 <body>
@@ -110,6 +119,9 @@
             </span>더보기
         </button>
     </nav>
+
+    <!-- 🌟 [버그수정] Boako.Util.toast()가 참조하는 토스트 요소 — PC index.html과 동일하게 추가 -->
+    <div id="boako-toast"></div>
 
     <!--
       [JS 파일 분할 로드]
