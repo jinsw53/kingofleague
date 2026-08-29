@@ -69,6 +69,8 @@
  * 🌟 [버그수정] refreshMoreBadge — 관리자 공지(is_notice=true)가 "요청" 카테고리에 등록돼있으면
  *    댓글이 안 달리는 게 당연한데도 "미답변 요청"으로 잘못 집계되던 문제. PC auth.js와 동일하게
  *    공지글은 제외.
+ * 🌟 [15단계: 화면별 포팅 + 버그수정] 더보기 시트의 "📋 전적기록" 항목이 다른 항목들과 달리
+ *    onclick 자체가 빠져있던 걸 발견 — openArchive() 진입점을 추가해서 js/mobile_archive.js로 연결.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -422,12 +424,21 @@ Boako.MobileShell = {
         if (area) await Boako.MobileMatch.render(area);
     },
 
-    // 🌟 [14단계: 신규] 더보기 시트의 "🎯 리그 콘텐츠" 진입점 — 본문 영역에 리그 콘텐츠(js/mobile_league.js)를 그림
+    // 🌟 [15단계: 신규] 더보기 시트의 "🎯 리그 콘텐츠" 진입점 — 본문 영역에 리그 콘텐츠(js/mobile_league.js)를 그림
     openLeague: async () => {
         Boako.MobileShell.closeAll();
         if (!Boako.MobileLeague) await Boako.Util.loadScript('/js/mobile_league.js');
         const area = document.getElementById('mobile-content-area');
         if (area) await Boako.MobileLeague.render(area);
+    },
+
+    // 🌟 [버그수정] 더보기 시트의 "📋 전적기록" 항목이 onclick 자체가 빠져있어 눌러도 아무 반응이
+    // 없던 문제 — 본문 영역에 전적기록(js/mobile_archive.js)을 그리는 진입점을 추가해서 연결.
+    openArchive: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.MobileArchive) await Boako.Util.loadScript('/js/mobile_archive.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.MobileArchive.render(area);
     },
 
     // ========== 아바타 드로어 / 더보기 시트 열고 닫기 ==========
@@ -562,7 +573,7 @@ Boako.MobileShell = {
                 <div onclick="Boako.MobileShell.openRival()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">⚡ 라이벌 매치</div>
                 <div onclick="Boako.MobileShell.openMatch()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">⚔️ 대항전</div>
                 <div onclick="Boako.MobileShell.openLeague()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🎯 리그 콘텐츠</div>
-                <div style="padding:12px 4px; font-size:14px; font-weight:700;">📋 전적기록</div>
+                <div onclick="Boako.MobileShell.openArchive()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">📋 전적기록</div>
                 <div onclick="Boako.MobileShell.openTogether()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">
                     <span>🤝 같이 하자</span>${badge(c.together)}
                 </div>
