@@ -3,6 +3,9 @@
  * - 정렬 알고리즘: 1순위(전원 활동 중) -> 2순위(결원 많은 팀) -> 3순위(최신 창단 팀)
  * 🌟 가입 신청 쪽지에 sender_name_override/receiver_name_override 채우도록 수정 (안 채우면 대화방 제목이 "null 님과의 대화"로 표시되던 버그)
  * 🌟 [수정] 섹션 헤더 문구 "방명록 및 로스터" → "등록된 팀 목록" (위 배너 제목과 안 맞고 의미도 어색했음)
+ * 🌟 [버그수정] 이미 소속된 팀이 있어도 "모집 마감"이 아닌 팀 카드에서는 계속 "가입 신청" 버튼이
+ *    클릭 가능하게 보여서, 눌러야만(토스트 에러) 막혀있다는 걸 알게 되던 문제 — requestJoin()의
+ *    실제 차단 로직과 별개로 버튼 자체도 소속돼 있으면 처음부터 비활성화 상태로 보여주도록 수정.
  */
 Boako.TeamList = {
     currentPage: 1,
@@ -108,6 +111,11 @@ Boako.TeamList = {
                 
                 const currentTo = team.member_count || 0;
                 const isFull = currentTo >= 4;
+                // 🌟 [버그수정] 이미 소속된 팀이 있어도 "모집 마감"이 아닌 팀 카드에서는 계속
+                // "가입 신청" 버튼이 클릭 가능하게 보여서, 눌러야만(토스트 에러) 막혀있다는 걸
+                // 알게 되던 문제 — requestJoin()의 실제 차단 로직과 별개로 버튼 자체도 처음부터
+                // 비활성화 상태로 보여주도록 수정.
+                const alreadyInTeam = !!Boako.state.team;
 
                 // 🌟 [추가된 로직] 전원이 활동 중인 팀(is_fully_active === 1)이면 HOT 배지 표시!
                 const isHot = team.is_fully_active === 1;
@@ -120,9 +128,14 @@ Boako.TeamList = {
                     ? `<span class="bg-slate-100 text-slate-400 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-slate-200">마감 (${currentTo}/4)</span>`
                     : `<span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-[11px] font-black tracking-tight border border-blue-200 animate-pulse">모집 중 (${currentTo}/4)</span>`;
 
-                const actionBtn = isFull
-                    ? `<button disabled class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200 text-center tracking-wide">모집 마감</button>`
-                    : `<button onclick="Boako.TeamList.requestJoin('${team.team_name}', '${leaderName}', ${team.id})" class="w-full mt-3 bg-slate-900 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 tracking-wide text-center">가입 신청</button>`;
+                let actionBtn;
+                if (isFull) {
+                    actionBtn = `<button disabled class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200 text-center tracking-wide">모집 마감</button>`;
+                } else if (alreadyInTeam) {
+                    actionBtn = `<button disabled title="이미 소속된 팀이 있습니다. 이적을 원하시면 먼저 탈퇴해 주세요." class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200 text-center tracking-wide">가입 신청 불가</button>`;
+                } else {
+                    actionBtn = `<button onclick="Boako.TeamList.requestJoin('${team.team_name}', '${leaderName}', ${team.id})" class="w-full mt-3 bg-slate-900 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 tracking-wide text-center">가입 신청</button>`;
+                }
 
                 listHtml += `
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] group flex flex-col">
