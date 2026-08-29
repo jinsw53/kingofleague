@@ -20,11 +20,11 @@
  *    같은 id를 가진 div/input을 그대로 마련해두면 별도 손댈 필요가 없음.
  * 🌟 [버그수정] 빙고 탭 상단 "시즌 드롭다운 + 동기화 버튼"이 가로 배치라 좁은 화면에서 계속
  *    넘치던 문제 — 소장님 지시로 아예 세로로 쌓는 방향으로 정리(각각 폭 전체 사용).
- * 🌟 [보정] 5x5 빙고판은 원래 형태(게임 로고+게임명 라벨+난이도 배지+점유 팀 로고+왕관)를 그대로
- *    유지하되(소장님 지시: "가독성은 떨어져도 색으로 구분되니 형태는 그대로"), 칸 밖으로 넘치거나
- *    서로 겹치던 요소들(점유 팀 로고, 난이도 배지, 왕관)의 크기만 축소해서 칸 안에 깔끔히
- *    들어가도록 보정. 게임명은 여전히 2줄 줄바꿈 + 탭하면 토스트로 전체 확인 가능.
- *    나머지 로직(승리 라인 계산, 스코어보드 갱신)은 league.js의 State/함수를 그대로 재사용.
+ * 🌟 [전면 재설계 2차] 5x5 빙고판 — 소장님 최종 방향: 색은 난이도(EASY/NORMAL/HARD/CENTER)
+ *    전용으로만 쓰고, 팀 점유 여부는 실제 팀 로고로 표시. 빈 칸은 번호가 크게, 점유된 칸은
+ *    번호 대신 팀 로고를 크게 박고 번호는 리스트와 매치용으로 코너에 작게 유지. 게임명은
+ *    칸 안에 다 못 넣으므로 그리드 아래 "칸 상세 리스트"를 별도로 붙여서 번호로 매치업.
+ *    승리 라인 계산/스코어보드 갱신은 league.js의 State/함수를 그대로 재사용.
  */
 window.Boako = window.Boako || {};
 Boako.MobileLeague = {
@@ -120,73 +120,84 @@ Boako.MobileLeague = {
             }).join('');
         };
 
-        // 🌟 [보정] 5x5 빙고판 — 원래 형태(게임 로고+게임명 라벨+난이도 배지+점유 팀 로고+왕관)는
-        // 그대로 유지하고, 칸 밖으로 넘치거나 서로 겹치던 요소들(점유 팀 로고/난이도 배지/왕관)의
-        // 크기만 축소. 게임명 2줄 줄바꿈 + 탭하면 토스트로 전체 확인은 유지. 승리 라인 계산/
-        // 스코어보드 갱신은 league.js의 State와 함수를 그대로 재사용.
+        // 🌟 [전면 재설계 2차] 5x5 빙고판 — 소장님 최종 방향: 색은 난이도(EASY/NORMAL/HARD/CENTER)
+        // 전용으로만 쓰고, 팀 점유 여부는 실제 팀 로고로 표시. 빈 칸은 번호가 크게, 점유된 칸은
+        // 번호 대신 팀 로고를 크게 박고 번호는 리스트와 매치용으로 코너에 작게 유지. 게임명은
+        // 칸 안에 다 못 넣으므로 그리드 아래 "칸 상세 리스트"를 별도로 붙여서 번호로 매치업.
+        // 승리 라인 계산/스코어보드 갱신은 league.js의 State/함수를 그대로 재사용.
         Boako.League.renderBingoBoard = function() {
             const grid = document.getElementById('bingo-grid'); if (!grid) return; grid.innerHTML = '';
             const winCells = Boako.League.calculateWinningCells();
             const myTeamName = Boako.state.team?.info?.team_name;
             const difficulties = Boako.League.State.missionDifficulties || Array(25).fill("EASY");
 
+            const diffColors = {
+                EASY: { bg: '#97c459', fg: '#173404', label: 'EASY' },
+                NORMAL: { bg: '#85b7eb', fg: '#042c53', label: 'NORMAL' },
+                HARD: { bg: '#f09595', fg: '#501313', label: 'HARD' },
+                HARD_CENTER_PENALTY: { bg: '#ef9f27', fg: '#412402', label: 'CENTER' }
+            };
+
             Boako.League.State.bingoBoard.forEach((ownerTeam, idx) => {
                 const cell = document.createElement('div');
+                const num = idx + 1;
                 const isWinner = winCells.includes(idx);
-                const isMyTeam = ownerTeam && ownerTeam === myTeamName;
                 const diffStatus = difficulties[idx] || "EASY";
+                const diffInfo = diffColors[diffStatus] || diffColors.EASY;
                 const gameName = Boako.League.State.boardGames25[idx] || "지정 미정";
-                const gameLogoUrl = Boako.League.State.boardLogos25[idx];
 
-                let bgClass = "bg-slate-50 border-slate-200/60";
+                cell.style.cssText = `position:relative; aspect-ratio:1; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer; ${isWinner ? 'box-shadow:0 0 0 2px #f59e0b;' : ''}`;
+
+                const diffBadgeHtml = `<span style="position:absolute; top:2px; left:2px; font-size:6.5px; font-weight:900; padding:1px 3px; border-radius:4px; background:${diffInfo.bg}; color:${diffInfo.fg}; z-index:3;">${diffInfo.label}</span>`;
+                const crownHtml = isWinner ? `<span style="position:absolute; top:2px; right:2px; font-size:10px; z-index:3;">👑</span>` : '';
+
+                let mainHtml, numberBadgeHtml = '';
                 if (ownerTeam) {
-                    if (isMyTeam) {
-                        bgClass = "bg-gradient-to-br from-violet-600 to-indigo-600 text-white border-violet-400 bingo-won-pulse border-2 scale-[0.97] shadow-md";
-                        if (!isWinner) bgClass = "bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300 text-violet-950 font-black scale-[0.97] shadow-inner border";
-                    } else {
-                        bgClass = isWinner ? "bg-slate-700 text-slate-100 border-slate-500 scale-[0.97] opacity-80" : "bg-slate-100 border-slate-200 text-slate-700 font-bold scale-[0.97]";
-                    }
-                }
-                if (diffStatus === 'HARD_CENTER_PENALTY') bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
-
-                cell.className = `h-28 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group cursor-pointer ${bgClass}`;
-
-                const gameLogoOpacity = ownerTeam ? "opacity-20 grayscale transition-all duration-300 group-hover:opacity-10" : "opacity-100 drop-shadow-md";
-                const gameImageHtml = gameLogoUrl
-                    ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-5"><img src="${Boako.Util.cdn(gameLogoUrl)}" alt="${gameName}" class="w-[55%] h-auto max-h-full object-contain ${gameLogoOpacity}"></div>`
-                    : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-2xl pb-5 z-10 ${gameLogoOpacity}">🎲</div>`;
-
-                // 🌟 [축소] 점유 팀 로고 오버레이 — 칸 밖으로 넘치던 것을 코너 배지 크기로 축소
-                let massiveOverlayHtml = '';
-                if (ownerTeam) {
+                    // 🌟 점유된 칸 — 번호 대신 실제 팀 로고를 크게
                     const teamLogoUrl = Boako.Util.cdn(Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
-                    massiveOverlayHtml = `<div class="absolute top-1 left-1 z-20 pointer-events-none"><img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-6 h-6 object-contain rounded-full bg-white/90 border border-white shadow"></div>`;
-                }
-
-                // 🌟 [축소] 난이도 배지 — 패딩/글자 더 작게
-                let diffBadgeHtml = '';
-                if (diffStatus === 'HARD_CENTER_PENALTY') {
-                    diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[6px] px-1 py-0.5 rounded shadow-sm pointer-events-none">🔥</span>`;
+                    mainHtml = `<img src="${teamLogoUrl}" alt="${ownerTeam}" style="width:60%; height:60%; object-fit:contain; z-index:2;">`;
+                    numberBadgeHtml = `<span style="position:absolute; bottom:2px; right:2px; font-size:7px; font-weight:900; color:#64748b; background:rgba(255,255,255,0.85); padding:0 3px; border-radius:4px; z-index:3;">${num}</span>`;
                 } else {
-                    const diffColors = { EASY: "bg-emerald-500/90 text-white", NORMAL: "bg-blue-500/90 text-white", HARD: "bg-rose-500/90 text-white" };
-                    diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[6px] px-1 py-0.5 rounded shadow-sm pointer-events-none">${diffStatus}</span>`;
+                    // 🌟 빈 칸 — 번호를 크게
+                    mainHtml = `<span style="font-size:17px; font-weight:900; color:#1e293b; z-index:2;">${num}</span>`;
                 }
 
-                // 🌟 [축소] 왕관 — 팀 로고 배지와 겹치지 않게 우측 상단(난이도 배지 바로 아래)으로 이동
-                const crownHtml = isWinner ? `<span class="absolute top-5 right-1 text-[10px] text-amber-400 z-30 pointer-events-none">👑</span>` : '';
+                cell.innerHTML = `${diffBadgeHtml}${crownHtml}${mainHtml}${numberBadgeHtml}`;
 
-                const gameLabelHtml = `<div class="absolute bottom-1 left-0 w-full px-1 z-30 pointer-events-none"><div class="w-full px-1 bg-white/90 backdrop-blur-md py-1 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[26px]"><span class="text-[8px] font-black text-slate-800 leading-tight" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:keep-all;">${gameName}</span></div></div>`;
-
-                cell.innerHTML = `${gameImageHtml}${massiveOverlayHtml}${diffBadgeHtml}${crownHtml}${gameLabelHtml}`;
-
-                // 🌟 긴 게임명을 탭하면 전체 이름(+점유 팀)을 토스트로 확인
                 cell.addEventListener('click', () => {
-                    const msg = ownerTeam ? `🎲 ${gameName} · 점유: ${ownerTeam}` : `🎲 ${gameName}`;
+                    const msg = ownerTeam ? `#${num} 🎲 ${gameName} · 점유: ${ownerTeam}` : `#${num} 🎲 ${gameName}`;
                     Boako.Util.toast(msg);
                 });
 
                 grid.appendChild(cell);
             });
+
+            // 🌟 [신규] 그리드 안에 다 못 넣는 정보(게임명/난이도/점유팀)를 번호로 매치업하는
+            // 상세 리스트를 그리드 카드 바로 아래에 붙임(처음 호출 시 1회 생성, 이후 갱신).
+            let listWrap = document.getElementById('mobile-bingo-detail-list');
+            if (!listWrap) {
+                listWrap = document.createElement('div');
+                listWrap.id = 'mobile-bingo-detail-list';
+                listWrap.style.cssText = 'margin-top:12px; border-top:1px solid #f1f5f9;';
+                grid.parentElement.appendChild(listWrap);
+            }
+            listWrap.innerHTML = Boako.League.State.bingoBoard.map((ownerTeam, idx) => {
+                const num = idx + 1;
+                const diffStatus = difficulties[idx] || "EASY";
+                const diffInfo = diffColors[diffStatus] || diffColors.EASY;
+                const gameName = Boako.League.State.boardGames25[idx] || "지정 미정";
+                const statusHtml = ownerTeam
+                    ? `<span style="font-size:11px; color:#64748b; font-weight:700; flex-shrink:0;">${ownerTeam} 점유</span>`
+                    : `<span style="font-size:11px; color:#cbd5e1; font-weight:700; flex-shrink:0;">비어있음</span>`;
+                return `
+                    <div style="display:flex; align-items:center; gap:8px; padding:9px 2px; border-bottom:1px solid #f1f5f9;">
+                        <span style="width:20px; height:20px; border-radius:50%; background:#f1f5f9; color:#334155; font-size:10.5px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${num}</span>
+                        <span style="flex:1; font-size:12.5px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gameName}</span>
+                        <span style="font-size:9px; font-weight:900; padding:2px 5px; border-radius:5px; background:${diffInfo.bg}; color:${diffInfo.fg}; flex-shrink:0;">${diffInfo.label}</span>
+                        ${statusHtml}
+                    </div>
+                `;
+            }).join('');
 
             Boako.League.updateStats();
         };
