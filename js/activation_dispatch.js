@@ -1,11 +1,13 @@
 /**
- * [ACTIVATION DISPATCH] ④⑤⑥⑦번 활성화 오버레이 통합 디스패처 (사이트)
+ * [ACTIVATION DISPATCH] ④⑤⑥⑦⑧번 활성화 오버레이 통합 디스패처 (사이트)
  * 🌟 대기열(activation_overlay_queue) 방식으로 전환 — fn_get_my_activation_overlay() 하나만 호출해서
  *    크론이 미리 계산해둔 결과를 조회만 함 (로그인 시점에 실시간 계산 안 함).
  * 🌟 다른 온보딩 모달(닉네임/기록기가이드/공지사항)이 아직 떠 있으면 끝날 때까지 대기했다가 표시 —
  *    Boako.Auth.requireNoticeModal()과 동일한 폴링 패턴 (풀스크린 오버레이 중복 노출 방지).
- * 🌟 overlay_type에 따라 rival_recommend.js 또는 social_activation.js의 렌더러(showOverlay)만 호출.
- *    ext_help는 확장 전용 시나리오라 사이트에선 무시.
+ * 🌟 overlay_type에 따라 rival_recommend.js / social_activation.js / kakao_calendar_nudge.js의
+ *    렌더러(showOverlay)만 호출. ext_help는 확장 전용 시나리오라 사이트에선 무시.
+ * 🌟 [2026-08-29 추가] ⑧번: kakao_calendar_nudge — 캘린더 등록 API가 -402(동의 부족)로 실패한 적 있는
+ *    유저에게 재로그인/재동의를 유도.
  */
 Boako.ActivationDispatch = {
     checkAndShow: async () => {
@@ -32,6 +34,9 @@ Boako.ActivationDispatch = {
             } else if (overlayType === 'social_activation') {
                 if (!Boako.SocialActivation) await Boako.Util.loadScript('js/social_activation.js');
                 Boako.SocialActivation.showOverlay(meta.target_type);
+            } else if (overlayType === 'kakao_calendar_nudge') {
+                if (!Boako.KakaoCalendarNudge) await Boako.Util.loadScript('js/kakao_calendar_nudge.js');
+                Boako.KakaoCalendarNudge.showOverlay();
             }
             // 🌟 ext_help는 확장(boako-widget.js) 전용 시나리오라 사이트에선 표시 안 함
         } catch (e) {
