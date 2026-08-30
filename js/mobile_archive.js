@@ -14,6 +14,14 @@
  *    나오는 카드 그리드라 가로 스크롤 문제가 없어 손대지 않고 그대로 재사용.
  * 🌟 [버그수정 발견] 더보기 시트의 "📋 전적기록" 항목이 다른 항목들과 달리 onclick 자체가
  *    빠져있던 걸 발견 — mobile_shell.js에 openArchive() 진입점을 추가해서 연결.
+ * 🌟 [버그수정] archive.js 원본 헤더(탭 전환 바 / 시즌·라운드 필터)가 PC 폭 기준으로 짜여있어
+ *    모바일에서 두 가지 문제가 있었음:
+ *      1) 탭 전환 바에 overflow-x-auto가 걸려있어 "게임별 통계" 탭이 좁은 화면에서 가로 스크롤
+ *         뒤로 숨어버림 — "가로 스크롤 절대 불가" 원칙 위반.
+ *      2) 라운드 필터 드롭다운이 w-[130px] 고정폭이라 "전체 라운드" 텍스트가 줄바꿈됨.
+ *    archive.js 파일은 안 건드리고 _injectHeaderStyleOverride()로 CSS만 한 번 주입해서 해결
+ *    (Boako.Archive.switchTab()이 탭 전환마다 같은 고정 클래스를 다시 씌우는 구조라, JS 오버라이드
+ *    대신 CSS 우선순위로 항상 덮어쓰는 방식을 씀 — 재전환해도 안전).
  */
 window.Boako = window.Boako || {};
 Boako.MobileArchive = {
@@ -25,8 +33,51 @@ Boako.MobileArchive = {
         Boako.Archive.renderRecords = Boako.MobileArchive._renderRecordsCards;
         Boako.Archive.renderGames = Boako.MobileArchive._renderGamesCards;
 
+        Boako.MobileArchive._injectHeaderStyleOverride();
+
         container.innerHTML = `<div id="mobile-archive-root"></div>`;
         Boako.Archive.buildUI('mobile-archive-root');
+    },
+
+    // 🌟 [버그수정] archive.js 원본 헤더(탭 전환 바 / 시즌·라운드 필터)가 PC 폭 기준으로 짜여있어
+    // 모바일에서 두 가지 문제가 있었음:
+    //   1) 탭 전환 바(기록실/랭킹보드/게임별 통계)에 overflow-x-auto가 걸려있어, 3개 탭이 좁은 화면에
+    //      안 들어가면 "게임별 통계" 탭이 가로 스크롤 뒤로 숨어버림 — "가로 스크롤 절대 불가" 원칙 위반.
+    //      게다가 Boako.Archive.switchTab()이 탭 전환마다 매번 같은 고정 Tailwind 클래스
+    //      (px-5 py-2.5 등)를 다시 씌우는 구조라, JS 오버라이드로는 매번 다시 깨질 수 있어
+    //      CSS 우선순위로 항상 덮어쓰는 방식을 씀(재전환해도 안전).
+    //   2) 라운드 필터 드롭다운 컨테이너가 w-[130px]로 고정폭이라 "전체 라운드" 텍스트+아이콘+화살표가
+    //      한 줄에 안 들어가고 줄바꿈됨 — 폭을 넉넉하게 늘림(부모가 flex-wrap이라 공간 부족하면
+    //      다음 줄로 자연스럽게 넘어가므로 가로 스크롤 위험 없음).
+    // archive.js 파일 자체는 안 건드리고, CSS만 한 번 주입해서 위 두 가지를 덮어씀.
+    _injectHeaderStyleOverride: () => {
+        if (document.getElementById('mobile-archive-header-fix')) return;
+        const style = document.createElement('style');
+        style.id = 'mobile-archive-header-fix';
+        style.innerHTML = `
+            #mobile-archive-root .flex.bg-slate-100.p-1.rounded-xl {
+                overflow-x: visible !important;
+            }
+            #mobile-archive-root .flex.bg-slate-100.p-1.rounded-xl > button {
+                flex: 1 1 0 !important;
+                padding: 8px 4px !important;
+                font-size: 11.5px !important;
+                justify-content: center !important;
+                gap: 4px !important;
+            }
+            #mobile-archive-root .flex.bg-slate-100.p-1.rounded-xl > button i {
+                width: 13px !important;
+                height: 13px !important;
+            }
+            #season-filter-container, #round-filter-wrapper {
+                width: auto !important;
+                min-width: 150px !important;
+            }
+            #season-filter-container button span, #round-filter-wrapper button span {
+                white-space: nowrap;
+            }
+        `;
+        document.head.appendChild(style);
     },
 
     _formatDate: function (dateStr) {
