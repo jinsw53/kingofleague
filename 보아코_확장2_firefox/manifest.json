@@ -1,6 +1,4 @@
 {
-"update_url": "https://clients2.google.com/service/update2/crx",
-
   "manifest_version": 3,
   "name": "BOAKO 팀 리그 기록 저장",
   "version": "3.14",
@@ -9,7 +7,14 @@
   "permissions": ["storage", "activeTab", "contextMenus", "identity"],
   "host_permissions": ["https://boardgamearena.com/*", "https://boako.dev-play.kr/*", "https://qrredwrxdnvqwdxzanba.supabase.co/*"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "boako-team-league@boakoarchive.co.kr",
+      "strict_min_version": "109.0"
+    }
   },
   "content_scripts": [
     {
