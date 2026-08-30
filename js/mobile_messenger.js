@@ -12,12 +12,15 @@
  *      boako_challenge_read)에 방 열람 시각을 기록하는 방식 (DM처럼 DB is_read 컬럼이 없는 구조)
  *    - 대항전 소통채널의 "일정 조율 투표" 카드도 함께 표시: 진행 상태(OPEN/PROPOSED/CONFIRMED) 조회는
  *      전부 지원하고, PROPOSED 상태의 수락/거절 버튼도 accept_schedule_poll/reject_schedule_poll
- *      RPC를 직접 호출해 지원함. 다만 OPEN 상태에서 "내가 되는 시간을 달력에 새로 찍어 제출"하는
- *      기능은 PC의 복잡한 달력 그리드 모달(Boako.Match.Chat.openPollModal)에 의존하고 있어 이번
- *      범위에서는 제외 — 이 경우에만 "캘린더로 시간 제출은 PC에서 진행해주세요" 안내를 띄움.
+ *      RPC를 직접 호출해 지원함.
  *      (PC의 acceptProposedTime/rejectProposedTime 함수를 그대로 부르지 않고 같은 RPC를 직접
  *      호출하는 이유: 그 함수들 끝에 PC 전용 loadMessagesAndPolls()를 호출해서, RPC 자체는 성공해도
  *      마무리 단계에서 에러가 나 "실패했습니다" 토스트가 잘못 뜰 위험이 있기 때문.)
+ * 🌟 [3단계: 일정조율 달력 제출 구현] OPEN 상태에서 "내가 되는 시간을 달력에 찍어서 제출"하는
+ *    기능도 구현 완료 — PC의 Boako.Match.Chat.openPollModal 흐름(달력 그리드 + 고정 시간 선택)을
+ *    풀스크린 오버레이(openPollCalendar/renderPollCalendarGrid/togglePollDate/submitPollData)로
+ *    새로 그리되, 제출은 PC와 동일한 submit_schedule_poll RPC를 그대로 호출. PC 모달 자체는
+ *    #poll-calendar-modal 등 PC 전용 DOM에 강하게 묶여있어 화면 재사용은 불가능했음.
  * 🌟 [버그 회피] PC의 replySchedule/replyChallenge/replyTeamJoin/replyTeamInvite는 처리 후
  *    Boako.Auth.renderWidget()과 Boako.Messenger.View.refreshRoomList()/openRoom()을 무조건
  *    호출해서 PC 전용 DOM이 없는 모바일에서 에러남 — 동일한 DB 업데이트/RPC 호출 로직을
@@ -218,7 +221,6 @@ Boako.MobileMessenger = {
 
     // 🌟 [2단계 신규] 대항전 소통채널의 일정 조율 투표 카드 — PC(js/messenger.js View.openRoom 내부)와
     // 동일한 상태 판정 로직(OPEN/PROPOSED/CONFIRMED, 과반수 계산)을 모바일 카드로 새로 그림.
-    // OPEN 상태의 "내 시간 새로 제출"만 PC 전용 달력 모달에 의존해서 이번 범위에서 제외.
     renderPollCard: (poll, room) => {
         const votersCount = Object.keys(poll.votes || {}).length;
         const status = poll.status;
@@ -231,8 +233,10 @@ Boako.MobileMessenger = {
             inner = `
                 <div style="font-size:11.5px; font-weight:900; color:#3730a3; margin-bottom:4px;">📊 일정 조율 투표 진행 중</div>
                 <div style="font-size:10.5px; color:#64748b; font-weight:700; margin-bottom:10px;">전체 ${entryCount}명 중 ${votersCount}명이 일정을 제출했습니다.</div>
-                <div onclick="Boako.Util.toast('🗓️ 내 시간 제출은 PC에서 캘린더로 진행해주세요.')" style="font-size:11.5px; text-align:center; background:#4f46e5; color:#fff; padding:9px; border-radius:10px; font-weight:900;">나도 달력으로 시간 찍기</div>
+                <div onclick="Boako.MobileMessenger.openPollCalendar()" style="font-size:11.5px; text-align:center; background:#4f46e5; color:#fff; padding:9px; border-radius:10px; font-weight:900;">나도 달력으로 시간 찍기</div>
             `;
+            // 🌟 달력을 열 때 room 정보(시즌/게임명)가 필요하므로 렌더 시점에 기억해둠
+            Boako.MobileMessenger._pollRoomInfo = { seasonNo: room.seasonNo, gameName: room.gameName };
         } else if (status === 'PROPOSED') {
             const confirmedUsers = poll.confirmations || [];
             const isAcceptedByMe = confirmedUsers.some(id => String(id) === myId);
@@ -266,6 +270,175 @@ Boako.MobileMessenger = {
         }
 
         return `<div style="display:flex; justify-content:center; margin:6px 0;"><div style="width:100%; max-width:280px; background:linear-gradient(180deg,#eef2ff,#fff); border:1.5px solid #c7d2fe; border-radius:16px; padding:14px;">${inner}</div></div>`;
+    },
+
+    // 🌟 [3단계 신규] "내 시간을 달력에 찍어서 제출" — PC의 Boako.Match.Chat.openPollModal 흐름
+    // (달력 그리드 + 고정 시간 선택 + submit_schedule_poll RPC)을 모바일 풀스크린 오버레이로 재구현.
+    // PC 모달 자체는 DOM(#poll-calendar-modal 등 PC 전용 id)에 강하게 묶여있어 그대로 재사용이
+    // 불가능해서 화면만 새로 그리고, 제출 RPC(submit_schedule_poll)는 PC와 동일하게 그대로 호출.
+    _pollCal: { year: 0, month: 0, times: [], fixedTime: '20:00' },
+    _pollRoomInfo: null, // renderPollCard가 렌더 시점에 세팅 (seasonNo, gameName)
+
+    openPollCalendar: async () => {
+        const info = Boako.MobileMessenger._pollRoomInfo;
+        if (!info) return;
+
+        // 🚨 PC와 동일하게, 열기 전 이미 확정된 상태인지 DB로 팩트 체크
+        const roomId = `${info.seasonNo}_${info.gameName}`;
+        const { data: confirmed } = await Boako.db.from('schedule_polls')
+            .select('poll_id').eq('target_id', roomId).eq('status', 'CONFIRMED').limit(1);
+        if (confirmed && confirmed.length > 0) {
+            Boako.Util.toast('🚨 이미 일정이 최종 확정되어 달력을 열 수 없습니다.');
+            return;
+        }
+
+        const now = new Date();
+        Boako.MobileMessenger._pollCal = { year: now.getFullYear(), month: now.getMonth() + 1, times: [], fixedTime: '20:00', roomId, seasonNo: info.seasonNo, gameName: info.gameName };
+
+        const timeOptions = [
+            { value: '시간 상관없음', label: '☀️ 시간 상관없음' },
+            ...Array.from({ length: 24 }, (_, i) => {
+                const time = String(i).padStart(2, '0') + ':00';
+                const ampm = i < 12 ? '오전' : '오후';
+                const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
+                return { value: time, label: `${time} (${ampm} ${h}시)` };
+            })
+        ];
+        const optionsHtml = timeOptions.map(o => `<option value="${o.value}" ${o.value === '20:00' ? 'selected' : ''}>${o.label}</option>`).join('');
+
+        const overlay = document.createElement('div');
+        overlay.id = 'mobile-poll-calendar-overlay';
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:#fff; display:flex; flex-direction:column;';
+        overlay.innerHTML = `
+            <div style="background:#4f46e5; color:#fff; padding:14px 16px; padding-top:calc(14px + env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between;">
+                <button onclick="Boako.MobileMessenger.changePollMonth(-1)" style="color:#fff; font-size:16px; padding:4px 8px;">◀</button>
+                <span id="mobile-poll-month-title" style="font-weight:900; font-size:14px; letter-spacing:.05em;"></span>
+                <button onclick="Boako.MobileMessenger.changePollMonth(1)" style="color:#fff; font-size:16px; padding:4px 8px;">▶</button>
+            </div>
+            <div style="position:relative;">
+                <span onclick="document.getElementById('mobile-poll-calendar-overlay').remove()" style="position:absolute; top:10px; right:14px; font-size:22px; color:#94a3b8; line-height:1;">×</span>
+            </div>
+            <div style="background:#eef2ff; padding:10px 14px; border-bottom:1px solid #e0e7ff; display:flex; align-items:center; gap:8px;">
+                <span style="font-size:10.5px; font-weight:900; color:#3730a3; flex-shrink:0;">⏰ 고정 시간</span>
+                <select id="mobile-poll-fixed-time" onchange="Boako.MobileMessenger._pollCal.fixedTime=this.value" style="flex:1; background:#fff; border:1px solid #c7d2fe; color:#312e81; font-size:12px; font-weight:700; border-radius:8px; padding:6px 8px;">
+                    ${optionsHtml}
+                </select>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:10px; font-weight:900; color:#94a3b8; padding:10px 12px 4px;">
+                <div style="color:#f87171;">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div style="color:#60a5fa;">토</div>
+            </div>
+            <div id="mobile-poll-days-grid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px; padding:6px 12px; flex:1; overflow-y:auto; align-content:start;"></div>
+            <div style="padding:12px 14px; padding-bottom:calc(12px + env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0;">
+                <button id="mobile-poll-submit-btn" onclick="Boako.MobileMessenger.submitPollData()" style="width:100%; background:#e2e8f0; color:#94a3b8; font-size:12.5px; font-weight:900; padding:13px; border:none; border-radius:12px;" disabled>날짜를 클릭하여 선택하세요</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        Boako.MobileMessenger.renderPollCalendarGrid();
+    },
+
+    changePollMonth: (delta) => {
+        const cal = Boako.MobileMessenger._pollCal;
+        let m = cal.month + delta, y = cal.year;
+        if (m > 12) { m = 1; y++; }
+        if (m < 1) { m = 12; y--; }
+        cal.year = y; cal.month = m;
+        Boako.MobileMessenger.renderPollCalendarGrid();
+    },
+
+    renderPollCalendarGrid: () => {
+        const cal = Boako.MobileMessenger._pollCal;
+        const titleEl = document.getElementById('mobile-poll-month-title');
+        if (titleEl) titleEl.innerText = `${cal.year}년 ${cal.month}월`;
+
+        const firstDay = new Date(cal.year, cal.month - 1, 1).getDay();
+        const lastDate = new Date(cal.year, cal.month, 0).getDate();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let html = '';
+        for (let i = 0; i < firstDay; i++) html += `<div></div>`;
+
+        for (let day = 1; day <= lastDate; day++) {
+            const cellDate = new Date(cal.year, cal.month - 1, day);
+            const isPast = cellDate < today;
+            const dateStr = `${cal.year}-${String(cal.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayTimes = cal.times.filter(t => t.startsWith(dateStr));
+            const isSelected = dayTimes.length > 0;
+
+            let style = 'aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:10px; font-size:11px; font-weight:800;';
+            let inner = `<span>${day}</span>`;
+
+            if (isPast) {
+                style += 'color:#cbd5e1; background:#f8fafc;';
+            } else if (isSelected) {
+                style += 'background:#4f46e5; color:#fff; box-shadow:0 2px 6px rgba(79,70,229,.35);';
+                const timeVal = dayTimes[0].split(' ')[1];
+                inner += `<span style="font-size:7.5px; font-weight:700; opacity:.9; margin-top:1px;">${timeVal === '상관없음' ? '☀️' : timeVal}</span>`;
+            } else {
+                style += 'color:#334155; background:#f8fafc; border:1px solid #f1f5f9;';
+            }
+
+            html += `<div onclick="${isPast ? '' : `Boako.MobileMessenger.togglePollDate('${dateStr}')`}" style="${style}">${inner}</div>`;
+        }
+
+        const grid = document.getElementById('mobile-poll-days-grid');
+        if (grid) grid.innerHTML = html;
+        Boako.MobileMessenger.updatePollSubmitButton();
+    },
+
+    togglePollDate: (dateStr) => {
+        const cal = Boako.MobileMessenger._pollCal;
+        const combined = `${dateStr} ${cal.fixedTime}`;
+        const idx = cal.times.indexOf(combined);
+        if (idx > -1) {
+            cal.times.splice(idx, 1);
+        } else {
+            cal.times = cal.times.filter(t => !t.startsWith(dateStr));
+            cal.times.push(combined);
+        }
+        Boako.MobileMessenger.renderPollCalendarGrid();
+    },
+
+    updatePollSubmitButton: () => {
+        const btn = document.getElementById('mobile-poll-submit-btn');
+        if (!btn) return;
+        const count = Boako.MobileMessenger._pollCal.times.length;
+        if (count > 0) {
+            btn.disabled = false;
+            btn.style.background = '#4f46e5';
+            btn.style.color = '#fff';
+            btn.innerText = `${count}개 일정 일괄 제출하기`;
+        } else {
+            btn.disabled = true;
+            btn.style.background = '#e2e8f0';
+            btn.style.color = '#94a3b8';
+            btn.innerText = '날짜를 클릭하여 선택하세요';
+        }
+    },
+
+    // 🌟 PC의 submit_schedule_poll RPC를 동일한 파라미터로 그대로 호출
+    submitPollData: async () => {
+        const cal = Boako.MobileMessenger._pollCal;
+        if (cal.times.length === 0) return;
+
+        try {
+            const { error } = await Boako.db.rpc('submit_schedule_poll', {
+                p_target_id: cal.roomId,
+                p_target_type: 'MATCH_CHANNEL',
+                p_game_name: cal.gameName,
+                p_mode: 'SWISS',
+                p_my_times: cal.times
+            });
+            if (error) throw error;
+
+            document.getElementById('mobile-poll-calendar-overlay')?.remove();
+            Boako.Util.toast(`📅 ${cal.times.length}개의 후보 일정이 성공적으로 제출되었습니다!`);
+            await Boako.MobileMessenger.refreshRooms();
+            Boako.MobileMessenger.draw(document.getElementById('mobile-content-area'));
+        } catch (e) {
+            console.error('일정 제출 실패:', e);
+            Boako.Util.toast('🚨 ' + (e.message || '제출에 실패했습니다.'));
+        }
     },
 
     // 🌟 [2단계 신규] 투표 수락/거절 — PC의 acceptProposedTime/rejectProposedTime과 같은 RPC를
