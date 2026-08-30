@@ -25,11 +25,17 @@
  *    Boako.Auth.renderWidget()과 Boako.Messenger.View.refreshRoomList()/openRoom()을 무조건
  *    호출해서 PC 전용 DOM이 없는 모바일에서 에러남 — 동일한 DB 업데이트/RPC 호출 로직을
  *    이 파일에 재구현하고 마무리만 모바일 재렌더로 대체.
+ * 🌟 [4단계: 그룹채팅 실시간 반영] 그동안 그룹채팅 3종은 DM과 달리 실시간 채널이 없어서 방을
+ *    나갔다 다시 들어와야 새 메시지가 보였음 — PC(js/messenger.js _subscribeChannelsAsLeader)와
+ *    동일한 6개 테이블(grandprix_match_chats/schedule_polls/together_chats/together_posts/
+ *    challenge_chats/challenges)을 mobile_shell.js가 구독하고, 이 파일의 handleGroupChatEvent()가
+ *    PC의 _onMatchChatInsert 등과 동일한 반응(내 방 아니면 무시 → 방 목록 최신화 → 보고 있으면
+ *    즉시 재렌더, 아니면 토스트)을 담당. PC의 탭 리더 선출 구조(RealtimeCoordinator)에는 편승하지
+ *    않고 DM 채널과 동일하게 모바일 전용 채널을 별도로 구독함(이유는 mobile_shell.js 코멘트 참고).
  * 🌟 [실시간] 새 쪽지 실시간 반영은 js/mobile_shell.js가 로그인 시점에 이미 구독 중인
  *    'mobile-messages-changes' 채널(안읽은 배지 갱신용)에 편승함 — 이 화면이 렌더된 상태에서
  *    새 쪽지가 오면 mobile_shell.js가 Boako.MobileMessenger.handleRealtimeInsert()를 호출해줌.
- *    별도 채널을 새로 만들지 않아 탭당 소켓이 늘어나는 문제를 피함. (그룹채팅 3종의 실시간 반영은
- *    이 채널이 'messages' 테이블만 구독하므로 아직 포함 안 됨 — 방을 나갔다 다시 들어오면 최신화됨.)
+ *    별도 채널을 새로 만들지 않아 탭당 소켓이 늘어나는 문제를 피함.
  * 🌟 액션 카드(일정제안/도전장/팀가입/스카웃) UI는 크롬 확장(보아코_확장2/boako-widget.js)의
  *    카드 마크업을 그대로 가져와 재사용 — 이미 터치 화면 크기에 맞춰 디자인된 스타일이라 그대로 맞음.
  */
@@ -690,6 +696,45 @@ Boako.MobileMessenger = {
 
         await Boako.MobileMessenger.refreshRooms();
         Boako.MobileMessenger.draw(container);
+    },
+
+    // 🌟 [4단계 신규] 그룹채팅 3종(대항전/같이하자/챌린지) + 일정투표/모집상태/매칭상태 변화 —
+    // PC(js/messenger.js _onMatchChatInsert/_onPollChange/_onTogetherChatInsert/_onTogetherPostsChange/
+    // _onChallengeChatInsert/_onChallengesChange)와 완전히 동일한 반응(내 방이 아니면 무시 → 방 목록
+    // 최신화 → 그 방을 보고 있으면 즉시 재렌더, 아니면 토스트)을 모바일 DOM으로 재구현.
+    // uiRoomId가 없는 이벤트(같이하자/챌린지 상태변화)는 방 자체가 새로 생기거나 없어질 수 있어서
+    // 조용히 목록만 새로고침(토스트 없음) — PC와 동일.
+    handleGroupChatEvent: async (roomType, uiRoomId, newMsg, toastMessage) => {
+        const container = document.getElementById('mobile-content-area');
+        const isMessengerListOpen = container && !document.getElementById('mobile-msg-thread') && container.querySelector('[onclick^="Boako.MobileMessenger.openRoom"]');
+        const isMessengerThreadOpen = container && !!document.getElementById('mobile-msg-thread');
+
+        if (!uiRoomId) {
+            if (isMessengerListOpen || isMessengerThreadOpen) {
+                await Boako.MobileMessenger.refreshRooms();
+                Boako.MobileMessenger.draw(container);
+            }
+            return;
+        }
+
+        // 🌟 PC의 `if (Boako.Messenger.chatRooms[uiRoomId])`와 동일 — 나와 무관한 방이면 조용히 무시
+        const isMine = Boako.MobileMessenger.rooms.some(r => r.id === uiRoomId);
+        if (!isMine) return;
+
+        const isThisRoomOpen = Boako.MobileMessenger.activeConversation?.roomId === uiRoomId;
+
+        if (isThisRoomOpen) {
+            await Boako.MobileMessenger.refreshRooms();
+            Boako.MobileMessenger.draw(container);
+        } else {
+            if (isMessengerListOpen) {
+                await Boako.MobileMessenger.refreshRooms();
+                Boako.MobileMessenger.draw(container);
+            }
+            if (newMsg && toastMessage && newMsg.sender_id !== Boako.state.user.id) {
+                Boako.Util.toast(toastMessage);
+            }
+        }
     },
 
     escapeHtml: (str) => {
