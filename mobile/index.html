@@ -35,7 +35,11 @@
          🌟 [버그수정] Boako.Util.toast()가 document.getElementById('boako-toast')를 찾아서
          띄우는 방식인데, 이 요소 자체가 PC index.html에만 있고 이 파일엔 빠져있어서 모바일에서
          호출되는 모든 토스트(빙고칸 탭, 각종 성공/실패 안내 등)가 계속 조용히 무시되고 있었음 —
-         PC와 완전히 동일한 마크업/CSS로 추가. -->
+         PC와 완전히 동일한 마크업/CSS로 추가.
+         🌟 [정리] 상단바의 🔔 벨 아이콘 제거 — onclick 자체가 없어 눌러도 아무 기능이 없던
+         장식용 자리였음. 쪽지 알림은 이미 아바타 옆 빨간 점(mobile-avatar-dot)이 담당하고,
+         업적/라이벌결과/추천보너스는 각자 실시간 풀스크린 오버레이로 바로 뜨는 구조라
+         "알림함"이 따로 필요하지 않아 벨 자체를 제거함. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -68,12 +72,11 @@
 </head>
 <body>
 
-    <!-- 상단바: 로고 + 검색 + 알림 아이콘 + 프로필 아바타(클릭 시 드로어) -->
+    <!-- 상단바: 로고 + 검색 + 프로필 아바타(클릭 시 드로어, 안읽은 쪽지 있으면 배지 표시) -->
     <header id="mobile-topbar" style="position:sticky; top:0; z-index:40; background:#fff; border-bottom:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; padding:14px 16px;">
         <span style="font-size:16px; font-weight:900;">BOAKO</span>
         <div style="display:flex; align-items:center; gap:16px;">
             <span onclick="Boako.MobileShell.openSearch()" style="font-size:19px; cursor:pointer;">🔍</span>
-            <span style="font-size:20px;">🔔</span>
             <div id="mobile-avatar-btn" onclick="Boako.MobileShell.openDrawer()" style="width:30px; height:30px; border-radius:50%; background:#e2e8f0; cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:16px;">
                 <span id="mobile-avatar-emoji">👤</span>
                 <img id="mobile-avatar-img" class="hidden" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">
