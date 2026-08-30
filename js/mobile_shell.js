@@ -71,6 +71,8 @@
  *    공지글은 제외.
  * 🌟 [15단계: 화면별 포팅 + 버그수정] 더보기 시트의 "📋 전적기록" 항목이 다른 항목들과 달리
  *    onclick 자체가 빠져있던 걸 발견 — openArchive() 진입점을 추가해서 js/mobile_archive.js로 연결.
+ * 🌟 [버그수정] "☕ 카페" 항목이 window.open()으로 새 창을 열려고 했는데 모바일 웹뷰에서 팝업이
+ *    막혀서 안 열리던 문제 — BGA 링크(requireBgaNickname)처럼 실제 <a href target="_blank"> 태그로 교체.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -579,7 +581,9 @@ Boako.MobileShell = {
                 </div>
                 <div onclick="Boako.MobileShell.openTeamHub('info')" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛡️ ${Boako.state.team ? '팀 관리' : '팀 창단'}</div>
                 <div onclick="Boako.MobileShell.openTeamList()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">👥 팀 목록</div>
-                <div onclick="window.open('https://cafe.naver.com/boardgamearena', '_blank')" style="padding:12px 4px; font-size:14px; font-weight:700;">☕ 카페</div>
+                <!-- 🌟 [버그수정] window.open()으로 새 창을 열려고 했는데 모바일 웹뷰에서 팝업이
+                     막혀서 안 열리던 문제 — BGA 링크(requireBgaNickname)처럼 실제 <a> 태그로 교체 -->
+                <a href="https://cafe.naver.com/boardgamearena" target="_blank" rel="noopener" style="display:block; padding:12px 4px; font-size:14px; font-weight:700; color:inherit; text-decoration:none;">☕ 카페</a>
                 <div onclick="Boako.MobileShell.openBoard()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">
                     <span>📝 게시판</span>${badge(c.boardRequest)}
                 </div>
