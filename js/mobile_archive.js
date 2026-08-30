@@ -14,6 +14,9 @@
  *    나오는 카드 그리드라 가로 스크롤 문제가 없어 손대지 않고 그대로 재사용.
  * 🌟 [버그수정 발견] 더보기 시트의 "📋 전적기록" 항목이 다른 항목들과 달리 onclick 자체가
  *    빠져있던 걸 발견 — mobile_shell.js에 openArchive() 진입점을 추가해서 연결.
+ * 🌟 [가독성 개선] 기록 카드의 웨이트/플레이타임/배점 배지 사이에 × 표시를 넣어서 "이 셋을 곱해
+ *    점수가 나온다"는 걸 직관적으로 알 수 있게 함. 우측 상단 RP 숫자에도 "RP" 단위를 붙여서
+ *    숫자만 덜렁 나오지 않게 함.
  */
 window.Boako = window.Boako || {};
 Boako.MobileArchive = {
@@ -161,10 +164,10 @@ Boako.MobileArchive = {
 
             const rpHtml = isFreeAgent
                 ? `<div style="display:flex; flex-direction:column; align-items:flex-end; line-height:1.2;">
-                       <span style="position:relative; font-weight:900; font-size:18px; color:#94a3b8;">${Math.floor(rec.rp || 0)}<span style="position:absolute; left:-2px; right:-2px; top:50%; border-top:2px solid #ef4444; transform:translateY(-50%) rotate(-4deg);"></span></span>
+                       <span style="position:relative; font-weight:900; font-size:18px; color:#94a3b8;">${Math.floor(rec.rp || 0)}<span style="font-size:11px; font-weight:800;">RP</span><span style="position:absolute; left:-2px; right:-2px; top:50%; border-top:2px solid #ef4444; transform:translateY(-50%) rotate(-4deg);"></span></span>
                        <span style="font-size:8px; font-weight:900; color:#ef4444; text-transform:uppercase; margin-top:2px;">미집계</span>
                    </div>`
-                : `<span style="font-weight:900; font-size:18px; color:#4f46e5;">${Math.floor(rec.rp || 0)}</span>`;
+                : `<span style="font-weight:900; font-size:18px; color:#4f46e5;">${Math.floor(rec.rp || 0)}<span style="font-size:11px; font-weight:800; margin-left:2px;">RP</span></span>`;
 
             const statusIconHtml = rec.is_verified == 0
                 ? `<i data-lucide="check-circle-2" style="color:#10b981; width:15px; height:15px;"></i>`
@@ -198,9 +201,11 @@ Boako.MobileArchive = {
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:9px;">
-                        <div style="display:flex; gap:4px;">
+                        <div style="display:flex; align-items:center; gap:4px;">
                             <span style="font-size:9.5px; font-weight:800; background:#f8fafc; border:1px solid #f1f5f9; border-radius:5px; padding:3px 6px; color:#64748b;">🧠 ${rec.weight || 0}</span>
+                            <span style="font-size:10px; font-weight:900; color:#cbd5e1;">×</span>
                             <span style="font-size:9.5px; font-weight:800; background:#f8fafc; border:1px solid #f1f5f9; border-radius:5px; padding:3px 6px; color:#64748b;">⏳ ${rec.playtime || 0}</span>
+                            <span style="font-size:10px; font-weight:900; color:#cbd5e1;">×</span>
                             <span style="font-size:9.5px; font-weight:800; background:#eef2ff; border:1px solid #e0e7ff; border-radius:5px; padding:3px 6px; color:#4f46e5;">🎲 ${rec.multiplier || 0}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
