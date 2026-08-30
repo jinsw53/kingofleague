@@ -89,9 +89,28 @@ Boako.MobileArchive = {
             }
             #free-agent-filter-wrapper {
                 padding: 11px 14px !important;
+                background: #fff;
+                border-color: #e2e8f0 !important;
+                transition: background-color .15s ease, border-color .15s ease;
             }
             #free-agent-filter-wrapper span:first-child {
                 font-size: 11.5px !important;
+            }
+            /* 🌟 [버그수정] 토글 스위치가 모바일 좁은 폭에서 공간을 불필요하게 차지하고,
+               검색창과 높이/크기가 안 맞아 통일감이 떨어지던 문제 — 스위치 비주얼(원래 라벨의
+               두 번째 자식 span, 체크박스+슬라이더)은 완전히 숨기고, 대신 버튼 전체가
+               켜짐/꺼짐 상태에 따라 색이 들어오도록 변경. CSS :has()로 체크박스 상태만 보고
+               판단하므로 archive.js의 toggleIncludeFreeAgents() 로직은 전혀 안 건드림.
+               스위치가 차지하던 폭이 없어진 만큼 검색창(flex:1)도 자동으로 더 길어짐. */
+            #free-agent-filter-wrapper > span:last-child {
+                display: none !important;
+            }
+            #free-agent-filter-wrapper:has(#free-agent-checkbox:checked) {
+                background: #eef2ff !important;
+                border-color: #6366f1 !important;
+            }
+            #free-agent-filter-wrapper:has(#free-agent-checkbox:checked) span:first-child {
+                color: #4f46e5 !important;
             }
         `;
         document.head.appendChild(style);
