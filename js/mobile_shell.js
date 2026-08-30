@@ -263,7 +263,16 @@ Boako.MobileShell = {
     // Boako.Messenger.View.refreshRoomList()를 무조건 부르는데, 둘 다 PC 전용 DOM(#login-widget-area,
     // #chat-room-list 등)이 없으면 에러가 나서 그 뒤에 있는 토스트 코드까지 실행이 안 됨.
     // 안읽은 개수 갱신(=아바타 드로어 재렌더)과 토스트만 필요한 부분이라 가볍게 새로 작성.
+    // 🌟 [4단계 추가] 대항전 소통채널/같이하자/챌린지 그룹채팅 3종 + 일정투표/모집상태/매칭상태
+    // 변화까지 총 6개 테이블을 PC(js/messenger.js _subscribeChannelsAsLeader)와 동일하게 구독.
+    // PC 그대로 재사용하지 않는 이유: PC의 _subscribeChannelsAsLeader()는 탭 리더로 선출되는
+    // 순간 리더 탭 안에서 PC 전용 View.refreshRoomList()/View.openRoom()을 직접 호출하도록
+    // 하드코딩돼있어서, 모바일 탭이 리더가 되면 그 시점에 바로 에러가 남 — 그래서 PC의 탭 리더
+    // 선출(RealtimeCoordinator) 구조에 편승하지 않고, DM 채널과 동일하게 모바일 전용 채널을
+    // 별도로 하나 더 구독함. (PC/모바일을 동시에 켜두면 채널이 약간 중복될 수 있으나, 이건 이미
+    // DM 채널에서도 동일하게 감수하고 있던 구조라 새로운 문제는 아님.)
     _messengerChannel: null,
+    _groupChatChannel: null,
 
     startMessengerRealtime: () => {
         if (!Boako.state.user || Boako.MobileShell._messengerChannel) return;
@@ -280,12 +289,40 @@ Boako.MobileShell = {
                     if (newMsg.receiver_id === myId) Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 쪽지가 도착했습니다!`);
                 }
             }).subscribe();
+
+        // 🌟 [4단계 추가] 그룹채팅 3종 + 부가 상태변화 3종, PC와 동일한 반응(방 목록 갱신/열려있으면
+        // 즉시 재렌더/아니면 토스트)을 Boako.MobileMessenger.handleGroupChatEvent에 위임
+        if (Boako.MobileShell._groupChatChannel) return;
+        Boako.MobileShell._groupChatChannel = Boako.db.channel('mobile-group-chats-changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, (payload) => {
+                Boako.MobileMessenger?.handleGroupChatEvent?.('match_channel', `match_channel_${payload.new.room_id}`, payload.new, '📣 [대항전] 채널에 새 메시지가 도착했습니다!');
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls' }, (payload) => {
+                Boako.MobileMessenger?.handleGroupChatEvent?.('match_channel', `match_channel_${payload.new?.target_id}`, null, null);
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'together_chats' }, (payload) => {
+                Boako.MobileMessenger?.handleGroupChatEvent?.('together', `together_${payload.new.post_id}`, payload.new, '🎲 [같이하자] 채팅방에 새 메시지가 도착했습니다!');
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
+                Boako.MobileMessenger?.handleGroupChatEvent?.(null, null, null, null);
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chats' }, (payload) => {
+                Boako.MobileMessenger?.handleGroupChatEvent?.('challenge', `challenge_${payload.new.challenge_id}`, payload.new, '🔥 [챌린지] 채팅방에 새 메시지가 도착했습니다!');
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, () => {
+                Boako.MobileMessenger?.handleGroupChatEvent?.(null, null, null, null);
+            })
+            .subscribe();
     },
 
     stopMessengerRealtime: () => {
         if (Boako.MobileShell._messengerChannel) {
             Boako.db.removeChannel(Boako.MobileShell._messengerChannel);
             Boako.MobileShell._messengerChannel = null;
+        }
+        if (Boako.MobileShell._groupChatChannel) {
+            Boako.db.removeChannel(Boako.MobileShell._groupChatChannel);
+            Boako.MobileShell._groupChatChannel = null;
         }
     },
 
