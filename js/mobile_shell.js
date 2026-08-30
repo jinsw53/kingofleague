@@ -73,6 +73,15 @@
  *    onclick 자체가 빠져있던 걸 발견 — openArchive() 진입점을 추가해서 js/mobile_archive.js로 연결.
  * 🌟 [버그수정] "☕ 카페" 항목이 window.open()으로 새 창을 열려고 했는데 모바일 웹뷰에서 팝업이
  *    막혀서 안 열리던 문제 — BGA 링크(requireBgaNickname)처럼 실제 <a href target="_blank"> 태그로 교체.
+ * 🌟 [4단계 추가] 대항전 소통채널/같이하자/챌린지 그룹채팅 3종 + 일정투표/모집상태/매칭상태 변화까지
+ *    총 6개 테이블을 실시간 구독(mobile-group-chats-changes 채널) — PC의 탭 리더 선출 구조에는
+ *    편승하지 않고 DM 채널과 동일하게 모바일 전용 채널로 별도 구독(자세한 이유는 아래 주석 참고).
+ * 🌟 [신규] PC/모바일 자동분기 Cloudflare Worker(boako-device-router)와 짝을 맞추는 수동 전환 링크
+ *    "🖥️ PC 버전으로 보기" — 드로어 맨 아래, 로그인 여부와 무관하게 항상 보이는 위치에 배치
+ *    (로그인 전엔 카카오 로그인 버튼 아래, 로그인 후엔 로그아웃 버튼 바로 옆). PC 쪽의 짝
+ *    (js/auth.js 로그인 위젯 "📱 모바일 버전으로 보기")도 동일하게 "계정 영역 맨 아래, 로그아웃
+ *    버튼 옆"에 둬서 양쪽 위치가 서로 대응되도록 통일함. Worker의 /__view/desktop 경로로
+ *    이동하면 Worker가 쿠키(force_desktop=1)를 심고 루트(/)로 리다이렉트함.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -524,6 +533,7 @@ Boako.MobileShell = {
         if (!user) {
             wrap.innerHTML = `
                 <button onclick="Boako.Auth.login()" style="width:100%; background:#fee500; color:#181600; font-weight:900; font-size:14px; padding:12px; border-radius:10px;">🟡 카카오 로그인</button>
+                <a href="/__view/desktop" style="display:block; text-align:center; margin-top:10px; font-size:12px; font-weight:700; color:#94a3b8;">🖥️ PC 버전으로 보기</a>
             `;
             return;
         }
@@ -593,6 +603,7 @@ Boako.MobileShell = {
             </div>
             <div style="margin-top:16px; padding-top:12px; border-top:1px solid #e2e8f0;">
                 <div onclick="Boako.Auth.logout && Boako.Auth.logout()" style="padding:11px 4px; font-size:13px; font-weight:700; color:#94a3b8;">로그아웃</div>
+                <a href="/__view/desktop" style="display:block; text-align:center; padding:11px 4px; font-size:12px; font-weight:700; color:#94a3b8; text-decoration:none;">🖥️ PC 버전으로 보기</a>
             </div>
         `;
     },
