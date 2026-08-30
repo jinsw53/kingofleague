@@ -82,13 +82,23 @@ Boako.MobileArchive = {
             #mobile-archive-root .rounded-2xl.shadow-sm.border.border-slate-200.mb-8 > div:last-child {
                 width: 100%;
             }
+            /* 🌟 [버그수정] 패딩만 맞춰서는 input과 button/label 태그의 기본 렌더링 차이(브라우저 기본
+               line-height 등) 때문에 미세하게 높이가 달라 보이던 문제 — 둘 다 height 40px로 명시
+               고정하고 box-sizing:border-box로 통일해서 확실하게 같은 높이로 맞춤. */
             #archive-search {
-                padding-top: 11px !important;
-                padding-bottom: 11px !important;
+                height: 40px !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
                 font-size: 13.5px !important;
+                box-sizing: border-box !important;
             }
             #free-agent-filter-wrapper {
-                padding: 11px 14px !important;
+                height: 40px !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+                padding-left: 14px !important;
+                padding-right: 14px !important;
+                box-sizing: border-box !important;
                 background: #fff;
                 border-color: #e2e8f0 !important;
                 transition: background-color .15s ease, border-color .15s ease;
