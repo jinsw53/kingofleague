@@ -1,13 +1,23 @@
 /**
  * [MOBILE MESSENGER] 모바일 전용 — 쪽지함
- * 🌟 [1단계 범위] PC js/messenger.js는 일반 쪽지(DM) 외에도 대항전 소통채널(투표카드 포함),
- *    같이하자 채팅방, 챌린지 그룹채팅방까지 4가지 방 유형을 지원하는 큰 화면이라, 이번 포팅은
- *    방 목록엔 4가지 유형을 전부 보여주되(아이콘/뱃지로 구분), 실제로 열어서 대화할 수 있는 건
- *    일반 쪽지(DM)만 우선 구현함. 대항전 소통채널(투표카드/일정조율)·같이하자 채팅·챌린지
- *    그룹채팅은 목록에는 보이지만 탭하면 "곧 지원 예정" 안내만 뜸 — 다음 단계로 미룸.
- * 🌟 [재사용 원칙] Boako.Messenger.loadChatRooms()/sendDirect()는 순수 데이터 함수(DOM 조작
- *    없이 DB 조회/삽입만 함)라 모바일에서도 안전하게 그대로 재사용. 4가지 방 유형을 전부 계산해서
- *    Boako.Messenger.chatRooms에 채워주므로, 목록 렌더링만 모바일 전용으로 새로 그림.
+ * 🌟 [재사용 원칙] Boako.Messenger.loadChatRooms()/sendDirect()/sendMatchChannel()/sendTogetherChat()/
+ *    sendChallengeChat()는 전부 순수 데이터 함수(DOM 조작 없이 DB 조회/삽입만 함)라 모바일에서도
+ *    안전하게 그대로 재사용. 4가지 방 유형(DM/대항전 소통채널/같이하자/챌린지)을 전부 계산해서
+ *    Boako.Messenger.chatRooms에 채워주므로, 화면 렌더링만 모바일 전용으로 새로 그림.
+ * 🌟 [2단계: 그룹채팅 3종 실제 구현] 1단계에서는 방 목록엔 4종을 다 보여주되 실제 대화는 DM만
+ *    가능했음("곧 지원 예정" 토스트). 이번에 대항전 소통채널/같이하자/챌린지도 실제로 열어서
+ *    텍스트 채팅을 주고받을 수 있게 함:
+ *    - 그룹채팅은 발신자가 여러 명이라 말풍선 위에 발신자 닉네임을 표시(DM은 1:1이라 불필요해서 안 함)
+ *    - 읽음 처리는 PC와 동일하게 localStorage(boako_match_read/boako_together_read/
+ *      boako_challenge_read)에 방 열람 시각을 기록하는 방식 (DM처럼 DB is_read 컬럼이 없는 구조)
+ *    - 대항전 소통채널의 "일정 조율 투표" 카드도 함께 표시: 진행 상태(OPEN/PROPOSED/CONFIRMED) 조회는
+ *      전부 지원하고, PROPOSED 상태의 수락/거절 버튼도 accept_schedule_poll/reject_schedule_poll
+ *      RPC를 직접 호출해 지원함. 다만 OPEN 상태에서 "내가 되는 시간을 달력에 새로 찍어 제출"하는
+ *      기능은 PC의 복잡한 달력 그리드 모달(Boako.Match.Chat.openPollModal)에 의존하고 있어 이번
+ *      범위에서는 제외 — 이 경우에만 "캘린더로 시간 제출은 PC에서 진행해주세요" 안내를 띄움.
+ *      (PC의 acceptProposedTime/rejectProposedTime 함수를 그대로 부르지 않고 같은 RPC를 직접
+ *      호출하는 이유: 그 함수들 끝에 PC 전용 loadMessagesAndPolls()를 호출해서, RPC 자체는 성공해도
+ *      마무리 단계에서 에러가 나 "실패했습니다" 토스트가 잘못 뜰 위험이 있기 때문.)
  * 🌟 [버그 회피] PC의 replySchedule/replyChallenge/replyTeamJoin/replyTeamInvite는 처리 후
  *    Boako.Auth.renderWidget()과 Boako.Messenger.View.refreshRoomList()/openRoom()을 무조건
  *    호출해서 PC 전용 DOM이 없는 모바일에서 에러남 — 동일한 DB 업데이트/RPC 호출 로직을
@@ -15,7 +25,8 @@
  * 🌟 [실시간] 새 쪽지 실시간 반영은 js/mobile_shell.js가 로그인 시점에 이미 구독 중인
  *    'mobile-messages-changes' 채널(안읽은 배지 갱신용)에 편승함 — 이 화면이 렌더된 상태에서
  *    새 쪽지가 오면 mobile_shell.js가 Boako.MobileMessenger.handleRealtimeInsert()를 호출해줌.
- *    별도 채널을 새로 만들지 않아 탭당 소켓이 늘어나는 문제를 피함.
+ *    별도 채널을 새로 만들지 않아 탭당 소켓이 늘어나는 문제를 피함. (그룹채팅 3종의 실시간 반영은
+ *    이 채널이 'messages' 테이블만 구독하므로 아직 포함 안 됨 — 방을 나갔다 다시 들어오면 최신화됨.)
  * 🌟 액션 카드(일정제안/도전장/팀가입/스카웃) UI는 크롬 확장(보아코_확장2/boako-widget.js)의
  *    카드 마크업을 그대로 가져와 재사용 — 이미 터치 화면 크기에 맞춰 디자인된 스타일이라 그대로 맞음.
  */
@@ -23,7 +34,7 @@ window.Boako = window.Boako || {};
 Boako.MobileMessenger = {
 
     rooms: [],
-    activeConversation: null, // { roomId, otherName }
+    activeConversation: null, // { roomId, roomType: 'dm'|'match_channel'|'together'|'challenge', ... }
 
     render: async (container) => {
         if (!Boako.state.user) {
@@ -92,30 +103,45 @@ Boako.MobileMessenger = {
         const room = Boako.MobileMessenger.rooms.find(r => r.id === roomId);
         if (!room) return;
 
-        // 🌟 [1단계 범위] 대항전 소통채널/같이하자/챌린지는 아직 채팅 UI 미구현 — 다음 단계로 미룸
-        if (room.isMatchChannel || room.isTogether || room.isChallengeChat) {
-            Boako.Util.toast('💬 이 채팅 유형은 곧 지원될 예정이에요!');
-            return;
+        // 🌟 [2단계] 그룹채팅 3종도 실제로 오픈 — PC와 동일하게 localStorage에 열람 시각 기록(읽음 처리)
+        if (room.isMatchChannel) {
+            const read = JSON.parse(localStorage.getItem('boako_match_read') || '{}');
+            read[roomId] = Date.now();
+            localStorage.setItem('boako_match_read', JSON.stringify(read));
+            room.unread = 0;
+            Boako.MobileMessenger.activeConversation = { roomId, roomType: 'match_channel', title: room.title, seasonNo: room.seasonNo, gameName: room.gameName, entryCount: room.entryCount, isConfirmed: room.isConfirmed };
+        } else if (room.isTogether) {
+            const read = JSON.parse(localStorage.getItem('boako_together_read') || '{}');
+            read[roomId] = Date.now();
+            localStorage.setItem('boako_together_read', JSON.stringify(read));
+            room.unread = 0;
+            Boako.MobileMessenger.activeConversation = { roomId, roomType: 'together', title: room.title, postId: room.postId };
+        } else if (room.isChallengeChat) {
+            const read = JSON.parse(localStorage.getItem('boako_challenge_read') || '{}');
+            read[roomId] = Date.now();
+            localStorage.setItem('boako_challenge_read', JSON.stringify(read));
+            room.unread = 0;
+            Boako.MobileMessenger.activeConversation = { roomId, roomType: 'challenge', title: room.title, challengeId: room.challengeId };
+        } else {
+            Boako.MobileMessenger.activeConversation = {
+                roomId,
+                roomType: 'dm',
+                otherId: room.otherId,
+                otherName: room.otherName,
+                isMatch: room.isMatch,
+                matchType: room.matchType,
+                gameName: room.gameName
+            };
+            // 🌟 읽음 처리 (PC와 동일 로직, DB 직접 업데이트만 — DOM 사이드이펙트 없음)
+            try {
+                await Boako.db.from('messages').update({ is_read: true })
+                    .eq('receiver_id', Boako.state.user.id)
+                    .or(`match_id.eq.${roomId},sender_id.eq.${roomId}`);
+                if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
+            } catch (e) { console.error('읽음 처리 실패:', e); }
         }
 
-        Boako.MobileMessenger.activeConversation = {
-            roomId,
-            otherId: room.otherId,
-            otherName: room.otherName,
-            isMatch: room.isMatch,
-            matchType: room.matchType,
-            gameName: room.gameName
-        };
-
-        // 🌟 읽음 처리 (PC와 동일 로직, DB 직접 업데이트만 — DOM 사이드이펙트 없음)
-        try {
-            await Boako.db.from('messages').update({ is_read: true })
-                .eq('receiver_id', Boako.state.user.id)
-                .or(`match_id.eq.${roomId},sender_id.eq.${roomId}`);
-            if (Boako.Messenger.fetchUnreadCount) await Boako.Messenger.fetchUnreadCount();
-            if (Boako.MobileShell && Boako.MobileShell.renderDrawer) await Boako.MobileShell.renderDrawer();
-        } catch (e) { console.error('읽음 처리 실패:', e); }
-
+        if (Boako.MobileShell && Boako.MobileShell.renderDrawer) await Boako.MobileShell.renderDrawer();
         Boako.MobileMessenger.draw(document.getElementById('mobile-content-area'));
     },
 
@@ -124,19 +150,26 @@ Boako.MobileMessenger = {
         Boako.MobileMessenger.draw(document.getElementById('mobile-content-area'));
     },
 
-    // ========== 🌟 대화창 (DM 전용) ==========
+    // ========== 🌟 대화창 (DM + 그룹채팅 3종 공용) ==========
     drawThread: (container) => {
-        const { roomId } = Boako.MobileMessenger.activeConversation;
-        const room = Boako.MobileMessenger.rooms.find(r => r.id === roomId);
+        const conv = Boako.MobileMessenger.activeConversation;
+        const room = Boako.MobileMessenger.rooms.find(r => r.id === conv.roomId);
         if (!room) { Boako.MobileMessenger.closeThread(); return; }
 
-        const bubbles = (room.messages || []).map(m => Boako.MobileMessenger.renderMessageBubble(m)).join('');
+        const isGroup = conv.roomType !== 'dm';
+        const bubbles = (room.messages || []).map(m => Boako.MobileMessenger.renderMessageBubble(m, room, isGroup)).join('');
+
+        // 🌟 그룹채팅은 헤더에 뱃지를 붙여서 어떤 유형의 방인지 구분(DM은 상대 닉네임만 표시)
+        const badgeMap = { match_channel: '📣 대항전', together: '🎲 같이하자', challenge: '🔥 챌린지' };
+        const headerTitle = isGroup ? conv.title : (room.otherName || '대화');
+        const headerBadge = isGroup ? `<span style="font-size:10px; font-weight:900; color:#7c3aed; background:#f5f3ff; padding:2px 7px; border-radius:6px; margin-left:6px;">${badgeMap[conv.roomType]}</span>` : '';
 
         container.innerHTML = `
             <div style="display:flex; flex-direction:column; height:calc(100vh - 220px); min-height:400px;">
                 <div style="display:flex; align-items:center; gap:8px; padding-bottom:10px; border-bottom:1px solid #e2e8f0; margin-bottom:10px;">
                     <span onclick="Boako.MobileMessenger.closeThread()" style="font-size:18px; cursor:pointer;">←</span>
-                    <span style="font-size:14px; font-weight:900; color:#1e293b;">${Boako.MobileMessenger.escapeHtml(room.otherName || '대화')}</span>
+                    <span style="font-size:14px; font-weight:900; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.MobileMessenger.escapeHtml(headerTitle)}</span>
+                    ${headerBadge}
                 </div>
                 <div id="mobile-msg-thread" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-bottom:8px;">
                     ${bubbles || `<div style="text-align:center; color:#94a3b8; font-size:12px; font-weight:700; padding:20px 0;">대화가 없습니다.</div>`}
@@ -151,25 +184,114 @@ Boako.MobileMessenger = {
         if (thread) thread.scrollTop = thread.scrollHeight;
     },
 
-    renderMessageBubble: (m) => {
+    renderMessageBubble: (m, room, isGroup) => {
         const isMe = m.sender_id === Boako.state.user.id;
         const time = new Date(m.created_at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+
+        // 🌟 [2단계] 대항전 소통채널의 일정 조율 투표 카드
+        if (m.type === 'POLL') return Boako.MobileMessenger.renderPollCard(m, room);
 
         if (m.action_type === 'SCHEDULE_PROPOSE') return Boako.MobileMessenger.renderScheduleCard(m, isMe, time);
         if (m.action_type === 'CHALLENGE_CARD') return Boako.MobileMessenger.renderChallengeCard(m, isMe, time);
         if (m.action_type === 'TEAM_JOIN' || m.action_type === 'TEAM_INVITE') return Boako.MobileMessenger.renderTeamActionCard(m, isMe, time);
 
+        // 🌟 [2단계] 그룹채팅(대항전/같이하자/챌린지)은 발신자가 여러 명이라 말풍선 위에 닉네임 표시
+        const senderNameHtml = (isGroup && !isMe)
+            ? `<div style="font-size:10.5px; font-weight:900; color:#7c3aed; margin:0 6px 2px;">${Boako.MobileMessenger.escapeHtml(m.profiles?.full_name || '참여자')}</div>`
+            : '';
+
         return `
-            <div style="display:flex; ${isMe ? 'justify-content:flex-end;' : 'justify-content:flex-start;'}">
-                <div>
-                    <div style="max-width:220px; padding:8px 12px; border-radius:14px; font-size:12.5px; line-height:1.4;
-                        ${isMe ? 'background:#4f46e5; color:#fff; border-bottom-right-radius:4px;' : 'background:#fff; border:1px solid #e2e8f0; color:#0f172a; border-bottom-left-radius:4px;'}">
-                        ${Boako.MobileMessenger.escapeHtml(m.content)}
+            <div style="display:flex; flex-direction:column; ${isMe ? 'align-items:flex-end;' : 'align-items:flex-start;'}">
+                ${senderNameHtml}
+                <div style="display:flex; ${isMe ? 'justify-content:flex-end;' : 'justify-content:flex-start;'}">
+                    <div>
+                        <div style="max-width:220px; padding:8px 12px; border-radius:14px; font-size:12.5px; line-height:1.4;
+                            ${isMe ? 'background:#4f46e5; color:#fff; border-bottom-right-radius:4px;' : 'background:#fff; border:1px solid #e2e8f0; color:#0f172a; border-bottom-left-radius:4px;'}">
+                            ${Boako.MobileMessenger.escapeHtml(m.content)}
+                        </div>
+                        <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0; text-align:${isMe ? 'right' : 'left'};">${time}</div>
                     </div>
-                    <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0; text-align:${isMe ? 'right' : 'left'};">${time}</div>
                 </div>
             </div>
         `;
+    },
+
+    // 🌟 [2단계 신규] 대항전 소통채널의 일정 조율 투표 카드 — PC(js/messenger.js View.openRoom 내부)와
+    // 동일한 상태 판정 로직(OPEN/PROPOSED/CONFIRMED, 과반수 계산)을 모바일 카드로 새로 그림.
+    // OPEN 상태의 "내 시간 새로 제출"만 PC 전용 달력 모달에 의존해서 이번 범위에서 제외.
+    renderPollCard: (poll, room) => {
+        const votersCount = Object.keys(poll.votes || {}).length;
+        const status = poll.status;
+        const myId = String(Boako.state.user.id);
+        const entryCount = room.entryCount || 2;
+        const majorityCount = Math.floor(entryCount / 2) + 1;
+
+        let inner = '';
+        if (status === 'OPEN') {
+            inner = `
+                <div style="font-size:11.5px; font-weight:900; color:#3730a3; margin-bottom:4px;">📊 일정 조율 투표 진행 중</div>
+                <div style="font-size:10.5px; color:#64748b; font-weight:700; margin-bottom:10px;">전체 ${entryCount}명 중 ${votersCount}명이 일정을 제출했습니다.</div>
+                <div onclick="Boako.Util.toast('🗓️ 내 시간 제출은 PC에서 캘린더로 진행해주세요.')" style="font-size:11.5px; text-align:center; background:#4f46e5; color:#fff; padding:9px; border-radius:10px; font-weight:900;">나도 달력으로 시간 찍기</div>
+            `;
+        } else if (status === 'PROPOSED') {
+            const confirmedUsers = poll.confirmations || [];
+            const isAcceptedByMe = confirmedUsers.some(id => String(id) === myId);
+            const confirmedCount = confirmedUsers.length;
+            const isMajorityReached = confirmedCount >= majorityCount;
+
+            const statusHtml = isMajorityReached
+                ? `<div style="background:#fffbeb; border:1px solid #fde68a; color:#b45309; padding:8px; border-radius:10px; font-size:10.5px; font-weight:900; margin-bottom:10px;">🔥 과반수 수락 완료! (${confirmedCount}/${entryCount}명)<br><span style="font-weight:700; color:#d97706;">남은 인원 무관 12시간 뒤 자동 확정</span></div>`
+                : `<div style="background:#f8fafc; border:1px solid #e2e8f0; color:#475569; padding:8px; border-radius:10px; font-size:10.5px; font-weight:900; margin-bottom:10px; display:flex; justify-content:space-between;"><span>수락 진행도: ${confirmedCount}/${entryCount}명</span><span style="color:#4f46e5;">과반수(${majorityCount}명) 필요</span></div>`;
+
+            const btnHtml = !isAcceptedByMe
+                ? `<div style="display:flex; flex-direction:column; gap:6px;">
+                       <button onclick="Boako.MobileMessenger.replyPoll('${poll.poll_id}', 'accept')" style="background:#059669; color:#fff; font-size:11.5px; font-weight:900; padding:9px; border:none; border-radius:10px;">🟢 수락하기</button>
+                       <button onclick="Boako.MobileMessenger.replyPoll('${poll.poll_id}', 'reject')" style="background:#fff1f2; color:#e11d48; border:1px solid #fecdd3; font-size:11px; font-weight:900; padding:8px; border-radius:10px;">🔴 거절 및 재투표</button>
+                   </div>`
+                : `<div style="display:flex; flex-direction:column; gap:6px;">
+                       <div style="text-align:center; background:#f1f5f9; color:#94a3b8; padding:9px; border-radius:10px; font-size:11px; font-weight:800;">✅ 나는 수락 완료 (대기 중)</div>
+                       <button onclick="Boako.MobileMessenger.replyPoll('${poll.poll_id}', 'reject')" style="background:#f1f5f9; color:#64748b; font-size:10.5px; font-weight:800; padding:7px; border:none; border-radius:8px;">↩️ 수락 취소</button>
+                   </div>`;
+
+            inner = `
+                <div style="font-size:11.5px; font-weight:900; color:#065f46; margin-bottom:4px;">🎯 교집합 일정 제안됨!</div>
+                <div style="font-size:13px; font-weight:900; color:#312e81; background:#fff; padding:10px; border-radius:10px; border:1px solid #c7d2fe; text-align:center; margin-bottom:8px;">${poll.proposed_time}</div>
+                ${statusHtml}${btnHtml}
+            `;
+        } else if (status === 'CONFIRMED') {
+            inner = `
+                <div style="font-size:11.5px; font-weight:900; color:#334155; margin-bottom:6px;">🏁 일정 최종 확정!</div>
+                <div style="font-size:11.5px; font-weight:900; color:#059669; background:#ecfdf5; border:1px solid #d1fae5; padding:9px; border-radius:10px; text-align:center;">🎉 확정 일정: ${poll.confirmed_time}</div>
+            `;
+        }
+
+        return `<div style="display:flex; justify-content:center; margin:6px 0;"><div style="width:100%; max-width:280px; background:linear-gradient(180deg,#eef2ff,#fff); border:1.5px solid #c7d2fe; border-radius:16px; padding:14px;">${inner}</div></div>`;
+    },
+
+    // 🌟 [2단계 신규] 투표 수락/거절 — PC의 acceptProposedTime/rejectProposedTime과 같은 RPC를
+    // 직접 호출(그 함수들을 그대로 부르지 않는 이유는 클래스 코멘트 참고).
+    replyPoll: async (pollId, action) => {
+        const confirmMsg = action === 'accept'
+            ? '이 제안된 시간을 최종 일정으로 수락하시겠습니까?'
+            : '이 제안을 거절하고 일정을 다시 조율하시겠습니까?\n거절 시 기존 교집합 제안이 취소되고 재투표가 진행됩니다.';
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            if (action === 'accept') {
+                const { data: isConfirmed, error } = await Boako.db.rpc('accept_schedule_poll', { p_poll_id: pollId });
+                if (error) throw error;
+                Boako.Util.toast(isConfirmed === true ? '🎉 참가자 전원의 일정이 확정되었습니다!' : '🟢 수락 처리가 기록되었습니다.');
+            } else {
+                const { error } = await Boako.db.rpc('reject_schedule_poll', { p_poll_id: pollId });
+                if (error) throw error;
+                Boako.Util.toast('🔴 거절 처리되었습니다. 새로운 시간대를 선택해 주세요.');
+            }
+        } catch (e) {
+            console.error('투표 응답 처리 실패:', e);
+            Boako.Util.toast('🚨 ' + (e.message || '처리에 실패했습니다.'));
+        }
+        await Boako.MobileMessenger.refreshRooms();
+        Boako.MobileMessenger.draw(document.getElementById('mobile-content-area'));
     },
 
     // 🌟 크롬 확장(boako-widget.js)의 카드 마크업을 그대로 가져와 재사용 — 이미 터치 크기에 맞게 디자인됨
@@ -287,18 +409,29 @@ Boako.MobileMessenger = {
         `;
     },
 
+    // 🌟 [2단계] 방 유형에 따라 실제 전송 함수를 분기 (DM/대항전/같이하자/챌린지)
     sendMessage: async () => {
         const input = document.getElementById('mobile-msg-input');
         const content = input.value.trim();
         if (!content || !Boako.MobileMessenger.activeConversation) return;
         input.value = '';
 
-        // 🌟 [버그수정] roomId만으로 매치방/DM을 구분하려 하면 둘 다 UUID 형태라 신뢰할 수 없음 —
-        // openRoom()에서 이미 저장해둔 room.isMatch 플래그를 그대로 사용 (PC executeChatSend와 동일 로직)
-        const { otherId, otherName, roomId, isMatch, matchType, gameName } = Boako.MobileMessenger.activeConversation;
-        const matchId = isMatch ? roomId : null;
-        const metadata = isMatch ? { match_type: matchType, game_name: gameName } : {};
-        const success = await Boako.Messenger.sendDirect(otherId, content, otherName, 'DEFAULT', metadata, matchId);
+        const conv = Boako.MobileMessenger.activeConversation;
+        let success = false;
+
+        if (conv.roomType === 'match_channel') {
+            success = await Boako.Messenger.sendMatchChannel(conv.seasonNo, conv.gameName, content);
+        } else if (conv.roomType === 'together') {
+            success = await Boako.Messenger.sendTogetherChat(conv.postId, content);
+        } else if (conv.roomType === 'challenge') {
+            success = await Boako.Messenger.sendChallengeChat(conv.challengeId, content);
+        } else {
+            // 🌟 [버그수정] roomId만으로 매치방/DM을 구분하려 하면 둘 다 UUID 형태라 신뢰할 수 없음 —
+            // openRoom()에서 이미 저장해둔 room.isMatch 플래그를 그대로 사용 (PC executeChatSend와 동일 로직)
+            const matchId = conv.isMatch ? conv.roomId : null;
+            const metadata = conv.isMatch ? { match_type: conv.matchType, game_name: conv.gameName } : {};
+            success = await Boako.Messenger.sendDirect(conv.otherId, content, conv.otherName, 'DEFAULT', metadata, matchId);
+        }
 
         if (success) {
             await Boako.MobileMessenger.refreshRooms();
