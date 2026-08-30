@@ -31,6 +31,12 @@
  * 🌟 [버그수정] checkBoardRequestBadge — 관리자 공지(is_notice=true)가 "요청" 카테고리에 등록돼있으면
  *    댓글이 안 달리는 게 당연한데도 "미답변 요청"으로 잘못 집계되던 문제. 공지글은 애초에 답변이
  *    필요 없으므로 제외.
+ * 🌟 [신규] PC/모바일 자동분기 Cloudflare Worker(boako-device-router)와 짝을 맞추는 수동 전환 링크
+ *    "📱 모바일 버전으로 보기" — 로그인 위젯(#login-widget-area) 맨 아래, 로그인 여부와 무관하게
+ *    항상 보이는 위치에 배치(로그인 전엔 카카오 로그인 버튼 아래, 로그인 후엔 로그아웃 버튼 아래).
+ *    모바일 쪽의 짝(js/mobile_shell.js 드로어 "🖥️ PC 버전으로 보기")도 동일하게 "계정 영역 맨 아래,
+ *    로그아웃 버튼 옆"에 둬서 양쪽 위치가 서로 대응되도록 통일함. Worker의 /__view/mobile 경로로
+ *    이동하면 Worker가 쿠키(force_mobile=1)를 심고 /mobile/로 리다이렉트함.
  */
 Boako.Auth = {
     init: async () => {
@@ -384,7 +390,8 @@ Boako.Auth = {
         const area = document.getElementById('login-widget-area');
         const user = Boako.state.user;
         if (!user) {
-            area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>`;
+            area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>
+            <a href="/__view/mobile" style="display:block; text-align:center; margin-top:10px; font-size:12px; font-weight:700; color:#94a3b8;">📱 모바일 버전으로 보기</a>`;
         } else {
             const kakaoAvatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://') || null;
 
@@ -452,7 +459,8 @@ Boako.Auth = {
             <div id="widget-badge-area" style="margin-top: 12px; min-height: 28px; display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;">
                 </div>
 
-            <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>`;
+            <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>
+            <a href="/__view/mobile" style="display:block; text-align:center; margin-top:10px; font-size:12px; font-weight:700; color:#94a3b8;">📱 모바일 버전으로 보기</a>`;
 
             // 아바타 hover 시 "사진 변경" 힌트 보이게
             if (!document.getElementById('avatar-hover-hint-style')) {
