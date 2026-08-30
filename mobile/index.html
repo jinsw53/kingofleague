@@ -39,7 +39,12 @@
          🌟 [정리] 상단바의 🔔 벨 아이콘 제거 — onclick 자체가 없어 눌러도 아무 기능이 없던
          장식용 자리였음. 쪽지 알림은 이미 아바타 옆 빨간 점(mobile-avatar-dot)이 담당하고,
          업적/라이벌결과/추천보너스는 각자 실시간 풀스크린 오버레이로 바로 뜨는 구조라
-         "알림함"이 따로 필요하지 않아 벨 자체를 제거함. -->
+         "알림함"이 따로 필요하지 않아 벨 자체를 제거함.
+         🌟 [신규] 전광판(js/ticker.js)/실시간 이슈(js/hot_issue.js) 추가 — 둘 다 고정 DOM id
+         (#boako-ticker-track, #hot-issue-list)만 참조하는 순수 렌더 함수라 PC 파일을 전혀
+         수정하지 않고 그대로 재사용. PC는 사이드바에 실시간 이슈가 상시 노출인데, 모바일은
+         화면 폭이 좁아 탭해서 펼치는 접이식 패널로 조정(전체 탭 공통 노출이라는 성격은 유지) —
+         js/mobile_main.js에서 PC main.js와 동일하게 로그인 여부 무관하게 즉시 init() 호출. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -68,6 +73,25 @@
            Boako.Util.toast()가 계속 조용히 무시되고 있었음 */
         #boako-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 16px 32px; border-radius: 50px; font-weight: 700; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 10000; box-shadow: 0 10px 25px rgba(0,0,0,0.3); max-width: calc(100vw - 32px); text-align: center; }
         #boako-toast.show { opacity: 1; bottom: 50px; }
+
+        /* 🌟 [신규] 전광판 롤링 바 — js/ticker.js가 그대로 참조하는 클래스명(PC와 동일하게 유지,
+           js/ticker.js를 전혀 수정하지 않고 그대로 재사용하기 위함). 폭/폰트만 모바일에 맞게 축소.
+           ITEM_HEIGHT(42px, js/ticker.js에 하드코딩)와 .ticker-item/.ticker-viewport 높이를
+           반드시 일치시켜야 애니메이션 속도 계산이 어긋나지 않음 — PC와 동일하게 42px 유지. */
+        .ticker-bar { background:#fff; border-bottom:1px solid var(--border-color); }
+        .ticker-viewport { overflow:hidden; height:42px; padding:0 16px; }
+        .ticker-track { display:flex; flex-direction:column; will-change:transform; }
+        .ticker-item { display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#475569; cursor:pointer; padding:0 2px; height:42px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; }
+        .ticker-empty { color:#94a3b8; font-weight:600; cursor:default; }
+        @keyframes boako-ticker-scroll { from { transform:translateY(0); } to { transform:translateY(-50%); } }
+
+        /* 🌟 [신규] 실시간 이슈 — PC에서는 사이드바에 항상 떠 있지만(전체 탭 공통), 모바일은
+           화면이 좁아 상시 노출 대신 탭 한 번으로 펼치는 방식으로 조정. js/hot_issue.js가
+           그대로 참조하는 #hot-issue-list id는 동일하게 유지(모듈 코드는 전혀 수정하지 않음). */
+        #mobile-hotissue-toggle { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:#fff; border-bottom:1px solid var(--border-color); cursor:pointer; }
+        #mobile-hotissue-panel { max-height:0; overflow:hidden; background:#fafafa; border-bottom:1px solid var(--border-color); transition:max-height .25s ease; }
+        #mobile-hotissue-panel.open { max-height:320px; overflow-y:auto; }
+        #hot-issue-list { list-style:none; padding:10px 16px; margin:0; display:flex; flex-direction:column; gap:10px; font-size:12.5px; font-weight:700; color:#475569; }
     </style>
 </head>
 <body>
@@ -84,6 +108,27 @@
             </div>
         </div>
     </header>
+
+    <!-- 🌟 [신규] 전광판 롤링 바 — PC와 동일하게 상단바 바로 아래, 전체 탭 공통으로 항상 노출 -->
+    <div id="boako-ticker-bar" class="ticker-bar">
+        <div class="ticker-viewport">
+            <div class="ticker-track" id="boako-ticker-track">
+                <span class="ticker-item ticker-empty">📡 소식을 불러오는 중...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🌟 [신규] 실시간 이슈 — PC는 사이드바에 상시 노출이지만, 모바일은 화면이 좁아
+         탭해서 펼치는 방식으로 조정(전체 탭 공통 노출이라는 성격은 동일하게 유지) -->
+    <div id="mobile-hotissue-toggle" onclick="document.getElementById('mobile-hotissue-panel').classList.toggle('open')">
+        <span style="font-size:12.5px; font-weight:900; color:#334155;">🔥 실시간 이슈</span>
+        <span style="font-size:11px; color:#94a3b8;">▾</span>
+    </div>
+    <div id="mobile-hotissue-panel">
+        <ul id="hot-issue-list">
+            <li style="color:#94a3b8; font-weight:600;">불러오는 중...</li>
+        </ul>
+    </div>
 
     <!-- 본문: 이후 화면별 포팅 시 js/mobile_*.js가 여기 그림 -->
     <main id="mobile-content-area" style="padding:16px; min-height:60vh;">
@@ -135,6 +180,8 @@
     <script src="/js/realtime_coordinator.js"></script>
     <script src="/js/util.js"></script>
     <script src="/js/auth.js"></script>
+    <script src="/js/hot_issue.js"></script>
+    <script src="/js/ticker.js"></script>
     <script src="/js/mobile_shell.js"></script>
     <script src="/js/mobile_main.js"></script>
 
