@@ -14,14 +14,6 @@
  *    나오는 카드 그리드라 가로 스크롤 문제가 없어 손대지 않고 그대로 재사용.
  * 🌟 [버그수정 발견] 더보기 시트의 "📋 전적기록" 항목이 다른 항목들과 달리 onclick 자체가
  *    빠져있던 걸 발견 — mobile_shell.js에 openArchive() 진입점을 추가해서 연결.
- * 🌟 [버그수정] archive.js 원본 헤더(탭 전환 바 / 시즌·라운드 필터)가 PC 폭 기준으로 짜여있어
- *    모바일에서 두 가지 문제가 있었음:
- *      1) 탭 전환 바에 overflow-x-auto가 걸려있어 "게임별 통계" 탭이 좁은 화면에서 가로 스크롤
- *         뒤로 숨어버림 — "가로 스크롤 절대 불가" 원칙 위반.
- *      2) 라운드 필터 드롭다운이 w-[130px] 고정폭이라 "전체 라운드" 텍스트가 줄바꿈됨.
- *    archive.js 파일은 안 건드리고 _injectHeaderStyleOverride()로 CSS만 한 번 주입해서 해결
- *    (Boako.Archive.switchTab()이 탭 전환마다 같은 고정 클래스를 다시 씌우는 구조라, JS 오버라이드
- *    대신 CSS 우선순위로 항상 덮어쓰는 방식을 씀 — 재전환해도 안전).
  */
 window.Boako = window.Boako || {};
 Boako.MobileArchive = {
@@ -49,7 +41,11 @@ Boako.MobileArchive = {
     //   2) 라운드 필터 드롭다운 컨테이너가 w-[130px]로 고정폭이라 "전체 라운드" 텍스트+아이콘+화살표가
     //      한 줄에 안 들어가고 줄바꿈됨 — 폭을 넉넉하게 늘림(부모가 flex-wrap이라 공간 부족하면
     //      다음 줄로 자연스럽게 넘어가므로 가로 스크롤 위험 없음).
-    // archive.js 파일 자체는 안 건드리고, CSS만 한 번 주입해서 위 두 가지를 덮어씀.
+    //   3) 브랜드 배너(🏆 BOAKO TEAM LEAGUE)가 원본 items-start 정렬 때문에 왼쪽으로 쏠려 보임 —
+    //      가운데 정렬로 보정.
+    //   4) 검색창이 PC 기준 py-4/text-lg라 다른 모바일 카드들 대비 유독 커 보임 — 폰트/패딩을 줄여서
+    //      "무소속 포함" 토글과 크기를 맞춤.
+    // archive.js 파일 자체는 안 건드리고, CSS만 한 번 주입해서 위 네 가지를 덮어씀.
     _injectHeaderStyleOverride: () => {
         if (document.getElementById('mobile-archive-header-fix')) return;
         const style = document.createElement('style');
@@ -75,6 +71,27 @@ Boako.MobileArchive = {
             }
             #season-filter-container button span, #round-filter-wrapper button span {
                 white-space: nowrap;
+            }
+            #mobile-archive-root .rounded-2xl.shadow-sm.border.border-slate-200.mb-8 {
+                align-items: center !important;
+            }
+            #mobile-archive-root .rounded-2xl.shadow-sm.border.border-slate-200.mb-8 > div:first-child {
+                width: 100%;
+                justify-content: center;
+            }
+            #mobile-archive-root .rounded-2xl.shadow-sm.border.border-slate-200.mb-8 > div:last-child {
+                width: 100%;
+            }
+            #archive-search {
+                padding-top: 11px !important;
+                padding-bottom: 11px !important;
+                font-size: 13.5px !important;
+            }
+            #free-agent-filter-wrapper {
+                padding: 11px 14px !important;
+            }
+            #free-agent-filter-wrapper span:first-child {
+                font-size: 11.5px !important;
             }
         `;
         document.head.appendChild(style);
