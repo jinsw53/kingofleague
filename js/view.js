@@ -639,8 +639,13 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                     await Boako.Util.loadScript('js/shop.js');
                 }
 
-                const { data: myProfile } = await Boako.db.from('profiles').select('points').eq('id', Boako.state.user.id).single();
+                const { data: myProfile } = await Boako.db.from('profiles').select('points, unlocked_badge_slots').eq('id', Boako.state.user.id).single();
                 const myPoints = myProfile?.points || 0;
+                // 🌟 [버그수정] 배지 슬롯 확장권은 누진 가격인데 카드에 item.price(고정 최초가 2000)만 표시되던 문제.
+                // 실제 다음 구매가는 openSlotExpansionModal(shop.js)과 동일한 표로 계산해서 보여줌.
+                const SLOT_EXPANSION_MAX = 7;
+                const SLOT_EXPANSION_PRICE_TABLE = [2000, 2500, 3000, 3500, 4000, 5000];
+                const mySlots = myProfile?.unlocked_badge_slots || 1;
                 
                 const { data: pointHistory } = await Boako.db.from('point_history')
                     .select('*')
@@ -732,9 +737,13 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                             </div>
                             <div style="padding:20px; border-top:1px solid #f1f5f9; background:#fafafa;">
                                 <button class="btn-submit" style="padding:15px; font-size:16px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 10px 20px rgba(245, 158, 11, 0.2);" onclick="Boako.Shop.buyItem('${item.item_id}')">
-                                    ${item.t_price != null
-                                        ? `🛡️ 팀 포인트 ${Number(item.t_price).toLocaleString()} P`
-                                        : `💎 ${Number(item.price).toLocaleString()} P 구매`
+                                    ${item.item_type === 'SLOT_EXPANSION'
+                                        ? (mySlots >= SLOT_EXPANSION_MAX
+                                            ? `🎉 최대 슬롯 달성`
+                                            : `💎 ${SLOT_EXPANSION_PRICE_TABLE[mySlots - 1].toLocaleString()} P 구매`)
+                                        : item.t_price != null
+                                            ? `🛡️ 팀 포인트 ${Number(item.t_price).toLocaleString()} P`
+                                            : `💎 ${Number(item.price).toLocaleString()} P 구매`
                                     }
                                 </button>
                             </div>
