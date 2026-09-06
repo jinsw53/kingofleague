@@ -39,8 +39,12 @@ Boako.MobileShop = {
         container.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
 
         try {
-            const { data: myProfile } = await Boako.db.from('profiles').select('points').eq('id', Boako.state.user.id).single();
+            const { data: myProfile } = await Boako.db.from('profiles').select('points, unlocked_badge_slots').eq('id', Boako.state.user.id).single();
             const myPoints = myProfile?.points || 0;
+            // 🌟 [버그수정] 배지 슬롯 확장권 누진 가격 표시 (PC view.js와 동일, shop.js의 PRICE_TABLE과 일치)
+            const SLOT_EXPANSION_MAX = 7;
+            const SLOT_EXPANSION_PRICE_TABLE = [2000, 2500, 3000, 3500, 4000, 5000];
+            const mySlots = myProfile?.unlocked_badge_slots || 1;
 
             const { data: pointHistory } = await Boako.db.from('point_history')
                 .select('*')
@@ -104,9 +108,13 @@ Boako.MobileShop = {
                         </div>
                         <div style="padding:14px; border-top:1px solid #f1f5f9; background:#fafafa;">
                             <button onclick="Boako.Shop.buyItem('${item.item_id}')" style="width:100%; padding:12px; font-size:13.5px; font-weight:900; color:#fff; background:linear-gradient(135deg,#f59e0b,#d97706); border-radius:10px;">
-                                ${item.t_price != null
-                                    ? `🛡️ 팀 포인트 ${Number(item.t_price).toLocaleString()} P`
-                                    : `💎 ${Number(item.price).toLocaleString()} P 구매`}
+                                ${item.item_type === 'SLOT_EXPANSION'
+                                    ? (mySlots >= SLOT_EXPANSION_MAX
+                                        ? `🎉 최대 슬롯 달성`
+                                        : `💎 ${SLOT_EXPANSION_PRICE_TABLE[mySlots - 1].toLocaleString()} P 구매`)
+                                    : item.t_price != null
+                                        ? `🛡️ 팀 포인트 ${Number(item.t_price).toLocaleString()} P`
+                                        : `💎 ${Number(item.price).toLocaleString()} P 구매`}
                             </button>
                         </div>
                     </div>
