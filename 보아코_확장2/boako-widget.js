@@ -80,12 +80,21 @@
  * 🌟 [버그수정] 위젯 아이콘의 안읽음 빨간 배지가 DM(State.unread)만 반영하고 팀챗 메시지는 무시하던
  *    문제 — team_chats엔 읽음 여부 컬럼이 없어 별도 카운터(State.teamChatUnread)로 관리하고,
  *    렌더링 시 두 카운터를 합산해서 표시. 팀챗 탭을 열면 그 카운터만 리셋.
+ * 🌟 [신규] 매치(라이벌전/승자연전) 대화방에 사이트(messenger.js)와 동일한 헤더 배너(디스코드입장/
+ *    나가기/일정제안) 추가 — 확장은 대화를 상대방(otherId) 단위로 묶어서, 사이트처럼 매치별로
+ *    쪼개진 방을 그대로 재현할 수는 없어 "가장 최근 매치" 기준으로 배너를 그림. "나가기"도 매치
+ *    단위가 아니라 그 사람과의 전체 대화를 숨기는 것으로 동작(새 쪽지 오면 자동 재노출).
+ *    "일정제안"은 사이트의 달력 모달(ScheduleModal)을 위젯 폭에 맞게 새로 구현해서 이식.
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
   if (window.top !== window) return;
 
   const SUPABASE_URL = "https://qrredwrxdnvqwdxzanba.supabase.co";
+  // 🌟 [신규] 사이트(js/core.js)의 Boako.config.discordInviteUrl과 동일한 값 — 매치방 헤더의
+  // "디스코드 입장" 버튼에 사용. 사이트는 config 객체에서 동적으로 읽지만, 확장은 별도 설정 로드
+  // 체계가 없어서 상수로 직접 박아둠 (바뀌면 여기랑 core.js 둘 다 수정 필요).
+  const DISCORD_INVITE_URL = "https://discord.gg/UvFjxv3msy";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmVkd3J4ZG52cXdkeHphbmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNjYxNjEsImV4cCI6MjA5Mjg0MjE2MX0.RrDMN1uxGe9YoonomO-Ibq_dhyaSaKMa7B05i-j0LuY";
 
   // ========================================================================
@@ -479,6 +488,29 @@
     } catch (e) {
       boakoErr('읽음 처리 실패:', e);
     }
+  }
+
+  // 🌟 [신규] "나가기" — 사이트 messenger.js의 hideRoom()과 동일한 방식.
+  // 확장은 매치별이 아니라 상대방(otherId) 단위로 대화를 묶고 있어서, 사이트처럼 "이 매치 대화방만"
+  // 나가는 건 불가능 — 대신 이 사람과의 전체 쪽지 목록에서 숨기는 것으로 동작(새 쪽지 오면 자동 재노출).
+  function getHiddenConversations() {
+    try { return JSON.parse(localStorage.getItem('boako_hidden_conversations') || '{}'); }
+    catch (e) { return {}; }
+  }
+
+  async function leaveConversation(otherId) {
+    if (!confirm('이 대화방을 나가시겠습니까?\n(새로운 쪽지가 도착하면 다시 나타나요.)')) return;
+
+    await markThreadAsRead(otherId);
+
+    const lastMsg = State.threadMessages[State.threadMessages.length - 1];
+    const hidden = getHiddenConversations();
+    hidden[otherId] = lastMsg ? lastMsg.created_at : new Date().toISOString();
+    localStorage.setItem('boako_hidden_conversations', JSON.stringify(hidden));
+
+    State.activeConversation = null;
+    await fetchMessages();
+    render();
   }
 
   // 🌟 [신규] 대화 열기 — 내역 조회 + 읽음 처리를 한 번에 처리
@@ -2077,7 +2109,18 @@
         body.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;font-size:12px;font-weight:700;">받은 쪽지가 없어요</div>`;
         return;
       }
-      body.innerHTML = State.messages.map((m, i) => `
+      // 🌟 [신규] "나가기"로 숨긴 대화방 제외 (숨긴 시점 이후 새 메시지가 왔으면 자동으로 다시 노출)
+      const hiddenMap = getHiddenConversations();
+      const visibleMessages = State.messages.filter(m => {
+        const hideTime = hiddenMap[m.otherId];
+        if (!hideTime) return true;
+        return new Date(m.lastTime) > new Date(hideTime);
+      });
+      if (visibleMessages.length === 0) {
+        body.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;font-size:12px;font-weight:700;">받은 쪽지가 없어요</div>`;
+        return;
+      }
+      body.innerHTML = visibleMessages.map((m, i) => `
         <div class="boako-msg-item" data-idx="${i}" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <div style="min-width:0;">
             <div class="boako-sender">${escapeHtml(m.otherName || '알 수 없음')}</div>
@@ -2088,7 +2131,7 @@
       `).join('');
       body.querySelectorAll('.boako-msg-item').forEach(el => {
         el.addEventListener('click', () => {
-          const m = State.messages[Number(el.dataset.idx)];
+          const m = visibleMessages[Number(el.dataset.idx)];
           openConversation(m.otherId, m.otherName);
         });
       });
@@ -2140,11 +2183,38 @@
       `;
     }).join('');
 
+    // 🌟 [신규] 사이트(messenger.js)의 isMatch 배너와 기능 동일하게 이식 — 이 대화에 라이벌전/승자연전
+    // 매치 메시지(match_id 있음)가 하나라도 있으면, 가장 최근 매치 정보를 기준으로 디스코드입장/나가기/
+    // 일정제안 버튼이 달린 빨간 상태 배너를 헤더 밑에 붙임. (확장은 otherId 단위로 대화를 묶으므로,
+    // 한 사람과 여러 매치가 있었다면 "가장 최근 매치" 기준으로 배너를 그림 — 사이트는 매치별로 방이
+    // 갈라지는 구조라 이 부분만 100% 동일하진 않음)
+    const matchMsg = [...State.threadMessages].reverse().find(m => m.match_id);
+    let matchBannerHtml = '';
+    if (matchMsg) {
+      const gameName = matchMsg.metadata?.game_name || '종목미정';
+      const typeName = matchMsg.metadata?.match_type === 'CHALLENGE' ? '🔥 승자연전' : '⚔️ 라이벌전';
+      matchBannerHtml = `
+        <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:9px 10px; margin-bottom:10px;">
+          <div style="font-size:11px; font-weight:900; color:#3730a3; margin-bottom:7px; display:flex; align-items:center; gap:4px;">
+            <span style="color:#ef4444;">🔴</span> 이 대화방은 [${escapeHtml(gameName)}] ${typeName} 전용 공간이에요
+          </div>
+          <div style="display:flex; gap:5px;">
+            <a href="${DISCORD_INVITE_URL}" target="_blank" style="flex:1; text-align:center; background:#4f46e5; color:#fff; font-size:10.5px; font-weight:800; padding:6px 4px; border-radius:7px; text-decoration:none;">🎮 디스코드</a>
+            <button class="boako-thread-action-btn" data-action="thread-leave" data-other-id="${conv.otherId}"
+              style="flex:1; background:#fff; color:#475569; border:1px solid #cbd5e1; font-size:10.5px; font-weight:800; padding:6px 4px; border-radius:7px; cursor:pointer;">나가기</button>
+            <button class="boako-thread-action-btn" data-action="thread-schedule" data-match-id="${matchMsg.match_id}" data-game-name="${escapeHtml(gameName)}" data-match-type="${matchMsg.metadata?.match_type || 'RIVAL'}"
+              style="flex:1; background:#4f46e5; color:#fff; font-size:10.5px; font-weight:800; padding:6px 4px; border-radius:7px; cursor:pointer;">📅 일정제안</button>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="boako-thread-header">
         <span class="boako-back" id="boako-thread-back">←</span>
         <span style="font-size:13px;font-weight:900;">${escapeHtml(conv.otherName || '대화')}</span>
       </div>
+      ${matchBannerHtml}
       ${State.threadHasMore ? `<div style="text-align:center; margin-bottom:10px;"><button id="boako-load-more-thread" style="background:#e2e8f0; color:#475569; border:none; border-radius:999px; padding:6px 14px; font-size:11px; font-weight:800; cursor:pointer;">↑ 이전 대화 더 보기</button></div>` : ''}
       ${bubbles || `<div style="font-size:11px;color:#94a3b8;text-align:center;padding:16px 0;">불러오는 중...</div>`}
     `;
@@ -2288,6 +2358,8 @@
     else if (action === 'teamjoin-reject') replyTeamJoin(messageId, 'REJECTED');
     else if (action === 'teaminvite-accept') replyTeamInvite(messageId, 'ACCEPTED');
     else if (action === 'teaminvite-reject') replyTeamInvite(messageId, 'REJECTED');
+    else if (action === 'thread-leave') leaveConversation(btn.dataset.otherId);
+    else if (action === 'thread-schedule') openScheduleModal({ matchId: btn.dataset.matchId, gameName: btn.dataset.gameName, matchType: btn.dataset.matchType });
   }
 
   // 액션 처리 후 목록/스레드/배지를 전부 최신 상태로 다시 불러옴 (사이트 messenger.js와 동일한 후처리)
@@ -2368,6 +2440,179 @@
       boakoErr('스카웃 응답 처리 실패:', e);
       showToast('system', '❌', '처리 실패', '오류가 발생했습니다.');
     }
+    await refreshAfterThreadAction();
+  }
+
+  // 🌟 [신규] 일정 제안 모달 — 사이트(js/messenger.js)의 Boako.Messenger.ScheduleModal을 위젯 폭(narrow)에
+  // 맞춰 이식. 여러 날짜를 선택해서 한 번에 후보로 보낼 수 있고, 시간은 상단에서 고정 선택.
+  const ScheduleModalState = {
+    matchInfo: null, // { matchId, gameName, matchType }
+    calYear: new Date().getFullYear(),
+    calMonth: new Date().getMonth() + 1,
+    selectedTimes: [], // [{ dateKey, iso, timeLabel }]
+    fixedTime: '20:00'
+  };
+
+  function openScheduleModal(matchInfo) {
+    ScheduleModalState.matchInfo = matchInfo;
+    ScheduleModalState.calYear = new Date().getFullYear();
+    ScheduleModalState.calMonth = new Date().getMonth() + 1;
+    ScheduleModalState.selectedTimes = [];
+    ScheduleModalState.fixedTime = '20:00';
+
+    document.getElementById('boako-schedule-modal')?.remove();
+
+    const timeOptions = Array.from({ length: 24 }, (_, i) => {
+      const time = String(i).padStart(2, '0') + ':00';
+      const ampm = i < 12 ? '오전' : '오후';
+      const h = i === 0 ? 12 : (i > 12 ? i - 12 : i);
+      return `<option value="${time}" ${time === '20:00' ? 'selected' : ''}>${time} (${ampm} ${h}시)</option>`;
+    }).join('');
+
+    const modalHtml = `
+      <div id="boako-schedule-modal" style="position:fixed; inset:0; z-index:1000000; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.6);">
+        <div style="background:#fff; border-radius:20px; width:280px; box-shadow:0 20px 50px rgba(0,0,0,.3); overflow:hidden; position:relative;">
+          <div style="background:#4f46e5; color:#fff; padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
+            <button id="boako-sched-prev-month" style="background:none; border:none; color:#fff; font-size:13px; cursor:pointer; padding:4px 8px;">◀</button>
+            <h3 id="boako-sched-month-title" style="font-size:12.5px; font-weight:900; margin:0;"></h3>
+            <button id="boako-sched-next-month" style="background:none; border:none; color:#fff; font-size:13px; cursor:pointer; padding:4px 8px;">▶</button>
+          </div>
+          <button id="boako-sched-close" style="position:absolute; top:8px; right:10px; background:none; border:none; color:rgba(255,255,255,.6); font-size:18px; font-weight:900; cursor:pointer;">×</button>
+
+          <div style="background:#eef2ff; padding:9px 10px; border-bottom:1px solid #e0e7ff; display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10px; font-weight:900; color:#3730a3; flex-shrink:0;">⏰ 시간</span>
+            <select id="boako-sched-time" style="flex:1; font-size:11px; font-weight:700; color:#3730a3; background:#fff; border:1px solid #c7d2fe; border-radius:7px; padding:5px 6px;">${timeOptions}</select>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:9.5px; font-weight:900; color:#94a3b8; padding:8px 8px 2px;">
+            <div style="color:#f87171;">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div style="color:#60a5fa;">토</div>
+          </div>
+          <div id="boako-sched-grid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; padding:8px;"></div>
+
+          <div style="padding:10px; border-top:1px solid #f1f5f9;">
+            <button id="boako-sched-submit" disabled style="width:100%; background:#e2e8f0; color:#94a3b8; font-size:11.5px; font-weight:900; padding:10px; border:none; border-radius:12px; cursor:not-allowed;">날짜를 선택하세요</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    document.getElementById('boako-sched-close').addEventListener('click', closeScheduleModal);
+    document.getElementById('boako-sched-prev-month').addEventListener('click', () => changeScheduleMonth(-1));
+    document.getElementById('boako-sched-next-month').addEventListener('click', () => changeScheduleMonth(1));
+    document.getElementById('boako-sched-time').addEventListener('change', (e) => { ScheduleModalState.fixedTime = e.target.value; });
+    document.getElementById('boako-sched-submit').addEventListener('click', submitScheduleProposal);
+
+    renderScheduleGrid();
+  }
+
+  function closeScheduleModal() {
+    document.getElementById('boako-schedule-modal')?.remove();
+  }
+
+  function changeScheduleMonth(delta) {
+    let m = ScheduleModalState.calMonth + delta;
+    let y = ScheduleModalState.calYear;
+    if (m > 12) { m = 1; y++; }
+    if (m < 1) { m = 12; y--; }
+    ScheduleModalState.calYear = y;
+    ScheduleModalState.calMonth = m;
+    renderScheduleGrid();
+  }
+
+  function renderScheduleGrid() {
+    const { calYear: year, calMonth: month } = ScheduleModalState;
+    const titleEl = document.getElementById('boako-sched-month-title');
+    if (titleEl) titleEl.textContent = `${year}년 ${month}월`;
+
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const lastDate = new Date(year, month, 0).getDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let gridHtml = '';
+    for (let i = 0; i < firstDay; i++) gridHtml += `<div></div>`;
+
+    for (let day = 1; day <= lastDate; day++) {
+      const cellDate = new Date(year, month - 1, day);
+      const isPast = cellDate < today;
+      const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const selected = ScheduleModalState.selectedTimes.find(t => t.dateKey === dateKey);
+
+      let cellStyle = "aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:9px; font-size:11px; font-weight:800; ";
+      if (isPast) cellStyle += "color:#cbd5e1; background:#f8fafc;";
+      else if (selected) cellStyle += "background:#4f46e5; color:#fff; cursor:pointer; box-shadow:0 2px 6px rgba(79,70,229,.35);";
+      else cellStyle += "background:#f1f5f9; color:#334155; cursor:pointer;";
+
+      gridHtml += `<div ${isPast ? '' : `class="boako-sched-day" data-date="${dateKey}"`} style="${cellStyle}">${day}</div>`;
+    }
+
+    const gridEl = document.getElementById('boako-sched-grid');
+    gridEl.innerHTML = gridHtml;
+    gridEl.querySelectorAll('.boako-sched-day').forEach(el => {
+      el.addEventListener('click', () => toggleScheduleDate(el.dataset.date));
+    });
+
+    updateScheduleSubmitButton();
+  }
+
+  function toggleScheduleDate(dateKey) {
+    const timeStr = ScheduleModalState.fixedTime;
+    const [hh, mm] = timeStr.split(':');
+    const iso = new Date(`${dateKey}T${hh}:${mm}:00+09:00`).toISOString();
+
+    const idx = ScheduleModalState.selectedTimes.findIndex(t => t.dateKey === dateKey);
+    if (idx > -1) ScheduleModalState.selectedTimes.splice(idx, 1);
+    else ScheduleModalState.selectedTimes.push({ dateKey, iso, timeLabel: timeStr });
+
+    renderScheduleGrid();
+  }
+
+  function updateScheduleSubmitButton() {
+    const btn = document.getElementById('boako-sched-submit');
+    if (!btn) return;
+    const count = ScheduleModalState.selectedTimes.length;
+    if (count > 0) {
+      btn.disabled = false;
+      btn.style.cssText = "width:100%; background:#4f46e5; color:#fff; font-size:11.5px; font-weight:900; padding:10px; border:none; border-radius:12px; cursor:pointer;";
+      btn.textContent = `${count}개 후보 일정 제안하기`;
+    } else {
+      btn.disabled = true;
+      btn.style.cssText = "width:100%; background:#e2e8f0; color:#94a3b8; font-size:11.5px; font-weight:900; padding:10px; border:none; border-radius:12px; cursor:not-allowed;";
+      btn.textContent = "날짜를 선택하세요";
+    }
+  }
+
+  async function submitScheduleProposal() {
+    const times = ScheduleModalState.selectedTimes;
+    if (times.length === 0) return;
+    if (!confirm(`${times.length}개의 후보 일정을 제안하시겠습니까?`)) return;
+
+    const { matchId, gameName, matchType } = ScheduleModalState.matchInfo;
+    const conv = State.activeConversation;
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+        method: 'POST',
+        headers: { ...authHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          sender_id: State.session.user.id,
+          sender_name_override: State.session.user.nickname,
+          receiver_id: conv.otherId,
+          receiver_name_override: conv.otherName,
+          content: '매치 일정을 제안합니다.',
+          action_type: 'SCHEDULE_PROPOSE',
+          match_id: matchId || null,
+          metadata: { match_type: matchType, game_name: gameName, proposed_times: times.map(t => t.iso) }
+        })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('system', '📅', '일정 제안 완료', `${times.length}개의 후보 일정을 보냈어요!`);
+    } catch (e) {
+      boakoErr('일정 제안 전송 실패:', e);
+      showToast('system', '❌', '전송 실패', '일정 제안 전송에 실패했습니다.');
+    }
+    closeScheduleModal();
     await refreshAfterThreadAction();
   }
 
