@@ -23,6 +23,9 @@
  * 🌟 [버그수정] 상단 배너가 다른 화면들(팀 목록/인벤토리/같이하자/라이벌 등)과 달리 PC
  *    .main-banner 패턴을 쓰지 않고 독자적으로 만든 마크업이라, 애초에 가운데 정렬 스타일 자체가
  *    빠져있어 왼쪽 정렬로 보였음 — 다른 화면들과 통일되게 flex 가운데 정렬 추가.
+ * 🌟 [전면 재작성] 오늘의 추천 게임 — PC와 동일하게 이지/노멀/하드 3개로 확장.
+ *    fn_get_today_recommended_game() → fn_get_today_recommended_games_by_tier()로 교체,
+ *    카드 1장 안에 가로 3분할(로고+난이도 배지+게임명)로 표시.
  */
 window.Boako = window.Boako || {};
 Boako.MobileNewsfeed = {
@@ -31,27 +34,33 @@ Boako.MobileNewsfeed = {
     TRIBUTE_IMAGE: 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/dustin.png',
 
     items: [],
-    todayRecommendGame: null,
+    todayRecommendGames: [],
 
     render: async (container) => {
         container.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">소식을 불러오는 중...</div>`;
         try {
             const [feedResult, recommendResult] = await Promise.all([
                 Boako.db.from('news_feed_items').select('*').order('created_at', { ascending: false }).limit(80),
-                Boako.db.rpc('fn_get_today_recommended_game'),
+                Boako.db.rpc('fn_get_today_recommended_games_by_tier'),
             ]);
             if (feedResult.error) throw feedResult.error;
             Boako.MobileNewsfeed.items = feedResult.data || [];
 
-            Boako.MobileNewsfeed.todayRecommendGame = null;
-            const recommendGameName = recommendResult?.data || null;
-            if (recommendGameName) {
+            // 🌟 [수정] 오늘의 추천 게임 — 이지/노멀/하드 3개로 확장
+            Boako.MobileNewsfeed.todayRecommendGames = [];
+            const recommendRows = recommendResult?.data || [];
+            if (recommendRows.length > 0) {
                 try {
-                    const { data: gameRow } = await Boako.db.from('games').select('image_url').eq('game_name', recommendGameName).maybeSingle();
-                    Boako.MobileNewsfeed.todayRecommendGame = { name: recommendGameName, image: gameRow?.image_url || null };
+                    const names = recommendRows.map(r => r.game_name);
+                    const { data: gameRows } = await Boako.db.from('games').select('game_name, image_url').in('game_name', names);
+                    const imageByName = Object.fromEntries((gameRows || []).map(g => [g.game_name, g.image_url]));
+                    const tierOrder = { EASY: 0, NORMAL: 1, HARD: 2 };
+                    Boako.MobileNewsfeed.todayRecommendGames = recommendRows
+                        .map(r => ({ tier: r.tier, name: r.game_name, image: imageByName[r.game_name] || null }))
+                        .sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
                 } catch (e) {
                     console.error('오늘의 추천 게임 로고 조회 실패:', e);
-                    Boako.MobileNewsfeed.todayRecommendGame = { name: recommendGameName, image: null };
+                    Boako.MobileNewsfeed.todayRecommendGames = recommendRows.map(r => ({ tier: r.tier, name: r.game_name, image: null }));
                 }
             }
 
@@ -111,10 +120,10 @@ Boako.MobileNewsfeed = {
         scored.sort((a, b) => b._score - a._score);
 
         const hasHeadline = scored.some(item => item._tier === 'headline');
-        const recommendHtml = Boako.MobileNewsfeed.todayRecommendGame ? Boako.MobileNewsfeed.renderRecommendCard() : '';
+        const recommendHtml = Boako.MobileNewsfeed.todayRecommendGames.length > 0 ? Boako.MobileNewsfeed.renderRecommendCard() : '';
         const bannerHtml = Boako.MobileNewsfeed.renderBanner();
 
-        if (scored.length === 0 && !Boako.MobileNewsfeed.todayRecommendGame) {
+        if (scored.length === 0 && Boako.MobileNewsfeed.todayRecommendGames.length === 0) {
             container.innerHTML = `<div style="display:flex; flex-direction:column; gap:12px;">${bannerHtml}<div style="padding:40px 16px; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">아직 표시할 소식이 없습니다.</div></div>`;
             return;
         }
@@ -126,18 +135,37 @@ Boako.MobileNewsfeed = {
         container.innerHTML = `<div style="display:flex; flex-direction:column; gap:12px;">${bannerHtml}${tributeHtml}${recommendHtml}${cardsHtml}</div>`;
     },
 
+    // 🌟 [전면 재작성] 이지/노멀/하드 3개를 카드 1장 안에 가로 3분할로 표시 (PC 라지카드와 동일 컨셉, 모바일 폭에 맞춤)
     renderRecommendCard: () => {
-        const game = Boako.MobileNewsfeed.todayRecommendGame;
-        const img = game.image ? Boako.Util.cdn(game.image) : null;
-        return `
-            <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:14px; padding:14px; display:flex; align-items:center; gap:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
-                <div style="width:56px; height:56px; border-radius:10px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden;">
-                    ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span style="font-size:26px;">🎲</span>`}
+        const games = Boako.MobileNewsfeed.todayRecommendGames;
+        const TIER_LABEL = { EASY: '이지', NORMAL: '노멀', HARD: '하드' };
+        const TIER_STYLE = {
+            EASY: { color: '#059669', bg: '#ecfdf5' },
+            NORMAL: { color: '#b45309', bg: '#fffbeb' },
+            HARD: { color: '#b91c1c', bg: '#fef2f2' }
+        };
+        const cellsHtml = games.map((game, i) => {
+            const img = game.image ? Boako.Util.cdn(game.image) : null;
+            const style = TIER_STYLE[game.tier] || TIER_STYLE.NORMAL;
+            const borderStyle = i < games.length - 1 ? 'border-right:1px solid #f1f5f9;' : '';
+            return `
+                <div onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; padding:10px 4px; cursor:pointer; ${borderStyle} min-width:0;">
+                    <span style="font-size:9px; font-weight:900; color:${style.color}; background:${style.bg}; padding:1px 6px; border-radius:6px; margin-bottom:6px;">${TIER_LABEL[game.tier] || game.tier}</span>
+                    <div style="width:40px; height:40px; border-radius:8px; background:#f8fafc; display:flex; align-items:center; justify-content:center; margin-bottom:5px; overflow:hidden;">
+                        ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span style="font-size:18px;">🎲</span>`}
+                    </div>
+                    <div style="font-size:10.5px; font-weight:800; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">${Boako.MobileNewsfeed.escapeHtml(game.name)}</div>
                 </div>
-                <div style="min-width:0;">
-                    <div style="font-size:10.5px; font-weight:900; color:#b45309;">⭐ 오늘의 추천 게임</div>
-                    <div style="font-size:14px; font-weight:900; color:#1e293b; margin-top:2px;">${Boako.MobileNewsfeed.escapeHtml(game.name)}</div>
-                    <div style="font-size:10.5px; font-weight:700; color:#d97706; margin-top:2px;">기록 시 💎포인트 지급! (오늘까지)</div>
+            `;
+        }).join('');
+        return `
+            <div style="background:#fff; border:1.5px solid #fde68a; border-radius:14px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                <div style="padding:8px 12px; background:#1e293b; display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:11px; font-weight:900; color:#fde68a;">⭐ 오늘의 추천 게임</span>
+                    <span style="font-size:9px; font-weight:700; color:#94a3b8;">기록 시 포인트 지급 · 오늘까지</span>
+                </div>
+                <div style="display:flex;">
+                    ${cellsHtml}
                 </div>
             </div>
         `;
