@@ -40,6 +40,13 @@
  *    부제목(subtitle)은 이번 요청 범위 밖이라 기존 hoverTitle 그대로 유지.
  * 🌟 [신규] 공략글이 아닌 일반 게시글도 본문에 스크린샷이 포함된 경우 소식지에 노출되도록 DB 트리거
  *    (trg_fn_board_guide_notify) 확장 — AI 생성 없이 본문 첫 <img> 원본을 대표 이미지로 사용.
+ * 🌟 [전면 재작성] 오늘의 추천 게임 — 이지/노멀/하드 3개로 확장(point_standards 테이블의 플레이타임
+ *    구간 기준, 팀 빙고 쟁탈전과 동일 기준: 0~10분/10~30분/30분+). fn_get_today_recommended_game()
+ *    (단일 게임) → fn_get_today_recommended_games_by_tier()(3개 반환)로 교체.
+ *    카드는 더 이상 사이드 슬롯(미디엄 크기)을 잡아먹지 않고, 로고 3개가 나란히 들어가는 라지 카드(2칸)
+ *    1장으로 독립 — 헤드라인/헌정 카드가 있는 쪽 반대편에 명시적으로 배치(grid-column 엇갈림)해서
+ *    두 큰 블록이 나란히 정렬돼 보이지 않게 하고, 그 사이 빈 칸은 dense 모드로 다른 카드가 자동으로 메움.
+ *    사이드 슬롯 2칸은 다시 원래대로 실제 소식/필러 전용으로 되돌림.
  */
 Boako.NewsFeed = {
     items: [],
@@ -64,7 +71,7 @@ Boako.NewsFeed = {
         const [feedResult, fillerPool, recommendResult] = await Promise.all([
             Boako.db.from('news_feed_items').select('*').order('created_at', { ascending: false }).limit(80),
             Boako.NewsFeed.buildFillerPool(),
-            Boako.db.rpc('fn_get_today_recommended_game'),
+            Boako.db.rpc('fn_get_today_recommended_games_by_tier'),
         ]);
 
         if (feedResult.error) {
@@ -76,16 +83,22 @@ Boako.NewsFeed = {
         Boako.NewsFeed.items = feedResult.data || [];
         Boako.NewsFeed.fillerPool = fillerPool;
         Boako.NewsFeed.fillerCursor = 0;
-        // 🌟 [신규] 오늘의 추천 게임 — 소식지 카드(미디엄 크기, 고정 1장)로 노출. 로고 이미지도 같이 조회.
-        Boako.NewsFeed.todayRecommendGame = null;
-        const recommendGameName = recommendResult?.data || null;
-        if (recommendGameName) {
+        // 🌟 [수정] 오늘의 추천 게임 — 이지/노멀/하드 3개로 확장, 라지 카드 1장 안에 3칸으로 표시.
+        // fn_get_today_recommended_games_by_tier()가 [{tier, game_name}, ...] 형태로 반환.
+        Boako.NewsFeed.todayRecommendGames = [];
+        const recommendRows = recommendResult?.data || [];
+        if (recommendRows.length > 0) {
             try {
-                const { data: gameRow } = await Boako.db.from('games').select('image_url').eq('game_name', recommendGameName).maybeSingle();
-                Boako.NewsFeed.todayRecommendGame = { name: recommendGameName, image: gameRow?.image_url || null };
+                const names = recommendRows.map(r => r.game_name);
+                const { data: gameRows } = await Boako.db.from('games').select('game_name, image_url').in('game_name', names);
+                const imageByName = Object.fromEntries((gameRows || []).map(g => [g.game_name, g.image_url]));
+                const tierOrder = { EASY: 0, NORMAL: 1, HARD: 2 };
+                Boako.NewsFeed.todayRecommendGames = recommendRows
+                    .map(r => ({ tier: r.tier, name: r.game_name, image: imageByName[r.game_name] || null }))
+                    .sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
             } catch (e) {
                 console.error('오늘의 추천 게임 로고 조회 실패:', e);
-                Boako.NewsFeed.todayRecommendGame = { name: recommendGameName, image: null };
+                Boako.NewsFeed.todayRecommendGames = recommendRows.map(r => ({ tier: r.tier, name: r.game_name, image: null }));
             }
         }
         Boako.NewsFeed.render();
@@ -345,13 +358,12 @@ Boako.NewsFeed = {
         const extraHeadlines = headlineItems.slice(1).map(item => ({ ...item, _tier: 'large' }));
         const nonHeadline = scored.filter(item => item._tier !== 'headline');
 
-        const hasRecommend = !!Boako.NewsFeed.todayRecommendGame;
-        const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, hasRecommend ? 1 : 2);
+        const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, 2);
         const sideIds = new Set(sideCandidates.map(item => item.id));
         const remaining = nonHeadline.filter(item => !sideIds.has(item.id));
 
-        let sideHtml = hasRecommend ? Boako.NewsFeed.renderTodayRecommendCard() : '';
-        for (let i = 0; i < (hasRecommend ? 1 : 2); i++) {
+        let sideHtml = '';
+        for (let i = 0; i < 2; i++) {
             if (sideCandidates[i]) {
                 sideHtml += Boako.NewsFeed.renderFillerReal(sideCandidates[i]);
             } else {
@@ -364,9 +376,26 @@ Boako.NewsFeed = {
         const belowItems = [...remaining, ...extraHeadlines].sort((a, b) => b._score - a._score);
         const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
 
+        const headlineBlock = Boako.NewsFeed.renderHeadlineBlock(mainHeadline);
+        const sideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${sideHtml}</div>`;
+        const side = Boako.NewsFeed.hashSide(mainHeadline.id);
+        // 헤드라인이 왼쪽이면 [헤드라인][사이드], 오른쪽이면 [사이드][헤드라인] 순서로 그냥 배치 —
+        // 자동 배치(auto-flow)가 이 둘을 순서대로 나란히 채우므로 col-start 계산이 아예 필요 없음
+        const topRowHtml = side === 'left' ? (headlineBlock + sideBlock) : (sideBlock + headlineBlock);
+
+        // 🌟 [신규] 오늘의 추천 게임(이지/노멀/하드) — 라지 카드(2칸) 1장으로, 헤드라인이 있는 쪽과
+        // 겹치지 않게 반대쪽에 명시적으로 배치(grid-column 직접 지정). dense 모드라 그 옆/사이 빈칸은
+        // 뒤이은 카드들이 자동으로 메꿔줌 — 헤드라인 밑에 나란히 정렬된 것처럼 안 보이게 하기 위함.
+        const recommendColStart = side === 'left' ? 3 : 1;
+        const recommendHtml = Boako.NewsFeed.todayRecommendGames.length > 0
+            ? Boako.NewsFeed.renderTodayRecommendCard(recommendColStart)
+            : '';
+        const recommendCols = Boako.NewsFeed.todayRecommendGames.length > 0 ? 2 : 0;
+
         // 🌟 [수정] 헤드라인이 있어도 다른 실제 소식이 몇 개 안 되면 화면이 휑해 보임 —
         // 카드 수가 부족하면 사이트의 다른 실제 데이터(필러 풀)로 최소한 채워준다.
-        const usedCols = belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
+        // (추천 게임 라지카드도 2칸을 차지하므로 usedCols 계산에 같이 포함)
+        const usedCols = recommendCols + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
         const remainder = usedCols % 4;
         const padCount = remainder === 0 ? 0 : (4 - remainder);
         let padHtml = '';
@@ -376,17 +405,11 @@ Boako.NewsFeed = {
             padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
         }
 
-        const headlineBlock = Boako.NewsFeed.renderHeadlineBlock(mainHeadline);
-        const sideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${sideHtml}</div>`;
-        const side = Boako.NewsFeed.hashSide(mainHeadline.id);
-        // 헤드라인이 왼쪽이면 [헤드라인][사이드], 오른쪽이면 [사이드][헤드라인] 순서로 그냥 배치 —
-        // 자동 배치(auto-flow)가 이 둘을 순서대로 나란히 채우므로 col-start 계산이 아예 필요 없음
-        const topRowHtml = side === 'left' ? (headlineBlock + sideBlock) : (sideBlock + headlineBlock);
-
         root.innerHTML = `
             ${bannerHtml}
             <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
                 ${topRowHtml}
+                ${recommendHtml}
                 ${belowCardsHtml}
                 ${padHtml}
             </div>
@@ -400,12 +423,11 @@ Boako.NewsFeed = {
         const mediumItems = scored.filter(item => item._tier === 'medium');
         const otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
 
-        const hasRecommend = !!Boako.NewsFeed.todayRecommendGame;
-        const fillerReal = mediumItems.slice(0, hasRecommend ? 1 : 2);
-        const leftoverMedium = mediumItems.slice(hasRecommend ? 1 : 2);
+        const fillerReal = mediumItems.slice(0, 2);
+        const leftoverMedium = mediumItems.slice(2);
 
-        let fillerHtml = hasRecommend ? Boako.NewsFeed.renderTodayRecommendCard() : '';
-        for (let i = 0; i < (hasRecommend ? 1 : 2); i++) {
+        let fillerHtml = '';
+        for (let i = 0; i < 2; i++) {
             if (fillerReal[i]) {
                 fillerHtml += Boako.NewsFeed.renderFillerReal(fillerReal[i]);
             } else {
@@ -417,18 +439,6 @@ Boako.NewsFeed = {
 
         const belowItems = [...otherItems, ...leftoverMedium].sort((a, b) => b._score - a._score);
         const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
-
-        // 아래쪽 그리드 마지막 줄이 4칸을 못 채우면, 풀에 남은 만큼만(중복 없이) 실제 데이터로 채운다.
-        // 풀이 부족하면 줄을 억지로 채우지 않고 그대로 둔다.
-        const usedCols = belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
-        const remainder = usedCols % 4;
-        const padCount = remainder === 0 ? 0 : (4 - remainder);
-        let padHtml = '';
-        for (let i = 0; i < padCount; i++) {
-            const filler = Boako.NewsFeed.nextFiller();
-            if (!filler) break; // 더 채울 실제 데이터가 없으면 여기서 멈춘다 (반복 카드 방지)
-            padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
-        }
 
         // 🌟 [버그수정] 헤드라인급 소식이 드물어서(임계값 5 이상) 이 헌정 카드가 실제로는
         // 거의 항상 그 자리를 대신하고 있는데, 여긴 hashSide를 안 써서 항상 왼쪽 고정이었음
@@ -450,9 +460,29 @@ Boako.NewsFeed = {
         const tributeSideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${fillerHtml}</div>`;
         const tributeTopRowHtml = tributeSide === 'left' ? (tributeBlock + tributeSideBlock) : (tributeSideBlock + tributeBlock);
 
+        // 🌟 [신규] 오늘의 추천 게임 라지카드 — 헌정 카드가 있는 쪽 반대편에 엇갈리게 배치(위 renderHeadlineGrid와 동일 원리)
+        const recommendColStart = tributeSide === 'left' ? 3 : 1;
+        const recommendHtml = Boako.NewsFeed.todayRecommendGames.length > 0
+            ? Boako.NewsFeed.renderTodayRecommendCard(recommendColStart)
+            : '';
+        const recommendCols = Boako.NewsFeed.todayRecommendGames.length > 0 ? 2 : 0;
+
+        // 아래쪽 그리드 마지막 줄이 4칸을 못 채우면, 풀에 남은 만큼만(중복 없이) 실제 데이터로 채운다.
+        // 풀이 부족하면 줄을 억지로 채우지 않고 그대로 둔다.
+        const usedCols = recommendCols + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
+        const remainder = usedCols % 4;
+        const padCount = remainder === 0 ? 0 : (4 - remainder);
+        let padHtml = '';
+        for (let i = 0; i < padCount; i++) {
+            const filler = Boako.NewsFeed.nextFiller();
+            if (!filler) break; // 더 채울 실제 데이터가 없으면 여기서 멈춘다 (반복 카드 방지)
+            padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
+        }
+
         return `
             <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
                 ${tributeTopRowHtml}
+                ${recommendHtml}
                 ${belowCardsHtml}
                 ${padHtml}
             </div>
@@ -477,23 +507,45 @@ Boako.NewsFeed = {
         `;
     },
 
-    // 🌟 [신규] 오늘의 추천 게임 — 미디엄 카드 크기로 고정 1장 배치 (게임 로고 이미지 표시).
-    // 다른 필러/실제 소식과 자연스럽게 섞이되, 노란 테두리로 살짝 구분되게 함. 클릭하면 그 게임 공략 게시판으로 이동.
-    // 🌟 [수정] 배지 배경이 노란색이라 ⭐(노란 별) 이모티콘이 묻혀 안 보이던 문제 — 배지를 진한 남색으로 바꿔 대비를 줌.
-    // 🌟 [수정] 배율("10배") 문구 제거, 오늘 자정까지 마감이라는 기한 안내 추가.
-    renderTodayRecommendCard: () => {
-        const game = Boako.NewsFeed.todayRecommendGame;
-        if (!game) return '';
-        const img = game.image ? Boako.Util.cdn(game.image) : null;
-        return `
-            <div class="min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300 flex flex-col hover:shadow-md transition-shadow" onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
-                <div class="h-24 overflow-hidden bg-amber-50 flex items-center justify-center p-2 relative">
-                    <span class="absolute top-1 left-1 text-[9px] font-black bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded">⭐ 오늘의 추천</span>
-                    ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;">` : `<span class="text-3xl">🎲</span>`}
+    // 🌟 [전면 재작성] 오늘의 추천 게임 — 이지/노멀/하드 3개를 라지카드(2칸) 1장 안에 3등분해서 표시.
+    // colStart: 헤드라인/헌정 카드가 있는 쪽과 겹치지 않게 반대편에 명시적으로 배치하기 위한 grid-column 시작 위치(1 또는 3).
+    renderTodayRecommendCard: (colStart) => {
+        const games = Boako.NewsFeed.todayRecommendGames;
+        if (!games || games.length === 0) return '';
+
+        const TIER_LABEL = { EASY: '이지 · 10분 미만', NORMAL: '노멀 · 10~30분', HARD: '하드 · 30분 이상' };
+        const TIER_STYLE = {
+            EASY: { color: '#059669', bg: '#ecfdf5' },
+            NORMAL: { color: '#b45309', bg: '#fffbeb' },
+            HARD: { color: '#b91c1c', bg: '#fef2f2' }
+        };
+
+        const cellsHtml = games.map((game, i) => {
+            const img = game.image ? Boako.Util.cdn(game.image) : null;
+            const style = TIER_STYLE[game.tier] || TIER_STYLE.NORMAL;
+            const borderClass = i < games.length - 1 ? 'border-r border-slate-100' : '';
+            return `
+                <div class="flex flex-col items-center text-center p-3 ${borderClass}" onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
+                    <span class="text-[9px] font-black px-2 py-0.5 rounded mb-2" style="color:${style.color}; background:${style.bg};">${TIER_LABEL[game.tier] || game.tier}</span>
+                    <div class="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-2 overflow-hidden">
+                        ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span class="text-xl">🎲</span>`}
+                    </div>
+                    <div class="text-[11px] font-black text-slate-900 leading-snug">${Boako.NewsFeed.escapeHtml(game.name)}</div>
                 </div>
-                <div class="p-3 min-w-0">
-                    <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.escapeHtml(game.name)}</h4>
-                    <p class="text-[10px] font-bold text-amber-600 mt-0.5">기록 시 💎포인트 지급! (오늘까지 입력하세요)</p>
+            `;
+        }).join('');
+
+        const startClass = colStart >= 3 ? 'md:col-start-3' : 'md:col-start-1';
+        return `
+            <div class="col-span-4 md:col-span-2 ${startClass}">
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300">
+                    <div class="flex items-center justify-between px-3 py-1.5 bg-slate-800">
+                        <span class="text-[11px] font-black text-amber-300">⭐ 오늘의 추천 게임</span>
+                        <span class="text-[9px] font-bold text-slate-400">기록 시 포인트 지급 · 오늘까지</span>
+                    </div>
+                    <div class="grid grid-cols-3">
+                        ${cellsHtml}
+                    </div>
                 </div>
             </div>
         `;
