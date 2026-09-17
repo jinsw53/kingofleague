@@ -51,6 +51,10 @@
  *    아이템(빈 껍데기 div)만 늘어나고 실제로 눈에 보이는 흰 카드(자식 div)는 원래 콘텐츠 높이만큼만
  *    차지해서 카드 아래에 빈 여백이 생기던 문제 — 껍데기에 flex, 안쪽 카드에 flex flex-col w-full,
  *    아이콘 그리드 줄에 flex-1을 줘서 옆 카드와 같은 높이로 정확히 늘어나도록 수정.
+ * 🌟 [수정] 위 수정 직후, flex-1로 늘어난 아이콘 그리드 행이 늘어난 높이 안에서 위쪽에만 붙어있고
+ *    밑에 빈 공간이 그대로 남아 "억지로 늘어난" 티가 나던 문제 — auto-rows-fr로 행 자체가 셀 높이를
+ *    꽉 채우게 하고, 각 칸(뱃지+아이콘+텍스트)엔 justify-center를 줘서 늘어난 칸 안에서 세로 중앙
+ *    정렬되도록 수정. 옆 카드가 얼마나 크든 내용이 항상 칸 한가운데 자리잡음.
  */
 Boako.NewsFeed = {
     items: [],
@@ -529,7 +533,7 @@ Boako.NewsFeed = {
             const style = TIER_STYLE[game.tier] || TIER_STYLE.NORMAL;
             const borderClass = i < games.length - 1 ? 'border-r border-slate-100' : '';
             return `
-                <div class="flex flex-col items-center text-center p-3 ${borderClass}" onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
+                <div class="flex flex-col items-center justify-center text-center p-3 ${borderClass}" onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
                     <span class="text-[9px] font-black px-2 py-0.5 rounded mb-2" style="color:${style.color}; background:${style.bg};">${TIER_LABEL[game.tier] || game.tier}</span>
                     <div class="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-2 overflow-hidden">
                         ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span class="text-xl">🎲</span>`}
@@ -547,7 +551,7 @@ Boako.NewsFeed = {
                         <span class="text-[11px] font-black text-amber-300">⭐ 오늘의 추천 게임</span>
                         <span class="text-[9px] font-bold text-slate-400">기록 시 포인트 지급 · 오늘까지</span>
                     </div>
-                    <div class="grid grid-cols-3 flex-1">
+                    <div class="grid grid-cols-3 flex-1 auto-rows-fr">
                         ${cellsHtml}
                     </div>
                 </div>
