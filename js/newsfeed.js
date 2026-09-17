@@ -47,6 +47,10 @@
  *    1장으로 독립 — 헤드라인/헌정 카드가 있는 쪽 반대편에 명시적으로 배치(grid-column 엇갈림)해서
  *    두 큰 블록이 나란히 정렬돼 보이지 않게 하고, 그 사이 빈 칸은 dense 모드로 다른 카드가 자동으로 메움.
  *    사이드 슬롯 2칸은 다시 원래대로 실제 소식/필러 전용으로 되돌림.
+ * 🌟 [버그수정] "오늘의 추천 게임" 카드가 옆 large 카드와 같은 행에서 셀 높이가 stretch될 때, 그리드
+ *    아이템(빈 껍데기 div)만 늘어나고 실제로 눈에 보이는 흰 카드(자식 div)는 원래 콘텐츠 높이만큼만
+ *    차지해서 카드 아래에 빈 여백이 생기던 문제 — 껍데기에 flex, 안쪽 카드에 flex flex-col w-full,
+ *    아이콘 그리드 줄에 flex-1을 줘서 옆 카드와 같은 높이로 정확히 늘어나도록 수정.
  */
 Boako.NewsFeed = {
     items: [],
@@ -537,13 +541,13 @@ Boako.NewsFeed = {
 
         const startClass = colStart >= 3 ? 'md:col-start-3' : 'md:col-start-1';
         return `
-            <div class="col-span-4 md:col-span-2 ${startClass}">
-                <div class="bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300">
+            <div class="col-span-4 md:col-span-2 ${startClass} flex">
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300 flex flex-col w-full">
                     <div class="flex items-center justify-between px-3 py-1.5 bg-slate-800">
                         <span class="text-[11px] font-black text-amber-300">⭐ 오늘의 추천 게임</span>
                         <span class="text-[9px] font-bold text-slate-400">기록 시 포인트 지급 · 오늘까지</span>
                     </div>
-                    <div class="grid grid-cols-3">
+                    <div class="grid grid-cols-3 flex-1">
                         ${cellsHtml}
                     </div>
                 </div>
