@@ -47,14 +47,12 @@
  *    1장으로 독립 — 헤드라인/헌정 카드가 있는 쪽 반대편에 명시적으로 배치(grid-column 엇갈림)해서
  *    두 큰 블록이 나란히 정렬돼 보이지 않게 하고, 그 사이 빈 칸은 dense 모드로 다른 카드가 자동으로 메움.
  *    사이드 슬롯 2칸은 다시 원래대로 실제 소식/필러 전용으로 되돌림.
- * 🌟 [버그수정] "오늘의 추천 게임" 카드가 옆 large 카드와 같은 행에서 셀 높이가 stretch될 때, 그리드
- *    아이템(빈 껍데기 div)만 늘어나고 실제로 눈에 보이는 흰 카드(자식 div)는 원래 콘텐츠 높이만큼만
- *    차지해서 카드 아래에 빈 여백이 생기던 문제 — 껍데기에 flex, 안쪽 카드에 flex flex-col w-full,
- *    아이콘 그리드 줄에 flex-1을 줘서 옆 카드와 같은 높이로 정확히 늘어나도록 수정.
- * 🌟 [수정] 위 수정 직후, flex-1로 늘어난 아이콘 그리드 행이 늘어난 높이 안에서 위쪽에만 붙어있고
- *    밑에 빈 공간이 그대로 남아 "억지로 늘어난" 티가 나던 문제 — auto-rows-fr로 행 자체가 셀 높이를
- *    꽉 채우게 하고, 각 칸(뱃지+아이콘+텍스트)엔 justify-center를 줘서 늘어난 칸 안에서 세로 중앙
- *    정렬되도록 수정. 옆 카드가 얼마나 크든 내용이 항상 칸 한가운데 자리잡음.
+ * 🌟 [버그수정→재설계] "오늘의 추천 게임" 카드를 옆 large 카드와 같은 줄에서 높이를 맞추려던 시도
+ *    (flex/auto-rows-fr/justify-center)를 전부 되돌림 — 라지 카드는 콘텐츠가 세로로 늘어날 수 있지만
+ *    추천 게임 카드(아이콘+한 줄 텍스트)는 구조적으로 늘어날 수 없어서, 정렬을 아무리 만져도 "억지로
+ *    늘어난 빈 여백" 느낌을 없앨 수 없었음. 대신 추천 게임 카드는 원래 크기(콘텐츠 크기)를 고수하고,
+ *    그 옆 2칸을 항상 스몰/미디엄(1칸) 카드로 고정 배치해서 애초에 라지 카드와 같은 줄에 못 붙게 함
+ *    (recommendPairCandidates — 부족하면 필러로 채움). render()/renderTributeGrid() 양쪽에 동일 적용.
  */
 Boako.NewsFeed = {
     items: [],
@@ -368,7 +366,7 @@ Boako.NewsFeed = {
 
         const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, 2);
         const sideIds = new Set(sideCandidates.map(item => item.id));
-        const remaining = nonHeadline.filter(item => !sideIds.has(item.id));
+        let remaining = nonHeadline.filter(item => !sideIds.has(item.id));
 
         let sideHtml = '';
         for (let i = 0; i < 2; i++) {
@@ -381,9 +379,6 @@ Boako.NewsFeed = {
             }
         }
 
-        const belowItems = [...remaining, ...extraHeadlines].sort((a, b) => b._score - a._score);
-        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
-
         const headlineBlock = Boako.NewsFeed.renderHeadlineBlock(mainHeadline);
         const sideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${sideHtml}</div>`;
         const side = Boako.NewsFeed.hashSide(mainHeadline.id);
@@ -392,18 +387,41 @@ Boako.NewsFeed = {
         const topRowHtml = side === 'left' ? (headlineBlock + sideBlock) : (sideBlock + headlineBlock);
 
         // 🌟 [신규] 오늘의 추천 게임(이지/노멀/하드) — 라지 카드(2칸) 1장으로, 헤드라인이 있는 쪽과
-        // 겹치지 않게 반대쪽에 명시적으로 배치(grid-column 직접 지정). dense 모드라 그 옆/사이 빈칸은
-        // 뒤이은 카드들이 자동으로 메꿔줌 — 헤드라인 밑에 나란히 정렬된 것처럼 안 보이게 하기 위함.
+        // 겹치지 않게 반대쪽에 명시적으로 배치(grid-column 직접 지정).
         const recommendColStart = side === 'left' ? 3 : 1;
         const recommendHtml = Boako.NewsFeed.todayRecommendGames.length > 0
             ? Boako.NewsFeed.renderTodayRecommendCard(recommendColStart)
             : '';
         const recommendCols = Boako.NewsFeed.todayRecommendGames.length > 0 ? 2 : 0;
 
+        // 🌟 [재설계] 추천 게임 카드는 원래 크기(콘텐츠 크기)를 고수하고, 대신 그 옆 2칸을
+        // 항상 스몰/미디엄(1칸) 카드로 고정 배치 — 라지 카드가 절대 같은 줄에 못 붙게 해서
+        // "억지로 늘어난 여백"이 생길 여지 자체를 없앤다. recommendHtml 바로 뒤(DOM 순서상
+        // dense 배치가 그 줄의 남은 2칸을 채우는 시점)에 배치해야 실제로 그 자리에 꽂힘.
+        let recommendPairHtml = '';
+        if (recommendCols > 0) {
+            const pairCandidates = remaining.filter(item => item._tier === 'small' || item._tier === 'medium').slice(0, 2);
+            const pairIds = new Set(pairCandidates.map(item => item.id));
+            remaining = remaining.filter(item => !pairIds.has(item.id));
+
+            for (let i = 0; i < 2; i++) {
+                if (pairCandidates[i]) {
+                    recommendPairHtml += Boako.NewsFeed.renderCard(pairCandidates[i]);
+                } else {
+                    const filler = Boako.NewsFeed.nextFiller();
+                    if (filler) recommendPairHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
+                    // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
+                }
+            }
+        }
+
+        const belowItems = [...remaining, ...extraHeadlines].sort((a, b) => b._score - a._score);
+        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
+
         // 🌟 [수정] 헤드라인이 있어도 다른 실제 소식이 몇 개 안 되면 화면이 휑해 보임 —
         // 카드 수가 부족하면 사이트의 다른 실제 데이터(필러 풀)로 최소한 채워준다.
-        // (추천 게임 라지카드도 2칸을 차지하므로 usedCols 계산에 같이 포함)
-        const usedCols = recommendCols + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
+        // (추천 게임 라지카드 + 고정 페어 2칸도 usedCols 계산에 같이 포함)
+        const usedCols = recommendCols + (recommendCols > 0 ? 2 : 0) + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
         const remainder = usedCols % 4;
         const padCount = remainder === 0 ? 0 : (4 - remainder);
         let padHtml = '';
@@ -418,6 +436,7 @@ Boako.NewsFeed = {
             <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
                 ${topRowHtml}
                 ${recommendHtml}
+                ${recommendPairHtml}
                 ${belowCardsHtml}
                 ${padHtml}
             </div>
@@ -429,10 +448,10 @@ Boako.NewsFeed = {
     // 🌟 [수정] 필러 풀이 소진되면 더 이상 채우지 않고 그 자리를 비워둔다 (같은 카드 반복 금지)
     renderTributeGrid: (scored) => {
         const mediumItems = scored.filter(item => item._tier === 'medium');
-        const otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
+        let otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
 
         const fillerReal = mediumItems.slice(0, 2);
-        const leftoverMedium = mediumItems.slice(2);
+        let leftoverMedium = mediumItems.slice(2);
 
         let fillerHtml = '';
         for (let i = 0; i < 2; i++) {
@@ -444,9 +463,6 @@ Boako.NewsFeed = {
                 // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
             }
         }
-
-        const belowItems = [...otherItems, ...leftoverMedium].sort((a, b) => b._score - a._score);
-        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
 
         // 🌟 [버그수정] 헤드라인급 소식이 드물어서(임계값 5 이상) 이 헌정 카드가 실제로는
         // 거의 항상 그 자리를 대신하고 있는데, 여긴 hashSide를 안 써서 항상 왼쪽 고정이었음
@@ -475,9 +491,32 @@ Boako.NewsFeed = {
             : '';
         const recommendCols = Boako.NewsFeed.todayRecommendGames.length > 0 ? 2 : 0;
 
+        // 🌟 [재설계] render()와 동일 — 추천 게임 카드 옆 2칸을 항상 스몰/미디엄(1칸)으로 고정,
+        // 라지 카드가 같은 줄에 못 붙게 해서 여백 문제 자체를 없앤다.
+        let recommendPairHtml = '';
+        if (recommendCols > 0) {
+            const pairCandidates = [...leftoverMedium, ...otherItems.filter(item => item._tier === 'small')].slice(0, 2);
+            const pairIds = new Set(pairCandidates.map(item => item.id));
+            leftoverMedium = leftoverMedium.filter(item => !pairIds.has(item.id));
+            otherItems = otherItems.filter(item => !pairIds.has(item.id));
+
+            for (let i = 0; i < 2; i++) {
+                if (pairCandidates[i]) {
+                    recommendPairHtml += Boako.NewsFeed.renderCard(pairCandidates[i]);
+                } else {
+                    const filler = Boako.NewsFeed.nextFiller();
+                    if (filler) recommendPairHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
+                    // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
+                }
+            }
+        }
+
+        const belowItems = [...otherItems, ...leftoverMedium].sort((a, b) => b._score - a._score);
+        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
+
         // 아래쪽 그리드 마지막 줄이 4칸을 못 채우면, 풀에 남은 만큼만(중복 없이) 실제 데이터로 채운다.
         // 풀이 부족하면 줄을 억지로 채우지 않고 그대로 둔다.
-        const usedCols = recommendCols + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
+        const usedCols = recommendCols + (recommendCols > 0 ? 2 : 0) + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
         const remainder = usedCols % 4;
         const padCount = remainder === 0 ? 0 : (4 - remainder);
         let padHtml = '';
@@ -491,6 +530,7 @@ Boako.NewsFeed = {
             <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
                 ${tributeTopRowHtml}
                 ${recommendHtml}
+                ${recommendPairHtml}
                 ${belowCardsHtml}
                 ${padHtml}
             </div>
@@ -517,6 +557,8 @@ Boako.NewsFeed = {
 
     // 🌟 [전면 재작성] 오늘의 추천 게임 — 이지/노멀/하드 3개를 라지카드(2칸) 1장 안에 3등분해서 표시.
     // colStart: 헤드라인/헌정 카드가 있는 쪽과 겹치지 않게 반대편에 명시적으로 배치하기 위한 grid-column 시작 위치(1 또는 3).
+    // 🌟 [재설계] 옆 카드 높이에 맞춰 늘리는 시도(flex/auto-rows-fr)를 걷어내고 원래 크기(콘텐츠 크기)로 되돌림 —
+    // 대신 render()/renderTributeGrid()에서 이 카드 옆 2칸을 항상 스몰/미디엄으로 고정 배치해 라지 카드와 안 만나게 함.
     renderTodayRecommendCard: (colStart) => {
         const games = Boako.NewsFeed.todayRecommendGames;
         if (!games || games.length === 0) return '';
@@ -545,13 +587,13 @@ Boako.NewsFeed = {
 
         const startClass = colStart >= 3 ? 'md:col-start-3' : 'md:col-start-1';
         return `
-            <div class="col-span-4 md:col-span-2 ${startClass} flex">
-                <div class="bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300 flex flex-col w-full">
+            <div class="col-span-4 md:col-span-2 ${startClass}">
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm border-2 border-amber-300">
                     <div class="flex items-center justify-between px-3 py-1.5 bg-slate-800">
                         <span class="text-[11px] font-black text-amber-300">⭐ 오늘의 추천 게임</span>
                         <span class="text-[9px] font-bold text-slate-400">기록 시 포인트 지급 · 오늘까지</span>
                     </div>
-                    <div class="grid grid-cols-3 flex-1 auto-rows-fr">
+                    <div class="grid grid-cols-3">
                         ${cellsHtml}
                     </div>
                 </div>
