@@ -1,5 +1,9 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
+ * 🌟 [수정] 큐 소진 후 마무리 채움 추가 — 중간에는 "2칸짜리를 놓기 직전에 낮은 컬럼을 채운다" 규칙이
+ *    있었지만, 맨 마지막(더 이상 놓을 카드가 없는 시점)에는 이 규칙이 트리거될 계기 자체가 없어서
+ *    특정 컬럼이 짧게 끝나며 옆 카드와 비교해 휑해 보이는 문제가 있었음. 큐가 다 끝난 뒤 컬럼 높이
+ *    차이가 크면 필러로 마저 채우는 마무리 루프를 추가해서, 마지막 줄도 옆 카드 높이에 맞춰지도록 함.
  * 🌟 [버그수정] _scheduleRelayout이 render()를 다시 부를 때마다 fillerCursor가 계속 전진해서
  *    재배치가 여러 번 일어날수록 필러 풀이 점점 소진되고, 그만큼 카드 개수가 실제로 줄어들던 버그 —
  *    재배치는 새로운 데이터가 아니라 같은 내용을 다시 그리는 것뿐이므로, render() 호출 직전에
@@ -452,6 +456,14 @@ Boako.NewsFeed = {
             }
             queue.shift();
             place(front.html, front.span, null);
+        }
+
+        // 3) 큐가 다 끝난 뒤에도 컬럼 높이가 들쭉날쭉하면(맨 끝이라 위 규칙이 트리거될 계기가 없었던 경우) —
+        // 가장 낮은 컬럼과 가장 높은 컬럼의 차이가 크면 필러로 마저 채워서 마무리한다
+        while (Math.max(...colHeights) - Math.min(...colHeights) > GAP_THRESHOLD) {
+            const filler = Boako.NewsFeed.nextFiller();
+            if (!filler) break; // 필러도 소진 — 어쩔 수 없이 그냥 둔다
+            place(Boako.NewsFeed.renderSupplementPadCard(filler), 1, null);
         }
 
         container.style.height = (Math.max(...colHeights) - gap) + 'px';
