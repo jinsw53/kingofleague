@@ -1,5 +1,9 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
+ * 🌟 [신규] 이미지 로딩 완료 시 재배치 안전장치 — masonry 배치 시점엔 아직 안 뜬 이미지(게임/팀 로고 등)가
+ *    나중에 로딩되면서 카드 높이가 바뀌면 이미 자리 잡은 아래 카드와 겹쳐 보일 수 있음. 배치된 카드 안의
+ *    <img>가 아직 안 떴으면 load/error 이벤트를 걸어두고, 완료되면 전체를 다시 배치(_scheduleRelayout,
+ *    150ms 디바운스로 여러 이미지의 재배치를 한 번으로 묶음)해서 최종적으로는 항상 맞게 정리되도록 함.
  * 🌟 [버그수정] runMasonry의 갭 채우기용 필러 카드가 renderSupplementFiller(.nf-filler-card,
  *    height:100% 의존)를 쓰고 있었음 — 이 클래스는 원래 grid-rows-2로 높이가 확정된 칸 안에서만
  *    정상 동작하는데, masonry는 그런 확정된 부모 높이가 없어서 height:100%가 비정상적으로 커지고
@@ -83,6 +87,17 @@ Boako.NewsFeed = {
     // 🌟 [수정] 이제 이 풀은 "다 쓰면 끝" — 모자라도 같은 카드를 반복해서 재사용하지 않는다
     fillerPool: [],
     fillerCursor: 0, // 🌟 [신규] 풀에서 다음에 꺼낼 위치
+
+    // 🌟 [신규] masonry 배치 시점엔 아직 안 뜬 이미지가 나중에 로딩되면서 카드 높이가 바뀌어
+    // 아래 카드와 겹칠 수 있음 — 이미지 로딩 완료 시 전체를 다시 배치해서 항상 최종적으로는
+    // 맞게 정리되도록 하는 안전장치. 여러 이미지가 비슷한 시점에 로드되면 재배치를 한 번으로 묶는다.
+    _relayoutTimer: null,
+    _scheduleRelayout: () => {
+        clearTimeout(Boako.NewsFeed._relayoutTimer);
+        Boako.NewsFeed._relayoutTimer = setTimeout(() => {
+            Boako.NewsFeed.render();
+        }, 150);
+    },
 
     init: async (containerId) => {
         Boako.NewsFeed.rootId = containerId;
@@ -390,6 +405,14 @@ Boako.NewsFeed = {
             el.style.position = 'absolute';
             el.style.left = colStart * (colWidth + gap) + 'px';
             el.style.top = top + 'px';
+
+            // 🌟 아직 안 뜬 이미지가 있으면, 로딩 완료 시 전체 재배치 예약
+            el.querySelectorAll('img').forEach(img => {
+                if (!img.complete) {
+                    img.addEventListener('load', Boako.NewsFeed._scheduleRelayout, { once: true });
+                    img.addEventListener('error', Boako.NewsFeed._scheduleRelayout, { once: true });
+                }
+            });
         };
 
         // 1) 헤드라인/헌정 카드 강제 배치
