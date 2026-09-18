@@ -1,5 +1,11 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
+ * 🌟 [전면 재작성] CSS Grid + 고정 슬롯(사이드 2칸/추천게임 페어 2칸/padCount) 방식을 걷어내고,
+ *    1면/2면 구분 없는 단일 masonry 엔진(runMasonry)으로 통합. 헤드라인/헌정 카드(3칸, hashSide로
+ *    좌우 로테이션)만 강제 위치, 오늘의 추천 게임은 큐 맨 앞에 편입. 그 외 전부 동일한 규칙 하나로 처리:
+ *    "2칸짜리를 놓기 직전에 유독 낮게 홀로 남은 컬럼이 있으면 1칸짜리를 먼저 당겨와 메운다"
+ *    (실제 소식이 없으면 필러 풀에서 대신 당겨옴, 필러도 소진되면 그냥 둠 — masonry 특성상 완전한
+ *    무틈은 보장되지 않음). medium/small 카드의 min-height 강제도 제거해 실제 콘텐츠 높이를 그대로 씀.
  * 🌟 [신규] "오늘의 추천 게임" 카드 추가 — fn_get_today_recommended_game() RPC로 게임명 조회 후
  *    games.image_url로 로고까지 가져와서, 사이드 슬롯(미디엄 카드 크기)에 항상 고정 1장으로 배치.
  *    해당 게임으로 오늘(기록 제출 시점 기준) 기록을 남기면 BTLDB 트리거(fn_award_daily_recommend_bonus)가
@@ -318,6 +324,94 @@ Boako.NewsFeed = {
         return h % 2 === 0 ? 'left' : 'right';
     },
 
+    // 🌟 [신규] 통합 masonry 배치 엔진 — 1면/2면 구분 없이 전체를 하나의 흐름으로 처리.
+    // forcedBlock(헤드라인/헌정 카드, 3칸)만 강제 위치, 나머지는 전부 동일한 규칙 하나로 처리:
+    // "2칸짜리를 놓기 직전에 유독 낮게 홀로 남은 컬럼이 있으면 1칸짜리를 먼저 당겨와 메운다"
+    // (실제 소식 중엔 없으면 필러 풀에서 대신 당겨오고, 필러도 소진되면 그냥 둔다 — 완전한 무틈은 보장 안 됨,
+    // masonry의 태생적 한계)
+    // container: 실제로 DOM에 붙어있는 빈 div (clientWidth 측정 가능해야 함)
+    // forcedBlock: { html, span:3, cols:[0,1,2] 또는 [1,2,3] }
+    // queue: [{ html, span:1|2 }, ...] — 점수순 정렬된 나머지 카드
+    runMasonry: (container, forcedBlock, includeRecommend, recommendHtml, queue) => {
+        const cols = 4;
+        const gap = 16; // gap-4
+        const containerWidth = container.clientWidth;
+        const colWidth = (containerWidth - gap * (cols - 1)) / cols;
+        const colHeights = new Array(cols).fill(0);
+
+        container.innerHTML = '';
+        container.style.position = 'relative';
+
+        const place = (html, span, forcedCols) => {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = html.trim();
+            const el = wrap.firstElementChild;
+            if (!el) return;
+            const width = span === 1 ? colWidth : colWidth * span + gap * (span - 1);
+            el.style.width = width + 'px';
+            el.style.position = 'static';
+            container.appendChild(el);
+            const height = el.offsetHeight;
+
+            let colStart, top;
+            if (forcedCols) {
+                colStart = forcedCols[0];
+                top = Math.max(...forcedCols.map(c => colHeights[c]));
+                forcedCols.forEach(c => { colHeights[c] = top + height + gap; });
+            } else if (span === 2) {
+                let bestPair = 0, bestMax = Infinity, bestSum = Infinity;
+                for (let i = 0; i <= cols - 2; i++) {
+                    const h1 = colHeights[i], h2 = colHeights[i + 1];
+                    const mx = Math.max(h1, h2), sm = h1 + h2;
+                    if (mx < bestMax || (mx === bestMax && sm < bestSum)) { bestMax = mx; bestSum = sm; bestPair = i; }
+                }
+                colStart = bestPair; top = bestMax;
+                colHeights[bestPair] = top + height + gap;
+                colHeights[bestPair + 1] = top + height + gap;
+            } else {
+                let bestIdx = 0, bestH = colHeights[0];
+                for (let i = 1; i < cols; i++) if (colHeights[i] < bestH) { bestH = colHeights[i]; bestIdx = i; }
+                colStart = bestIdx; top = bestH;
+                colHeights[bestIdx] = top + height + gap;
+            }
+            el.style.position = 'absolute';
+            el.style.left = colStart * (colWidth + gap) + 'px';
+            el.style.top = top + 'px';
+        };
+
+        // 1) 헤드라인/헌정 카드 강제 배치
+        place(forcedBlock.html, forcedBlock.span, forcedBlock.cols);
+
+        // 2) 추천게임을 큐 맨 앞에 끼워넣고, 이후는 규칙 하나만 반복
+        if (includeRecommend) queue.unshift({ html: recommendHtml, span: 2 });
+
+        const GAP_THRESHOLD = 50;
+        while (queue.length) {
+            const front = queue[0];
+            if (front.span === 2) {
+                const sorted = [...colHeights].sort((a, b) => a - b);
+                if (sorted[1] - sorted[0] > GAP_THRESHOLD) {
+                    const idx = queue.findIndex(q => q.span === 1);
+                    if (idx !== -1) {
+                        const [single] = queue.splice(idx, 1);
+                        place(single.html, 1, null);
+                        continue;
+                    }
+                    const filler = Boako.NewsFeed.nextFiller();
+                    if (filler) {
+                        place(Boako.NewsFeed.renderSupplementFiller(filler), 1, null);
+                        continue;
+                    }
+                    // 필러도 소진 — 어쩔 수 없이 그냥 놓는다
+                }
+            }
+            queue.shift();
+            place(front.html, front.span, null);
+        }
+
+        container.style.height = (Math.max(...colHeights) - gap) + 'px';
+    },
+
     render: () => {
         const root = document.getElementById(Boako.NewsFeed.rootId);
         if (!root) return;
@@ -345,8 +439,9 @@ Boako.NewsFeed = {
         if (!hasHeadline) {
             root.innerHTML = `
                 ${bannerHtml}
-                ${Boako.NewsFeed.renderTributeGrid(scored)}
+                <div id="nf-masonry-root"></div>
             `;
+            Boako.NewsFeed.renderTributeGrid(scored, document.getElementById('nf-masonry-root'));
             return;
         }
 
@@ -364,113 +459,44 @@ Boako.NewsFeed = {
         const extraHeadlines = headlineItems.slice(1).map(item => ({ ...item, _tier: 'large' }));
         const nonHeadline = scored.filter(item => item._tier !== 'headline');
 
-        const sideCandidates = nonHeadline.filter(item => item._tier === 'medium').slice(0, 2);
-        const sideIds = new Set(sideCandidates.map(item => item.id));
-        let remaining = nonHeadline.filter(item => !sideIds.has(item.id));
-
-        let sideHtml = '';
-        for (let i = 0; i < 2; i++) {
-            if (sideCandidates[i]) {
-                sideHtml += Boako.NewsFeed.renderFillerReal(sideCandidates[i]);
-            } else {
-                const filler = Boako.NewsFeed.nextFiller();
-                if (filler) sideHtml += Boako.NewsFeed.renderSupplementFiller(filler);
-                // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
-            }
-        }
-
+        // 🌟 [재작성] 1면/2면 구분 없는 통합 masonry — 헤드라인만 강제 위치, 나머지는 전부
+        // runMasonry의 단일 규칙으로 처리 (사이드/페어 고정 슬롯, padCount 계산 전부 제거)
         const headlineBlock = Boako.NewsFeed.renderHeadlineBlock(mainHeadline);
-        const sideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${sideHtml}</div>`;
         const side = Boako.NewsFeed.hashSide(mainHeadline.id);
-        // 헤드라인이 왼쪽이면 [헤드라인][사이드], 오른쪽이면 [사이드][헤드라인] 순서로 그냥 배치 —
-        // 자동 배치(auto-flow)가 이 둘을 순서대로 나란히 채우므로 col-start 계산이 아예 필요 없음
-        const topRowHtml = side === 'left' ? (headlineBlock + sideBlock) : (sideBlock + headlineBlock);
+        const headlineCols = side === 'left' ? [0, 1, 2] : [1, 2, 3];
 
-        // 🌟 [신규] 오늘의 추천 게임(이지/노멀/하드) — 라지 카드(2칸) 1장으로, 헤드라인이 있는 쪽과
-        // 겹치지 않게 반대쪽에 명시적으로 배치(grid-column 직접 지정).
-        const recommendColStart = side === 'left' ? 3 : 1;
-        const recommendHtml = Boako.NewsFeed.todayRecommendGames.length > 0
-            ? Boako.NewsFeed.renderTodayRecommendCard(recommendColStart)
-            : '';
-        const recommendCols = Boako.NewsFeed.todayRecommendGames.length > 0 ? 2 : 0;
+        const includeRecommend = Boako.NewsFeed.todayRecommendGames.length > 0;
+        const recommendHtml = includeRecommend ? Boako.NewsFeed.renderTodayRecommendCard(1) : '';
 
-        // 🌟 [재설계] 추천 게임 카드는 원래 크기(콘텐츠 크기)를 고수하고, 대신 그 옆 2칸을
-        // 항상 스몰/미디엄(1칸) 카드로 고정 배치 — 라지 카드가 절대 같은 줄에 못 붙게 해서
-        // "억지로 늘어난 여백"이 생길 여지 자체를 없앤다. recommendHtml 바로 뒤(DOM 순서상
-        // dense 배치가 그 줄의 남은 2칸을 채우는 시점)에 배치해야 실제로 그 자리에 꽂힘.
-        let recommendPairHtml = '';
-        if (recommendCols > 0) {
-            const pairCandidates = remaining.filter(item => item._tier === 'small' || item._tier === 'medium').slice(0, 2);
-            const pairIds = new Set(pairCandidates.map(item => item.id));
-            remaining = remaining.filter(item => !pairIds.has(item.id));
-
-            for (let i = 0; i < 2; i++) {
-                if (pairCandidates[i]) {
-                    recommendPairHtml += Boako.NewsFeed.renderCard(pairCandidates[i]);
-                } else {
-                    const filler = Boako.NewsFeed.nextFiller();
-                    if (filler) recommendPairHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
-                    // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
-                }
-            }
-        }
-
-        const belowItems = [...remaining, ...extraHeadlines].sort((a, b) => b._score - a._score);
-        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
-
-        // 🌟 [수정] 헤드라인이 있어도 다른 실제 소식이 몇 개 안 되면 화면이 휑해 보임 —
-        // 카드 수가 부족하면 사이트의 다른 실제 데이터(필러 풀)로 최소한 채워준다.
-        // (추천 게임 라지카드 + 고정 페어 2칸도 usedCols 계산에 같이 포함)
-        const usedCols = recommendCols + (recommendCols > 0 ? 2 : 0) + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
-        const remainder = usedCols % 4;
-        const padCount = remainder === 0 ? 0 : (4 - remainder);
-        let padHtml = '';
-        for (let i = 0; i < padCount; i++) {
-            const filler = Boako.NewsFeed.nextFiller();
-            if (!filler) break; // 필러도 소진되면 그냥 있는 만큼만 (반복 카드 방지)
-            padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
-        }
+        const queue = [...nonHeadline, ...extraHeadlines]
+            .sort((a, b) => b._score - a._score)
+            .map(item => ({ html: Boako.NewsFeed.renderCard(item), span: item._tier === 'large' ? 2 : 1 }));
 
         root.innerHTML = `
             ${bannerHtml}
-            <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
-                ${topRowHtml}
-                ${recommendHtml}
-                ${recommendPairHtml}
-                ${belowCardsHtml}
-                ${padHtml}
-            </div>
+            <div id="nf-masonry-root"></div>
         `;
+        Boako.NewsFeed.runMasonry(
+            document.getElementById('nf-masonry-root'),
+            { html: headlineBlock, span: 3, cols: headlineCols },
+            includeRecommend, recommendHtml, queue
+        );
     },
 
     // 헤드라인이 없을 때: 헌정 카드(헤드라인 자리) + 필러 슬롯 2칸(미디엄 실제 소식 우선, 부족하면 사이트의 다른 실제 데이터)
     // + 남는 소식(라지/스몰/필러에 못 들어간 미디엄) + 마지막 줄이 4칸을 못 채우면 실제 데이터로 채움
     // 🌟 [수정] 필러 풀이 소진되면 더 이상 채우지 않고 그 자리를 비워둔다 (같은 카드 반복 금지)
-    renderTributeGrid: (scored) => {
+    // 🌟 [재작성] container(실제 DOM)를 직접 받아 masonry로 그림 (더 이상 HTML 문자열을 반환하지 않음)
+    renderTributeGrid: (scored, container) => {
         const mediumItems = scored.filter(item => item._tier === 'medium');
-        let otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
+        const otherItems = scored.filter(item => item._tier === 'large' || item._tier === 'small');
 
-        const fillerReal = mediumItems.slice(0, 2);
-        let leftoverMedium = mediumItems.slice(2);
-
-        let fillerHtml = '';
-        for (let i = 0; i < 2; i++) {
-            if (fillerReal[i]) {
-                fillerHtml += Boako.NewsFeed.renderFillerReal(fillerReal[i]);
-            } else {
-                const filler = Boako.NewsFeed.nextFiller();
-                if (filler) fillerHtml += Boako.NewsFeed.renderSupplementFiller(filler);
-                // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
-            }
-        }
-
-        // 🌟 [버그수정] 헤드라인급 소식이 드물어서(임계값 5 이상) 이 헌정 카드가 실제로는
-        // 거의 항상 그 자리를 대신하고 있는데, 여긴 hashSide를 안 써서 항상 왼쪽 고정이었음
-        // — 그래서 "좌우가 안 바뀐다"는 문제가 실제로 체감됐음. 날짜 기준으로 해시해서
-        // 하루 단위로는 고정(같은 날엔 같은 자리), 날짜가 바뀌면 자리도 바뀔 수 있게 함.
+        // 🌟 헤드라인급 소식이 드물어서 이 헌정 카드가 실제로는 거의 항상 그 자리를 대신함 —
+        // 날짜 기준 해시로 하루 단위 고정, 날짜가 바뀌면 자리도 바뀜.
         const tributeSide = Boako.NewsFeed.hashSide(new Date().toDateString());
+        const tributeCols = tributeSide === 'left' ? [0, 1, 2] : [1, 2, 3];
         const tributeBlock = `
-            <div class="col-span-4 md:col-span-3 md:row-span-2 nf-tribute">
+            <div class="nf-tribute">
                 <div class="nf-tribute-photo">
                     <img src="${Boako.Util.cdn(Boako.NewsFeed.TRIBUTE_IMAGE)}" alt="더스틴밤">
                 </div>
@@ -481,60 +507,19 @@ Boako.NewsFeed = {
                 </div>
             </div>
         `;
-        const tributeSideBlock = `<div class="col-span-2 md:col-span-1 md:row-span-2 grid grid-rows-2 gap-4">${fillerHtml}</div>`;
-        const tributeTopRowHtml = tributeSide === 'left' ? (tributeBlock + tributeSideBlock) : (tributeSideBlock + tributeBlock);
 
-        // 🌟 [신규] 오늘의 추천 게임 라지카드 — 헌정 카드가 있는 쪽 반대편에 엇갈리게 배치(위 renderHeadlineGrid와 동일 원리)
-        const recommendColStart = tributeSide === 'left' ? 3 : 1;
-        const recommendHtml = Boako.NewsFeed.todayRecommendGames.length > 0
-            ? Boako.NewsFeed.renderTodayRecommendCard(recommendColStart)
-            : '';
-        const recommendCols = Boako.NewsFeed.todayRecommendGames.length > 0 ? 2 : 0;
+        const includeRecommend = Boako.NewsFeed.todayRecommendGames.length > 0;
+        const recommendHtml = includeRecommend ? Boako.NewsFeed.renderTodayRecommendCard(1) : '';
 
-        // 🌟 [재설계] render()와 동일 — 추천 게임 카드 옆 2칸을 항상 스몰/미디엄(1칸)으로 고정,
-        // 라지 카드가 같은 줄에 못 붙게 해서 여백 문제 자체를 없앤다.
-        let recommendPairHtml = '';
-        if (recommendCols > 0) {
-            const pairCandidates = [...leftoverMedium, ...otherItems.filter(item => item._tier === 'small')].slice(0, 2);
-            const pairIds = new Set(pairCandidates.map(item => item.id));
-            leftoverMedium = leftoverMedium.filter(item => !pairIds.has(item.id));
-            otherItems = otherItems.filter(item => !pairIds.has(item.id));
+        const queue = [...mediumItems, ...otherItems]
+            .sort((a, b) => b._score - a._score)
+            .map(item => ({ html: Boako.NewsFeed.renderCard(item), span: item._tier === 'large' ? 2 : 1 }));
 
-            for (let i = 0; i < 2; i++) {
-                if (pairCandidates[i]) {
-                    recommendPairHtml += Boako.NewsFeed.renderCard(pairCandidates[i]);
-                } else {
-                    const filler = Boako.NewsFeed.nextFiller();
-                    if (filler) recommendPairHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
-                    // 필러가 소진되면 그냥 빈 칸으로 둔다 (반복 카드 방지)
-                }
-            }
-        }
-
-        const belowItems = [...otherItems, ...leftoverMedium].sort((a, b) => b._score - a._score);
-        const belowCardsHtml = belowItems.map(item => Boako.NewsFeed.renderCard(item)).join('');
-
-        // 아래쪽 그리드 마지막 줄이 4칸을 못 채우면, 풀에 남은 만큼만(중복 없이) 실제 데이터로 채운다.
-        // 풀이 부족하면 줄을 억지로 채우지 않고 그대로 둔다.
-        const usedCols = recommendCols + (recommendCols > 0 ? 2 : 0) + belowItems.reduce((sum, item) => sum + (item._tier === 'large' ? 2 : 1), 0);
-        const remainder = usedCols % 4;
-        const padCount = remainder === 0 ? 0 : (4 - remainder);
-        let padHtml = '';
-        for (let i = 0; i < padCount; i++) {
-            const filler = Boako.NewsFeed.nextFiller();
-            if (!filler) break; // 더 채울 실제 데이터가 없으면 여기서 멈춘다 (반복 카드 방지)
-            padHtml += Boako.NewsFeed.renderSupplementPadCard(filler);
-        }
-
-        return `
-            <div class="grid grid-cols-4 gap-4" style="grid-auto-flow: dense;">
-                ${tributeTopRowHtml}
-                ${recommendHtml}
-                ${recommendPairHtml}
-                ${belowCardsHtml}
-                ${padHtml}
-            </div>
-        `;
+        Boako.NewsFeed.runMasonry(
+            container,
+            { html: tributeBlock, span: 3, cols: tributeCols },
+            includeRecommend, recommendHtml, queue
+        );
     },
 
     // 🌟 [신규] 메인 헤드라인 전용 — 사이드 컬럼(2칸, row-span-2)과 짝을 이루는 형태라
@@ -637,7 +622,7 @@ Boako.NewsFeed = {
             ? `onclick="window.open('${filler.externalUrl.replace(/'/g, "\\'")}', '_blank')" style="cursor:pointer;"`
             : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '');
         return `
-            <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
+            <div class="col-span-2 md:col-span-1 bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                 ${img ? `<div class="h-24 overflow-hidden bg-slate-50 flex items-center justify-center p-3"><img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;"></div>` : ''}
                 <div class="p-3 min-w-0">
                     <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.clampTitle(filler.title)}</h4>
@@ -680,7 +665,7 @@ Boako.NewsFeed = {
 
         if (item._tier === 'medium') {
             return `
-                <div class="col-span-2 md:col-span-1 min-h-[132px] bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
+                <div class="col-span-2 md:col-span-1 bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                     ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
                     <div class="p-3 min-w-0">
                         <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.clampTitle(item.title)}</h4>
@@ -694,7 +679,7 @@ Boako.NewsFeed = {
         // 처리(white-space:nowrap) 대신, 직접 break-words + line-clamp(2줄)로 자연스럽게
         // 줄바꿈되도록 변경 (이 카드에서는 호버 팝업이 더 이상 필요 없어져서 hoverTitle을 안 씀).
         return `
-            <div class="col-span-2 md:col-span-1 min-h-[44px] bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 hover:bg-slate-100 transition-colors flex items-center min-w-0" ${clickable}>
+            <div class="col-span-2 md:col-span-1 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 hover:bg-slate-100 transition-colors flex items-center min-w-0" ${clickable}>
                 <span class="text-[11px] font-bold text-slate-500 break-words leading-snug" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${Boako.NewsFeed.escapeHtml(item.title)}</span>
             </div>
         `;
