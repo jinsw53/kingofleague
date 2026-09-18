@@ -1,5 +1,11 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
+ * 🌟 [버그수정] runMasonry의 갭 채우기용 필러 카드가 renderSupplementFiller(.nf-filler-card,
+ *    height:100% 의존)를 쓰고 있었음 — 이 클래스는 원래 grid-rows-2로 높이가 확정된 칸 안에서만
+ *    정상 동작하는데, masonry는 그런 확정된 부모 높이가 없어서 height:100%가 비정상적으로 커지고
+ *    그 안 썸네일(.thumb 70%)까지 같이 뻥튀기됨 → 필러 카드/이미지가 거대해지고, 그로 인해 해당 컬럼의
+ *    높이 계산까지 틀어져서 다른 컬럼에 실제로는 없는 거대한 빈 공간까지 생기던 버그. 고정 크기 클래스를
+ *    쓰는 renderSupplementPadCard로 교체해서 해결.
  * 🌟 [전면 재작성] CSS Grid + 고정 슬롯(사이드 2칸/추천게임 페어 2칸/padCount) 방식을 걷어내고,
  *    1면/2면 구분 없는 단일 masonry 엔진(runMasonry)으로 통합. 헤드라인/헌정 카드(3칸, hashSide로
  *    좌우 로테이션)만 강제 위치, 오늘의 추천 게임은 큐 맨 앞에 편입. 그 외 전부 동일한 규칙 하나로 처리:
@@ -406,7 +412,7 @@ Boako.NewsFeed = {
                     }
                     const filler = Boako.NewsFeed.nextFiller();
                     if (filler) {
-                        place(Boako.NewsFeed.renderSupplementFiller(filler), 1, null);
+                        place(Boako.NewsFeed.renderSupplementPadCard(filler), 1, null);
                         continue;
                     }
                     // 필러도 소진 — 어쩔 수 없이 그냥 놓는다
@@ -606,6 +612,8 @@ Boako.NewsFeed = {
 
     // 필러 슬롯을 채우는 사이트의 다른 실제 데이터 — 진짜 소식 카드와 똑같은 모양이라 자연스럽게 섞인다 (배지 없음)
     // 🌟 [수정] externalUrl(게임의 실제 BGA 페이지 등)이 있으면 그걸 새 탭으로 열고, 없으면 기존처럼 내부 navigateToLink 사용
+    // ⚠️ [현재 미사용] .nf-filler-card는 height:100%가 확정된 부모(원래의 grid-rows-2 사이드 칸) 안에서만
+    // 정상 동작해서, masonry 엔진에서는 절대 다시 쓰면 안 됨 (renderSupplementPadCard 참고)
     renderSupplementFiller: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         const clickable = filler.externalUrl
@@ -623,6 +631,8 @@ Boako.NewsFeed = {
     // 🌟 [수정] 여기 들어오는 image는 팀/랭킹/게임 "로고"라서 object-fit:cover로 자르면 안 됨 —
     // contain + 여백 배경으로 로고 전체가 보이도록 (실제 뉴스 썸네일용 object-fit:cover와는 용도가 다름)
     // 🌟 [수정] externalUrl(게임의 실제 BGA 페이지 등)이 있으면 그걸 새 탭으로 열고, 없으면 기존처럼 내부 navigateToLink 사용
+    // 🌟 [수정] 고정 크기 클래스만 써서(h-24 썸네일) masonry 엔진에서도 안전하게 씀 — runMasonry의
+    // 필러 채우기가 이제 이 함수를 사용 (renderSupplementFiller의 height:100% 버그 회피)
     renderSupplementPadCard: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         const clickable = filler.externalUrl
