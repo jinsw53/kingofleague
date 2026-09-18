@@ -6,6 +6,9 @@
  *    "2칸짜리를 놓기 직전에 유독 낮게 홀로 남은 컬럼이 있으면 1칸짜리를 먼저 당겨와 메운다"
  *    (실제 소식이 없으면 필러 풀에서 대신 당겨옴, 필러도 소진되면 그냥 둠 — masonry 특성상 완전한
  *    무틈은 보장되지 않음). medium/small 카드의 min-height 강제도 제거해 실제 콘텐츠 높이를 그대로 씀.
+ * 🌟 [튜닝] runMasonry의 GAP_THRESHOLD 50 → 20으로 축소 — 실사용 확인해보니 50px 허용은 카드 하나
+ *    높이(100px+)에 비해 너무 후해서, "허용 오차 안"이라며 넘어간 자리에도 눈에 띄는 흰 여백이 남는
+ *    경우가 있었음. 20으로 줄여서 여백을 거의 없앰 (대신 점수순 배치가 흐트러지는 빈도는 약간 증가).
  * 🌟 [신규] "오늘의 추천 게임" 카드 추가 — fn_get_today_recommended_game() RPC로 게임명 조회 후
  *    games.image_url로 로고까지 가져와서, 사이드 슬롯(미디엄 카드 크기)에 항상 고정 1장으로 배치.
  *    해당 게임으로 오늘(기록 제출 시점 기준) 기록을 남기면 BTLDB 트리거(fn_award_daily_recommend_bonus)가
@@ -385,7 +388,7 @@ Boako.NewsFeed = {
         // 2) 추천게임을 큐 맨 앞에 끼워넣고, 이후는 규칙 하나만 반복
         if (includeRecommend) queue.unshift({ html: recommendHtml, span: 2 });
 
-        const GAP_THRESHOLD = 50;
+        const GAP_THRESHOLD = 20;
         while (queue.length) {
             const front = queue[0];
             if (front.span === 2) {
