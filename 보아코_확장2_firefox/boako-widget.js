@@ -85,6 +85,24 @@
  *    쪼개진 방을 그대로 재현할 수는 없어 "가장 최근 매치" 기준으로 배너를 그림. "나가기"도 매치
  *    단위가 아니라 그 사람과의 전체 대화를 숨기는 것으로 동작(새 쪽지 오면 자동 재노출).
  *    "일정제안"은 사이트의 달력 모달(ScheduleModal)을 위젯 폭에 맞게 새로 구현해서 이식.
+ * 🌟 [신규] 알림 처리 3분류 체계 도입 — "라이브"(즉시 수신)/"대기열"(게임 테이블 페이지에 있으면
+ *    로비 복귀까지 보류)/"캐치업"(비접속 중 놓친 걸 재접속 시 수신). isOnGameTablePage()로
+ *    content.js와 동일한 URL 정규식을 재사용해 게임 중 여부를 판별하고, 확인 칼럼
+ *    (profiles.tutorial_status.confirmed_*_ids — 사이트 achievements.js와 동일 패턴/필드 공유)으로
+ *    "봤는지"를 추적. 게임 중이면 무조건 대기열(_lobbyWaitQueue)로 보내고, 2초 간격 폴링으로 로비
+ *    복귀를 감지하면 순서대로 흘려보냄. checkCatchupNotifications()가 로그인/재접속 시점마다
+ *    5종(업적/라이벌투표결과/토너먼트개최/라이벌매치수락/같이하자개설)을 확인 칼럼과 대조해서
+ *    빠진 게 있으면 다시 보여줌. 방해금지도 "못 보여준 이유" 중 하나로 자연 편입됨(fireNewsToast가
+ *    false를 반환하면 확인 처리를 안 하므로, 다음 재접속 때 캐치업으로 다시 시도됨).
+ * 🌟 [신규] 라이벌 매치 수락(rival_matches status→ACCEPTED)/같이하자 모집 개설(together_posts INSERT)이
+ *    새로 news_feed_items 트리거에 편입됨 — 둘 다 위 대기열/캐치업 대상. 라이벌 도전장 발송(공개 방송)도
+ *    news_feed_items에 추가됐지만 이건 라이브만 지원(대기열/캐치업 없음, 기존 6개 소식 항목과 동일 취급) —
+ *    방어자 개인용 사적 쪽지(create_match_chat_room)는 이미 별도로 존재해서 별개로 둠.
+ * 🌟 [신규] 토너먼트 개최는 대기열/캐치업으로 늦게 보여줄 수 있어서, 그 사이 tournament_posts.scheduled_date가
+ *    지나버렸으면 토스트는 생략하고 확인 처리만 함(다음에도 계속 체크 대상으로 남지 않도록).
+ * 🌟 [신규] 업적 달성/라이벌 투표결과 확인 오버레이도 위 대기열/캐치업 체계에 편입 — enqueueFullscreenOverlay
+ *    직접 호출 대신 deliverOrHold()를 거치도록 변경. 단, 오늘의 추천게임 보너스 오버레이는 애초에
+ *    본인이 직접 그 게임 기록을 남기는 순간에만 트리거되는 안전한 구조라 그대로 둠(대기열/캐치업 미적용).
  */
 (function () {
   // iframe에서 중복 실행 방지 (게임 플레이 페이지는 iframe 구조라 all_frames:true로 여러 프레임에서 로드됨)
@@ -788,13 +806,114 @@
     handleIncomingToast('message', payload.new, true);
   }
 
+  // ========================================================================
+  // 🌟 [신규] 게임 중 대기열 + 캐치업 공용 메커니즘
+  // "라이브"(즉시 수신) / "대기열"(게임 중이라 로비 복귀까지 보류, 방해금지도 동일 취급) /
+  // "캐치업"(비접속 중 놓친 걸 재접속 시 수신) — 이 세 경로를 확인 칼럼
+  // (profiles.tutorial_status.confirmed_*_ids)이라는 하나의 규칙으로 통합 처리.
+  // "확인 안 함" 상태로 남아있는 건 다음에 조건(로비/방해금지 해제/재접속)이 풀리는 순간 자동으로 보여짐.
+  // ========================================================================
+  function isOnGameTablePage() {
+    // 🌟 content.js가 사이드바 생성 여부를 판단할 때 쓰는 것과 동일한 정규식(실제 게임 테이블 페이지 판별)
+    return /https:\/\/boardgamearena\.com\/\d+\/[a-zA-Z]+\?table=\d+/.test(window.location.href);
+  }
+
+  async function getTutorialStatus() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${State.session.user.id}&select=tutorial_status`, { headers: authHeaders() });
+      const [row] = await res.json();
+      return row?.tutorial_status || {};
+    } catch (e) {
+      boakoErr('확인 칼럼(tutorial_status) 조회 실패:', e);
+      return {};
+    }
+  }
+
+  // 🌟 확인 칼럼의 특정 키(confirmed_achievement_ids 등)에 id들을 추가 — 읽고·수정하고·통째로 다시
+  // 쓰는 방식(사이트 achievements.js의 markConfirmed와 동일 패턴). 사이트와 필드를 공유하므로,
+  // 사이트에서 이미 확인한 건 확장에서도 다시 안 뜨고 반대도 마찬가지.
+  async function markConfirmedIds(key, ids) {
+    if (!ids || ids.length === 0 || !State.session) return;
+    try {
+      const status = await getTutorialStatus();
+      const confirmedIds = new Set(status[key] || []);
+      ids.forEach(id => confirmedIds.add(id));
+      status[key] = [...confirmedIds];
+      await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${State.session.user.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ tutorial_status: status })
+      });
+    } catch (e) { boakoErr(`확인 상태 저장 실패(${key}):`, e); }
+  }
+
+  // 대기열 — 게임 페이지에 있는 동안 보류된 항목들. 로비 복귀 감지 시 순서대로 처리.
+  const _lobbyWaitQueue = [];
+
+  // showFn: 실제로 보여주는 함수. 반환값이 false면 "못 보여줬으니 확인 처리하지 말고 다음 기회에 재시도"
+  // (방해금지로 막힌 경우), 그 외(true/undefined)는 "보여줬거나, 보여줄 필요가 없어졌으니(지난 토너먼트 등)
+  // 확인 처리함"을 의미.
+  function deliverOrHold(showFn, key, id) {
+    const run = async () => {
+      const shown = await showFn();
+      if (shown !== false && key && id != null) markConfirmedIds(key, [id]);
+    };
+    if (isOnGameTablePage()) {
+      _lobbyWaitQueue.push(run);
+    } else {
+      run();
+    }
+  }
+
+  // 게임 페이지 → 로비 복귀 감지(2초 간격 폴링, content.js와 독립적으로 자체 동작)해서
+  // 대기열에 쌓인 걸 순서대로 흘려보냄
+  let _wasOnGamePage = isOnGameTablePage();
+  setInterval(() => {
+    const nowOnGamePage = isOnGameTablePage();
+    if (_wasOnGamePage && !nowOnGamePage && _lobbyWaitQueue.length) {
+      boakoLog(`로비 복귀 감지 — 대기열 ${_lobbyWaitQueue.length}건 처리`);
+      while (_lobbyWaitQueue.length) _lobbyWaitQueue.shift()();
+    }
+    _wasOnGamePage = nowOnGamePage;
+  }, 2000);
+
+  // 🌟 소식지 이벤트 중 대기열/캐치업 대상인 것들 — event_type → 확인 칼럼 키 매핑.
+  // 이 목록에 없는 이벤트(팀창단 등 기존 항목)는 지금처럼 라이브만 지원(캐치업 없음).
+  const CATCHUP_NEWS_EVENT_TYPES = {
+    TOURNAMENT_ANNOUNCED: 'confirmed_tournament_ids',
+    RIVAL_MATCH_ACCEPTED: 'confirmed_rival_accept_ids',
+    TOGETHER_POST_OPENED: 'confirmed_together_post_ids'
+  };
+
   function onNewsInsert(payload) {
     boakoOk('새 아카이브 소식 실시간 수신:', payload.new);
     const item = payload.new;
-    const targetUrl = (item.link_type && item.link_id)
-      ? `https://boakoarchive.co.kr/?open=${encodeURIComponent(item.link_type)}&id=${encodeURIComponent(item.link_id)}`
-      : 'https://boakoarchive.co.kr/';
-    fireNewsToast(item.title || '새 소식이 도착했어요', item.subtitle || '클릭해서 확인해보세요', targetUrl);
+    const confirmKey = CATCHUP_NEWS_EVENT_TYPES[item.event_type];
+
+    const showFn = async () => {
+      // 🌟 토너먼트 개최는 대기열/캐치업으로 늦게 보여줄 수 있어서, 그 사이 날짜가 지나버렸으면
+      // 토스트는 생략하고 확인 처리만 함(다음에도 계속 체크 대상으로 남지 않도록)
+      if (item.event_type === 'TOURNAMENT_ANNOUNCED' && item.link_id) {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/tournament_posts?id=eq.${item.link_id}&select=scheduled_date`, { headers: authHeaders() });
+          const [t] = await res.json();
+          if (t?.scheduled_date && new Date(t.scheduled_date) < new Date()) {
+            boakoLog('지난 토너먼트 — 알림 생략, 확인 처리만 함');
+            return true;
+          }
+        } catch (e) { boakoErr('토너먼트 날짜 확인 실패:', e); }
+      }
+      const targetUrl = (item.link_type && item.link_id)
+        ? `https://boakoarchive.co.kr/?open=${encodeURIComponent(item.link_type)}&id=${encodeURIComponent(item.link_id)}`
+        : 'https://boakoarchive.co.kr/';
+      return fireNewsToast(item.title || '새 소식이 도착했어요', item.subtitle || '클릭해서 확인해보세요', targetUrl);
+    };
+
+    if (confirmKey) {
+      deliverOrHold(showFn, confirmKey, item.id);
+    } else {
+      showFn();
+    }
   }
 
   async function onAchievementInsert(payload) {
@@ -802,14 +921,99 @@
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${payload.new.achievement_id}&select=*`, { headers: authHeaders() });
       const [achievement] = await res.json();
-      if (achievement) enqueueFullscreenOverlay(() => renderAchievementOverlay(achievement, payload.new.meta, payload.new.season_no));
+      if (achievement) {
+        deliverOrHold(() => {
+          enqueueFullscreenOverlay(() => renderAchievementOverlay(achievement, payload.new.meta, payload.new.season_no));
+          return true;
+        }, 'confirmed_achievement_ids', payload.new.id);
+      }
     } catch (e) { boakoErr('업적 정보 조회 실패:', e); }
   }
 
   function onRivalVoteUpdate(payload) {
     if (!payload.new.resolved_at || (payload.old && payload.old.resolved_at)) return;
     boakoOk('라이벌전 투표 결과 실시간 수신:', payload.new);
-    enqueueFullscreenOverlay(() => renderRivalResultOverlay(payload.new));
+    deliverOrHold(() => {
+      enqueueFullscreenOverlay(() => renderRivalResultOverlay(payload.new));
+      return true;
+    }, 'confirmed_rival_vote_ids', payload.new.id);
+  }
+
+  // ========================================================================
+  // 🌟 [신규] 캐치업 — 로그인/재접속 시점에 "확인 칼럼에 없는" 항목들을 찾아서 다시 보여줌.
+  // 게임 중이면 위 deliverOrHold가 알아서 대기열로 돌림. 공개형 3종(토너먼트/라이벌수락/같이하자)은
+  // 무한정 쌓이는 걸 막기 위해 최근 것 위주로만 조회(created_at desc + limit).
+  // ========================================================================
+  async function checkCatchupNotifications() {
+    if (!State.session) return;
+    const uid = State.session.user.id;
+    const status = await getTutorialStatus();
+
+    // 1) 업적 달성 — 사이트(achievements.js)와 확인 칼럼을 공유하므로 사이트에서 본 건 여기 안 뜸
+    try {
+      const confirmed = new Set(status.confirmed_achievement_ids || []);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/user_achievements?user_id=eq.${uid}&select=id,meta,season_no,achievement_id&order=achieved_at.asc`, { headers: authHeaders() });
+      const rows = await res.json();
+      for (const row of (rows || [])) {
+        if (confirmed.has(row.id)) continue;
+        const ares = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${row.achievement_id}&select=*`, { headers: authHeaders() });
+        const [achievement] = await ares.json();
+        if (achievement) {
+          deliverOrHold(() => { enqueueFullscreenOverlay(() => renderAchievementOverlay(achievement, row.meta, row.season_no)); return true; }, 'confirmed_achievement_ids', row.id);
+        }
+      }
+    } catch (e) { boakoErr('업적 캐치업 실패:', e); }
+
+    // 2) 라이벌 투표결과 확인
+    try {
+      const confirmed = new Set(status.confirmed_rival_vote_ids || []);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rival_match_votes?voter_id=eq.${uid}&resolved_at=not.is.null&select=*`, { headers: authHeaders() });
+      const rows = await res.json();
+      for (const row of (rows || [])) {
+        if (confirmed.has(row.id)) continue;
+        deliverOrHold(() => { enqueueFullscreenOverlay(() => renderRivalResultOverlay(row)); return true; }, 'confirmed_rival_vote_ids', row.id);
+      }
+    } catch (e) { boakoErr('라이벌 투표결과 캐치업 실패:', e); }
+
+    // 3) 토너먼트 개최 (지난 날짜는 확인 처리만 하고 토스트는 생략)
+    try {
+      const confirmed = new Set(status.confirmed_tournament_ids || []);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/tournament_posts?type=eq.ANNOUNCEMENT&select=id,title,game_name,scheduled_date&order=created_at.desc&limit=50`, { headers: authHeaders() });
+      const rows = await res.json();
+      for (const row of (rows || [])) {
+        if (confirmed.has(row.id)) continue;
+        const expired = row.scheduled_date && new Date(row.scheduled_date) < new Date();
+        const targetUrl = `https://boakoarchive.co.kr/?open=TOURNAMENT&id=${row.id}`;
+        deliverOrHold(() => {
+          if (expired) return true;
+          return fireNewsToast('토너먼트 개최: ' + row.title, row.game_name || '', targetUrl);
+        }, 'confirmed_tournament_ids', row.id);
+      }
+    } catch (e) { boakoErr('토너먼트 캐치업 실패:', e); }
+
+    // 4) 라이벌 매치 수락
+    try {
+      const confirmed = new Set(status.confirmed_rival_accept_ids || []);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rival_matches?status=eq.ACCEPTED&select=match_id,game_name&order=created_at.desc&limit=50`, { headers: authHeaders() });
+      const rows = await res.json();
+      for (const row of (rows || [])) {
+        if (confirmed.has(row.match_id)) continue;
+        const targetUrl = `https://boakoarchive.co.kr/?open=RIVAL_MATCH&id=${row.match_id}`;
+        deliverOrHold(() => fireNewsToast('라이벌 매치 성사!', `[${row.game_name}] 승자 예측 투표를 걸어보세요`, targetUrl), 'confirmed_rival_accept_ids', row.match_id);
+      }
+    } catch (e) { boakoErr('라이벌 매치 수락 캐치업 실패:', e); }
+
+    // 5) 같이하자 모집 카드 개설
+    try {
+      const confirmed = new Set(status.confirmed_together_post_ids || []);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/together_posts?select=id,title,game_name&order=created_at.desc&limit=50`, { headers: authHeaders() });
+      const rows = await res.json();
+      for (const row of (rows || [])) {
+        if (confirmed.has(row.id)) continue;
+        const targetUrl = `https://boakoarchive.co.kr/?open=TOGETHER_POST&id=${row.id}`;
+        deliverOrHold(() => fireNewsToast('같이하자 모집이 열렸어요!', `[${row.game_name || '종목미정'}] ${row.title}`, targetUrl), 'confirmed_together_post_ids', row.id);
+      }
+    } catch (e) { boakoErr('같이하자 캐치업 실패:', e); }
   }
 
   function onRecommendBonusUpdate(payload) {
@@ -952,9 +1156,10 @@
   function fireNewsToast(title, body, url) {
     if (isInDnd('news')) {
       boakoLog('방해금지 시간대(소식) — 소식 토스트 생략');
-      return;
+      return false;
     }
     showToast('news', '⭐', title, body, () => window.open(url || 'https://boakoarchive.co.kr/', '_blank'));
+    return true;
   }
 
   function showToast(type, icon, title, body, onClick) {
@@ -2731,6 +2936,7 @@
     State.teamId = await fetchTeamId();
     boakoLog('소속 팀 id:', State.teamId || '(없음)');
     await Promise.all([fetchMessages(), fetchTeamChats()]);
+    checkCatchupNotifications(); // 🌟 [신규] 캐치업 체크 — 결과 기다리지 않고 백그라운드로 진행
     initRealtimeCoordination(); // 🌟 탭 리더 선출 후, 리더 탭만 실제 웹소켓 연결을 만듦
     render();
   }
