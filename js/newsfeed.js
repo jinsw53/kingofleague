@@ -1,5 +1,9 @@
 /**
  * [NEWSFEED] 소식지 — 중요도 × 신선도로 신문 1면처럼 배치되는 뉴스피드
+ * 🌟 [버그수정] _scheduleRelayout이 render()를 다시 부를 때마다 fillerCursor가 계속 전진해서
+ *    재배치가 여러 번 일어날수록 필러 풀이 점점 소진되고, 그만큼 카드 개수가 실제로 줄어들던 버그 —
+ *    재배치는 새로운 데이터가 아니라 같은 내용을 다시 그리는 것뿐이므로, render() 호출 직전에
+ *    fillerCursor를 0으로 리셋해서 매번 동일한 필러 선택이 재현되도록 수정.
  * 🌟 [신규] 이미지 로딩 완료 시 재배치 안전장치 — masonry 배치 시점엔 아직 안 뜬 이미지(게임/팀 로고 등)가
  *    나중에 로딩되면서 카드 높이가 바뀌면 이미 자리 잡은 아래 카드와 겹쳐 보일 수 있음. 배치된 카드 안의
  *    <img>가 아직 안 떴으면 load/error 이벤트를 걸어두고, 완료되면 전체를 다시 배치(_scheduleRelayout,
@@ -95,6 +99,11 @@ Boako.NewsFeed = {
     _scheduleRelayout: () => {
         clearTimeout(Boako.NewsFeed._relayoutTimer);
         Boako.NewsFeed._relayoutTimer = setTimeout(() => {
+            // 🌟 [버그수정] render()를 다시 부를 때마다 fillerCursor가 계속 전진해서 필러 풀이
+            // 재배치될 때마다 점점 소진되고, 결국 카드 개수가 줄어드는 것처럼 보이던 문제 —
+            // 재배치는 새로운 데이터가 아니라 같은 내용을 다시 그리는 것뿐이므로 커서를 리셋해서
+            // 매번 동일한 필러 선택이 재현되도록 함
+            Boako.NewsFeed.fillerCursor = 0;
             Boako.NewsFeed.render();
         }, 150);
     },
