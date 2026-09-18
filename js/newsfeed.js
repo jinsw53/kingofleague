@@ -9,6 +9,10 @@
  * 🌟 [튜닝] runMasonry의 GAP_THRESHOLD 50 → 20으로 축소 — 실사용 확인해보니 50px 허용은 카드 하나
  *    높이(100px+)에 비해 너무 후해서, "허용 오차 안"이라며 넘어간 자리에도 눈에 띄는 흰 여백이 남는
  *    경우가 있었음. 20으로 줄여서 여백을 거의 없앰 (대신 점수순 배치가 흐트러지는 빈도는 약간 증가).
+ * 🌟 [수정] 메인 헤드라인(renderHeadlineBlock) 비율을 고정 min-height:280px에서 aspect-ratio:4/3으로 변경.
+ *    폭(3/4칸)에 비해 높이가 고정이라 화면이 넓을수록 납작하고 길쭉해 보이던 문제 — "신문 1면 헤드라인"
+ *    다운 존재감이 부족하다는 피드백. 강등된 헤드라인(large 카드, aspect-ratio:16/9)과 같은 폭 비례
+ *    방식으로 통일하되, 더 우람해 보이도록 16/9보다 세로가 긴 4/3으로 설정.
  * 🌟 [신규] "오늘의 추천 게임" 카드 추가 — fn_get_today_recommended_game() RPC로 게임명 조회 후
  *    games.image_url로 로고까지 가져와서, 사이드 슬롯(미디엄 카드 크기)에 항상 고정 1장으로 배치.
  *    해당 게임으로 오늘(기록 제출 시점 기준) 기록을 남기면 BTLDB 트리거(fn_award_daily_recommend_bonus)가
@@ -531,7 +535,7 @@ Boako.NewsFeed = {
         const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
         const img = item.thumbnail_url ? Boako.Util.cdn(item.thumbnail_url) : null;
         return `
-            <div class="col-span-4 md:col-span-3 md:row-span-2 relative rounded-2xl overflow-hidden shadow-lg border border-slate-200 hover:shadow-xl transition-shadow" style="min-height: 280px;" ${clickable}>
+            <div class="col-span-4 md:col-span-3 md:row-span-2 relative rounded-2xl overflow-hidden shadow-lg border border-slate-200 hover:shadow-xl transition-shadow" style="aspect-ratio: 4/3;" ${clickable}>
                 ${img ? `<img src="${img}" class="absolute inset-0 w-full h-full object-cover">` : `<div class="absolute inset-0 bg-slate-100 flex items-center justify-center text-8xl">📰</div>`}
                 <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
                 <div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
