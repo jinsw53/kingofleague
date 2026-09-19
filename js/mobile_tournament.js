@@ -23,19 +23,44 @@ Boako.MobileTournament = {
 
     render: async (container) => {
         Boako.MobileTournament.State.currentTab = 'ANNOUNCEMENT'; // 재진입 시 항상 공지 탭부터 (PC와 동일 원칙)
+        Boako.MobileTournament.State.container = container;
         container.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
         await Boako.MobileTournament.loadPosts(container);
-        Boako.MobileTournament.subscribeRealtime(container);
+        Boako.MobileTournament.startRealtime();
     },
 
-    subscribeRealtime: (container) => {
+    // 🌟 [리팩토링] 이 화면을 여러 탭에서 열어두면 탭마다 각자 채널을 구독해서 소켓이
+    // 늘어나던 문제 방지 — realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup) 적용.
+    _rtGroup: null,
+    startRealtime: () => {
+        if (!Boako.MobileTournament._rtGroup) {
+            Boako.MobileTournament._rtGroup = Boako.RealtimeCoordinator.createGroup('mobile-tournament');
+            Boako.MobileTournament._rtGroup.onRelay('refresh', () => Boako.MobileTournament._onChangeCommon());
+            Boako.MobileTournament._rtGroup.onBecomeLeader(() => Boako.MobileTournament._subscribeAsLeader());
+        }
+        Boako.MobileTournament._rtGroup.start();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeAsLeader: () => {
         if (Boako.MobileTournament.State.realtimeChannel) return;
         Boako.MobileTournament.State.realtimeChannel = Boako.db
             .channel('mobile-tournament-posts-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
-                if (Boako.MobileTournament.State.currentTab !== 'VOTE') Boako.MobileTournament.loadPosts(container);
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => Boako.MobileTournament._onRemoteChange())
             .subscribe();
+    },
+
+    // 🌟 리더가 실제 이벤트를 받으면 로컬 갱신 + 팔로워 탭에 중계
+    _onRemoteChange: () => {
+        Boako.MobileTournament._onChangeCommon();
+        Boako.MobileTournament._rtGroup.broadcast('refresh', null);
+    },
+
+    // 🌟 리더/팔로워 공통 반응 — VOTE 탭 보는 중엔 목록을 새로고침하지 않음(기존 동작 유지)
+    _onChangeCommon: () => {
+        if (Boako.MobileTournament.State.currentTab !== 'VOTE' && Boako.MobileTournament.State.container) {
+            Boako.MobileTournament.loadPosts(Boako.MobileTournament.State.container);
+        }
     },
 
     loadPosts: async (container) => {
