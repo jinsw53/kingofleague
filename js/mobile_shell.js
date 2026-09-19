@@ -74,14 +74,26 @@
  * 🌟 [버그수정] "☕ 카페" 항목이 window.open()으로 새 창을 열려고 했는데 모바일 웹뷰에서 팝업이
  *    막혀서 안 열리던 문제 — BGA 링크(requireBgaNickname)처럼 실제 <a href target="_blank"> 태그로 교체.
  * 🌟 [4단계 추가] 대항전 소통채널/같이하자/챌린지 그룹채팅 3종 + 일정투표/모집상태/매칭상태 변화까지
- *    총 6개 테이블을 실시간 구독(mobile-group-chats-changes 채널) — PC의 탭 리더 선출 구조에는
- *    편승하지 않고 DM 채널과 동일하게 모바일 전용 채널로 별도 구독(자세한 이유는 아래 주석 참고).
+ *    총 6개 테이블을 실시간 구독(mobile-group-chats-changes 채널). 도입 당시엔 PC의 탭 리더 선출
+ *    구조에 편승하지 않고 DM 채널과 동일하게 탭마다 무조건 구독했으나, 이후 모바일 전용 미니
+ *    코디네이터로 리팩토링됨(자세한 내용은 아래 별도 주석 참고).
  * 🌟 [신규] PC/모바일 자동분기 Cloudflare Worker(boako-device-router)와 짝을 맞추는 수동 전환 링크
  *    "🖥️ PC 버전으로 보기" — 드로어 맨 아래, 로그인 여부와 무관하게 항상 보이는 위치에 배치
  *    (로그인 전엔 카카오 로그인 버튼 아래, 로그인 후엔 로그아웃 버튼 바로 옆). PC 쪽의 짝
  *    (js/auth.js 로그인 위젯 "📱 모바일 버전으로 보기")도 동일하게 "계정 영역 맨 아래, 로그아웃
  *    버튼 옆"에 둬서 양쪽 위치가 서로 대응되도록 통일함. Worker의 /__view/desktop 경로로
  *    이동하면 Worker가 쿠키(force_desktop=1)를 심고 루트(/)로 리다이렉트함.
+ * 🌟 [리팩토링] 쪽지/그룹채팅/더보기 배지 실시간 3종(mobile-messages-changes,
+ *    mobile-group-chats-changes, mobile-more-badge-global)이 모바일 탭마다 무조건 각자
+ *    구독돼서 탭 수에 비례해 Realtime 동시 연결이 계속 늘어나던 문제 수정 — 유저 한 명이
+ *    탭만 늘려도 Supabase 프로젝트 전체의 Peak Connections를 혼자 잠식할 수 있는 구조였음.
+ *    js/realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup('mobile-shell'))를
+ *    도입해 "같은 브라우저의 모바일 탭들"끼리만 리더 선출 — 리더 탭 하나만 실제 소켓 3개를
+ *    열고 나머지는 중계만 받아서, 탭을 몇 개 열어도 이 브라우저가 차지하는 소켓 수는 항상
+ *    최대 3개로 고정됨. PC의 전역 RealtimeCoordinator(messenger.js가 쓰는 것)와는 별개의
+ *    독립된 그룹이라 여전히 PC 탭과 리더를 다투지 않음(그 이유는 아래 startMessengerRealtime
+ *    주석 참고) — 그래서 PC 탭 + 모바일 탭을 동시에 켜둔 경우엔 최대 2세트(각 플랫폼당 1개)
+ *    까지만 늘고, 그 이상은 탭을 아무리 늘려도 늘지 않음.
  */
 window.Boako = window.Boako || {};
 Boako.MobileShell = {
@@ -267,7 +279,36 @@ Boako.MobileShell = {
         }
     },
 
-    // ========== 🌟 [신규] 쪽지 실시간 알림 (모바일 전용 — messenger.js의 startRealtime()을
+    // ========== 🌟 [리팩토링] 쪽지/그룹채팅/더보기 배지 실시간 3종을 모바일 전용 미니
+    // 코디네이터(createGroup('mobile-shell'))로 통합 구독. 예전엔 모바일 탭을 열 때마다
+    // (같은 브라우저에서 탭이 여러 개면 탭 수만큼) 무조건 이 3개 채널을 각자 구독해서
+    // Realtime 동시 연결 수가 탭 수에 정비례해 계속 늘어나던 문제가 있었음 — 유저 한 명이
+    // 그냥 탭만 늘려도 프로젝트 전체 Peak Connections를 혼자 잠식할 수 있는 구조였음.
+    // 이제 "같은 브라우저의 모바일 탭들"끼리만 리더 선출해서 리더 탭 하나만 실제 소켓 3개를
+    // 열고 나머지는 중계만 받음 — 탭을 몇 개 열어도 이 브라우저가 차지하는 소켓 수는 항상
+    // 최대 3개로 고정됨.
+    // 🌟 PC의 전역 RealtimeCoordinator(js/messenger.js가 쓰는 것)와는 독립된 별도 그룹이라
+    // PC 탭과 리더를 다투지 않음 — messenger.js가 모바일에 없는 PC 전용 DOM을 직접 호출하는
+    // 문제(아래 원래 사유 참고)는 여전히 피하면서, "모바일끼리는" 탭 수에 비례해 늘어나던
+    // 문제만 제거함. (PC 탭 + 모바일 탭을 동시에 켜두면 messenger.js 그룹 최대 1개 + 이 그룹
+    // 최대 1개, 즉 상수 개수만 추가되고, 더 이상 "각자의 탭 수"에 비례해 늘지 않음.)
+    _rtGroup: null,
+    _messengerChannel: null,
+    _groupChatChannel: null,
+    _moreBadgeChannel: null,
+
+    _ensureRtGroup: () => {
+        if (!Boako.MobileShell._rtGroup) {
+            Boako.MobileShell._rtGroup = Boako.RealtimeCoordinator.createGroup('mobile-shell');
+            Boako.MobileShell._rtGroup.onRelay('dm', (msg) => Boako.MobileShell._onDmInsert(msg));
+            Boako.MobileShell._rtGroup.onRelay('group-chat', (evt) => Boako.MobileShell._onGroupChatRelay(evt));
+            Boako.MobileShell._rtGroup.onRelay('more-badge', () => Boako.MobileShell.refreshMoreBadge());
+            Boako.MobileShell._rtGroup.onBecomeLeader(() => Boako.MobileShell._subscribeShellAsLeader());
+        }
+        Boako.MobileShell._rtGroup.start();
+    },
+
+    // 🌟 [신규] 쪽지 실시간 알림 (모바일 전용 — messenger.js의 startRealtime()을
     // 그대로 재사용하지 않는 유일한 예외). PC 버전은 새 쪽지 도착 시 Boako.Auth.renderWidget()과
     // Boako.Messenger.View.refreshRoomList()를 무조건 부르는데, 둘 다 PC 전용 DOM(#login-widget-area,
     // #chat-room-list 등)이 없으면 에러가 나서 그 뒤에 있는 토스트 코드까지 실행이 안 됨.
@@ -276,52 +317,94 @@ Boako.MobileShell = {
     // 변화까지 총 6개 테이블을 PC(js/messenger.js _subscribeChannelsAsLeader)와 동일하게 구독.
     // PC 그대로 재사용하지 않는 이유: PC의 _subscribeChannelsAsLeader()는 탭 리더로 선출되는
     // 순간 리더 탭 안에서 PC 전용 View.refreshRoomList()/View.openRoom()을 직접 호출하도록
-    // 하드코딩돼있어서, 모바일 탭이 리더가 되면 그 시점에 바로 에러가 남 — 그래서 PC의 탭 리더
-    // 선출(RealtimeCoordinator) 구조에 편승하지 않고, DM 채널과 동일하게 모바일 전용 채널을
-    // 별도로 하나 더 구독함. (PC/모바일을 동시에 켜두면 채널이 약간 중복될 수 있으나, 이건 이미
-    // DM 채널에서도 동일하게 감수하고 있던 구조라 새로운 문제는 아님.)
-    _messengerChannel: null,
-    _groupChatChannel: null,
-
+    // 하드코딩돼있어서, 모바일 탭이 리더가 되면 그 시점에 바로 에러가 남 — 그래서 PC의 전역 탭
+    // 리더 선출에 직접 편승하지 않고, 위 모바일 전용 미니 코디네이터(_rtGroup)로 구독함.
     startMessengerRealtime: () => {
-        if (!Boako.state.user || Boako.MobileShell._messengerChannel) return;
-        Boako.MobileShell._messengerChannel = Boako.db.channel('mobile-messages-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-                const newMsg = payload.new;
-                const myId = Boako.state.user.id;
-                if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
-                    await Boako.MobileShell.renderDrawer(); // 안읽은 쪽지 수 재조회 + 상단바/드로어 배지 갱신
-                    // 🌟 [신규] 쪽지함 화면이 지금 열려있으면 그 화면도 실시간으로 갱신 (모듈이 로드 안 됐으면 조용히 무시)
-                    if (Boako.MobileMessenger && Boako.MobileMessenger.handleRealtimeInsert) {
-                        Boako.MobileMessenger.handleRealtimeInsert(newMsg);
-                    }
-                    if (newMsg.receiver_id === myId) Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 쪽지가 도착했습니다!`);
-                }
-            }).subscribe();
+        if (!Boako.state.user) return;
+        Boako.MobileShell._ensureRtGroup();
+        // onBecomeLeader는 "리더가 되는 순간"에만 발화하므로, 이미 리더인 탭에서 로그인이
+        // 나중에 일어난 경우(더보기 배지 구독이 로그인 전에 먼저 시작된 경우 등)를 대비해
+        // 지금 리더 상태면 쪽지/그룹챗 구독을 바로 한 번 더 시도해줌.
+        if (Boako.MobileShell._rtGroup.isLeader()) Boako.MobileShell._subscribeMessengerAsLeader();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독 — 더보기 배지는
+    // 로그인 여부와 무관하게 항상 구독하고, 쪽지/그룹챗은 로그인 상태일 때만 구독함.
+    _subscribeShellAsLeader: () => {
+        if (!Boako.MobileShell._moreBadgeChannel) {
+            Boako.MobileShell._moreBadgeChannel = Boako.db.channel('mobile-more-badge-global')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.MobileShell._onMoreBadgeChange())
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => Boako.MobileShell._onMoreBadgeChange())
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => Boako.MobileShell._onMoreBadgeChange())
+                .subscribe();
+        }
+        if (Boako.state.user) Boako.MobileShell._subscribeMessengerAsLeader();
+    },
+
+    _subscribeMessengerAsLeader: () => {
+        if (!Boako.MobileShell._messengerChannel) {
+            Boako.MobileShell._messengerChannel = Boako.db.channel('mobile-messages-changes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+                    await Boako.MobileShell._onDmInsert(payload.new);
+                    if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('dm', payload.new);
+                }).subscribe();
+        }
 
         // 🌟 [4단계 추가] 그룹채팅 3종 + 부가 상태변화 3종, PC와 동일한 반응(방 목록 갱신/열려있으면
         // 즉시 재렌더/아니면 토스트)을 Boako.MobileMessenger.handleGroupChatEvent에 위임
         if (Boako.MobileShell._groupChatChannel) return;
         Boako.MobileShell._groupChatChannel = Boako.db.channel('mobile-group-chats-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, (payload) => {
-                Boako.MobileMessenger?.handleGroupChatEvent?.('match_channel', `match_channel_${payload.new.room_id}`, payload.new, '📣 [대항전] 채널에 새 메시지가 도착했습니다!');
+                Boako.MobileShell._relayGroupChatEvent('match_channel', `match_channel_${payload.new.room_id}`, payload.new, '📣 [대항전] 채널에 새 메시지가 도착했습니다!');
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls' }, (payload) => {
-                Boako.MobileMessenger?.handleGroupChatEvent?.('match_channel', `match_channel_${payload.new?.target_id}`, null, null);
+                Boako.MobileShell._relayGroupChatEvent('match_channel', `match_channel_${payload.new?.target_id}`, null, null);
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'together_chats' }, (payload) => {
-                Boako.MobileMessenger?.handleGroupChatEvent?.('together', `together_${payload.new.post_id}`, payload.new, '🎲 [같이하자] 채팅방에 새 메시지가 도착했습니다!');
+                Boako.MobileShell._relayGroupChatEvent('together', `together_${payload.new.post_id}`, payload.new, '🎲 [같이하자] 채팅방에 새 메시지가 도착했습니다!');
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
-                Boako.MobileMessenger?.handleGroupChatEvent?.(null, null, null, null);
+                Boako.MobileShell._relayGroupChatEvent(null, null, null, null);
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chats' }, (payload) => {
-                Boako.MobileMessenger?.handleGroupChatEvent?.('challenge', `challenge_${payload.new.challenge_id}`, payload.new, '🔥 [챌린지] 채팅방에 새 메시지가 도착했습니다!');
+                Boako.MobileShell._relayGroupChatEvent('challenge', `challenge_${payload.new.challenge_id}`, payload.new, '🔥 [챌린지] 채팅방에 새 메시지가 도착했습니다!');
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, () => {
-                Boako.MobileMessenger?.handleGroupChatEvent?.(null, null, null, null);
+                Boako.MobileShell._relayGroupChatEvent(null, null, null, null);
             })
             .subscribe();
+    },
+
+    // 🌟 리더가 실제 그룹챗 이벤트를 받으면 로컬 반응 + 팔로워 탭에 중계
+    _relayGroupChatEvent: (type, roomId, payload, toastMsg) => {
+        const evt = { type, roomId, payload, toastMsg };
+        Boako.MobileShell._onGroupChatRelay(evt);
+        if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('group-chat', evt);
+    },
+
+    // 🌟 리더가 더보기 배지 변화를 받으면 로컬 반응 + 팔로워 탭에 중계
+    _onMoreBadgeChange: () => {
+        Boako.MobileShell.refreshMoreBadge();
+        if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('more-badge', null);
+    },
+
+    // 🌟 리더/팔로워 공통 반응 로직 (쪽지)
+    _onDmInsert: async (newMsg) => {
+        const myId = Boako.state.user?.id;
+        if (!myId) return;
+        if (newMsg.receiver_id === myId || newMsg.sender_id === myId) {
+            await Boako.MobileShell.renderDrawer(); // 안읽은 쪽지 수 재조회 + 상단바/드로어 배지 갱신
+            // 🌟 [신규] 쪽지함 화면이 지금 열려있으면 그 화면도 실시간으로 갱신 (모듈이 로드 안 됐으면 조용히 무시)
+            if (Boako.MobileMessenger && Boako.MobileMessenger.handleRealtimeInsert) {
+                Boako.MobileMessenger.handleRealtimeInsert(newMsg);
+            }
+            if (newMsg.receiver_id === myId) Boako.Util.toast(`💬 ${newMsg.sender_name_override}님의 쪽지가 도착했습니다!`);
+        }
+    },
+
+    // 🌟 리더/팔로워 공통 반응 로직 (그룹채팅)
+    _onGroupChatRelay: (evt) => {
+        Boako.MobileMessenger?.handleGroupChatEvent?.(evt.type, evt.roomId, evt.payload, evt.toastMsg);
     },
 
     stopMessengerRealtime: () => {
@@ -686,12 +769,10 @@ Boako.MobileShell = {
         if (dot) dot.classList.toggle('hidden', total === 0);
     },
 
+    // 🌟 [리팩토링] 더보기 배지 채널도 위 _rtGroup(모바일 전용 리더 선출)에 통합 —
+    // 로그인 여부와 무관하게 항상 필요하므로 startMessengerRealtime과 별개로 호출되지만,
+    // 같은 그룹을 재사용해서(_ensureRtGroup이 이미 있으면 그대로 씀) 소켓을 추가로 늘리지 않음.
     subscribeMoreBadge: () => {
-        if (Boako.MobileShell._moreBadgeChannel) return; // 중복 구독 방지
-        Boako.MobileShell._moreBadgeChannel = Boako.db.channel('mobile-more-badge-global')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.MobileShell.refreshMoreBadge())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => Boako.MobileShell.refreshMoreBadge())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => Boako.MobileShell.refreshMoreBadge())
-            .subscribe();
+        Boako.MobileShell._ensureRtGroup();
     }
 };
