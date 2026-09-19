@@ -13,6 +13,8 @@ Boako.Together = {
         realtimeChannel: null
     },
 
+    _rtGroup: null,
+
     init: async (containerId) => {
         const root = document.getElementById(containerId);
         if (!root) return;
@@ -43,7 +45,7 @@ Boako.Together = {
         `;
 
         await Boako.Together.loadPosts();
-        Boako.Together.subscribeRealtime();
+        Boako.Together.startRealtime();
     },
 
     // 🌟 시간 도달까지 반영한 실질 확정/취소 판단 (DB의 fn_together_is_confirmed와 동일 로직)
@@ -62,17 +64,33 @@ Boako.Together = {
         return post.status === 'RECRUITING' && new Date(post.scheduled_date) > new Date();
     },
 
-    subscribeRealtime: () => {
+    // 🌟 [리팩토링] 같이하자 화면을 여러 탭에서 열어두면 탭마다 각자 채널을 구독해서 소켓이
+    // 늘어나던 문제 방지 — realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup) 적용.
+    // 이 화면은 로그인하면 항상 켜져있는 전역 채널이 아니라 "같이하자 화면을 실제로 열어본 탭"
+    // 에서만 필요한 lazy 채널이라, 전역 리더 선출을 그대로 쓰면 안 됨(team.js 팀챗과 동일한 이유).
+    startRealtime: () => {
+        if (!Boako.Together._rtGroup) {
+            Boako.Together._rtGroup = Boako.RealtimeCoordinator.createGroup('together');
+            Boako.Together._rtGroup.onRelay('refresh', () => Boako.Together.loadPosts());
+            Boako.Together._rtGroup.onBecomeLeader(() => Boako.Together._subscribeAsLeader());
+        }
+        Boako.Together._rtGroup.start();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeAsLeader: () => {
         if (Boako.Together.State.realtimeChannel) return; // 중복 구독 방지
         Boako.Together.State.realtimeChannel = Boako.db
             .channel('together-board-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
-                Boako.Together.loadPosts();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_participants' }, () => {
-                Boako.Together.loadPosts();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.Together._onRemoteChange())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_participants' }, () => Boako.Together._onRemoteChange())
             .subscribe();
+    },
+
+    // 🌟 리더가 실제 이벤트를 받으면 로컬 갱신 + 팔로워 탭에 중계
+    _onRemoteChange: () => {
+        Boako.Together.loadPosts();
+        Boako.Together._rtGroup.broadcast('refresh', null);
     },
 
     switchTab: (tab) => {
