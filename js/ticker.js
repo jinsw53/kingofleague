@@ -14,6 +14,7 @@ Boako.Ticker = {
     PIXELS_PER_SECOND: 24,
 
     _channel: null,
+    _coordinatorInited: false,
 
     init: async () => {
         const bar = document.getElementById('boako-ticker-bar');
@@ -26,7 +27,36 @@ Boako.Ticker = {
             console.error('전광판 로드 실패:', err);
         }
 
-        Boako.Ticker.subscribeRealtime();
+        Boako.Ticker.startRealtime();
+    },
+
+    // 🌟 [리팩토링] 탭마다 각자 구독하면 소켓이 쌓이는 문제 방지 — realtime_coordinator.js
+    // 탭 리더 선출 패턴 적용 (achievements.js 등과 동일 방식)
+    startRealtime: () => {
+        if (!Boako.Ticker._coordinatorInited) {
+            Boako.Ticker._coordinatorInited = true;
+            Boako.RealtimeCoordinator.onRelay('ticker:refresh', () => Boako.Ticker.init());
+            Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.Ticker._subscribeAsLeader());
+        }
+        Boako.Ticker._subscribeAsLeader();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeAsLeader: () => {
+        if (!Boako.RealtimeCoordinator.isLeader()) return;
+        if (Boako.Ticker._channel) return;
+        Boako.Ticker._channel = Boako.db.channel('ticker-realtime')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, () => Boako.Ticker._onRemoteChange())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.Ticker._onRemoteChange())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.Ticker._onRemoteChange())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.Ticker._onRemoteChange())
+            .subscribe();
+    },
+
+    // 🌟 리더가 실제 이벤트를 받으면 로컬 갱신 + 팔로워 탭에 중계
+    _onRemoteChange: () => {
+        Boako.Ticker.init();
+        Boako.RealtimeCoordinator.broadcast('ticker:refresh', null);
     },
 
     fetchItems: async () => {
@@ -205,14 +235,4 @@ Boako.Ticker = {
         div.innerText = str || '';
         return div.innerHTML;
     },
-
-    subscribeRealtime: () => {
-        if (Boako.Ticker._channel) return;
-        Boako.Ticker._channel = Boako.db.channel('ticker-realtime')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, () => Boako.Ticker.init())
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.Ticker.init())
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.Ticker.init())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.Ticker.init())
-            .subscribe();
-    }
 };
