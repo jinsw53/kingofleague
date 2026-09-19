@@ -154,4 +154,124 @@ Boako.RealtimeCoordinator = (function () {
     };
 })();
 
+// 🌟 [범용 미니 코디네이터] team.js 팀챗 전용 리더 선출(2026-08-28)과 동일한 개념을 일반화한 팩토리.
+// 위 전역 RealtimeCoordinator는 "로그인하면 항상 켜져있는" 채널(메신저/업적/전광판 등) 전용이라,
+// 특정 화면을 열어본 탭에서만 필요한 lazy 채널(같이하자 게시판, 토너먼트 탭, 매치방 등)에 그대로
+// 재사용하면 안 됨 — 전역 리더로 뽑힌 탭이 그 화면을 한 번도 안 열어봤으면, 다른 탭에서 그 화면을
+// 열어도 실제 구독을 아무도 안 하고 있어서 실시간 이벤트가 영원히 발생하지 않는 사각지대가 생김
+// (team.js 팀챗에서 처음 발견된 문제). 그래서 "지금 이 화면을 열어본 탭들"끼리만 격리된 리더
+// 선출을 하는 인스턴스를 만들어 씀.
+// 사용법: const g = Boako.RealtimeCoordinator.createGroup('together');  // 대상이 하나뿐인 화면
+//         const g = Boako.RealtimeCoordinator.createGroup('match-chat', roomId); // id별로 격리
+//         g.start();                              // 화면 렌더 시 1회
+//         g.onBecomeLeader(() => { ...channel 구독... });
+//         g.broadcast('type', payload);            // 리더 콜백 안에서 팔로워에 중계
+//         g.onRelay('type', payload => {...});     // 리더/팔로워 공통 반응 로직
+Boako.RealtimeCoordinator.createGroup = function (namespace, instanceId) {
+    const key = instanceId ? `${namespace}_${instanceId}` : namespace;
+    const TAB_ID = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+    const LEADER_KEY = `boako_grp_leader_${key}`;
+    const BC_NAME = `boako-grp-relay-${key}`;
+    const LEADER_TTL_MS = 6000;
+    const HEARTBEAT_INTERVAL_MS = 2000;
+
+    let isLeader = false;
+    let heartbeatTimer = null;
+    let followerTimer = null;
+    let bc = null;
+    let started = false;
+    const leaderCallbacks = [];
+    const relayHandlers = {};
+
+    function getLeaderInfo() {
+        try { return JSON.parse(localStorage.getItem(LEADER_KEY)); } catch (e) { return null; }
+    }
+    function isAlive(info) { return !!info && (Date.now() - info.ts) < LEADER_TTL_MS; }
+    function dispatchRelay(type, payload) {
+        (relayHandlers[type] || []).forEach(fn => {
+            try { fn(payload); } catch (e) { console.error(`[BOAKO REALTIME:${key}] relay 핸들러 오류 (${type}):`, e); }
+        });
+    }
+    function claim() {
+        if (followerTimer) { clearInterval(followerTimer); followerTimer = null; }
+        localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
+        isLeader = true;
+        heartbeatTimer = setInterval(() => {
+            localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
+        }, HEARTBEAT_INTERVAL_MS);
+        leaderCallbacks.forEach(fn => {
+            try { fn(); } catch (e) { console.error(`[BOAKO REALTIME:${key}] onBecomeLeader 콜백 오류:`, e); }
+        });
+    }
+    function becomeFollower() {
+        isLeader = false;
+        if (!followerTimer) {
+            followerTimer = setInterval(() => {
+                const info = getLeaderInfo();
+                if (!isAlive(info)) tryClaimWithJitter();
+            }, 2000);
+        }
+    }
+    function tryClaimWithJitter() {
+        const jitter = Math.random() * 400;
+        setTimeout(() => {
+            const info = getLeaderInfo();
+            if (!isAlive(info)) claim(); else becomeFollower();
+        }, jitter);
+    }
+    function start() {
+        if (started) return;
+        started = true;
+        bc = new BroadcastChannel(BC_NAME);
+        bc.onmessage = (e) => {
+            if (isLeader) return;
+            const { type, payload } = e.data || {};
+            if (type) dispatchRelay(type, payload);
+        };
+        window.addEventListener('beforeunload', () => {
+            if (isLeader) {
+                try {
+                    const info = getLeaderInfo();
+                    if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+                } catch (e) { /* noop */ }
+                if (heartbeatTimer) clearInterval(heartbeatTimer);
+            }
+        });
+        tryClaimWithJitter();
+    }
+    function teardown() {
+        if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+        if (followerTimer) { clearInterval(followerTimer); followerTimer = null; }
+        if (isLeader) {
+            try {
+                const info = getLeaderInfo();
+                if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+            } catch (e) { /* noop */ }
+        }
+        if (bc) { try { bc.close(); } catch (e) { /* noop */ } bc = null; }
+        isLeader = false;
+        started = false;
+    }
+
+    return {
+        start,
+        teardown,
+        isLeader: () => isLeader,
+        onBecomeLeader: (fn) => {
+            leaderCallbacks.push(fn);
+            if (isLeader) {
+                try { fn(); } catch (e) { console.error(`[BOAKO REALTIME:${key}] onBecomeLeader 콜백 오류:`, e); }
+            }
+        },
+        broadcast: (type, payload) => {
+            if (!isLeader || !bc) return;
+            try { bc.postMessage({ type, payload }); } catch (e) { /* noop */ }
+        },
+        onRelay: (type, fn) => {
+            if (!relayHandlers[type]) relayHandlers[type] = [];
+            relayHandlers[type].push(fn);
+        }
+    };
+};
+
 Boako.RealtimeCoordinator.init();
