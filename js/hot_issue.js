@@ -13,7 +13,19 @@ Boako.HotIssue = {
             console.error("실시간 이슈 로드 실패:", err);
         }
 
-        Boako.HotIssue.subscribeRealtime();
+        Boako.HotIssue.startRealtime();
+    },
+
+    // 🌟 [리팩토링] 사이트를 여러 탭으로 띄워두면 탭마다 각자 채널을 구독해서 소켓이
+    // 늘어나던 문제 방지 — realtime_coordinator.js 전역 탭 리더 선출 패턴 적용(achievements.js와 동일).
+    _coordinatorInited: false,
+    startRealtime: () => {
+        if (!Boako.HotIssue._coordinatorInited) {
+            Boako.HotIssue._coordinatorInited = true;
+            Boako.RealtimeCoordinator.onRelay('hot-issue:refresh', () => Boako.HotIssue.init());
+            Boako.RealtimeCoordinator.onBecomeLeader(() => Boako.HotIssue._subscribeAsLeader());
+        }
+        Boako.HotIssue._subscribeAsLeader();
     },
 
     fetchItems: async () => {
@@ -132,12 +144,20 @@ Boako.HotIssue = {
         }).join('');
     },
 
-    subscribeRealtime: () => {
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeAsLeader: () => {
+        if (!Boako.RealtimeCoordinator.isLeader()) return;
         if (Boako.HotIssue._channel) return;
         Boako.HotIssue._channel = Boako.db.channel('hot-issue-realtime')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.HotIssue.init())
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.HotIssue.init())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.HotIssue.init())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.HotIssue._onRemoteChange())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.HotIssue._onRemoteChange())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.HotIssue._onRemoteChange())
             .subscribe();
+    },
+
+    // 🌟 리더가 실제 이벤트를 받으면 로컬 갱신 + 팔로워 탭에 중계
+    _onRemoteChange: () => {
+        Boako.HotIssue.init();
+        Boako.RealtimeCoordinator.broadcast('hot-issue:refresh', null);
     }
 };
