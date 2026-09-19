@@ -22,6 +22,11 @@
  *    다르게(boako_site_realtime_leader, boako-site-realtime-relay) 지정 — 사이트와 확장은 서로
  *    다른 origin(boakoarchive.co.kr vs boardgamearena.com)이라 원래 충돌할 일은 없지만, 향후
  *    같은 origin에서 쓰일 가능성까지 감안해 이름을 명확히 분리해둠.
+ * 🌟 [보강] 리더가 죽은 직후 여러 탭이 거의 동시에 클레임을 시도하면(예: 탭 여러 개를 동시에
+ *    열어둔 경우) localStorage 쓰기가 서로 덮어써져서 순간적으로 리더가 2개 이상 생길 수 있던
+ *    레이스 컨디션을 보완 — claim() 직후 곧바로 리더 역할을 시작하지 않고, 600ms 뒤 내 tabId가
+ *    여전히 기록돼있는지 재확인한 다음에만 실제로 하트비트/구독을 시작함. 진 탭은 조용히
+ *    팔로워로 돌아감(createGroup 팩토리도 동일하게 적용).
  */
 Boako.RealtimeCoordinator = (function () {
     const TAB_ID = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -57,18 +62,33 @@ Boako.RealtimeCoordinator = (function () {
         });
     }
 
+    // 🌟 [레이스 방지] 여러 탭이 거의 동시에 리더가 비었다고 판단해서 각자 localStorage에 자기
+    // tabId를 쓰면, 마지막에 쓴 탭 하나만 남고 나머지는 자기도 모르게 "졌는데도" 그대로 리더
+    // 역할(실제 채널 구독)을 시작해버릴 수 있음(순간적으로 리더가 2개 이상 존재). 그래서 쓰자마자
+    // 바로 리더 역할을 시작하지 않고, 짧게 기다렸다가 localStorage에 남은 값이 여전히 내 tabId인지
+    // 재확인한 뒤에만 실제로 하트비트/구독을 시작함 — 졌으면 조용히 팔로워로 전환.
+    const CLAIM_CONFIRM_DELAY_MS = 600;
+
     function claim() {
         if (followerWatchTimer) { clearInterval(followerWatchTimer); followerWatchTimer = null; }
         localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
-        isLeader = true;
-        log(`이 탭이 사이트 실시간 연결 리더로 선출됨 (id: ${TAB_ID.slice(0, 8)})`);
-        heartbeatTimer = setInterval(() => {
-            localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
-        }, HEARTBEAT_INTERVAL_MS);
-        // 🌟 이미 등록된(먼저 로드된 모듈들의) 콜백을 전부 실행 — 최초 선출/승격 공통 경로
-        leaderCallbacks.forEach(fn => {
-            try { fn(); } catch (e) { console.error('[BOAKO REALTIME] onBecomeLeader 콜백 오류:', e); }
-        });
+        setTimeout(() => {
+            const info = getLeaderInfo();
+            if (!info || info.tabId !== TAB_ID) {
+                // 다른 탭의 클레임이 내 것을 덮어씀 — 이 탭은 경합에서 진 것이므로 팔로워로 전환
+                becomeFollower();
+                return;
+            }
+            isLeader = true;
+            log(`이 탭이 사이트 실시간 연결 리더로 선출됨 (id: ${TAB_ID.slice(0, 8)})`);
+            heartbeatTimer = setInterval(() => {
+                localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
+            }, HEARTBEAT_INTERVAL_MS);
+            // 🌟 이미 등록된(먼저 로드된 모듈들의) 콜백을 전부 실행 — 최초 선출/승격 공통 경로
+            leaderCallbacks.forEach(fn => {
+                try { fn(); } catch (e) { console.error('[BOAKO REALTIME] onBecomeLeader 콜백 오류:', e); }
+            });
+        }, CLAIM_CONFIRM_DELAY_MS);
     }
 
     function becomeFollower() {
@@ -107,15 +127,14 @@ Boako.RealtimeCoordinator = (function () {
         };
 
         window.addEventListener('beforeunload', () => {
-            if (isLeader) {
-                // 리더가 사라진다는 걸 즉시 localStorage에서 지워서, 팔로워가 하트비트 타임아웃(최대 6초)까지
-                // 안 기다리고 다음 감시 주기(2초 이내)에 바로 승격하도록 함
-                try {
-                    const info = getLeaderInfo();
-                    if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
-                } catch (e) { /* noop */ }
-                if (heartbeatTimer) clearInterval(heartbeatTimer);
-            }
+            // 리더가 사라진다는 걸 즉시 localStorage에서 지워서, 팔로워가 하트비트 타임아웃(최대 6초)까지
+            // 안 기다리고 다음 감시 주기(2초 이내)에 바로 승격하도록 함. isLeader 확정 전(확인 대기 중)에
+            // 닫히는 경우에도 내 tabId가 남아있으면 정리해서 유령 클레임이 남지 않게 함.
+            try {
+                const info = getLeaderInfo();
+                if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+            } catch (e) { /* noop */ }
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
         });
 
         // 🌟 백그라운드 탭은 브라우저가 타이머를 느리게 만들어 하트비트가 늦어질 수 있음 —
@@ -178,6 +197,7 @@ Boako.RealtimeCoordinator.createGroup = function (namespace, instanceId) {
     let isLeader = false;
     let heartbeatTimer = null;
     let followerTimer = null;
+    let confirmTimer = null;
     let bc = null;
     let started = false;
     const leaderCallbacks = [];
@@ -192,16 +212,31 @@ Boako.RealtimeCoordinator.createGroup = function (namespace, instanceId) {
             try { fn(payload); } catch (e) { console.error(`[BOAKO REALTIME:${key}] relay 핸들러 오류 (${type}):`, e); }
         });
     }
+    // 🌟 [레이스 방지] 여러 탭이 거의 동시에 클레임을 시도해 localStorage를 서로 덮어쓸 수 있으므로,
+    // 쓰자마자 바로 리더 역할을 시작하지 않고 짧게 기다렸다가 내 tabId가 여전히 남아있는지
+    // 재확인한 뒤에만 실제로 하트비트/구독을 시작함 — 졌으면 조용히 팔로워로 전환(전역 버전과 동일한 패턴).
+    const CLAIM_CONFIRM_DELAY_MS = 600;
+
     function claim() {
         if (followerTimer) { clearInterval(followerTimer); followerTimer = null; }
         localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
-        isLeader = true;
-        heartbeatTimer = setInterval(() => {
-            localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
-        }, HEARTBEAT_INTERVAL_MS);
-        leaderCallbacks.forEach(fn => {
-            try { fn(); } catch (e) { console.error(`[BOAKO REALTIME:${key}] onBecomeLeader 콜백 오류:`, e); }
-        });
+        confirmTimer = setTimeout(() => {
+            confirmTimer = null;
+            // 🌟 확인 대기 중에 화면을 벗어나 teardown()이 먼저 호출됐으면 아무 것도 시작하지 않고 조용히 중단
+            if (!started) return;
+            const info = getLeaderInfo();
+            if (!info || info.tabId !== TAB_ID) {
+                becomeFollower();
+                return;
+            }
+            isLeader = true;
+            heartbeatTimer = setInterval(() => {
+                localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
+            }, HEARTBEAT_INTERVAL_MS);
+            leaderCallbacks.forEach(fn => {
+                try { fn(); } catch (e) { console.error(`[BOAKO REALTIME:${key}] onBecomeLeader 콜백 오류:`, e); }
+            });
+        }, CLAIM_CONFIRM_DELAY_MS);
     }
     function becomeFollower() {
         isLeader = false;
@@ -229,25 +264,25 @@ Boako.RealtimeCoordinator.createGroup = function (namespace, instanceId) {
             if (type) dispatchRelay(type, payload);
         };
         window.addEventListener('beforeunload', () => {
-            if (isLeader) {
-                try {
-                    const info = getLeaderInfo();
-                    if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
-                } catch (e) { /* noop */ }
-                if (heartbeatTimer) clearInterval(heartbeatTimer);
-            }
+            try {
+                const info = getLeaderInfo();
+                if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+            } catch (e) { /* noop */ }
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
         });
         tryClaimWithJitter();
     }
     function teardown() {
         if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
         if (followerTimer) { clearInterval(followerTimer); followerTimer = null; }
-        if (isLeader) {
-            try {
-                const info = getLeaderInfo();
-                if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
-            } catch (e) { /* noop */ }
-        }
+        if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
+        // 🌟 확정되기 전(확인 대기 중)에 teardown되면 isLeader는 아직 false지만 localStorage엔
+        // 이미 내 tabId가 임시로 남아있을 수 있음 — isLeader 여부와 무관하게 내 tabId면 정리해서
+        // 다른 탭이 TTL(6초)까지 기다리지 않고 바로 새로 클레임할 수 있게 함.
+        try {
+            const info = getLeaderInfo();
+            if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+        } catch (e) { /* noop */ }
         if (bc) { try { bc.close(); } catch (e) { /* noop */ } bc = null; }
         isLeader = false;
         started = false;
