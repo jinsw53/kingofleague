@@ -73,18 +73,34 @@ Boako.Tournament = {
         `;
 
         await Boako.Tournament.loadPosts();
-        Boako.Tournament.subscribeRealtime();
+        Boako.Tournament.startRealtime();
     },
 
-    // 🌟 실시간 구독 — 양쪽 탭 다 실시간 반영
-    subscribeRealtime: () => {
+    // 🌟 [리팩토링] 토너먼트 화면을 여러 탭에서 열어두면 탭마다 각자 채널을 구독해서 소켓이
+    // 늘어나던 문제 방지 — realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup) 적용.
+    _rtGroup: null,
+    startRealtime: () => {
+        if (!Boako.Tournament._rtGroup) {
+            Boako.Tournament._rtGroup = Boako.RealtimeCoordinator.createGroup('tournament');
+            Boako.Tournament._rtGroup.onRelay('refresh', () => Boako.Tournament.loadPosts());
+            Boako.Tournament._rtGroup.onBecomeLeader(() => Boako.Tournament._subscribeAsLeader());
+        }
+        Boako.Tournament._rtGroup.start();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독 — 양쪽 탭 다 실시간 반영
+    _subscribeAsLeader: () => {
         if (Boako.Tournament.State.realtimeChannel) return; // 이미 구독 중이면 중복 방지
         Boako.Tournament.State.realtimeChannel = Boako.db
             .channel('tournament-posts-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
-                Boako.Tournament.loadPosts();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => Boako.Tournament._onRemoteChange())
             .subscribe();
+    },
+
+    // 🌟 리더가 실제 이벤트를 받으면 로컬 갱신 + 팔로워 탭에 중계
+    _onRemoteChange: () => {
+        Boako.Tournament.loadPosts();
+        Boako.Tournament._rtGroup.broadcast('refresh', null);
     },
 
     switchTab: (tab) => {
