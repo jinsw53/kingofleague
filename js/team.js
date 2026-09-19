@@ -1217,8 +1217,22 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
     // ---------- 팀 포인트 내역 실시간 구독 ----------
     pointHistoryChannel: null,
+    _pointHistoryRtGroup: null,
 
+    // 🌟 [리팩토링] 이 화면을 여러 탭에서 열어두면 탭마다 각자 채널을 구독해서 소켓이
+    // 늘어나던 문제 방지 — realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup)
+    // 적용(teamId별 격리).
     subscribePointHistoryRealtime: function(teamId) {
+        if (!Boako.Team._pointHistoryRtGroup) {
+            Boako.Team._pointHistoryRtGroup = Boako.RealtimeCoordinator.createGroup('team-point-history', teamId);
+            Boako.Team._pointHistoryRtGroup.onRelay('refresh', () => Boako.Team.loadTeamPointHistory());
+            Boako.Team._pointHistoryRtGroup.onBecomeLeader(() => Boako.Team._subscribePointHistoryAsLeader(teamId));
+        }
+        Boako.Team._pointHistoryRtGroup.start();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribePointHistoryAsLeader: function(teamId) {
         if (Boako.Team.pointHistoryChannel || !Boako.db) return;
 
         Boako.Team.pointHistoryChannel = Boako.db
@@ -1230,6 +1244,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 filter: `team_id=eq.${teamId}`
             }, (payload) => {
                 Boako.Team.loadTeamPointHistory();
+                Boako.Team._pointHistoryRtGroup.broadcast('refresh', null);
             })
             .subscribe();
     },
@@ -1238,6 +1253,10 @@ const isLeader = Boako.state.team.type === 'LEADER';
         if (Boako.Team.pointHistoryChannel && Boako.db) {
             Boako.db.removeChannel(Boako.Team.pointHistoryChannel);
             Boako.Team.pointHistoryChannel = null;
+        }
+        if (Boako.Team._pointHistoryRtGroup) {
+            Boako.Team._pointHistoryRtGroup.teardown();
+            Boako.Team._pointHistoryRtGroup = null;
         }
     },
 
