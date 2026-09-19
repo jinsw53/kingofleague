@@ -29,10 +29,10 @@
  *    모바일 쪽지함(messenger)이 아직 포팅 전이라, 경기 일정은 조회/렌더 로직을 이 파일에
  *    재구현하고 진행 예정 경기 클릭 시 토스트로 대체(완료 경기는 외부 링크 그대로 동작), 챌린지
  *    쪽은 openChallengeChat 함수 자체를 모바일 세션에서 토스트로 안전하게 덮어씀.
- * 🌟 [알려진 제한] 팀챗 실시간 채널(subscribeChat)은 PC의 Boako.Team.Chat과 마찬가지로 아직
- *    js/realtime_coordinator.js 탭 리더 선출을 적용하지 않음 — 화면을 벗어날 때(teardownChat)
- *    확실히 구독 해제해서 최소한 "떠나 있는 동안 계속 열려있는" 것만 방지함. 사이트 전역 실시간
- *    최적화 작업 때 PC/모바일 팀챗을 함께 코디네이터 방식으로 옮기는 걸 백로그로 남겨둠.
+ * 🌟 [리팩토링 완료] 팀챗 실시간 채널(subscribeChat, 2개: mobile-team-chat-N / mobile-team-chat-reads-N)에
+ *    js/realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup, teamId로 격리)를 적용함.
+ *    탭마다 각자 소켓을 열던 문제를 해결 — 리더 탭만 실제 구독하고 나머지는 중계만 받음. 화면을
+ *    벗어날 때(teardownChat)는 여전히 확실하게 구독/그룹을 해제함.
  * 🌟 [버그수정] 팀 창단 폼과 팀 본부 메인 배너 모두 PC .main-banner 기본값(가운데 정렬, 보라색
  *    #8b5cf6→#6d28d9)과 통일. 이전에는 팀 창단 폼에 임의로 남색(#1e293b→#0f172a) 배경 + 없는
  *    부제목 "전설의 팀을 만들어보세요"를 넣었었는데, PC team.js는 이 배너에 배경색을 따로
@@ -786,32 +786,67 @@ Boako.MobileTeamHub = {
         if (el) el.scrollTop = el.scrollHeight;
     },
 
+    // 🌟 [리팩토링] 모바일 팀 허브를 여러 탭에서 열어두면 탭마다 각자 채널 2개를 구독해서 소켓이
+    // 늘어나던 문제 방지 — realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup) 적용.
+    // teamId별로 격리해서 팀을 바꿔 다시 들어와도 안전하게 재구독되도록 함.
     subscribeChat: (teamId) => {
         Boako.MobileTeamHub.teardownChat();
+
+        Boako.MobileTeamHub._chatRtGroup = Boako.RealtimeCoordinator.createGroup('mobile-team-chat', teamId);
+        Boako.MobileTeamHub._chatRtGroup.onRelay('chat', (payload) => Boako.MobileTeamHub._onChatRemoteMessage(payload, teamId));
+        Boako.MobileTeamHub._chatRtGroup.onBecomeLeader(() => Boako.MobileTeamHub._subscribeChatAsLeader(teamId));
+        Boako.MobileTeamHub._chatRtGroup.start();
+
+        Boako.MobileTeamHub._chatReadsRtGroup = Boako.RealtimeCoordinator.createGroup('mobile-team-chat-reads', teamId);
+        Boako.MobileTeamHub._chatReadsRtGroup.onRelay('reads', () => Boako.MobileTeamHub._onChatReadsRemoteChange(teamId));
+        Boako.MobileTeamHub._chatReadsRtGroup.onBecomeLeader(() => Boako.MobileTeamHub._subscribeChatReadsAsLeader(teamId));
+        Boako.MobileTeamHub._chatReadsRtGroup.start();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeChatAsLeader: (teamId) => {
+        if (Boako.MobileTeamHub.chatChannel) return;
         Boako.MobileTeamHub.chatChannel = Boako.db.channel(`mobile-team-chat-${teamId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'team_chats', filter: `team_id=eq.${teamId}` }, async (payload) => {
-                const newMsg = payload.new;
-                if (newMsg.sender_id !== Boako.state.user.id) {
-                    newMsg.profiles = { full_name: '팀원' };
-                    Boako.MobileTeamHub.renderChatMessage(newMsg);
-                    Boako.MobileTeamHub.scrollChatToBottom();
-                    Boako.Util.toast('💬 팀 작전 회의실에 새로운 메시지가 있습니다!');
-                    await Boako.MobileTeamHub.markChatRead(teamId);
-                }
+                await Boako.MobileTeamHub._onChatRemoteMessage(payload.new, teamId);
+                if (Boako.MobileTeamHub._chatRtGroup) Boako.MobileTeamHub._chatRtGroup.broadcast('chat', payload.new);
             })
             .subscribe();
+    },
 
+    // 🌟 리더가 실제 이벤트를 받으면(또는 팔로워가 중계받으면) 공통 반응 로직
+    _onChatRemoteMessage: async (newMsg, teamId) => {
+        if (newMsg.sender_id !== Boako.state.user.id) {
+            newMsg.profiles = { full_name: '팀원' };
+            Boako.MobileTeamHub.renderChatMessage(newMsg);
+            Boako.MobileTeamHub.scrollChatToBottom();
+            Boako.Util.toast('💬 팀 작전 회의실에 새로운 메시지가 있습니다!');
+            await Boako.MobileTeamHub.markChatRead(teamId);
+        }
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeChatReadsAsLeader: (teamId) => {
+        if (Boako.MobileTeamHub.chatReadsChannel) return;
         Boako.MobileTeamHub.chatReadsChannel = Boako.db.channel(`mobile-team-chat-reads-${teamId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_chat_reads', filter: `team_id=eq.${teamId}` }, async () => {
-                await Boako.MobileTeamHub.fetchChatReadRows(teamId);
-                Boako.MobileTeamHub.updateAllChatUnreadBadges();
+                await Boako.MobileTeamHub._onChatReadsRemoteChange(teamId);
+                if (Boako.MobileTeamHub._chatReadsRtGroup) Boako.MobileTeamHub._chatReadsRtGroup.broadcast('reads', null);
             })
             .subscribe();
+    },
+
+    // 🌟 리더가 실제 이벤트를 받으면(또는 팔로워가 중계받으면) 공통 반응 로직
+    _onChatReadsRemoteChange: async (teamId) => {
+        await Boako.MobileTeamHub.fetchChatReadRows(teamId);
+        Boako.MobileTeamHub.updateAllChatUnreadBadges();
     },
 
     teardownChat: () => {
         if (Boako.MobileTeamHub.chatChannel) { Boako.db.removeChannel(Boako.MobileTeamHub.chatChannel); Boako.MobileTeamHub.chatChannel = null; }
         if (Boako.MobileTeamHub.chatReadsChannel) { Boako.db.removeChannel(Boako.MobileTeamHub.chatReadsChannel); Boako.MobileTeamHub.chatReadsChannel = null; }
+        if (Boako.MobileTeamHub._chatRtGroup) { Boako.MobileTeamHub._chatRtGroup.teardown(); Boako.MobileTeamHub._chatRtGroup = null; }
+        if (Boako.MobileTeamHub._chatReadsRtGroup) { Boako.MobileTeamHub._chatReadsRtGroup.teardown(); Boako.MobileTeamHub._chatReadsRtGroup = null; }
     },
 
     escapeHtml: (str) => {
