@@ -8,12 +8,36 @@ Boako.Match = {
     scoreChannel: null,
 
     // 🌟 [신규] 실시간 스코어 감지기
+    // 🌟 [리팩토링] 이 화면(대항전 대시보드)을 여러 탭으로 띄워두면 탭마다 각자 채널을 열어서
+    // 소켓이 늘어나던 문제 방지 — realtime_coordinator.js의 화면 전용 미니 코디네이터(createGroup)
+    // 적용. seasonNo가 바뀌면(다른 시즌 화면으로 이동) 이전 그룹을 정리하고 새로 만듦.
+    _rtGroup: null,
+    _rtSeasonNo: null,
     setupRealtimeScore: (seasonNo) => {
-        // 기존 구독이 있다면 먼저 해제 (중복 통신 방지)
-        if (Boako.Match.scoreChannel) {
-            Boako.db.removeChannel(Boako.Match.scoreChannel);
+        if (Boako.Match._rtGroup && Boako.Match._rtSeasonNo !== seasonNo) {
+            Boako.Match._rtGroup.teardown();
+            Boako.Match._rtGroup = null;
+            if (Boako.Match.scoreChannel) {
+                Boako.db.removeChannel(Boako.Match.scoreChannel);
+                Boako.Match.scoreChannel = null;
+            }
         }
+        Boako.Match._rtSeasonNo = seasonNo;
 
+        if (!Boako.Match._rtGroup) {
+            Boako.Match._rtGroup = Boako.RealtimeCoordinator.createGroup('match-score', seasonNo);
+            Boako.Match._rtGroup.onRelay('refresh', () => {
+                Boako.Util.toast("🏆 스코어보드가 실시간으로 업데이트되었습니다!", 3000);
+                Boako.Match.loadData();
+            });
+            Boako.Match._rtGroup.onBecomeLeader(() => Boako.Match._subscribeScoreAsLeader(seasonNo));
+        }
+        Boako.Match._rtGroup.start();
+    },
+
+    // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+    _subscribeScoreAsLeader: (seasonNo) => {
+        if (Boako.Match.scoreChannel) return;
         // 해당 시즌의 grandprix_game_scores 테이블의 모든 변화(INSERT, UPDATE)를 감시
         Boako.Match.scoreChannel = Boako.db.channel(`match-score-season-${seasonNo}`)
             .on('postgres_changes', {
@@ -25,6 +49,7 @@ Boako.Match = {
                 console.log("🌟 [실시간 감지] 스코어 데이터 변경:", payload);
                 Boako.Util.toast("🏆 스코어보드가 실시간으로 업데이트되었습니다!", 3000);
                 Boako.Match.loadData();
+                Boako.Match._rtGroup.broadcast('refresh', null);
             })
             .subscribe();
     },
@@ -767,29 +792,52 @@ Boako.Match = {
             // 🌟 2. 첫 방문 튜토리얼 체크
             await Boako.Match.Chat.checkAndShowTutorial();
 
-            // 🌟 3. 리얼타임 구독
-            if (Boako.Match.Chat.channel) Boako.db.removeChannel(Boako.Match.Chat.channel);
+            // 🌟 3. 리얼타임 구독 — [리팩토링] 같은 방을 여러 탭에서 열어두면 탭마다 각자 채널을
+            // 구독해서 소켓이 늘어나던 문제 방지. realtime_coordinator.js의 화면 전용 미니
+            // 코디네이터(createGroup)를 roomId별로 격리해서 적용.
+            if (Boako.Match.Chat.channel) { Boako.db.removeChannel(Boako.Match.Chat.channel); Boako.Match.Chat.channel = null; }
+            if (Boako.Match.Chat._rtGroup) Boako.Match.Chat._rtGroup.teardown();
 
+            Boako.Match.Chat._rtGroup = Boako.RealtimeCoordinator.createGroup('match-chat', roomId);
+            Boako.Match.Chat._rtGroup.onRelay('chat-insert', (payload) => Boako.Match.Chat._onChatInsert(payload));
+            Boako.Match.Chat._rtGroup.onRelay('poll-change', (payload) => Boako.Match.Chat._onPollChange(payload));
+            Boako.Match.Chat._rtGroup.onBecomeLeader(() => Boako.Match.Chat._subscribeAsLeader(roomId));
+            Boako.Match.Chat._rtGroup.start();
+
+            setTimeout(() => document.getElementById('match-chat-input').focus(), 100);
+        },
+
+        // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
+        _subscribeAsLeader: (roomId) => {
+            if (Boako.Match.Chat.channel) return;
             Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${roomId}`)
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats', filter: `room_id=eq.${roomId}` }, (payload) => {
-                    if (String(payload.new.sender_id) !== String(Boako.state.user.id)) {
-                        payload.new.profiles = { full_name: payload.new.sender_name_override || "참여자" };
-                        Boako.Match.Chat.renderMessage(payload.new);
-                        Boako.Match.Chat.scrollToBottom();
-                    }
+                    Boako.Match.Chat._onChatInsert(payload.new);
+                    Boako.Match.Chat._rtGroup.broadcast('chat-insert', payload.new);
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls', filter: `target_id=eq.${roomId}` }, (payload) => {
-                    Boako.Match.Chat.loadMessagesAndPolls();
-                    if (payload.eventType === 'UPDATE') {
-                        const oldStatus = payload.old?.status;
-                        const newStatus = payload.new?.status;
-                        if (oldStatus !== 'PROPOSED' && newStatus === 'PROPOSED') Boako.Util.toast("🎯 교집합 일정이 방금 발견되었습니다!");
-                        else if (oldStatus !== 'CONFIRMED' && newStatus === 'CONFIRMED') Boako.Util.toast("🏁 방금 일정이 최종 확정되었습니다!");
-                    }
+                    Boako.Match.Chat._onPollChange(payload);
+                    Boako.Match.Chat._rtGroup.broadcast('poll-change', payload);
                 })
                 .subscribe();
-            
-            setTimeout(() => document.getElementById('match-chat-input').focus(), 100);
+        },
+
+        // 🌟 리더/팔로워 공통 반응 로직
+        _onChatInsert: (newMsg) => {
+            if (String(newMsg.sender_id) !== String(Boako.state.user.id)) {
+                newMsg.profiles = { full_name: newMsg.sender_name_override || "참여자" };
+                Boako.Match.Chat.renderMessage(newMsg);
+                Boako.Match.Chat.scrollToBottom();
+            }
+        },
+        _onPollChange: (payload) => {
+            Boako.Match.Chat.loadMessagesAndPolls();
+            if (payload.eventType === 'UPDATE') {
+                const oldStatus = payload.old?.status;
+                const newStatus = payload.new?.status;
+                if (oldStatus !== 'PROPOSED' && newStatus === 'PROPOSED') Boako.Util.toast("🎯 교집합 일정이 방금 발견되었습니다!");
+                else if (oldStatus !== 'CONFIRMED' && newStatus === 'CONFIRMED') Boako.Util.toast("🏁 방금 일정이 최종 확정되었습니다!");
+            }
         },
 
         close: () => {
@@ -800,6 +848,10 @@ Boako.Match = {
             if (Boako.Match.Chat.channel) {
                 Boako.db.removeChannel(Boako.Match.Chat.channel);
                 Boako.Match.Chat.channel = null;
+            }
+            if (Boako.Match.Chat._rtGroup) {
+                Boako.Match.Chat._rtGroup.teardown();
+                Boako.Match.Chat._rtGroup = null;
             }
         },
 
