@@ -583,6 +583,9 @@
   // 같은 브라우저 안의 탭들 중 "리더" 탭 하나만 진짜 연결을 열고, 나머지(팔로워)는 그 리더가
   // BroadcastChannel로 중계해주는 이벤트만 받아서 동일하게 반응(토스트/뱃지/오버레이는 각 탭이 알아서 그림).
   // 리더가 죽으면(탭 닫힘 등) 하트비트가 끊기고, 남은 탭 중 하나가 자동으로 리더를 이어받음.
+  // 🌟 [보강] 리더가 죽은 직후 여러 탭이 거의 동시에 클레임을 시도하면 localStorage 쓰기가
+  // 서로 덮어써져서 순간적으로 리더가 2개 이상 생길 수 있던 레이스 컨디션을 보완 — 클레임 직후
+  // 곧바로 연결하지 않고 600ms 뒤 재확인한 다음에만 실제 웹소켓을 엶(자세한 내용은 claimLeadership 참고).
   // ========================================================================
   const TAB_ID = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
   const LEADER_KEY = 'boako_realtime_leader';
@@ -593,6 +596,8 @@
   let leaderHeartbeatTimer = null;
   let followerWatchTimer = null;
   let realtimeBC = null;
+  let confirmClaimTimer = null;
+  let coordinationActive = false; // 🌟 initRealtimeCoordination()~teardownRealtimeCoordination() 사이에만 true
 
   function getLeaderInfo() {
     try {
@@ -622,21 +627,39 @@
     }
   }
 
+  // 🌟 [레이스 방지] BGA 탭을 여러 개 동시에 열어두면 리더가 죽은 직후 여러 탭이 거의 동시에
+  // 클레임을 시도해서 localStorage 쓰기가 서로 덮어써질 수 있음 — 이 경우 진 탭도 자기가
+  // 이겼다고 착각하고 그대로 실제 웹소켓을 열어버려서 순간적으로 리더가 2개 이상 생길 수 있었음.
+  // 그래서 쓰자마자 바로 리더 역할(실제 연결)을 시작하지 않고, 600ms 뒤 내 tabId가 여전히
+  // 기록돼있는지 재확인한 다음에만 _doConnect()를 호출함 — 졌으면 조용히 팔로워로 전환.
+  const CLAIM_CONFIRM_DELAY_MS = 600;
+
   function claimLeadership() {
     if (followerWatchTimer) { clearInterval(followerWatchTimer); followerWatchTimer = null; }
     localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
-    isRealtimeLeader = true;
-    boakoOk(`이 탭이 실시간 연결 리더로 선출됨 (id: ${TAB_ID.slice(0, 8)})`);
-    _doConnect(); // 진짜 웹소켓 연결은 리더 탭에서만 생성
-    leaderHeartbeatTimer = setInterval(() => {
-      localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
-    }, HEARTBEAT_INTERVAL_MS);
-    // 🌟 [신규] 시즌 스플래시(팀 소속자 전용) — 사이트 season_splash.js와 완전히 동일한 디자인/애니메이션/사운드.
-    // enqueueFullscreenOverlay 큐에 태워서 업적/라이벌결과/추천보너스/④⑤⑥⑦활성화와 자동으로 안 겹치게 함.
-    checkSeasonSplash();
-    // 🌟 [리팩토링] ④⑤⑥번 활성화 오버레이 통합 대기열 체크 — 여러 BGA 탭이 열려있어도
-    // 리더 탭에서만 체크해서 중복 방지. 크론이 미리 계산해둔 대기열을 조회만 함.
-    checkActivationOverlayQueue();
+    confirmClaimTimer = setTimeout(() => {
+      confirmClaimTimer = null;
+      // 🌟 확인 대기 중에 로그아웃 등으로 teardownRealtimeCoordination()이 먼저 호출됐으면 중단
+      if (!coordinationActive) return;
+      const info = getLeaderInfo();
+      if (!info || info.tabId !== TAB_ID) {
+        // 다른 탭의 클레임이 내 것을 덮어씀 — 이 탭은 경합에서 진 것이므로 팔로워로 전환
+        becomeFollower();
+        return;
+      }
+      isRealtimeLeader = true;
+      boakoOk(`이 탭이 실시간 연결 리더로 선출됨 (id: ${TAB_ID.slice(0, 8)})`);
+      _doConnect(); // 진짜 웹소켓 연결은 리더 탭에서만 생성
+      leaderHeartbeatTimer = setInterval(() => {
+        localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
+      }, HEARTBEAT_INTERVAL_MS);
+      // 🌟 [신규] 시즌 스플래시(팀 소속자 전용) — 사이트 season_splash.js와 완전히 동일한 디자인/애니메이션/사운드.
+      // enqueueFullscreenOverlay 큐에 태워서 업적/라이벌결과/추천보너스/④⑤⑥⑦활성화와 자동으로 안 겹치게 함.
+      checkSeasonSplash();
+      // 🌟 [리팩토링] ④⑤⑥번 활성화 오버레이 통합 대기열 체크 — 여러 BGA 탭이 열려있어도
+      // 리더 탭에서만 체크해서 중복 방지. 크론이 미리 계산해둔 대기열을 조회만 함.
+      checkActivationOverlayQueue();
+    }, CLAIM_CONFIRM_DELAY_MS);
   }
 
   function becomeFollower() {
@@ -668,6 +691,7 @@
   }
 
   function initRealtimeCoordination() {
+    coordinationActive = true;
     realtimeBC = new BroadcastChannel('boako-realtime-relay');
     realtimeBC.onmessage = (e) => {
       if (isRealtimeLeader) return; // 리더는 이벤트의 원본 발신자이므로 자기 방송은 무시
@@ -676,29 +700,31 @@
     };
 
     window.addEventListener('beforeunload', () => {
-      if (isRealtimeLeader) {
-        // 리더가 사라진다는 걸 즉시 localStorage에서 지워서, 팔로워가 하트비트 타임아웃(최대 6초)까지
-        // 안 기다리고 다음 감시 주기(2초 이내)에 바로 승격하도록 함
-        try {
-          const info = getLeaderInfo();
-          if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
-        } catch (e) { /* noop */ }
-        if (leaderHeartbeatTimer) clearInterval(leaderHeartbeatTimer);
-      }
+      // 리더가 사라진다는 걸 즉시 localStorage에서 지워서, 팔로워가 하트비트 타임아웃(최대 6초)까지
+      // 안 기다리고 다음 감시 주기(2초 이내)에 바로 승격하도록 함. isRealtimeLeader 확정 전(확인
+      // 대기 중)에 닫히는 경우에도 내 tabId가 남아있으면 정리해서 유령 클레임이 남지 않게 함.
+      try {
+        const info = getLeaderInfo();
+        if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+      } catch (e) { /* noop */ }
+      if (leaderHeartbeatTimer) clearInterval(leaderHeartbeatTimer);
     });
 
     tryClaimWithJitter();
   }
 
   function teardownRealtimeCoordination() {
+    coordinationActive = false;
     if (leaderHeartbeatTimer) { clearInterval(leaderHeartbeatTimer); leaderHeartbeatTimer = null; }
     if (followerWatchTimer) { clearInterval(followerWatchTimer); followerWatchTimer = null; }
-    if (isRealtimeLeader) {
-      try {
-        const info = getLeaderInfo();
-        if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
-      } catch (e) { /* noop */ }
-    }
+    if (confirmClaimTimer) { clearTimeout(confirmClaimTimer); confirmClaimTimer = null; }
+    // 🌟 확정되기 전(확인 대기 중)에 teardown되면 isRealtimeLeader는 아직 false지만 localStorage엔
+    // 이미 내 tabId가 임시로 남아있을 수 있음 — 여부와 무관하게 내 tabId면 정리해서 다른 탭이
+    // TTL(6초)까지 기다리지 않고 바로 새로 클레임할 수 있게 함.
+    try {
+      const info = getLeaderInfo();
+      if (info && info.tabId === TAB_ID) localStorage.removeItem(LEADER_KEY);
+    } catch (e) { /* noop */ }
     isRealtimeLeader = false;
     if (realtimeBC) { try { realtimeBC.close(); } catch (e) {} realtimeBC = null; }
   }
