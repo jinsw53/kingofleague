@@ -1,5 +1,6 @@
 /**
- * [HOT ISSUE] 사이드바 실시간 이슈 — 라이벌 도전, 토너먼트 개최, 같이하자 모임 확정, 업적 달성 등 가벼운 즉발성 소식
+ * [HOT ISSUE] 사이드바 실시간 이슈 — 라이벌 도전, 토너먼트 개최, 같이하자 모임 확정, 업적 달성,
+ * 5연속 전적 기록("수배전단") 등 가벼운 즉발성 소식
  */
 Boako.HotIssue = {
     init: async () => {
@@ -150,6 +151,27 @@ Boako.HotIssue = {
             }
         } catch (e) { console.error("업적 이슈 로드 실패:", e); }
 
+        // 6. 🌟 [신규] 5연속 전적 기록 ("수배전단") — 전용 테이블이 없고 소식지(news_feed_items)를
+        //    소스로 재사용. event_type='RECORD_STREAK'인 것만 필터링.
+        try {
+            const { data: streaks } = await Boako.db
+                .from('news_feed_items')
+                .select('*')
+                .eq('event_type', 'RECORD_STREAK')
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            (streaks || []).forEach(s => {
+                items.push({
+                    icon: '🤠',
+                    text: s.title,
+                    time: s.created_at,
+                    linkType: s.link_type,
+                    linkId: s.link_id
+                });
+            });
+        } catch (e) { console.error("연속기록 이슈 로드 실패:", e); }
+
         items.sort((a, b) => new Date(b.time) - new Date(a.time));
         return items.slice(0, 5);
     },
@@ -185,6 +207,7 @@ Boako.HotIssue = {
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.HotIssue._onRemoteChange())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.HotIssue._onRemoteChange())
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements' }, () => Boako.HotIssue._onRemoteChange())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, () => Boako.HotIssue._onRemoteChange())
             .subscribe();
     },
 
