@@ -23,6 +23,8 @@
  *    "응원하기"(승자 예측 투표) 탭으로 바로 진입하도록 수정.
  * 🌟 [신규] navigateToLink에 BOARD_CATEGORY 케이스 추가 — ④번 활성화 시나리오(크롬 확장의
  *    "확장 사용 어려움" 오버레이)에서 요청 게시판으로 바로 이동시키는 용도. linkId = 카테고리명.
+ * 🌟 [신규] navigateToLink에 ARCHIVE 케이스 추가 — 5연속 전적 기록("수배전단") 소식 클릭 시
+ *    전적기록실(archive)로 이동. 특정 유저로 필터링하는 기능은 아직 없어 일단 전체 화면만 염.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -165,6 +167,10 @@ Boako.Util = {
                 case 'USER':
                     // 🌟 [신규] 검색결과의 '유저' 항목 클릭 시 팀 목록에서 소속 팀을 찾아보도록 안내
                     await Boako.View.render('team_list');
+                    break;
+                // 🌟 [신규] 5연속 전적 기록("수배전단") 소식 클릭 시 전적기록실로 이동
+                case 'ARCHIVE':
+                    await Boako.View.render('archive');
                     break;
                 default:
                     console.warn('알 수 없는 link_type:', linkType);
