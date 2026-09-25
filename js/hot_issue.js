@@ -1,5 +1,5 @@
 /**
- * [HOT ISSUE] 사이드바 실시간 이슈 — 라이벌 도전, 토너먼트 개최, 같이하자 모임 확정 등 가벼운 즉발성 소식
+ * [HOT ISSUE] 사이드바 실시간 이슈 — 라이벌 도전, 토너먼트 개최, 같이하자 모임 확정, 업적 달성 등 가벼운 즉발성 소식
  */
 Boako.HotIssue = {
     init: async () => {
@@ -118,6 +118,31 @@ Boako.HotIssue = {
             });
         } catch (e) { console.error("질문 게시글 이슈 로드 실패:", e); }
 
+        // 5. 업적 달성 (최근 획득분) — 클릭 이동 위치는 추후 결정 전까지 비활성
+        try {
+            const { data: uas } = await Boako.db
+                .from('user_achievements')
+                .select('id, user_id, achieved_at, achievements(name)')
+                .order('achieved_at', { ascending: false })
+                .limit(5);
+
+            if (uas && uas.length > 0) {
+                const userIds = [...new Set(uas.map(u => u.user_id))];
+                const { data: profiles } = await Boako.db.from('profiles').select('id, full_name').in('id', userIds);
+                const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
+
+                uas.forEach(u => {
+                    items.push({
+                        icon: '🏅',
+                        text: `${profileMap[u.user_id] || '누군가'}님이 ${u.achievements?.name || '업적'} 업적 달성!`,
+                        time: u.achieved_at,
+                        linkType: null,
+                        linkId: null
+                    });
+                });
+            }
+        } catch (e) { console.error("업적 이슈 로드 실패:", e); }
+
         items.sort((a, b) => new Date(b.time) - new Date(a.time));
         return items.slice(0, 5);
     },
@@ -152,6 +177,7 @@ Boako.HotIssue = {
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.HotIssue._onRemoteChange())
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.HotIssue._onRemoteChange())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.HotIssue._onRemoteChange())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements' }, () => Boako.HotIssue._onRemoteChange())
             .subscribe();
     },
 
