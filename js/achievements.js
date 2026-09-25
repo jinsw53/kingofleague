@@ -15,6 +15,7 @@
  *    여러 탭으로 띄워도 Realtime 소켓은 리더 탭 1개만 유지하도록 함 (자세한 설명은 아래 주석 참고).
  * 🌟 [업그레이드] OO매니아 스퀴클 테두리를 2단계 단색 그라데이션에서 4단계 메탈릭 그라데이션으로 교체
  *    (밝은 하이라이트 → 진한 그림자 톤까지, 소식지 카드의 서버 합성 배지와 동일한 컬러값 사용)
+ * 🌟 [수정] 오버레이에 업적 이름만 있고 왜 받았는지 안 보여서, 이름 아래에 achievements.description을 추가로 표시
  */
 Boako.Achievements = {
     channel: null,
@@ -205,6 +206,7 @@ Boako.Achievements = {
                     <div style="font-size:26px; font-weight:900; color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.45); line-height:1.35;">
                         ${achievement.name}${gameName ? `<br><span style="font-size:16px; color:#cbd5e1; font-weight:700;">(${gameName})</span>` : ''}
                     </div>
+                    ${achievement.description ? `<div style="font-size:14px; font-weight:600; color:#cbd5e1; margin-top:-8px;">${achievement.description}</div>` : ''}
                     <div style="font-size:16px; font-weight:900; color:#fbbf24; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">
                         +${Number(achievement.point_reward || 0).toLocaleString()} P 획득
                     </div>
