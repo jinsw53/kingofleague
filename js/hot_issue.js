@@ -119,10 +119,12 @@ Boako.HotIssue = {
         } catch (e) { console.error("질문 게시글 이슈 로드 실패:", e); }
 
         // 5. 업적 달성 (최근 획득분) — 클릭 이동 위치는 추후 결정 전까지 비활성
+        //    🌟 OO매니아류는 achievements.name에 'OO' 플레이스홀더가 그대로 들어있어서,
+        //    meta.game_name으로 치환해줘야 함 (소식지 트리거와 동일한 규칙)
         try {
             const { data: uas } = await Boako.db
                 .from('user_achievements')
-                .select('id, user_id, achieved_at, achievements(name)')
+                .select('id, user_id, achieved_at, meta, achievements(name)')
                 .order('achieved_at', { ascending: false })
                 .limit(5);
 
@@ -132,9 +134,14 @@ Boako.HotIssue = {
                 const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
 
                 uas.forEach(u => {
+                    let achievementName = u.achievements?.name || '업적';
+                    const gameName = u.meta?.game_name;
+                    if (achievementName.includes('OO') && gameName) {
+                        achievementName = achievementName.replace('OO', gameName + ' ');
+                    }
                     items.push({
                         icon: '🏅',
-                        text: `${profileMap[u.user_id] || '누군가'}님이 ${u.achievements?.name || '업적'} 업적 달성!`,
+                        text: `${profileMap[u.user_id] || '누군가'}님이 ${achievementName} 업적 달성!`,
                         time: u.achieved_at,
                         linkType: null,
                         linkId: null
