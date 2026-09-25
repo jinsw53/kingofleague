@@ -13,6 +13,8 @@
  *    (업적 전용 4음 상승 아르페지오)로 사운드 교체. achievementUnlock이 없는 구버전 대비 success로 폴백.
  * 🌟 [리팩토링] startRealtime()을 js/realtime_coordinator.js 탭 리더 선출 방식으로 전환 — 사이트를
  *    여러 탭으로 띄워도 Realtime 소켓은 리더 탭 1개만 유지하도록 함 (자세한 설명은 아래 주석 참고).
+ * 🌟 [업그레이드] OO매니아 스퀴클 테두리를 2단계 단색 그라데이션에서 4단계 메탈릭 그라데이션으로 교체
+ *    (밝은 하이라이트 → 진한 그림자 톤까지, 소식지 카드의 서버 합성 배지와 동일한 컬러값 사용)
  */
 Boako.Achievements = {
     channel: null,
@@ -33,11 +35,12 @@ Boako.Achievements = {
     },
 
     // 🌟 업적명 뒤에 붙은 (동)/(은)/(금)으로 티어 컬러 판별. 없으면 기본(보라) 톤.
+    // 🌟 [업그레이드] 4단계 메탈릭 그라데이션 — 소식지 서버 합성(news-feed-add-item)의 tierColorRGB와 동일 팔레트
     getTierStyle: (name) => {
-        if (name && name.includes('(금)')) return { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', ring: '#fbbf24', label: 'GOLD' };
-        if (name && name.includes('(은)')) return { bg: 'linear-gradient(135deg,#e2e8f0,#94a3b8)', ring: '#cbd5e1', label: 'SILVER' };
-        if (name && name.includes('(동)')) return { bg: 'linear-gradient(135deg,#fb923c,#c2703d)', ring: '#fb923c', label: 'BRONZE' };
-        return { bg: 'linear-gradient(135deg,#8b5cf6,#4f46e5)', ring: '#8b5cf6', label: null };
+        if (name && name.includes('(금)')) return { bg: 'linear-gradient(135deg,#fff7e0,#f5c453 40%,#c98a1f 70%,#8a5a0f)', ring: '#c98a1f', label: 'GOLD' };
+        if (name && name.includes('(은)')) return { bg: 'linear-gradient(135deg,#ffffff,#e8edf2 40%,#b8c4cf 70%,#7c8a97)', ring: '#b8c4cf', label: 'SILVER' };
+        if (name && name.includes('(동)')) return { bg: 'linear-gradient(135deg,#ffe8d1,#f0a868 40%,#c2703d 70%,#7a4420)', ring: '#c2703d', label: 'BRONZE' };
+        return { bg: 'linear-gradient(135deg,#f0ebff,#b8a4f5 40%,#8b5cf6 70%,#5b3fb0)', ring: '#8b5cf6', label: null };
     },
 
     // 🌟 [리팩토링] 사이트를 여러 탭으로 띄워두면 탭마다 각자 이 채널을 구독해서 Realtime 동시연결
@@ -290,7 +293,7 @@ Boako.Achievements = {
             const pad = Math.max(2, Math.round(sizePx * 0.08));
             const innerPad = Math.max(2, Math.round(sizePx * 0.06));
             return `
-                <div style="height:${sizePx}px; display:inline-flex; align-items:center; justify-content:center; border-radius:${Math.round(sizePx * 0.22)}px; background:${tier.bg}; padding:${pad}px; box-shadow:0 0 0 2px ${tier.ring}55; box-sizing:border-box;">
+                <div style="height:${sizePx}px; display:inline-flex; align-items:center; justify-content:center; border-radius:${Math.round(sizePx * 0.22)}px; background:${tier.bg}; padding:${pad}px; box-shadow:0 0 0 1px ${tier.ring}88, 0 3px 8px rgba(0,0,0,0.25); box-sizing:border-box;">
                     <div style="height:100%; display:inline-flex; align-items:center; justify-content:center; border-radius:${Math.round(sizePx * 0.18)}px; background:#fff; padding:${innerPad}px; box-sizing:border-box;">
                         ${gameLogo ? `<img src="${Boako.Util.cdn(gameLogo)}" style="height:100%; width:auto; display:block;">` : `<span style="font-size:${Math.round(sizePx * 0.5)}px;">🎲</span>`}
                     </div>
