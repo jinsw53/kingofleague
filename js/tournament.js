@@ -306,12 +306,12 @@ Boako.Tournament = {
             return;
         }
 
-        resultsBox.innerHTML = data.map(g => `
+        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto">${data.map(g => `
             <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer transition-colors" onclick="Boako.Tournament.selectGame('${g.game_name.replace(/'/g, "\\'")}', '${(g.image_url || '').replace(/'/g, "\\'")}')">
                 <img src="${Boako.Util.cdn(g.image_url || DEFAULT_LOGO_FALLBACK)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
                 <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
             </div>
-        `).join('');
+        `).join('')}</div>`;
         resultsBox.classList.remove('hidden');
     },
 
@@ -346,7 +346,7 @@ Boako.Tournament = {
                         <div class="mb-3 relative">
                             <label class="text-xs font-bold text-slate-600 block mb-1">종목(게임) 검색</label>
                             <input type="text" id="tourney-input-game-search" autocomplete="off" placeholder="게임명을 입력해 검색하세요" oninput="Boako.Tournament.searchGames(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                            <div id="tourney-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
+                            <div id="tourney-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden"></div>
                         </div>
                         <div class="mb-3">
                             <label class="text-xs font-bold text-slate-600 block mb-1">설명</label>
