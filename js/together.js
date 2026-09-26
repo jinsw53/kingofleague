@@ -363,7 +363,7 @@ Boako.Together = {
                 </div>
                 <div id="together-party-search-box" class="hidden relative mt-4">
                     <input type="text" id="together-party-search-input" autocomplete="off" placeholder="닉네임으로 파티원 검색" oninput="Boako.Together.searchPartyMember(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                    <div id="together-party-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden"></div>
+                    <div id="together-party-search-results" class="hidden bg-white border border-slate-200 rounded-l-lg shadow-lg overflow-hidden" style="position:fixed; z-index:9997;"></div>
                 </div>
                 <button onclick="Boako.Together.runFindGame()" class="w-full mt-4 bg-sky-600 hover:bg-sky-700 text-white text-sm font-black py-2.5 rounded-lg transition-colors">🎯 같이할 게임 찾기</button>
             </div>
@@ -379,6 +379,30 @@ Boako.Together = {
         if (!box.classList.contains('hidden')) document.getElementById('together-party-search-input').focus();
     },
 
+    // 🌟 파티원 검색 드롭다운은 position:fixed로 띄운다 — .section-card의 overflow:hidden(전역 스타일)
+    // 안에 absolute로 두면 카드 경계를 넘어가는 즉시 통째로 잘려 보이는 문제가 있었음. fixed로 두고
+    // 입력창 위치를 기준으로 좌표를 직접 계산해서 붙이면 그 어떤 조상 요소의 overflow에도 안 잘림.
+    // 열려있는 동안 스크롤/리사이즈해도 입력창을 계속 따라가도록 리스너를 한 번만 붙여둠.
+    _partySearchRepositionBound: false,
+    _positionPartySearchResults: () => {
+        const input = document.getElementById('together-party-search-input');
+        const resultsBox = document.getElementById('together-party-search-results');
+        if (!input || !resultsBox) return;
+        const rect = input.getBoundingClientRect();
+        resultsBox.style.top = `${rect.bottom + 4}px`;
+        resultsBox.style.left = `${rect.left}px`;
+        resultsBox.style.width = `${rect.width}px`;
+
+        if (!Boako.Together._partySearchRepositionBound) {
+            Boako.Together._partySearchRepositionBound = true;
+            const reposition = () => {
+                if (!resultsBox.classList.contains('hidden')) Boako.Together._positionPartySearchResults();
+            };
+            window.addEventListener('scroll', reposition, true);
+            window.addEventListener('resize', reposition);
+        }
+    },
+
     searchPartyMember: async (query) => {
         const resultsBox = document.getElementById('together-party-search-results');
         if (!query || query.trim().length === 0) {
@@ -392,6 +416,7 @@ Boako.Together = {
 
         if (filtered.length === 0) {
             resultsBox.innerHTML = `<div class="p-3 text-xs text-slate-400 font-bold">검색 결과가 없습니다.</div>`;
+            Boako.Together._positionPartySearchResults();
             resultsBox.classList.remove('hidden');
             return;
         }
@@ -401,6 +426,7 @@ Boako.Together = {
                 <span class="text-xs font-bold text-slate-700">${p.full_name}</span>
             </div>
         `).join('')}</div>`;
+        Boako.Together._positionPartySearchResults();
         resultsBox.classList.remove('hidden');
     },
 
@@ -590,7 +616,7 @@ Boako.Together = {
                         <div class="mb-3 relative">
                             <label class="text-xs font-bold text-slate-600 block mb-1">종목(게임) 검색</label>
                             <input type="text" id="together-input-game-search" autocomplete="off" placeholder="게임명을 입력해 검색하세요" oninput="Boako.Together.searchGames(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                            <div id="together-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden"></div>
+                            <div id="together-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-l-lg shadow-lg mt-1 overflow-hidden"></div>
                         </div>
                         <div class="mb-3">
                             <label class="text-xs font-bold text-slate-600 block mb-1">설명</label>
