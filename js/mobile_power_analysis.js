@@ -12,6 +12,9 @@
  *    직접 배너+placeholder를 그린 뒤 init()만 호출함(배너도 PC 전용 클래스를 쓰므로 재사용 불가).
  * 🌟 [버그수정] 배너 텍스트가 왼쪽 정렬돼있었음 — PC .main-banner는 가운데 정렬인데 그 클래스가
  *    모바일엔 정의돼있지 않아 정렬이 다르게 보임. 인라인으로 직접 가운데 정렬 속성을 추가함.
+ * 🌟 [신규] 탐험도 카드에 플레이한 게임 로고 미리보기 추가, 클릭 시 PC와 완전히 동일한
+ *    Boako.PowerAnalysis.openExploredGamesModal()을 그대로 재사용 (Tailwind CDN이 모바일에도
+ *    로드돼 있어 그 모달의 Tailwind 클래스가 그대로 먹힘 — 별도 모바일 전용 모달 안 만듦).
  */
 window.Boako = window.Boako || {};
 Boako.MobilePowerAnalysis = {
@@ -51,9 +54,22 @@ Boako.MobilePowerAnalysis = {
         const {
             myRecordCount, totalRecordCount, activityPct,
             distinctGameCount, totalGameCount, explorePct,
+            playedGamesList,
             firstWinCount, topRecordedGames, topTournamentGames,
             teamHistory
         } = stats;
+
+        // 🌟 모달(Boako.PowerAnalysis.openExploredGamesModal, PC와 완전히 동일한 함수 재사용)이
+        // 참조할 수 있도록 저장. Tailwind CDN이 모바일에도 로드돼 있어 모달 자체는 그대로 재사용 가능.
+        Boako.PowerAnalysis._playedGamesList = playedGamesList || [];
+        const previewLogos = Boako.PowerAnalysis._playedGamesList.slice(0, 5).map((g, idx) => `
+            <img src="${g.logo ? Boako.Util.cdn(g.logo) : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" title="${Boako.MobilePowerAnalysis.escapeHtml(g.name)}"
+                 style="width:22px; height:22px; border-radius:6px; object-fit:contain; background:#f8fafc; border:2px solid #fff; box-shadow:0 1px 2px rgba(0,0,0,0.15); margin-left:${idx === 0 ? '0' : '-8px'}; position:relative; z-index:${10 - idx};">
+        `).join('');
+        const explorePreviewHtml = Boako.PowerAnalysis._playedGamesList.length > 0
+            ? `<div style="display:flex; align-items:center; justify-content:center; margin-top:10px;">${previewLogos}</div>
+               <div style="font-size:9.5px; color:#0891b2; font-weight:800; margin-top:6px;">탭해서 전체 보기 →</div>`
+            : '';
 
         // ===== 1. 활동량 + 2. 탐험도 =====
         const statsHtml = `
@@ -66,13 +82,14 @@ Boako.MobilePowerAnalysis = {
                         <div style="width:${Math.min(100, activityPct)}%; background:linear-gradient(90deg,#4338ca,#7c3aed); height:100%;"></div>
                     </div>
                 </div>
-                <div style="flex:1; background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:16px; text-align:center;">
+                <div style="flex:1; background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:16px; text-align:center; cursor:pointer;" onclick="Boako.PowerAnalysis.openExploredGamesModal()">
                     <div style="font-size:11px; font-weight:900; color:#94a3b8;">🗺️ 탐험도</div>
                     <div style="font-size:26px; font-weight:950; color:#0891b2; margin-top:6px;">${explorePct.toFixed(1)}%</div>
                     <div style="font-size:10.5px; color:#64748b; font-weight:700; margin-top:6px; line-height:1.5;">등록 ${totalGameCount.toLocaleString()}종 중<br><b style="color:#0891b2;">${distinctGameCount.toLocaleString()}종</b> 플레이</div>
                     <div style="width:100%; background:#f1f5f9; height:6px; border-radius:99px; margin-top:10px; overflow:hidden;">
                         <div style="width:${Math.min(100, explorePct)}%; background:linear-gradient(90deg,#0891b2,#06b6d4); height:100%;"></div>
                     </div>
+                    ${explorePreviewHtml}
                 </div>
             </div>
         `;
