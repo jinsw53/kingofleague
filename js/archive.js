@@ -13,6 +13,9 @@
  * 🌟 타이틀 스폰서 배지: "Boako Team League" 브랜드 타이틀(id=archive-brand-title) 앞에 표시.
  *    현재 선택된 시즌 필터(currentSeasonFilter)에 맞춰 Boako.Util.setTitleSponsorBadge로 갱신됨
  *    (buildUI 최초 진입 / 자동 감지된 최근 시즌 적용 시 / 시즌 드롭다운 선택 시 3곳에서 호출).
+ * 🌟 [신규] 4번째 탭 "🗺️ 히스토리" — 최근 90일 RP 비중 기반 세력지도(js/territory_map.js,
+ *    Boako.TerritoryMap.buildUI). 이 탭은 검색/무소속토글/시즌·라운드 드롭다운을 전부 숨기고
+ *    (자체 90일 슬라이더로 독립 동작), fetchAndRender() 대신 TerritoryMap.buildUI를 바로 호출함.
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -156,6 +159,9 @@ Boako.Archive = {
                         <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
                             <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
                         </button>
+                        <button onclick="Boako.Archive.switchTab('territory_map')" id="tab-territory_map" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
+                            🗺️ 히스토리
+                        </button>
                     </div>
                 </div>
 
@@ -171,7 +177,7 @@ Boako.Archive = {
                     </div>
                 </div>
 
-                <div class="relative mb-8 flex items-center gap-3">
+                <div id="archive-filter-row" class="relative mb-8 flex items-center gap-3">
                     <div class="relative flex-1">
                         <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5"></i>
                         <input type="text" id="archive-search" oninput="Boako.Archive.filterData()" placeholder="닉네임이나 게임 종목 검색..."
@@ -476,29 +482,58 @@ Boako.Archive = {
         document.getElementById('tab-records').className = tabName === 'records' ? activeClass : inactiveClass;
         document.getElementById('tab-rankings').className = tabName === 'rankings' ? activeClass : inactiveClass;
         document.getElementById('tab-games').className = tabName === 'games' ? activeClass : inactiveClass;
+        document.getElementById('tab-territory_map').className = tabName === 'territory_map' ? activeClass : inactiveClass;
         
         const titleEl = document.getElementById('archive-page-title');
         const descEl = document.getElementById('archive-page-desc');
         const subDescEl = document.getElementById('archive-page-subdesc');
         const roundFilter = document.getElementById('round-filter-wrapper');
+        const seasonFilter = document.getElementById('season-filter-container');
+        const filterRow = document.getElementById('archive-filter-row');
 
         if (tabName === 'records') {
             titleEl.innerText = '시즌 경기 기록실';
             descEl.innerText = '시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.';
             if (subDescEl) subDescEl.style.display = 'block';
             if (roundFilter) roundFilter.style.display = 'block';
+            if (seasonFilter) seasonFilter.style.display = 'block';
+            if (filterRow) filterRow.style.display = 'flex';
         } else if (tabName === 'rankings') {
             titleEl.innerText = '리그 개인 순위표';
             descEl.innerText = '누적 RP 기준 전체 유저들의 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'block';
+            if (seasonFilter) seasonFilter.style.display = 'block';
+            if (filterRow) filterRow.style.display = 'flex';
         } else if (tabName === 'games') {
             titleEl.innerText = '시즌 대세 게임 & 게임별 순위';
             descEl.innerText = '가장 핫한 보드게임 종목 순위와 게임별 모든 유저의 기록 순위입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'none';
+            if (seasonFilter) seasonFilter.style.display = 'block';
+            if (filterRow) filterRow.style.display = 'flex';
+        } else if (tabName === 'territory_map') {
+            titleEl.innerText = '세력 히스토리';
+            descEl.innerText = '최근 90일간 RP 비중으로 나눈 팀/개인 세력 지도입니다.';
+            if (subDescEl) subDescEl.style.display = 'none';
+            if (roundFilter) roundFilter.style.display = 'none';
+            if (seasonFilter) seasonFilter.style.display = 'none';
+            if (filterRow) filterRow.style.display = 'none';
         }
         // 🌟 "무소속 포함" 토글은 이제 3개 탭 전부에서 동일하게 노출 (탭별로 숨기지 않음)
+
+        // 🌟 [신규] 히스토리(세력지도) 탭은 자체 렌더러를 씀 — 공통 fetchAndRender 파이프라인 안 탐
+        if (tabName === 'territory_map') {
+            if (!Boako.TerritoryMap || !Boako.TerritoryMap.buildUI) {
+                await Boako.Util.loadScript('js/territory_map.js');
+            }
+            const area = document.getElementById('archive-content-area');
+            if (area) area.innerHTML = '';
+            if (Boako.TerritoryMap && typeof Boako.TerritoryMap.buildUI === 'function') {
+                Boako.TerritoryMap.buildUI('archive-content-area');
+            }
+            return;
+        }
         
         this.fetchAndRender();
     },
