@@ -10,6 +10,7 @@
 Boako.TeamList = {
     currentPage: 1,
     itemsPerPage: 6, // 리스트가 깔끔하게 보이도록 6개 추천
+    State: { teams: [] }, // 🌟 카톡 공유(shareToKakao)가 팀 데이터를 다시 조회하지 않고 바로 찾을 수 있도록 마지막 로드 결과 캐시
 
     init: async (containerId) => {
         const container = document.getElementById(containerId);
@@ -52,6 +53,14 @@ Boako.TeamList = {
             if (e.key === 'Enter') Boako.TeamList.loadTeams(1);
         });
 
+        // 🌟 카톡 공유 딥링크(?view=team_list&post=팀명)로 들어온 경우, 검색창에 팀명을 채워서
+        // 기존 검색 필터링(team_name.ilike)으로 그 팀만 바로 보여줌 — 팀 목록은 정렬/페이지네이션이라
+        // together/tournament처럼 특정 카드로 스크롤하는 방식 대신 검색으로 좁히는 게 안전함.
+        if (window.Boako.__deepLinkPostId) {
+            document.getElementById('team-search-input').value = window.Boako.__deepLinkPostId;
+            window.Boako.__deepLinkPostId = null;
+        }
+
         await Boako.TeamList.loadTeams(1);
     },
 
@@ -87,6 +96,7 @@ Boako.TeamList = {
             if (error) throw error;
 
             if (countBadge) countBadge.innerText = `총 ${totalCount || 0}개 팀`;
+            Boako.TeamList.State.teams = paginatedTeams || []; // 🌟 shareToKakao가 참조할 캐시
 
             if (!paginatedTeams || paginatedTeams.length === 0) {
                 container.innerHTML = `<div class="col-span-full bg-white border border-slate-200 rounded-xl p-10 text-center flex flex-col items-center justify-center shadow-sm"><span class="text-4xl mb-3">📭</span><h4 class="font-black text-slate-600 text-lg mb-1">검색 결과 없음</h4></div>`;
@@ -137,6 +147,11 @@ Boako.TeamList = {
                     actionBtn = `<button onclick="Boako.TeamList.requestJoin('${team.team_name}', '${leaderName}', ${team.id})" class="w-full mt-3 bg-slate-900 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 tracking-wide text-center">가입 신청</button>`;
                 }
 
+                // 🌟 모집 마감된 팀은 공유할 이유가 없으니(더 이상 못 들어오니) 모집 중일 때만 공유 버튼 노출
+                const shareBtn = !isFull
+                    ? `<button onclick="Boako.TeamList.shareToKakao(${team.id})" class="shrink-0 w-7 h-7 rounded-full bg-yellow-50 hover:bg-yellow-100 flex items-center justify-center text-sm transition-colors" title="카톡으로 공유">💬</button>`
+                    : '';
+
                 listHtml += `
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] group flex flex-col">
                         <div class="h-32 bg-slate-50 border-b border-slate-100 flex items-center justify-center relative overflow-hidden p-4">
@@ -160,7 +175,10 @@ Boako.TeamList = {
                                         </div>
                                         <span class="text-xs font-black text-slate-600">${leaderName}</span>
                                     </div>
-                                    ${toBadge}
+                                    <div class="flex items-center gap-2">
+                                        ${shareBtn}
+                                        ${toBadge}
+                                    </div>
                                 </div>
                                 ${actionBtn}
                             </div>
@@ -176,6 +194,23 @@ Boako.TeamList = {
             console.error("팀 목록 로드 실패:", err);
             container.innerHTML = `<div class="col-span-full text-center py-10 text-red-500 font-bold text-sm bg-red-50 rounded-xl">데이터를 불러오는 중 오류가 발생했습니다.</div>`;
         }
+    },
+
+    // 🌟 카톡 공유 — 팀을 피드 템플릿으로 공유. postId 자리엔 팀 ID 대신 팀명을 실어서,
+    // 받는 사람이 링크를 열면 team_list.js가 검색창에 팀명을 채워 그 팀만 바로 보여줌
+    // (팀 목록은 정렬/페이지네이션이 있어서 ID로 특정 카드에 스크롤하는 방식이 안 맞음).
+    shareToKakao: (teamId) => {
+        const team = Boako.TeamList.State.teams.find(t => t.id === teamId);
+        if (!team) return;
+        const currentTo = team.member_count || 0;
+        Boako.Util.shareToKakao({
+            title: `[${team.team_name}] 팀원을 모집합니다`,
+            description: `${team.team_motto ? `"${team.team_motto}" · ` : ''}👥 ${currentTo}/4명 · 팀장 ${team.leader_name || '미지정'}`,
+            imageUrl: team.logo_url || 'https://placehold.co/150x150?text=NO+LOGO',
+            view: 'team_list',
+            postId: team.team_name,
+            buttonTitle: '팀 보러가기'
+        });
     },
 
     renderPagination: (totalCount) => {
