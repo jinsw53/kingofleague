@@ -28,6 +28,8 @@
  * 🌟 [신규] navigateToLink에 TERRITORY_MAP 케이스 추가 — 매일 자동 생성되는 "어제의 영향력 지도"
  *    소식지 카드 클릭 시 전적기록실을 열고 "히스토리" 탭으로 바로 전환 (RIVAL_MATCH가 "응원하기" 탭으로
  *    바로 들어가는 것과 동일한 패턴).
+ * 🌟 [신규] shareToKakao — 카카오톡 공유(피드 템플릿) 공용 함수. 같이하자/토너먼트/팀 모집 카드에서
+ *    공통으로 재사용. index.html/mobile/index.html에서 Kakao JS SDK 로드+init 완료를 전제로 함.
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -36,6 +38,36 @@ Boako.Util = {
         if(!t) return;
         t.innerText = msg; t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 3000);
+    },
+
+    // 🌟 [신규] 카카오톡 공유 — 피드 템플릿(이미지+제목/본문+버튼 최대 2개)으로 공유 시트 오픈
+    // opts: { title, description, imageUrl, view, postId }
+    //  - view: main.js가 읽는 딥링크용 화면 이름 (예: 'together')
+    //  - postId: 있으면 링크에 &post=ID 추가 (특정 글로 자동 스크롤+하이라이트)
+    shareToKakao: (opts) => {
+        if (!window.Kakao || !Kakao.isInitialized()) {
+            Boako.Util.toast('카카오톡 공유를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+        const base = `${window.location.origin}${window.location.pathname}`;
+        const deepLink = `${base}?view=${opts.view}${opts.postId ? `&post=${opts.postId}` : ''}`;
+        const inviteLink = Boako.state.user
+            ? `${deepLink}&ref=${Boako.state.user.id}`
+            : deepLink;
+
+        Kakao.Share.sendDefault({
+            objectType: 'feed',
+            content: {
+                title: opts.title,
+                description: opts.description,
+                imageUrl: Boako.Util.cdn(opts.imageUrl) || 'https://cdn.boakoarchive.co.kr/storage/v1/object/public/teams/etc/challenge%20(1).png',
+                link: { webUrl: deepLink, mobileWebUrl: deepLink }
+            },
+            buttons: [
+                { title: opts.buttonTitle || '보러가기', link: { webUrl: deepLink, mobileWebUrl: deepLink } },
+                { title: '친구 초대', link: { webUrl: inviteLink, mobileWebUrl: inviteLink } }
+            ]
+        });
     },
 
     // 🖼️ 2. 이미지 미리보기 (기존 코드 그대로)
