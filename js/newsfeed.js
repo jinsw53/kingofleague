@@ -84,6 +84,11 @@
  *    늘어난 빈 여백" 느낌을 없앨 수 없었음. 대신 추천 게임 카드는 원래 크기(콘텐츠 크기)를 고수하고,
  *    그 옆 2칸을 항상 스몰/미디엄(1칸) 카드로 고정 배치해서 애초에 라지 카드와 같은 줄에 못 붙게 함
  *    (recommendPairCandidates — 부족하면 필러로 채움). render()/renderTributeGrid() 양쪽에 동일 적용.
+ * 🌟 [신규] "영향력 지도" 카드 — 오늘의 추천 게임처럼 importance/신선도 감쇠(scored/tier) 파이프라인을
+ *    아예 안 타는 고정 카드. news_feed_items에는 (poster_type='territory_map' 크론이) 계속 매일
+ *    event_type='TERRITORY_MAP_DAILY' 행을 쌓지만, 일반 소식 목록 조회에서는 이 event_type을 제외하고
+ *    최신 1건만 따로 가져와 항상 medium 크기로 고정 표시 — 등급이 시간이 지나도 절대 안 떨어짐(어차피
+ *    매일 새로 갱신되는 스냅샷이라 "오래된 소식"이라는 개념 자체가 안 맞아서). 클릭 시 히스토리 탭 이동.
  */
 Boako.NewsFeed = {
     items: [],
@@ -121,10 +126,12 @@ Boako.NewsFeed = {
 
         root.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">소식을 불러오는 중...</div>`;
 
-        const [feedResult, fillerPool, recommendResult] = await Promise.all([
-            Boako.db.from('news_feed_items').select('*').order('created_at', { ascending: false }).limit(80),
+        const [feedResult, fillerPool, recommendResult, territoryMapResult] = await Promise.all([
+            // 🌟 영향력 지도(TERRITORY_MAP_DAILY)는 여기서 아예 빼고 아래에서 최신 1건만 따로 가져옴
+            Boako.db.from('news_feed_items').select('*').neq('event_type', 'TERRITORY_MAP_DAILY').order('created_at', { ascending: false }).limit(80),
             Boako.NewsFeed.buildFillerPool(),
             Boako.db.rpc('fn_get_today_recommended_games_by_tier'),
+            Boako.db.from('news_feed_items').select('thumbnail_url, title').eq('event_type', 'TERRITORY_MAP_DAILY').order('created_at', { ascending: false }).limit(1).maybeSingle(),
         ]);
 
         if (feedResult.error) {
@@ -136,6 +143,8 @@ Boako.NewsFeed = {
         Boako.NewsFeed.items = feedResult.data || [];
         Boako.NewsFeed.fillerPool = fillerPool;
         Boako.NewsFeed.fillerCursor = 0;
+        // 🌟 [신규] 영향력 지도 고정 카드 — 감쇠 없이 항상 medium 크기로 노출
+        Boako.NewsFeed.territoryMapCard = territoryMapResult?.data || null;
         // 🌟 [수정] 오늘의 추천 게임 — 이지/노멀/하드 3개로 확장, 라지 카드 1장 안에 3칸으로 표시.
         // fn_get_today_recommended_games_by_tier()가 [{tier, game_name}, ...] 형태로 반환.
         Boako.NewsFeed.todayRecommendGames = [];
@@ -528,6 +537,8 @@ Boako.NewsFeed = {
         const queue = [...nonHeadline, ...extraHeadlines]
             .sort((a, b) => b._score - a._score)
             .map(item => ({ html: Boako.NewsFeed.renderCard(item), span: item._tier === 'large' ? 2 : 1 }));
+        // 🌟 영향력 지도 고정 카드 — 점수 계산을 안 거치고 큐 맨 앞에 무조건 medium(span:1)으로 끼움
+        if (Boako.NewsFeed.territoryMapCard) queue.unshift({ html: Boako.NewsFeed.renderTerritoryMapCard(), span: 1 });
 
         root.innerHTML = `
             ${bannerHtml}
@@ -571,6 +582,8 @@ Boako.NewsFeed = {
         const queue = [...mediumItems, ...otherItems]
             .sort((a, b) => b._score - a._score)
             .map(item => ({ html: Boako.NewsFeed.renderCard(item), span: item._tier === 'large' ? 2 : 1 }));
+        // 🌟 영향력 지도 고정 카드 — 여기서도 동일하게 큐 맨 앞에 무조건 끼움
+        if (Boako.NewsFeed.territoryMapCard) queue.unshift({ html: Boako.NewsFeed.renderTerritoryMapCard(), span: 1 });
 
         Boako.NewsFeed.runMasonry(
             container,
@@ -638,6 +651,23 @@ Boako.NewsFeed = {
                     <div class="grid grid-cols-3">
                         ${cellsHtml}
                     </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // 🌟 [신규] 영향력 지도 고정 카드 — "오늘의 추천 게임"과 같은 위상: importance/신선도 감쇠를 전혀
+    // 타지 않고, medium 카드(renderCard의 medium 분기)와 완전히 동일한 마크업으로 항상 같은 크기 유지.
+    // 클릭하면 전적기록실 "히스토리" 탭으로 이동 (link_id 필요 없음).
+    renderTerritoryMapCard: () => {
+        const card = Boako.NewsFeed.territoryMapCard;
+        if (!card) return '';
+        const img = card.thumbnail_url ? Boako.Util.cdn(card.thumbnail_url) : null;
+        return `
+            <div class="col-span-2 md:col-span-1 bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" onclick="Boako.Util.navigateToLink('TERRITORY_MAP', null)" style="cursor:pointer;">
+                ${img ? `<div class="h-24 overflow-hidden"><img src="${img}" class="w-full h-full object-cover"></div>` : ''}
+                <div class="p-3 min-w-0">
+                    <h4 class="text-xs font-black text-slate-800 leading-snug">${Boako.NewsFeed.clampTitle(card.title || '🗺️ 영향력 지도')}</h4>
                 </div>
             </div>
         `;
