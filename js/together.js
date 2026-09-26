@@ -455,19 +455,33 @@ Boako.Together = {
 
         const allGameNames = [...intersection, ...majority].map(g => g.game_name);
         let logoMap = {};
+        let rangeMap = {};
         if (allGameNames.length > 0) {
-            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url').in('game_name', allGameNames);
+            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url, min_players, max_players').in('game_name', allGameNames);
             logoMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.image_url]));
+            rangeMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, { min: g.min_players, max: g.max_players }]));
         }
 
-        Boako.Together.State.findGameResults = { total, intersection, majority, logoMap };
+        Boako.Together.State.findGameResults = { total, intersection, majority, logoMap, rangeMap };
         Boako.Together.renderFindGameResults();
     },
 
     renderFindGameResults: () => {
         const box = document.getElementById('together-findgame-results');
         if (!box) return;
-        const { total, intersection, majority, logoMap } = Boako.Together.State.findGameResults;
+        const { total, intersection, majority, logoMap, rangeMap } = Boako.Together.State.findGameResults;
+
+        // 🌟 게임의 min_players/max_players와 우리 파티 인원수(total)를 비교해서 안 맞으면 경고 표시.
+        // 정보가 없는 게임(min/max 둘 다 null)은 판단할 수 없으니 아무 표시도 하지 않음.
+        // 완전히 목록에서 빼지는 않음 — "이 인원이 전에 다 같이 해봤다"는 사실 자체는 유효한 정보라서.
+        const renderPlayerRange = (gameName) => {
+            const range = rangeMap[gameName];
+            if (!range || (range.min == null && range.max == null)) return '';
+            const misfit = (range.min != null && total < range.min) || (range.max != null && total > range.max);
+            const lo = range.min ?? '?';
+            const hi = range.max ?? '?';
+            return `<div class="text-[10px] font-bold mt-0.5 ${misfit ? 'text-rose-500' : 'text-slate-400'}">${misfit ? '⚠️ ' : ''}${lo}~${hi}인용${misfit ? ` · 우리 ${total}명과 안 맞아요` : ''}</div>`;
+        };
 
         const renderCard = (g) => `
             <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-sky-300 transition-colors" onclick="Boako.Together.openWriteModal('${g.game_name.replace(/'/g, "\\'")}')">
@@ -475,6 +489,7 @@ Boako.Together = {
                 <div class="min-w-0">
                     <div class="text-sm font-black text-slate-800 truncate">${g.game_name}</div>
                     <div class="text-[11px] font-bold text-slate-500">${g.count} / ${total}명 플레이</div>
+                    ${renderPlayerRange(g.game_name)}
                 </div>
             </div>
         `;
