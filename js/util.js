@@ -50,7 +50,7 @@ Boako.Util = {
             return;
         }
         const base = `${window.location.origin}${window.location.pathname}`;
-        const deepLink = `${base}?view=${opts.view}${opts.postId ? `&post=${opts.postId}` : ''}`;
+        const deepLink = `${base}?view=${opts.view}${opts.postId ? `&post=${encodeURIComponent(opts.postId)}` : ''}`;
         const inviteLink = Boako.state.user
             ? `${deepLink}&ref=${Boako.state.user.id}`
             : deepLink;
