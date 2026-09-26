@@ -193,6 +193,20 @@ Boako.Tournament = {
         }
 
         container.innerHTML = posts.map(p => Boako.Tournament.renderCard(p)).join('');
+
+        // 🌟 카톡 공유 딥링크(?view=tournament&post=ID)로 들어온 경우 해당 글로 스크롤+하이라이트 (1회만)
+        if (window.Boako.__deepLinkPostId) {
+            const targetId = window.Boako.__deepLinkPostId;
+            window.Boako.__deepLinkPostId = null;
+            setTimeout(() => {
+                const el = document.getElementById(`tournament-post-${targetId}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-4', 'ring-violet-400');
+                    setTimeout(() => el.classList.remove('ring-4', 'ring-violet-400'), 2000);
+                }
+            }, 100);
+        }
     },
 
     renderCard: (p) => {
@@ -203,7 +217,7 @@ Boako.Tournament = {
 
         if (p.type === 'ANNOUNCEMENT') {
             return `
-                <div class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="window.open('${p.source_url}', '_blank')">
+                <div id="tournament-post-${p.id}" class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="window.open('${p.source_url}', '_blank')">
                     <div class="flex items-center gap-3">
                         <div class="flex flex-col items-center shrink-0" style="width:52px;">
                             <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
@@ -213,6 +227,7 @@ Boako.Tournament = {
                             <div class="text-base font-black text-violet-700">📅 ${dateStr}</div>
                             <div class="text-[11px] text-slate-400 truncate">${p.title}</div>
                         </div>
+                        <button onclick="event.stopPropagation(); Boako.Tournament.shareToKakao(${p.id})" class="shrink-0 w-7 h-7 rounded-full bg-yellow-50 hover:bg-yellow-100 flex items-center justify-center text-sm transition-colors" title="카톡으로 공유">💬</button>
                         <span class="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">🔗</span>
                     </div>
                     ${p.max_participants ? `<div class="text-[11px] text-slate-400 font-bold mt-2">👥 최대 ${p.max_participants}명</div>` : ''}
@@ -249,6 +264,24 @@ Boako.Tournament = {
                     : `<a href="${p.source_url}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
+    },
+
+    // 🌟 카톡 공유 — 토너먼트 개최 공지를 피드 템플릿으로 공유
+    shareToKakao: (postId) => {
+        const p = Boako.Tournament.State.posts.find(x => x.id === postId);
+        if (!p) return;
+        const dateStr = p.scheduled_date
+            ? new Date(p.scheduled_date).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '일정 미정';
+        const gameLogo = Boako.Tournament.State.gameLogoMap[p.game_name] || DEFAULT_LOGO_FALLBACK;
+        Boako.Util.shareToKakao({
+            title: p.title,
+            description: `📅 ${dateStr} · ${p.game_name || '종목 미정'}${p.max_participants ? ` · 최대 ${p.max_participants}명` : ''}`,
+            imageUrl: gameLogo,
+            view: 'tournament',
+            postId: p.id,
+            buttonTitle: '공지 보러가기'
+        });
     },
 
     // 🌟 게임 검색 (games 테이블 자동완성) — 베타/알파/협력 게임은 검색결과에서 아예 제외
