@@ -13,9 +13,11 @@
  * 🌟 타이틀 스폰서 배지: "Boako Team League" 브랜드 타이틀(id=archive-brand-title) 앞에 표시.
  *    현재 선택된 시즌 필터(currentSeasonFilter)에 맞춰 Boako.Util.setTitleSponsorBadge로 갱신됨
  *    (buildUI 최초 진입 / 자동 감지된 최근 시즌 적용 시 / 시즌 드롭다운 선택 시 3곳에서 호출).
- * 🌟 [신규] 4번째 탭 "🗺️ 히스토리" — 최근 90일 RP 비중 기반 세력지도(js/territory_map.js,
- *    Boako.TerritoryMap.buildUI). 이 탭은 검색/무소속토글/시즌·라운드 드롭다운을 전부 숨기고
- *    (자체 90일 슬라이더로 독립 동작), fetchAndRender() 대신 TerritoryMap.buildUI를 바로 호출함.
+ * 🌟 [신규] 4번째 탭 "히스토리" — 최근 90일 RP 비중 기반 세력지도(js/territory_map.js,
+ *    Boako.TerritoryMap.buildUI). 탭 아이콘은 다른 3개 탭과 통일감 있게 lucide "map" 아이콘 사용
+ *    (컬러 이모지 대신 — 처음엔 🗺️ 이모지였는데 다른 탭들과 톤이 안 맞아서 교체함).
+ *    이 탭은 검색/무소속토글/시즌·라운드 드롭다운을 전부 숨기고(자체 90일 슬라이더로 독립 동작),
+ *    fetchAndRender() 대신 TerritoryMap.buildUI를 바로 호출함.
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -160,7 +162,7 @@ Boako.Archive = {
                             <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
                         </button>
                         <button onclick="Boako.Archive.switchTab('territory_map')" id="tab-territory_map" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
-                            🗺️ 히스토리
+                            <i data-lucide="map" class="w-4 h-4"></i> 히스토리
                         </button>
                     </div>
                 </div>
