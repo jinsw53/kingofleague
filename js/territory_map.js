@@ -12,7 +12,9 @@
  *    자기 방향선을 따라 바깥쪽으로. 그래서 신흥 강자는 가장자리에서 나타나 중앙으로 다가오며
  *    커지고, 밀리는 쪽은 중앙에서 바깥으로 밀려남 — 보로노이 경계 밀림과 합쳐져 서로 부딪히며
  *    영역을 다투는 느낌을 냄. 팀 안 팀원 배치도 팀 내부 순위 기준으로 동일하게 적용.
- * 🌟 [신규] 정중앙(그날 1등)에게는 라벨 앞에 👑 표시 — 중앙 = 1등이라는 걸 한눈에 알아보기 쉽게.
+ * 🌟 [신규] 정중앙(그날 1등)에게는 로고/닉네임이 있는 줄 "위에" 별도의 👑 줄을 하나 더 넣음
+ *    (이름 앞에 인라인으로 붙이면 로고+이름 줄 폭이 흔들려서, 그 줄 자체는 안 건드리고
+ *    바로 위에 왕관 전용 줄을 하나 추가하는 방식으로 변경 — 로고/이름 배치는 그대로 유지됨).
  * 시각화: 화면 전체를 빈틈없이 채우는 보로노이 테셀레이션. 진한 경계선=팀/개인 간 경계,
  *        얇은 경계선=팀 안 팀원 간 경계. 라벨(닉네임/팀명)은 실제로 칠해진 영역의 무게중심을
  *        따라다님 (경계가 밀려도 라벨이 안 겉돎).
@@ -347,7 +349,7 @@ Boako.TerritoryMap = {
 
         topRaw.forEach(x => {
             const e = x.e;
-            const crown = x.isRank1 ? '👑 ' : '';
+            const crownDiv = x.isRank1 ? `<div style="font-size:14px; line-height:1.1; margin-bottom:1px;">👑</div>` : '';
             if (e.kind === 'team') {
                 const total = e.team.memberList.reduce((s, m) => s + sumUpTo(m.daily), 0);
                 const center = centroidOf(topCentroid, e.key, e.cx, e.cy);
@@ -356,7 +358,7 @@ Boako.TerritoryMap = {
                 const logoHtml = e.team.logoUrl
                     ? `<img src="${Boako.Util.cdn(e.team.logoUrl)}" style="width:20px; height:20px; object-fit:contain; border-radius:4px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.4);">`
                     : `<span style="width:20px; height:20px; border-radius:50%; background:${this.HUES[x.hueIdx][800]}; color:#fff; font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;">${e.key.charAt(0)}</span>`;
-                el.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; gap:5px;">${logoHtml}<span style="font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${crown}${e.key}</span></div>
+                el.innerHTML = `${crownDiv}<div style="display:flex; align-items:center; justify-content:center; gap:5px;">${logoHtml}<span style="font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${e.key}</span></div>
                     <div style="font-size:11px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6); margin-top:2px;">${Math.round(total)} RP</div>`;
                 const mws = memberWeightsByTeam[e.key] || [];
                 mws.forEach(info => {
@@ -371,7 +373,7 @@ Boako.TerritoryMap = {
                 const center = centroidOf(ownerCentroid, e.key, e.cx, e.cy);
                 const el = this.labelDivs[e.key];
                 el.style.left = center.x + 'px'; el.style.top = center.y + 'px';
-                el.innerHTML = `<div style="font-size:13px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${crown}${e.key}</div>
+                el.innerHTML = `${crownDiv}<div style="font-size:13px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${e.key}</div>
                     <div style="font-size:11px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${Math.round(total)} RP</div>`;
             }
         });
