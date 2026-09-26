@@ -119,9 +119,10 @@ Boako.HotIssue = {
             });
         } catch (e) { console.error("질문 게시글 이슈 로드 실패:", e); }
 
-        // 5. 업적 달성 (최근 획득분) — 클릭 이동 위치는 추후 결정 전까지 비활성
+        // 5. 업적 달성 (최근 획득분)
         //    🌟 OO매니아류는 achievements.name에 'OO' 플레이스홀더가 그대로 들어있어서,
         //    meta.game_name으로 치환해줘야 함 (소식지 트리거와 동일한 규칙)
+        //    🌟 [수정] 클릭 이동 위치 확정 — 전적기록실로 이동 (소식지 트리거와 동일하게 ARCHIVE 사용).
         try {
             const { data: uas } = await Boako.db
                 .from('user_achievements')
@@ -144,7 +145,7 @@ Boako.HotIssue = {
                         icon: '🏅',
                         text: `${profileMap[u.user_id] || '누군가'}님이 ${achievementName} 업적 달성!`,
                         time: u.achieved_at,
-                        linkType: null,
+                        linkType: 'ARCHIVE',
                         linkId: null
                     });
                 });
