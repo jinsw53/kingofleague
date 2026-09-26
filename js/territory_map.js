@@ -11,6 +11,9 @@
  * 시각화: 화면 전체를 빈틈없이 채우는 보로노이 테셀레이션. 진한 경계선=팀/개인 간 경계,
  *        얇은 경계선=팀 안 팀원 간 경계. 라벨(닉네임/팀명)은 고정 좌표가 아니라 그 순간
  *        실제로 칠해진 영역의 무게중심을 따라다님 (경계가 밀려도 라벨이 안 겉돎).
+ * 🌟 [수정] render() 시점마다, 슬라이더가 가리키는 날짜까지 실제 rp 누적이 0인 팀/개인(EPS 제외 순수값)은
+ *    그날의 보로노이 계산에서 통째로 빼버림 — 팀 안 개별 팀원 단위로도 동일 적용. 그래서 아직
+ *    창단 전이거나 활동 시작 전인 개체는 그 좌표에 미리 자리를 차지한 채로 보이지 않음.
  * 클릭 동작: 아직 미정이라 클릭 핸들러 없음 (추후 결정 시 추가).
  */
 Boako.TerritoryMap = {
@@ -225,21 +228,38 @@ Boako.TerritoryMap = {
         const EPS = 0.05;
         const sumUpTo = (arr) => arr.slice(0, dayIdx + 1).reduce((a, b) => a + b, 0);
 
-        const topRaw = this.topEntities.map((e, i) => {
-            const value = e.kind === 'team'
-                ? e.team.memberList.reduce((s, m) => s + sumUpTo(m.daily), 0)
-                : sumUpTo(e.solo.daily);
-            return { e, value: value + EPS, hueIdx: i % this.HUES.length };
-        });
+        // 🌟 그 날짜까지 실제 활동(rp)이 0인 팀/개인은 지도에서 아예 제외 (아직 창단/활동 전)
+        const topRaw = this.topEntities
+            .map((e, i) => {
+                const rawValue = e.kind === 'team'
+                    ? e.team.memberList.reduce((s, m) => s + sumUpTo(m.daily), 0)
+                    : sumUpTo(e.solo.daily);
+                return { e, rawValue, hueIdx: i % this.HUES.length };
+            })
+            .filter(x => x.rawValue > 0)
+            .map(x => Object.assign({}, x, { value: x.rawValue + EPS }));
+
+        // 라벨은 매번 전부 비우고, 이번 날짜에 실제로 존재하는 개체만 다시 채움
+        Object.values(this.labelDivs).forEach(el => { el.innerHTML = ''; });
+
+        const ctx = this.ctx;
+        if (topRaw.length === 0) {
+            ctx.clearRect(0, 0, this.W, this.H);
+            return;
+        }
+
         const topSum = topRaw.reduce((s, x) => s + x.value, 0);
         topRaw.forEach(x => { x.weight = this.weightOf(x.value / topSum); });
 
         const memberWeightsByTeam = {};
         topRaw.forEach(x => {
             if (x.e.kind !== 'team') return;
-            const raws = x.e.team.memberList.map(m => sumUpTo(m.daily) + EPS);
+            const activeMembers = x.e.team.memberList
+                .map((m, mi) => ({ m, mi, raw: sumUpTo(m.daily) }))
+                .filter(o => o.raw > 0);
+            const raws = activeMembers.map(o => o.raw + EPS);
             const sum = raws.reduce((a, b) => a + b, 0);
-            memberWeightsByTeam[x.e.key] = x.e.team.memberList.map((m, mi) => ({ m, weight: this.weightOf(raws[mi] / sum) }));
+            memberWeightsByTeam[x.e.key] = activeMembers.map((o, idx) => ({ m: o.m, mi: o.mi, weight: this.weightOf(raws[idx] / sum) }));
         });
 
         const W = this.W, H = this.H, STEP = this.STEP;
@@ -266,11 +286,11 @@ Boako.TerritoryMap = {
                 } else {
                     const mws = memberWeightsByTeam[best.e.key];
                     let bestM = null, bestMi = 0, bestMR = Infinity;
-                    mws.forEach((info, mi) => {
+                    mws.forEach((info) => {
                         const mx = best.e.cx + info.m.dx, my = best.e.cy + info.m.dy;
                         const d = Math.hypot(x - mx, y - my);
                         const ratio = d / info.weight;
-                        if (ratio < bestMR) { bestMR = ratio; bestM = info; bestMi = mi; }
+                        if (ratio < bestMR) { bestMR = ratio; bestM = info; bestMi = info.mi; }
                     });
                     ownerKey = bestM.m.name;
                     fillColor = hue[bestMi % 2 === 0 ? 400 : 200];
@@ -283,7 +303,6 @@ Boako.TerritoryMap = {
             }
         }
 
-        const ctx = this.ctx;
         for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { ctx.fillStyle = fillGrid[r][c]; ctx.fillRect(c * STEP, r * STEP, STEP + 1, STEP + 1); }
 
         const hueByTop = {};
@@ -322,7 +341,9 @@ Boako.TerritoryMap = {
                     : `<span style="width:20px; height:20px; border-radius:50%; background:${this.HUES[x.hueIdx][800]}; color:#fff; font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;">${e.key.charAt(0)}</span>`;
                 el.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; gap:5px;">${logoHtml}<span style="font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${e.key}</span></div>
                     <div style="font-size:11px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6); margin-top:2px;">${Math.round(total)} RP</div>`;
-                e.team.memberList.forEach(m => {
+                const mws = memberWeightsByTeam[e.key] || [];
+                mws.forEach(info => {
+                    const m = info.m;
                     const mCenter = centroidOf(ownerCentroid, m.name, e.cx + m.dx, e.cy + m.dy);
                     const mel = this.labelDivs[m.name];
                     mel.style.left = mCenter.x + 'px'; mel.style.top = mCenter.y + 'px';
