@@ -5,20 +5,27 @@
  *       세력 크기는 절대 RP가 아니라 그 시점 전체 대비 상대 비중으로 계산 (sqrt(share)를
  *       가중치로 쓰는 weighted Voronoi 근사 — 절대 RP가 아니라 상대 비중이라 모두가 같이
  *       커져도 화면상 크기는 그대로, 상대 순위가 바뀔 때만 경계가 움직임).
- * 팀 소속: team_members.is_active 기준 "지금" 소속으로 묶음 (기록 시점 스냅샷 b_all_team 아님).
- * 🌟 [좌표 방식 변경] 방향(각도)은 golden-angle spiral로 개체별 영구 고정(개체 늘어나도 기존
- *    개체 방향은 안 흔들림, 정렬 기준은 "최근 90일 내 첫 활동일"). 대신 중심으로부터의 거리는
- *    고정이 아니라 "그날의 순위"로 매번 다시 계산 — 1등은 항상 정중앙(거리 0), 순위가 밀릴수록
- *    자기 방향선을 따라 바깥쪽으로. 그래서 신흥 강자는 가장자리에서 나타나 중앙으로 다가오며
- *    커지고, 밀리는 쪽은 중앙에서 바깥으로 밀려남 — 보로노이 경계 밀림과 합쳐져 서로 부딪히며
- *    영역을 다투는 느낌을 냄. 팀 안 팀원 배치도 팀 내부 순위 기준으로 동일하게 적용.
- * 🌟 [신규] 정중앙(그날 1등)에게는 로고/닉네임이 있는 줄 "위에" 별도의 👑 줄을 하나 더 넣음
+ * 🌟 [수정] 팀 소속 판정을 team_members.is_active(지금 소속) 대신 각 기록 자체의 b_all_team
+ *    스냅샷(그 기록이 찍힌 "그 당시" 소속)으로 바꿈 — 실제 RP 집계(랭킹보드 등)가 무소속 시절
+ *    기록은 팀에 안 합산하는 것과 동일한 기준으로 맞춤. 그래서 무소속이었다가 나중에 팀에
+ *    들어가도, 무소속 시절 기록은 이 지도에서 사라지고(랭킹보드처럼 아예 집계 안 됨) 팀 합류
+ *    이후 기록만 그 팀 안 그 사람 몫으로 새로 쌓임. teams/team_members 테이블 조회가 필요 없어져서
+ *    v_boako_total_records 한 번 조회(b_all_team, logo_url 포함)로 끝남 — 팀 로고도 이 뷰의
+ *    logo_url을 그대로 씀. 팀원 정렬 기준도 "입단일" 대신 "그 팀 소속으로 최근 90일 내 처음
+ *    RP를 낸 날"로 변경.
+ * 좌표: 방향(각도)은 golden-angle spiral로 개체별 영구 고정(개체 늘어나도 기존 개체 방향은
+ *    안 흔들림, 정렬 기준은 "최근 90일 내 첫 활동일"). 대신 중심으로부터의 거리는 고정이 아니라
+ *    "그날의 순위"로 매번 다시 계산 — 1등은 항상 정중앙(거리 0), 순위가 밀릴수록 자기 방향선을
+ *    따라 바깥쪽으로. 그래서 신흥 강자는 가장자리에서 나타나 중앙으로 다가오며 커지고, 밀리는
+ *    쪽은 중앙에서 바깥으로 밀려남 — 보로노이 경계 밀림과 합쳐져 서로 부딪히며 영역을 다투는
+ *    느낌을 냄. 팀 안 팀원 배치도 팀 내부 순위 기준으로 동일하게 적용.
+ * 정중앙(그날 1등)에게는 로고/닉네임이 있는 줄 "위에" 별도의 👑 줄을 하나 더 넣음
  *    (이름 앞에 인라인으로 붙이면 로고+이름 줄 폭이 흔들려서, 그 줄 자체는 안 건드리고
- *    바로 위에 왕관 전용 줄을 하나 추가하는 방식으로 변경 — 로고/이름 배치는 그대로 유지됨).
+ *    바로 위에 왕관 전용 줄을 추가).
  * 시각화: 화면 전체를 빈틈없이 채우는 보로노이 테셀레이션. 진한 경계선=팀/개인 간 경계,
  *        얇은 경계선=팀 안 팀원 간 경계. 라벨(닉네임/팀명)은 실제로 칠해진 영역의 무게중심을
  *        따라다님 (경계가 밀려도 라벨이 안 겉돎).
- * 🌟 그 날짜까지 실제 rp 누적이 0인 팀/개인(EPS 제외 순수값)은 그날의 계산에서 통째로 제외
+ * 그 날짜까지 실제 rp 누적이 0인 팀/개인(EPS 제외 순수값)은 그날의 계산에서 통째로 제외
  *    (아직 창단/활동 전인 개체는 안 보임) — 팀 안 개별 팀원 단위로도 동일 적용.
  * 클릭 동작: 아직 미정이라 클릭 핸들러 없음 (추후 결정 시 추가).
  */
@@ -85,16 +92,14 @@ Boako.TerritoryMap = {
         const wrap = document.getElementById('tm-wrap');
         try {
             const windowStartIso = this.windowStartKst().toISOString();
-            const [{ data: teams, error: tErr }, { data: members, error: mErr }, { data: records, error: rErr }] = await Promise.all([
-                Boako.db.from('teams').select('id, team_name, logo_url').order('id', { ascending: true }),
-                Boako.db.from('team_members').select('team_name, player_name, joined_at').eq('is_active', true),
-                Boako.db.from('v_boako_total_records').select('nickname, created_at, rp').eq('is_verified', 0).gte('created_at', windowStartIso)
-            ]);
-            if (tErr) throw tErr;
-            if (mErr) throw mErr;
+            const { data: records, error: rErr } = await Boako.db
+                .from('v_boako_total_records')
+                .select('nickname, created_at, rp, b_all_team, logo_url')
+                .eq('is_verified', 0)
+                .gte('created_at', windowStartIso);
             if (rErr) throw rErr;
 
-            this.buildModel(teams || [], members || [], records || []);
+            this.buildModel(records || []);
 
             if (this.topEntities.length === 0) {
                 if (wrap) wrap.innerHTML = `<div style="padding:60px; text-align:center; color:#94a3b8; font-weight:700;">최근 90일간 인증된 기록이 없습니다.</div>`;
@@ -109,30 +114,25 @@ Boako.TerritoryMap = {
         }
     },
 
-    buildModel: function(teams, members, records) {
-        const memberToTeam = {};
-        members.forEach(m => { memberToTeam[m.player_name] = m.team_name; });
-
+    // 🌟 [수정] team_members(지금 소속) 대신 각 기록의 b_all_team(그 기록 당시 소속 스냅샷)으로
+    // 팀을 묶음 — 무소속 시절 기록은 나중에 팀 합류해도 팀 몫으로 안 들어가고 그냥 집계에서 빠짐.
+    buildModel: function(records) {
         const teamByName = {};
-        teams.forEach(t => { teamByName[t.team_name] = { name: t.team_name, logoUrl: t.logo_url, members: {} }; });
-
-        members.forEach(m => {
-            const t = teamByName[m.team_name];
-            if (!t) return;
-            t.members[m.player_name] = { name: m.player_name, joinedAt: m.joined_at, daily: new Array(this.WINDOW_DAYS).fill(0), firstDay: null };
-        });
-
         const solos = {};
 
         records.forEach(r => {
             const nick = r.nickname;
             if (!nick) return;
             const idx = this.dayIndexOf(r.created_at);
-            const teamName = memberToTeam[nick];
-            if (teamName && teamByName[teamName] && teamByName[teamName].members[nick]) {
-                const m = teamByName[teamName].members[nick];
-                m.daily[idx] += (r.rp || 0);
-                if (m.firstDay === null) m.firstDay = idx;
+
+            if (r.b_all_team) {
+                const teamName = r.b_all_team;
+                if (!teamByName[teamName]) teamByName[teamName] = { name: teamName, logoUrl: r.logo_url || null, members: {} };
+                const t = teamByName[teamName];
+                if (!t.logoUrl && r.logo_url) t.logoUrl = r.logo_url;
+                if (!t.members[nick]) t.members[nick] = { name: nick, daily: new Array(this.WINDOW_DAYS).fill(0), firstDay: null };
+                t.members[nick].daily[idx] += (r.rp || 0);
+                if (t.members[nick].firstDay === null) t.members[nick].firstDay = idx;
             } else {
                 if (!solos[nick]) solos[nick] = { name: nick, daily: new Array(this.WINDOW_DAYS).fill(0), firstDay: null };
                 solos[nick].daily[idx] += (r.rp || 0);
@@ -142,9 +142,7 @@ Boako.TerritoryMap = {
 
         const activeTeams = Object.values(teamByName)
             .map(t => {
-                t.memberList = Object.values(t.members)
-                    .filter(m => m.firstDay !== null)
-                    .sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+                t.memberList = Object.values(t.members).sort((a, b) => a.firstDay - b.firstDay);
                 return t;
             })
             .filter(t => t.memberList.length > 0);
