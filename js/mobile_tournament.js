@@ -142,6 +142,20 @@ Boako.MobileTournament = {
         wrap.innerHTML = filtered.length === 0
             ? `<div style="padding:32px 16px; text-align:center; color:#94a3b8; font-weight:700; font-size:13px; border:1px dashed #e2e8f0; border-radius:12px; background:#fff;">${currentTab === 'ANNOUNCEMENT' ? '아직 개최 공지가 없습니다.' : '아직 개최 요청이 없습니다.'}</div>`
             : `<div style="display:flex; flex-direction:column; gap:10px;">${filtered.map(p => Boako.MobileTournament.renderCard(p)).join('')}</div>`;
+
+        // 🌟 카톡 공유 딥링크(?view=tournament&post=ID)로 들어온 경우 해당 글로 스크롤+하이라이트 (1회만)
+        if (window.Boako.__deepLinkPostId) {
+            const targetId = window.Boako.__deepLinkPostId;
+            window.Boako.__deepLinkPostId = null;
+            setTimeout(() => {
+                const el = document.getElementById(`tournament-post-${targetId}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.style.boxShadow = '0 0 0 3px #a78bfa';
+                    setTimeout(() => { el.style.boxShadow = ''; }, 2000);
+                }
+            }, 100);
+        }
     },
 
     renderCard: (p) => {
@@ -152,13 +166,14 @@ Boako.MobileTournament = {
 
         if (p.type === 'ANNOUNCEMENT') {
             return `
-                <div onclick="window.open('${p.source_url}', '_blank')" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; cursor:pointer;">
+                <div id="tournament-post-${p.id}" onclick="window.open('${p.source_url}', '_blank')" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; cursor:pointer;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <img src="${Boako.Util.cdn(gameLogo)}" style="width:44px; height:44px; border-radius:10px; object-fit:contain; background:#f8fafc; border:1px solid #f1f5f9; padding:4px; flex-shrink:0;">
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:14px; font-weight:900; color:#6d28d9;">📅 ${dateStr}</div>
                             <div style="font-size:11px; color:#94a3b8; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.MobileTournament.escapeHtml(p.title)}</div>
                         </div>
+                        <button onclick="event.stopPropagation(); Boako.MobileTournament.shareToKakao(${p.id})" style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:#fefce8; display:flex; align-items:center; justify-content:center; font-size:13px;" title="카톡으로 공유">💬</button>
                         <span style="font-size:11px; font-weight:900; color:#7c3aed; background:#f5f3ff; padding:3px 8px; border-radius:999px; flex-shrink:0;">🔗</span>
                     </div>
                     ${p.max_participants ? `<div style="font-size:11px; color:#94a3b8; font-weight:700; margin-top:8px;">👥 최대 ${p.max_participants}명</div>` : ''}
@@ -189,6 +204,24 @@ Boako.MobileTournament = {
                     : `<a href="${p.source_url}" target="_blank" style="display:block; text-align:center; margin-top:10px; font-size:11.5px; font-weight:700; color:#7c3aed;">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
+    },
+
+    // 🌟 카톡 공유 — 토너먼트 개최 공지를 피드 템플릿으로 공유 (PC Boako.Tournament.shareToKakao와 동일 로직)
+    shareToKakao: (postId) => {
+        const p = Boako.MobileTournament.State.posts.find(x => x.id === postId);
+        if (!p) return;
+        const dateStr = p.scheduled_date
+            ? new Date(p.scheduled_date).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '일정 미정';
+        const gameLogo = Boako.MobileTournament.State.gameLogoMap[p.game_name] || Boako.MobileTournament.DEFAULT_LOGO_FALLBACK;
+        Boako.Util.shareToKakao({
+            title: p.title,
+            description: `📅 ${dateStr} · ${p.game_name || '종목 미정'}${p.max_participants ? ` · 최대 ${p.max_participants}명` : ''}`,
+            imageUrl: gameLogo,
+            view: 'tournament',
+            postId: p.id,
+            buttonTitle: '공지 보러가기'
+        });
     },
 
     // ========== 🌟 [신규] 작성 모달 (공지/요청) — PC openWriteModal/searchGames/selectGame/submitPost 로직 그대로 ==========
