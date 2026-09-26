@@ -24,6 +24,14 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* 🌟 [신규] 게임/파티원 검색 드롭다운 스크롤 — Windows 클래식 테마 등에서 OS 기본 스크롤바가
+           둥근 모서리 컨테이너 안에서 각지게 잘려 보이는 문제를 막기 위해, 얇고 둥근 커스텀
+           스크롤바로 통일 (together.js/tournament.js의 검색 결과 드롭다운에 적용). */
+        .dropdown-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+        .dropdown-scroll::-webkit-scrollbar { width: 6px; }
+        .dropdown-scroll::-webkit-scrollbar-track { background: transparent; }
+        .dropdown-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+        .dropdown-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         body { background-color: var(--bg-body); font-family: 'Noto Sans KR', sans-serif; color: var(--text-main); line-height: 1.6; overflow-y: scroll; word-break: keep-all; }
         .inner { width: 95%; max-width: var(--inner-width); margin: 0 auto; }
         ul { list-style: none; }
