@@ -27,7 +27,8 @@ window.onload = () => {
 
     // 🌟 딥링크 화면 이름 → 모바일 진입 함수 매핑. 새 화면에 공유 기능을 추가할 때마다 여기만 추가하면 됨.
     const DEEP_LINK_ENTRIES = {
-        together: () => Boako.MobileShell.openTogether()
+        together: () => Boako.MobileShell.openTogether(),
+        tournament: () => Boako.MobileShell.switchTab('tournament')
     };
 
     const urlParams = new URLSearchParams(window.location.search);
