@@ -13,11 +13,13 @@
  * 🌟 타이틀 스폰서 배지: "Boako Team League" 브랜드 타이틀(id=archive-brand-title) 앞에 표시.
  *    현재 선택된 시즌 필터(currentSeasonFilter)에 맞춰 Boako.Util.setTitleSponsorBadge로 갱신됨
  *    (buildUI 최초 진입 / 자동 감지된 최근 시즌 적용 시 / 시즌 드롭다운 선택 시 3곳에서 호출).
- * 🌟 [신규] 4번째 탭 "히스토리" — 최근 90일 RP 비중 기반 세력지도(js/territory_map.js,
+ * 🌟 4번째 탭 "히스토리" — 최근 90일 RP 비중 기반 영향력 지도(js/territory_map.js,
  *    Boako.TerritoryMap.buildUI). 탭 아이콘은 다른 3개 탭과 통일감 있게 lucide "map" 아이콘 사용
  *    (컬러 이모지 대신 — 처음엔 🗺️ 이모지였는데 다른 탭들과 톤이 안 맞아서 교체함).
  *    이 탭은 검색/무소속토글/시즌·라운드 드롭다운을 전부 숨기고(자체 90일 슬라이더로 독립 동작),
  *    fetchAndRender() 대신 TerritoryMap.buildUI를 바로 호출함.
+ * 🌟 [수정] 탭 제목/설명을 "세력 히스토리"/"...세력 지도입니다"에서 "영향력 히스토리"/
+ *    "...영향력 지도입니다"로 용어 통일.
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -515,8 +517,8 @@ Boako.Archive = {
             if (seasonFilter) seasonFilter.style.display = 'block';
             if (filterRow) filterRow.style.display = 'flex';
         } else if (tabName === 'territory_map') {
-            titleEl.innerText = '세력 히스토리';
-            descEl.innerText = '최근 90일간 RP 비중으로 나눈 팀/개인 세력 지도입니다.';
+            titleEl.innerText = '영향력 히스토리';
+            descEl.innerText = '최근 90일간 RP 비중으로 나눈 팀/개인 영향력 지도입니다.';
             if (subDescEl) subDescEl.style.display = 'none';
             if (roundFilter) roundFilter.style.display = 'none';
             if (seasonFilter) seasonFilter.style.display = 'none';
@@ -524,7 +526,7 @@ Boako.Archive = {
         }
         // 🌟 "무소속 포함" 토글은 이제 3개 탭 전부에서 동일하게 노출 (탭별로 숨기지 않음)
 
-        // 🌟 [신규] 히스토리(세력지도) 탭은 자체 렌더러를 씀 — 공통 fetchAndRender 파이프라인 안 탐
+        // 🌟 히스토리(영향력 지도) 탭은 자체 렌더러를 씀 — 공통 fetchAndRender 파이프라인 안 탐
         if (tabName === 'territory_map') {
             if (!Boako.TerritoryMap || !Boako.TerritoryMap.buildUI) {
                 await Boako.Util.loadScript('js/territory_map.js');
