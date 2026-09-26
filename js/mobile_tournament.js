@@ -245,7 +245,7 @@ Boako.MobileTournament = {
                     <div style="margin-bottom:12px; position:relative;">
                         <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:5px;">종목(게임) 검색</label>
                         <input type="text" id="mobile-tourney-input-game-search" autocomplete="off" placeholder="게임명을 입력해 검색하세요" oninput="Boako.MobileTournament.searchGames(this.value)" style="width:100%; border:1px solid #e2e8f0; border-radius:10px; padding:11px; font-size:14px;">
-                        <div id="mobile-tourney-game-search-results" class="hidden" style="position:absolute; z-index:10; left:0; right:0; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,0.1); margin-top:4px; max-height:200px; overflow-y:auto;"></div>
+                        <div id="mobile-tourney-game-search-results" class="hidden" style="position:absolute; z-index:10; left:0; right:0; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,0.1); margin-top:4px; overflow:hidden;"></div>
                     </div>
                     <div style="margin-bottom:12px;">
                         <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:5px;">설명</label>
@@ -300,12 +300,12 @@ Boako.MobileTournament = {
             resultsBox.classList.remove('hidden');
             return;
         }
-        resultsBox.innerHTML = data.map(g => `
+        resultsBox.innerHTML = `<div style="max-height:200px; overflow-y:auto;">${data.map(g => `
             <div onclick="Boako.MobileTournament.selectGame('${g.game_name.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:8px; padding:9px 10px;">
                 <img src="${Boako.Util.cdn(g.image_url || Boako.MobileTournament.DEFAULT_LOGO_FALLBACK)}" style="width:24px; height:24px; border-radius:6px; object-fit:contain; background:#f8fafc; border:1px solid #f1f5f9;">
                 <span style="font-size:12.5px; font-weight:700; color:#334155;">${Boako.MobileTournament.escapeHtml(g.game_name)}</span>
             </div>
-        `).join('');
+        `).join('')}</div>`;
         resultsBox.classList.remove('hidden');
     },
 
