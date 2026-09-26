@@ -40,10 +40,13 @@ Boako.Util = {
         setTimeout(() => t.classList.remove('show'), 3000);
     },
 
-    // 🌟 [신규] 카카오톡 공유 — 피드 템플릿(이미지+제목/본문+버튼 최대 2개)으로 공유 시트 오픈
+    // 🌟 [신규] 카카오톡 공유 — 피드 템플릿(이미지+제목/본문+버튼 1개)으로 공유 시트 오픈
     // opts: { title, description, imageUrl, view, postId }
     //  - view: main.js가 읽는 딥링크용 화면 이름 (예: 'together')
     //  - postId: 있으면 링크에 &post=ID 추가 (특정 글로 자동 스크롤+하이라이트)
+    // 🌟 [수정] 버튼을 "보러가기"/"친구 초대" 2개로 나눴던 걸 1개로 통합.
+    // 어차피 fn_apply_referral()이 referred_by가 이미 있으면 아무것도 안 하는 1회성 RPC라
+    // 로그인된 유저 본인이나 이미 추천인이 있는 사람이 눌러도 안전 — 버튼을 굳이 나눌 이유가 없었음.
     shareToKakao: (opts) => {
         if (!window.Kakao || !Kakao.isInitialized()) {
             Boako.Util.toast('카카오톡 공유를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
@@ -51,7 +54,7 @@ Boako.Util = {
         }
         const base = `${window.location.origin}${window.location.pathname}`;
         const deepLink = `${base}?view=${opts.view}${opts.postId ? `&post=${encodeURIComponent(opts.postId)}` : ''}`;
-        const inviteLink = Boako.state.user
+        const link = Boako.state.user
             ? `${deepLink}&ref=${Boako.state.user.id}`
             : deepLink;
 
@@ -61,11 +64,10 @@ Boako.Util = {
                 title: opts.title,
                 description: opts.description,
                 imageUrl: Boako.Util.cdn(opts.imageUrl) || 'https://cdn.boakoarchive.co.kr/storage/v1/object/public/teams/etc/challenge%20(1).png',
-                link: { webUrl: deepLink, mobileWebUrl: deepLink }
+                link: { webUrl: link, mobileWebUrl: link }
             },
             buttons: [
-                { title: opts.buttonTitle || '보러가기', link: { webUrl: deepLink, mobileWebUrl: deepLink } },
-                { title: '친구 초대', link: { webUrl: inviteLink, mobileWebUrl: inviteLink } }
+                { title: opts.buttonTitle || '보러가기', link: { webUrl: link, mobileWebUrl: link } }
             ]
         });
     },
