@@ -6,11 +6,13 @@
  */
 Boako.Together = {
     State: {
-        currentTab: 'BOARD', // 'BOARD'(전체 모집) | 'MINE'(내가 참여 중인 모임)
+        currentTab: 'BOARD', // 'BOARD'(전체 모집) | 'MINE'(내가 참여 중인 모임) | 'FIND_GAME'(같이할 게임 찾기)
         posts: [],
         participantsMap: {},   // { post_id: [{user_id, full_name, profile_url}, ...] }
         gameLogoMap: {},
-        realtimeChannel: null
+        realtimeChannel: null,
+        findGameParty: null,
+        findGameResults: null
     },
 
     _rtGroup: null,
@@ -21,8 +23,8 @@ Boako.Together = {
 
         root.innerHTML = `
             <div class="main-banner" style="background:linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);">
-                <h1>🎲 같이하자</h1>
-                <p>지금 같이 놀 사람을 모아보세요. 참가는 선착순, 승인 없이 바로 확정돼요.</p>
+                <h1>🤝 같이하자</h1>
+                <p>지금 같이 놀 사람을 모아보고, 같이할 게임도 찾아보세요. 참가는 선착순, 승인 없이 바로 확정돼요.</p>
             </div>
 
             <section class="section-card">
@@ -30,6 +32,7 @@ Boako.Together = {
                     <div class="flex gap-2">
                         <button id="together-tab-btn-BOARD" class="together-tab-btn bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.Together.switchTab('BOARD')">📋 전체 모집</button>
                         <button id="together-tab-btn-MINE" class="together-tab-btn bg-slate-100 text-slate-500 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.Together.switchTab('MINE')">🙋 내 모임</button>
+                        <button id="together-tab-btn-FIND_GAME" class="together-tab-btn bg-slate-100 text-slate-500 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.Together.switchTab('FIND_GAME')">🎯 같이할 게임 찾기</button>
                     </div>
                     <button class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-sky-700 transition-colors" onclick="Boako.Together.openWriteModal()">+ 모집하기</button>
                 </div>
@@ -38,6 +41,7 @@ Boako.Together = {
                     <div id="together-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="col-span-full text-center py-16 text-slate-400 font-bold">불러오는 중...</div>
                     </div>
+                    <div id="together-findgame-container" class="hidden"></div>
                 </div>
             </section>
 
@@ -104,7 +108,19 @@ Boako.Together = {
             activeBtn.classList.remove('bg-slate-100', 'text-slate-500');
             activeBtn.classList.add('bg-slate-800', 'text-white');
         }
-        Boako.Together.renderList();
+
+        const listContainer = document.getElementById('together-list-container');
+        const findGameContainer = document.getElementById('together-findgame-container');
+
+        if (tab === 'FIND_GAME') {
+            listContainer.classList.add('hidden');
+            findGameContainer.classList.remove('hidden');
+            Boako.Together.initFindGame();
+        } else {
+            listContainer.classList.remove('hidden');
+            findGameContainer.classList.add('hidden');
+            Boako.Together.renderList();
+        }
     },
 
     loadPosts: async () => {
@@ -285,6 +301,180 @@ Boako.Together = {
         `;
     },
 
+    // ========== 🎯 같이할 게임 찾기 ==========
+    initFindGame: async () => {
+        const container = document.getElementById('together-findgame-container');
+        if (!Boako.state.user) {
+            container.innerHTML = `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">로그인 후 이용해주세요.</div>`;
+            return;
+        }
+        if (!Boako.Together.State.findGameParty) {
+            const { data: myProfile } = await Boako.db.from('profiles').select('id, full_name, profile_url, custom_avatar_url').eq('id', Boako.state.user.id).single();
+            Boako.Together.State.findGameParty = [{
+                user_id: myProfile.id,
+                full_name: myProfile.full_name,
+                avatar: myProfile.custom_avatar_url || myProfile.profile_url,
+                isSelf: true
+            }];
+            Boako.Together.State.findGameResults = null;
+        }
+        Boako.Together.renderFindGame();
+    },
+
+    renderFindGame: () => {
+        const container = document.getElementById('together-findgame-container');
+        const party = Boako.Together.State.findGameParty || [];
+
+        const avatarsHtml = party.map(m => `
+            <div class="flex flex-col items-center" style="width:52px;">
+                <div class="relative group">
+                    <img src="${Boako.Util.cdn(m.avatar || TOGETHER_DEFAULT_AVATAR)}" class="w-11 h-11 rounded-full object-cover bg-slate-100" style="border:2px solid ${m.isSelf ? '#0ea5e9' : '#e2e8f0'};">
+                    ${!m.isSelf ? `<div onclick="Boako.Together.removePartyMember('${m.user_id}')" class="hidden group-hover:flex absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-black items-center justify-center cursor-pointer" style="box-shadow:0 0 0 2px #fff;">×</div>` : ''}
+                </div>
+                <div class="text-[10.5px] font-bold ${m.isSelf ? 'text-sky-700' : 'text-slate-600'} mt-1 truncate" style="max-width:52px;" title="${m.full_name}">${m.full_name}</div>
+            </div>
+        `).join('');
+
+        container.innerHTML = `
+            <div class="bg-white border border-slate-200 rounded-xl p-5 mb-4">
+                <div class="text-xs font-bold text-slate-600 mb-3">파티원</div>
+                <div class="flex items-start gap-3 flex-wrap">
+                    ${avatarsHtml}
+                    <div class="flex flex-col items-center" style="width:52px;">
+                        <div onclick="Boako.Together.togglePartySearch()" class="w-11 h-11 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-lg font-bold cursor-pointer hover:border-sky-400 hover:text-sky-500 transition-colors">+</div>
+                    </div>
+                </div>
+                <div id="together-party-search-box" class="hidden relative mt-4">
+                    <input type="text" id="together-party-search-input" autocomplete="off" placeholder="닉네임으로 파티원 검색" oninput="Boako.Together.searchPartyMember(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                    <div id="together-party-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
+                </div>
+                <button onclick="Boako.Together.runFindGame()" class="w-full mt-4 bg-sky-600 hover:bg-sky-700 text-white text-sm font-black py-2.5 rounded-lg transition-colors">🎯 같이할 게임 찾기</button>
+            </div>
+            <div id="together-findgame-results"></div>
+        `;
+
+        if (Boako.Together.State.findGameResults) Boako.Together.renderFindGameResults();
+    },
+
+    togglePartySearch: () => {
+        const box = document.getElementById('together-party-search-box');
+        box.classList.toggle('hidden');
+        if (!box.classList.contains('hidden')) document.getElementById('together-party-search-input').focus();
+    },
+
+    searchPartyMember: async (query) => {
+        const resultsBox = document.getElementById('together-party-search-results');
+        if (!query || query.trim().length === 0) {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+            return;
+        }
+        const existingIds = new Set(Boako.Together.State.findGameParty.map(m => m.user_id));
+        const { data } = await Boako.db.from('profiles').select('id, full_name, profile_url, custom_avatar_url').ilike('full_name', `%${query.trim()}%`).limit(8);
+        const filtered = (data || []).filter(p => !existingIds.has(p.id));
+
+        if (filtered.length === 0) {
+            resultsBox.innerHTML = `<div class="p-3 text-xs text-slate-400 font-bold">검색 결과가 없습니다.</div>`;
+            resultsBox.classList.remove('hidden');
+            return;
+        }
+        resultsBox.innerHTML = filtered.map(p => `
+            <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.addPartyMember('${p.id}', '${p.full_name.replace(/'/g, "\\'")}', '${(p.custom_avatar_url || p.profile_url || '').replace(/'/g, "\\'")}')">
+                <img src="${Boako.Util.cdn(p.custom_avatar_url || p.profile_url || TOGETHER_DEFAULT_AVATAR)}" class="w-6 h-6 rounded-full object-cover bg-slate-100">
+                <span class="text-xs font-bold text-slate-700">${p.full_name}</span>
+            </div>
+        `).join('');
+        resultsBox.classList.remove('hidden');
+    },
+
+    addPartyMember: (userId, fullName, avatar) => {
+        Boako.Together.State.findGameParty.push({ user_id: userId, full_name: fullName, avatar, isSelf: false });
+        Boako.Together.State.findGameResults = null;
+        document.getElementById('together-party-search-input').value = '';
+        document.getElementById('together-party-search-results').classList.add('hidden');
+        document.getElementById('together-party-search-box').classList.add('hidden');
+        Boako.Together.renderFindGame();
+    },
+
+    removePartyMember: (userId) => {
+        Boako.Together.State.findGameParty = Boako.Together.State.findGameParty.filter(m => m.user_id !== userId);
+        Boako.Together.State.findGameResults = null;
+        Boako.Together.renderFindGame();
+    },
+
+    runFindGame: async () => {
+        const party = Boako.Together.State.findGameParty;
+        if (party.length < 2) {
+            Boako.Util.toast('파티원을 1명 이상 추가해주세요.');
+            return;
+        }
+        const nicknames = party.map(m => m.full_name);
+        const total = nicknames.length;
+        const majorityThreshold = Math.ceil(total / 2);
+
+        const { data, error } = await Boako.db.from('v_boako_total_records').select('nickname, game_name').in('nickname', nicknames);
+        if (error) {
+            console.error(error);
+            Boako.Util.toast('❌ 조회에 실패했습니다.');
+            return;
+        }
+
+        const gameMap = {};
+        (data || []).forEach(row => {
+            if (!row.game_name) return;
+            if (!gameMap[row.game_name]) gameMap[row.game_name] = new Set();
+            gameMap[row.game_name].add(row.nickname);
+        });
+
+        const intersection = [];
+        const majority = [];
+        Object.entries(gameMap).forEach(([gameName, players]) => {
+            const count = players.size;
+            if (count === total) intersection.push({ game_name: gameName, count });
+            else if (count >= majorityThreshold) majority.push({ game_name: gameName, count });
+        });
+        intersection.sort((a, b) => a.game_name.localeCompare(b.game_name));
+        majority.sort((a, b) => b.count - a.count || a.game_name.localeCompare(b.game_name));
+
+        const allGameNames = [...intersection, ...majority].map(g => g.game_name);
+        let logoMap = {};
+        if (allGameNames.length > 0) {
+            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url').in('game_name', allGameNames);
+            logoMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.image_url]));
+        }
+
+        Boako.Together.State.findGameResults = { total, intersection, majority, logoMap };
+        Boako.Together.renderFindGameResults();
+    },
+
+    renderFindGameResults: () => {
+        const box = document.getElementById('together-findgame-results');
+        if (!box) return;
+        const { total, intersection, majority, logoMap } = Boako.Together.State.findGameResults;
+
+        const renderCard = (g) => `
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-sky-300 transition-colors" onclick="Boako.Together.openWriteModal('${g.game_name.replace(/'/g, "\\'")}')">
+                <img src="${Boako.Util.cdn(logoMap[g.game_name] || TOGETHER_DEFAULT_LOGO)}" class="w-10 h-10 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0">
+                <div class="min-w-0">
+                    <div class="text-sm font-black text-slate-800 truncate">${g.game_name}</div>
+                    <div class="text-[11px] font-bold text-slate-500">${g.count} / ${total}명 플레이</div>
+                </div>
+            </div>
+        `;
+
+        box.innerHTML = `
+            <div class="text-xs font-bold text-teal-700 mb-2">🎯 전원이 해본 게임</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                ${intersection.length > 0 ? intersection.map(renderCard).join('') : `<div class="col-span-full text-center py-8 text-slate-400 text-sm font-bold border border-dashed border-slate-200 rounded-xl bg-white">전원이 함께 해본 게임이 없어요.</div>`}
+            </div>
+            <div class="text-xs font-bold text-sky-700 mb-2">🙋 과반수 이상이 해본 게임</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                ${majority.length > 0 ? majority.map(renderCard).join('') : `<div class="col-span-full text-center py-8 text-slate-400 text-sm font-bold border border-dashed border-slate-200 rounded-xl bg-white">과반이 해본 게임이 없어요.</div>`}
+            </div>
+            <div class="mt-4 text-[11px] text-slate-400 text-center">카드를 클릭하면 그 게임으로 모집글 쓰기가 열려요</div>
+        `;
+    },
+
     // 🌟 게임 검색 자동완성 (tournament.js와 동일 패턴)
     searchGames: async (query) => {
         const resultsBox = document.getElementById('together-game-search-results');
@@ -320,7 +510,7 @@ Boako.Together = {
         if (resultsBox) resultsBox.classList.add('hidden');
     },
 
-    openWriteModal: () => {
+    openWriteModal: (prefillGameName) => {
         if (!Boako.state.user) {
             Boako.Util.toast('로그인 후 이용해주세요.');
             return;
@@ -368,6 +558,9 @@ Boako.Together = {
             </div>
         `;
         document.getElementById('together-modal-root').innerHTML = modalHtml;
+        if (prefillGameName) {
+            document.getElementById('together-input-game-search').value = prefillGameName;
+        }
     },
 
     submitPost: async (e) => {
