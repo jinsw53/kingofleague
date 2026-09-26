@@ -2,8 +2,9 @@
  * [MAIN] 스크립트 실행 진입점
  */
 window.onload = () => {
+    let authInit;
     if (Boako && Boako.Auth) {
-        Boako.Auth.init();
+        authInit = Boako.Auth.init();
     } else {
         console.error("Core 모듈 로딩에 실패했습니다.");
         return;
@@ -15,6 +16,18 @@ window.onload = () => {
 
     if (Boako.Ticker && Boako.Ticker.init) {
         Boako.Ticker.init();
+    }
+
+    // 🌟 [신규] 카톡 공유 딜링크(?view=xxx&post=yyy)로 들어온 경우 해당 화면으로 바로 이동.
+    // Boako.Auth.init()이 내부적으로 Boako.View.render('main')을 항상 호출하므로,
+    // 그것과 경쟁하지 않도록 authInit이 끝난 뒤에 덮어쌜서 렌더한다.
+    // post는 together.js가 renderList()에서 window.Boako.__deepLinkPostId로 소비해서 스크롤+하이라이트함
+    const urlParams = new URLSearchParams(window.location.search);
+    const deepLinkView = urlParams.get('view');
+    if (deepLinkView) {
+        const deepLinkPostId = urlParams.get('post');
+        if (deepLinkPostId) window.Boako.__deepLinkPostId = deepLinkPostId;
+        Promise.resolve(authInit).then(() => Boako.View.render(deepLinkView));
     }
 
     // 🌟 [수정] 카카오 로그인 리다이렉트 후 URL에 남아있는 인증 토큰 조각(#access_token=...)을
