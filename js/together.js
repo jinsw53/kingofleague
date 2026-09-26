@@ -234,6 +234,20 @@ Boako.Together = {
         }
 
         container.innerHTML = posts.map(p => Boako.Together.renderCard(p)).join('');
+
+        // 🌟 카톡 공유 딥링크(?view=together&post=ID)로 들어온 경우 해당 글로 스크롤+하이라이트 (1회만)
+        if (window.Boako.__deepLinkPostId) {
+            const targetId = window.Boako.__deepLinkPostId;
+            window.Boako.__deepLinkPostId = null;
+            setTimeout(() => {
+                const el = document.getElementById(`together-post-${targetId}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-4', 'ring-sky-400');
+                    setTimeout(() => el.classList.remove('ring-4', 'ring-sky-400'), 2000);
+                }
+            }, 100);
+        }
     },
 
     renderCard: (p) => {
@@ -277,8 +291,10 @@ Boako.Together = {
             }
         }
 
+        const shareBtn = !cancelled ? `<button onclick="Boako.Together.shareToKakao(${p.id})" class="shrink-0 w-7 h-7 rounded-full bg-yellow-50 hover:bg-yellow-100 flex items-center justify-center text-sm transition-colors" title="카톡으로 공유">💬</button>` : '';
+
         return `
-            <div class="bg-white border ${confirmed ? 'border-emerald-200' : cancelled ? 'border-slate-200 opacity-70' : 'border-sky-200'} rounded-xl p-4">
+            <div id="together-post-${p.id}" class="bg-white border ${confirmed ? 'border-emerald-200' : cancelled ? 'border-slate-200 opacity-70' : 'border-sky-200'} rounded-xl p-4 transition-shadow">
                 <div class="flex items-center gap-3 mb-2">
                     <div class="flex flex-col items-center shrink-0" style="width:52px;">
                         <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
@@ -288,6 +304,7 @@ Boako.Together = {
                         <div class="text-base font-black text-sky-700">📅 ${dateStr}</div>
                         <div class="text-[11px] text-slate-400 truncate">${p.title || ''}</div>
                     </div>
+                    ${shareBtn}
                     ${statusBadge}
                 </div>
                 ${p.content ? `<div class="bg-sky-50/60 border border-sky-100 rounded-lg p-3 mb-3"><p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${p.content}</p></div>` : ''}
@@ -663,6 +680,22 @@ Boako.Together = {
             console.error(err);
             Boako.Util.toast('❌ ' + (err.message || '취소에 실패했습니다.'));
         }
+    },
+
+    // 🌟 카톡 공유 — 모집 카드를 피드 템플릿으로 공유 (친구초대 링크 포함)
+    shareToKakao: (postId) => {
+        const p = Boako.Together.State.posts.find(x => x.id === postId);
+        if (!p) return;
+        const dateStr = new Date(p.scheduled_date).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const gameLogo = Boako.Together.State.gameLogoMap[p.game_name] || TOGETHER_DEFAULT_LOGO;
+        Boako.Util.shareToKakao({
+            title: p.title || `${p.game_name || '보드게임'} 같이 하실 분 구해요`,
+            description: `📅 ${dateStr} · 👥 ${p.current_count}/${p.max_participants}명 · ${p.game_name || '종목 미정'}`,
+            imageUrl: gameLogo,
+            view: 'together',
+            postId: p.id,
+            buttonTitle: '참가하기'
+        });
     },
 
     // ========== 채팅방 입장 (메신저로 위임) ==========
