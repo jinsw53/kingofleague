@@ -363,7 +363,7 @@ Boako.Together = {
                 </div>
                 <div id="together-party-search-box" class="hidden relative mt-4">
                     <input type="text" id="together-party-search-input" autocomplete="off" placeholder="닉네임으로 파티원 검색" oninput="Boako.Together.searchPartyMember(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                    <div id="together-party-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
+                    <div id="together-party-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden"></div>
                 </div>
                 <button onclick="Boako.Together.runFindGame()" class="w-full mt-4 bg-sky-600 hover:bg-sky-700 text-white text-sm font-black py-2.5 rounded-lg transition-colors">🎯 같이할 게임 찾기</button>
             </div>
@@ -395,12 +395,12 @@ Boako.Together = {
             resultsBox.classList.remove('hidden');
             return;
         }
-        resultsBox.innerHTML = filtered.map(p => `
+        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto">${filtered.map(p => `
             <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.addPartyMember('${p.id}', '${p.full_name.replace(/'/g, "\\'")}', '${(p.custom_avatar_url || p.profile_url || '').replace(/'/g, "\\'")}')">
                 <img src="${Boako.Util.cdn(p.custom_avatar_url || p.profile_url || TOGETHER_DEFAULT_AVATAR)}" class="w-6 h-6 rounded-full object-cover bg-slate-100">
                 <span class="text-xs font-bold text-slate-700">${p.full_name}</span>
             </div>
-        `).join('');
+        `).join('')}</div>`;
         resultsBox.classList.remove('hidden');
     },
 
@@ -456,10 +456,12 @@ Boako.Together = {
         const allGameNames = [...intersection, ...majority].map(g => g.game_name);
         let logoMap = {};
         let rangeMap = {};
+        let bgaUrlMap = {};
         if (allGameNames.length > 0) {
-            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url, min_players, max_players').in('game_name', allGameNames);
+            const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url, min_players, max_players, bga_url').in('game_name', allGameNames);
             logoMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.image_url]));
             rangeMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, { min: g.min_players, max: g.max_players }]));
+            bgaUrlMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.bga_url]));
         }
 
         // 🌟 게임의 min_players/max_players가 우리 파티 인원수(total)와 안 맞으면 결과에서 아예 제외.
@@ -474,8 +476,19 @@ Boako.Together = {
         const filteredIntersection = intersection.filter(g => fitsPartySize(g.game_name));
         const filteredMajority = majority.filter(g => fitsPartySize(g.game_name));
 
-        Boako.Together.State.findGameResults = { total, intersection: filteredIntersection, majority: filteredMajority, logoMap, rangeMap };
+        Boako.Together.State.findGameResults = { total, intersection: filteredIntersection, majority: filteredMajority, logoMap, rangeMap, bgaUrlMap };
         Boako.Together.renderFindGameResults();
+    },
+
+    // 🌟 같이할 게임 찾기 결과 카드를 클릭했을 때 — 모집글 작성이 아니라 그 게임의 실제 BGA 페이지를 열어서
+    // 바로 플레이하러 갈 수 있게 함. bga_url이 없는 게임은 링크가 없다고 안내만 함.
+    openGamePage: (gameName) => {
+        const bgaUrl = Boako.Together.State.findGameResults?.bgaUrlMap?.[gameName];
+        if (bgaUrl) {
+            window.open(bgaUrl, '_blank');
+        } else {
+            Boako.Util.toast('이 게임의 아레나 링크 정보가 없어요.');
+        }
     },
 
     renderFindGameResults: () => {
@@ -493,7 +506,7 @@ Boako.Together = {
         };
 
         const renderCard = (g) => `
-            <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-sky-300 transition-colors" onclick="Boako.Together.openWriteModal('${g.game_name.replace(/'/g, "\\'")}')">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-sky-300 transition-colors" onclick="Boako.Together.openGamePage('${g.game_name.replace(/'/g, "\\'")}')">
                 <img src="${Boako.Util.cdn(logoMap[g.game_name] || TOGETHER_DEFAULT_LOGO)}" class="w-10 h-10 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0">
                 <div class="min-w-0">
                     <div class="text-sm font-black text-slate-800 truncate">${g.game_name}</div>
@@ -512,7 +525,7 @@ Boako.Together = {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 ${majority.length > 0 ? majority.map(renderCard).join('') : `<div class="col-span-full text-center py-8 text-slate-400 text-sm font-bold border border-dashed border-slate-200 rounded-xl bg-white">과반이 해본, 지금 인원에 맞는 게임이 없어요.</div>`}
             </div>
-            <div class="mt-4 text-[11px] text-slate-400 text-center">카드를 클릭하면 그 게임으로 모집글 쓰기가 열려요</div>
+            <div class="mt-4 text-[11px] text-slate-400 text-center">카드를 클릭하면 그 게임의 아레나 페이지로 바로 이동해요</div>
         `;
     },
 
@@ -534,12 +547,12 @@ Boako.Together = {
             return;
         }
 
-        resultsBox.innerHTML = data.map(g => `
+        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto">${data.map(g => `
             <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.selectGame('${g.game_name.replace(/'/g, "\\'")}')">
                 <img src="${Boako.Util.cdn(g.image_url || TOGETHER_DEFAULT_LOGO)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
                 <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
             </div>
-        `).join('');
+        `).join('')}</div>`;
         resultsBox.classList.remove('hidden');
     },
 
@@ -577,7 +590,7 @@ Boako.Together = {
                         <div class="mb-3 relative">
                             <label class="text-xs font-bold text-slate-600 block mb-1">종목(게임) 검색</label>
                             <input type="text" id="together-input-game-search" autocomplete="off" placeholder="게임명을 입력해 검색하세요" oninput="Boako.Together.searchGames(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                            <div id="together-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto"></div>
+                            <div id="together-game-search-results" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 overflow-hidden"></div>
                         </div>
                         <div class="mb-3">
                             <label class="text-xs font-bold text-slate-600 block mb-1">설명</label>
