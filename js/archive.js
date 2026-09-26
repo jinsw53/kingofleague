@@ -20,6 +20,10 @@
  *    fetchAndRender() 대신 TerritoryMap.buildUI를 바로 호출함.
  * 🌟 [수정] 탭 제목/설명을 "세력 히스토리"/"...세력 지도입니다"에서 "영향력 히스토리"/
  *    "...영향력 지도입니다"로 용어 통일.
+ * 🌟 [버그수정] territory_map.js 로드 경로가 상대경로('js/territory_map.js')라 PC(루트 경로)에서만
+ *    우연히 맞았음 — 모바일(mobile_archive.js가 이 buildUI를 그대로 재사용)은 /mobile/ 하위에서
+ *    실행되므로 상대경로가 /mobile/js/territory_map.js로 잘못 풀려 404가 나서 히스토리 탭이 빈 화면으로
+ *    남는 문제가 있었음. 절대경로('/js/territory_map.js')로 수정 — PC 쪽 동작은 동일하게 유지됨.
  */
 Boako.Archive = {
     filteredRecords: [],
@@ -529,7 +533,7 @@ Boako.Archive = {
         // 🌟 히스토리(영향력 지도) 탭은 자체 렌더러를 씀 — 공통 fetchAndRender 파이프라인 안 탐
         if (tabName === 'territory_map') {
             if (!Boako.TerritoryMap || !Boako.TerritoryMap.buildUI) {
-                await Boako.Util.loadScript('js/territory_map.js');
+                await Boako.Util.loadScript('/js/territory_map.js');
             }
             const area = document.getElementById('archive-content-area');
             if (area) area.innerHTML = '';
