@@ -462,7 +462,19 @@ Boako.Together = {
             rangeMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, { min: g.min_players, max: g.max_players }]));
         }
 
-        Boako.Together.State.findGameResults = { total, intersection, majority, logoMap, rangeMap };
+        // 🌟 게임의 min_players/max_players가 우리 파티 인원수(total)와 안 맞으면 결과에서 아예 제외.
+        // 인원수 정보가 없는 게임(min/max 둘 다 null)은 판단할 수 없으니 그대로 둠.
+        const fitsPartySize = (gameName) => {
+            const range = rangeMap[gameName];
+            if (!range) return true;
+            if (range.min != null && total < range.min) return false;
+            if (range.max != null && total > range.max) return false;
+            return true;
+        };
+        const filteredIntersection = intersection.filter(g => fitsPartySize(g.game_name));
+        const filteredMajority = majority.filter(g => fitsPartySize(g.game_name));
+
+        Boako.Together.State.findGameResults = { total, intersection: filteredIntersection, majority: filteredMajority, logoMap, rangeMap };
         Boako.Together.renderFindGameResults();
     },
 
@@ -471,16 +483,13 @@ Boako.Together = {
         if (!box) return;
         const { total, intersection, majority, logoMap, rangeMap } = Boako.Together.State.findGameResults;
 
-        // 🌟 게임의 min_players/max_players와 우리 파티 인원수(total)를 비교해서 안 맞으면 경고 표시.
-        // 정보가 없는 게임(min/max 둘 다 null)은 판단할 수 없으니 아무 표시도 하지 않음.
-        // 완전히 목록에서 빼지는 않음 — "이 인원이 전에 다 같이 해봤다"는 사실 자체는 유효한 정보라서.
+        // 🌟 인원수 정보가 있는 게임은 참고용으로 "n~m인용"만 표시 (안 맞는 게임은 이미 위에서 걸러졌으므로 경고 없음)
         const renderPlayerRange = (gameName) => {
             const range = rangeMap[gameName];
             if (!range || (range.min == null && range.max == null)) return '';
-            const misfit = (range.min != null && total < range.min) || (range.max != null && total > range.max);
             const lo = range.min ?? '?';
             const hi = range.max ?? '?';
-            return `<div class="text-[10px] font-bold mt-0.5 ${misfit ? 'text-rose-500' : 'text-slate-400'}">${misfit ? '⚠️ ' : ''}${lo}~${hi}인용${misfit ? ` · 우리 ${total}명과 안 맞아요` : ''}</div>`;
+            return `<div class="text-[10px] font-bold text-slate-400 mt-0.5">${lo}~${hi}인용</div>`;
         };
 
         const renderCard = (g) => `
@@ -497,11 +506,11 @@ Boako.Together = {
         box.innerHTML = `
             <div class="text-xs font-bold text-teal-700 mb-2">🎯 전원이 해본 게임</div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-                ${intersection.length > 0 ? intersection.map(renderCard).join('') : `<div class="col-span-full text-center py-8 text-slate-400 text-sm font-bold border border-dashed border-slate-200 rounded-xl bg-white">전원이 함께 해본 게임이 없어요.</div>`}
+                ${intersection.length > 0 ? intersection.map(renderCard).join('') : `<div class="col-span-full text-center py-8 text-slate-400 text-sm font-bold border border-dashed border-slate-200 rounded-xl bg-white">전원이 함께 해본, 지금 인원에 맞는 게임이 없어요.</div>`}
             </div>
             <div class="text-xs font-bold text-sky-700 mb-2">🙋 과반수 이상이 해본 게임</div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                ${majority.length > 0 ? majority.map(renderCard).join('') : `<div class="col-span-full text-center py-8 text-slate-400 text-sm font-bold border border-dashed border-slate-200 rounded-xl bg-white">과반이 해본 게임이 없어요.</div>`}
+                ${majority.length > 0 ? majority.map(renderCard).join('') : `<div class="col-span-full text-center py-8 text-slate-400 text-sm font-bold border border-dashed border-slate-200 rounded-xl bg-white">과반이 해본, 지금 인원에 맞는 게임이 없어요.</div>`}
             </div>
             <div class="mt-4 text-[11px] text-slate-400 text-center">카드를 클릭하면 그 게임으로 모집글 쓰기가 열려요</div>
         `;
