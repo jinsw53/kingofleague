@@ -25,6 +25,9 @@
  *    "확장 사용 어려움" 오버레이)에서 요청 게시판으로 바로 이동시키는 용도. linkId = 카테고리명.
  * 🌟 [신규] navigateToLink에 ARCHIVE 케이스 추가 — 5연속 전적 기록("수배전단") 소식 클릭 시
  *    전적기록실(archive)로 이동. 특정 유저로 필터링하는 기능은 아직 없어 일단 전체 화면만 염.
+ * 🌟 [신규] navigateToLink에 TERRITORY_MAP 케이스 추가 — 매일 자동 생성되는 "어제의 영향력 지도"
+ *    소식지 카드 클릭 시 전적기록실을 열고 "히스토리" 탭으로 바로 전환 (RIVAL_MATCH가 "응원하기" 탭으로
+ *    바로 들어가는 것과 동일한 패턴).
  */
 Boako.Util = {
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
@@ -171,6 +174,16 @@ Boako.Util = {
                 // 🌟 [신규] 5연속 전적 기록("수배전단") 소식 클릭 시 전적기록실로 이동
                 case 'ARCHIVE':
                     await Boako.View.render('archive');
+                    break;
+                // 🌟 [신규] 매일 자동 생성되는 "어제의 영향력 지도" 소식지 클릭 시
+                // 전적기록실을 열고 "히스토리" 탭으로 바로 전환
+                case 'TERRITORY_MAP':
+                    await Boako.View.render('archive');
+                    setTimeout(() => {
+                        if (Boako.Archive && typeof Boako.Archive.switchTab === 'function') {
+                            Boako.Archive.switchTab('territory_map');
+                        }
+                    }, 150);
                     break;
                 default:
                     console.warn('알 수 없는 link_type:', linkType);
