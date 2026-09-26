@@ -51,6 +51,12 @@ Boako.MobileTeamList = {
             if (e.key === 'Enter') Boako.TeamList.loadTeams(1);
         });
 
+        // 🌟 카톡 공유 딥링크(?view=team_list&post=팀명) — PC team_list.js init()과 동일하게 처리
+        if (window.Boako.__deepLinkPostId) {
+            document.getElementById('team-search-input').value = window.Boako.__deepLinkPostId;
+            window.Boako.__deepLinkPostId = null;
+        }
+
         // 🌟 PC와 완전히 동일한 함수 그대로 재사용 (카드/페이지네이션 렌더링 전부 위임)
         await Boako.TeamList.loadTeams(1);
     }
