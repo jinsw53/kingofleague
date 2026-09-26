@@ -395,7 +395,7 @@ Boako.Together = {
             resultsBox.classList.remove('hidden');
             return;
         }
-        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto">${filtered.map(p => `
+        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto dropdown-scroll">${filtered.map(p => `
             <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.addPartyMember('${p.id}', '${p.full_name.replace(/'/g, "\\'")}', '${(p.custom_avatar_url || p.profile_url || '').replace(/'/g, "\\'")}')">
                 <img src="${Boako.Util.cdn(p.custom_avatar_url || p.profile_url || TOGETHER_DEFAULT_AVATAR)}" class="w-6 h-6 rounded-full object-cover bg-slate-100">
                 <span class="text-xs font-bold text-slate-700">${p.full_name}</span>
@@ -547,7 +547,7 @@ Boako.Together = {
             return;
         }
 
-        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto">${data.map(g => `
+        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto dropdown-scroll">${data.map(g => `
             <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.selectGame('${g.game_name.replace(/'/g, "\\'")}')">
                 <img src="${Boako.Util.cdn(g.image_url || TOGETHER_DEFAULT_LOGO)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
                 <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
