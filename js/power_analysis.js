@@ -7,6 +7,9 @@
  *
  * 🌟 개인 기록 자체는 팀 소속 여부와 무관하게 "내 활동 전체"를 보여주는 게 목적이므로
  *    무소속(Free Agent) 기록도 포함해서 집계한다. (기록실/랭킹보드의 팀 리그 전용 필터와는 다른 성격)
+ * 🌟 [신규] 탐험도 카드 — 진행바 아래에 실제로 플레이한 게임 로고를 최대 6개 겹쳐서 미리보기로
+ *    보여주고, 카드를 클릭하면 openExploredGamesModal()이 전체 목록을 로고+게임명+횟수 그리드로
+ *    보여줌. 모바일(mobile_power_analysis.js)도 이 모달 함수를 그대로 재사용.
  */
 Boako.PowerAnalysis = {
 
@@ -69,6 +72,18 @@ Boako.PowerAnalysis = {
             const distinctGameCount = Object.keys(gameStats).length;
             const explorePct = totalGameCount > 0 ? (distinctGameCount / totalGameCount * 100) : 0;
 
+            // 🌟 [신규] 탐험도 카드에서 "내가 실제로 어떤 게임을 했는지" 로고로 보여주기 위한 목록.
+            // 게임 수가 많을 수도 있어서 로고는 games 테이블에서 한 번에 조회.
+            const playedGameNames = Object.keys(gameStats);
+            let playedGamesList = [];
+            if (playedGameNames.length > 0) {
+                const { data: gamesData } = await Boako.db.from('games').select('game_name, image_url').in('game_name', playedGameNames);
+                const logoMap = Object.fromEntries((gamesData || []).map(g => [g.game_name, g.image_url]));
+                playedGamesList = playedGameNames
+                    .map(name => ({ name, count: gameStats[name].count, logo: logoMap[name] || null }))
+                    .sort((a, b) => b.count - a.count);
+            }
+
             const firstWinCount = rows.filter(r => r.is_first == 1).length;
 
             const topRecordedGames = Object.entries(gameStats)
@@ -92,6 +107,7 @@ Boako.PowerAnalysis = {
             this.render({
                 myRecordCount, totalRecordCount: totalRecordCount || 0, activityPct,
                 distinctGameCount, totalGameCount: totalGameCount || 0, explorePct,
+                playedGamesList,
                 firstWinCount, topRecordedGames, topTournamentGames,
                 teamHistory: teamHistory || []
             });
@@ -115,9 +131,23 @@ Boako.PowerAnalysis = {
         const {
             myRecordCount, totalRecordCount, activityPct,
             distinctGameCount, totalGameCount, explorePct,
+            playedGamesList,
             firstWinCount, topRecordedGames, topTournamentGames,
             teamHistory
         } = stats;
+
+        // 🌟 모달에서 참조할 수 있도록 저장해둠 (openExploredGamesModal이 인자 없이 호출되므로)
+        this._playedGamesList = playedGamesList || [];
+
+        // 🌟 탐험도 카드 안, 진행바 아래에 보여줄 미리보기 로고 (많이 한 순 최대 6개, 겹쳐서 스택)
+        const previewLogos = this._playedGamesList.slice(0, 6).map((g, idx) => `
+            <img src="${g.logo ? Boako.Util.cdn(g.logo) : PA_DEFAULT_LOGO}" title="${g.name}"
+                 style="width:28px; height:28px; border-radius:8px; object-fit:contain; background:#f8fafc; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); margin-left:${idx === 0 ? '0' : '-10px'}; position:relative; z-index:${10 - idx};">
+        `).join('');
+        const explorePreviewHtml = this._playedGamesList.length > 0
+            ? `<div style="display:flex; align-items:center; justify-content:center; margin-top:14px;">${previewLogos}</div>
+               <div style="font-size:10.5px; color:#0891b2; font-weight:800; margin-top:8px;">탭해서 전체 보기 →</div>`
+            : '';
 
         // ===== 1. 활동량 + 2. 탐험도 (나란히 배치) =====
         const activityHtml = `
@@ -134,7 +164,7 @@ Boako.PowerAnalysis = {
                         </div>
                     </div>
                 </div>
-                <div class="section-card" style="margin-bottom:0;">
+                <div class="section-card" style="margin-bottom:0; cursor:pointer;" onclick="Boako.PowerAnalysis.openExploredGamesModal()">
                     <div class="card-header" style="font-size:16px;">🗺️ 탐험도</div>
                     <div class="card-body" style="text-align:center; padding:30px;">
                         <div style="font-size:42px; font-weight:950; color:#0891b2; line-height:1;">${explorePct.toFixed(1)}%</div>
@@ -144,6 +174,7 @@ Boako.PowerAnalysis = {
                         <div style="width:100%; background:#f1f5f9; height:8px; border-radius:99px; margin-top:16px; overflow:hidden;">
                             <div style="width:${Math.min(100, explorePct)}%; background:linear-gradient(90deg,#0891b2,#06b6d4); height:100%; border-radius:99px;"></div>
                         </div>
+                        ${explorePreviewHtml}
                     </div>
                 </div>
             </div>
@@ -231,5 +262,44 @@ Boako.PowerAnalysis = {
         `;
 
         area.innerHTML = activityHtml + powerAnalysisHtml + historySectionHtml;
+    },
+
+    // 🌟 [신규] 탐험도 카드 클릭 시 — 내가 실제로 플레이한 게임을 로고와 함께 전부 보여주는 모달.
+    // 좁은 카드 공간에는 미리보기 6개만 겹쳐서 보여주고, 전체 목록(수십 종일 수 있음)은 여기서 그리드로.
+    openExploredGamesModal: function() {
+        if (document.getElementById('pa-explore-modal-overlay')) return;
+        const list = this._playedGamesList || [];
+
+        const gridHtml = list.length === 0
+            ? `<div class="text-center text-slate-400 font-bold py-10">아직 플레이한 게임이 없습니다.</div>`
+            : `<div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                ${list.map(g => `
+                    <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-slate-200 bg-slate-50">
+                        <img src="${g.logo ? Boako.Util.cdn(g.logo) : PA_DEFAULT_LOGO}" class="w-12 h-12 rounded-lg object-contain bg-white border border-slate-100 p-1">
+                        <span class="text-xs font-black text-slate-700 text-center leading-tight">${g.name}</span>
+                        <span class="text-[10px] font-bold text-cyan-600">${g.count}회</span>
+                    </div>
+                `).join('')}
+              </div>`;
+
+        const modalHtml = `
+            <div id="pa-explore-modal-overlay" class="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4" onclick="if(event.target===this) Boako.PowerAnalysis.closeExploredGamesModal()">
+                <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-black text-lg">🗺️ 내가 플레이한 게임 ${list.length}종</h3>
+                        <button onclick="Boako.PowerAnalysis.closeExploredGamesModal()" class="text-slate-400 font-black text-xl">×</button>
+                    </div>
+                    ${gridHtml}
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+
+    closeExploredGamesModal: function() {
+        document.getElementById('pa-explore-modal-overlay')?.remove();
     }
 };
+
+// 게임 로고를 못 찾았을 때 대체용
+const PA_DEFAULT_LOGO = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
