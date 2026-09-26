@@ -58,6 +58,12 @@
             --text-main: #1e293b; --text-sub: #64748b; --border-color: #e2e8f0;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* 🌟 [신규] 게임/파티원 검색 드롭다운 스크롤 — PC index.html과 동일 (mobile_tournament.js에 적용) */
+        .dropdown-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+        .dropdown-scroll::-webkit-scrollbar { width: 6px; }
+        .dropdown-scroll::-webkit-scrollbar-track { background: transparent; }
+        .dropdown-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+        .dropdown-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         /* 🌟 [버그수정] 가로 스크롤이 절대 생기지 않도록 전역으로 막음. 세로 스크롤은 자유롭게 허용. */
         html, body {
             overflow-x: hidden;
