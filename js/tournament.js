@@ -306,7 +306,7 @@ Boako.Tournament = {
             return;
         }
 
-        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto">${data.map(g => `
+        resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto dropdown-scroll">${data.map(g => `
             <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer transition-colors" onclick="Boako.Tournament.selectGame('${g.game_name.replace(/'/g, "\\'")}', '${(g.image_url || '').replace(/'/g, "\\'")}')">
                 <img src="${Boako.Util.cdn(g.image_url || DEFAULT_LOGO_FALLBACK)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
                 <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
