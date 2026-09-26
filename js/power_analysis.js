@@ -10,6 +10,9 @@
  * 🌟 [신규] 탐험도 카드 — 진행바 아래에 실제로 플레이한 게임 로고를 최대 6개 겹쳐서 미리보기로
  *    보여주고, 카드를 클릭하면 openExploredGamesModal()이 전체 목록을 로고+게임명+횟수 그리드로
  *    보여줌. 모바일(mobile_power_analysis.js)도 이 모달 함수를 그대로 재사용.
+ * 🌟 [수정] 모달 그리드의 로고 이미지에 loading="lazy"/decoding="async" 추가 — 플레이한 게임이
+ *    많을 때 모달을 여는 즉시 전부 다운로드 요청이 몰리지 않고, 스크롤해서 보이는 만큼만
+ *    브라우저가 순차적으로 불러오도록 함. 모달 자체(텍스트/그리드 틀)는 항상 즉시 뜸.
  */
 Boako.PowerAnalysis = {
 
@@ -275,7 +278,7 @@ Boako.PowerAnalysis = {
             : `<div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
                 ${list.map(g => `
                     <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-slate-200 bg-slate-50">
-                        <img src="${g.logo ? Boako.Util.cdn(g.logo) : PA_DEFAULT_LOGO}" class="w-12 h-12 rounded-lg object-contain bg-white border border-slate-100 p-1">
+                        <img src="${g.logo ? Boako.Util.cdn(g.logo) : PA_DEFAULT_LOGO}" loading="lazy" decoding="async" class="w-12 h-12 rounded-lg object-contain bg-white border border-slate-100 p-1">
                         <span class="text-xs font-black text-slate-700 text-center leading-tight">${g.name}</span>
                         <span class="text-[10px] font-bold text-cyan-600">${g.count}회</span>
                     </div>
