@@ -48,21 +48,21 @@ Boako.MobileTogether = {
 
         container.innerHTML = `
             <div style="background:linear-gradient(135deg,#0ea5e9,#0369a1); border-radius:16px; padding:20px; margin-bottom:14px; color:#fff; display:flex; flex-direction:column; align-items:center; text-align:center;">
-                <div style="font-size:17px; font-weight:900;">🎲 같이하자</div>
-                <div style="font-size:11.5px; font-weight:700; opacity:0.9; margin-top:4px;">지금 같이 놀 사람을 모아보세요. 참가는 선착순, 승인 없이 바로 확정돼요.</div>
+                <div style="font-size:17px; font-weight:900;">🤝 같이하자</div>
+                <div style="font-size:11.5px; font-weight:700; opacity:0.9; margin-top:4px;">지금 같이 놀 사람을 모아보고, 같이할 게임도 찾아보세요. 참가는 선착순, 승인 없이 바로 확정돼요.</div>
             </div>
 
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-                <div style="display:flex; gap:6px;">
-                    <button id="together-tab-btn-BOARD" class="together-tab-btn bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.Together.switchTab('BOARD')">📋 전체 모집</button>
-                    <button id="together-tab-btn-MINE" class="together-tab-btn bg-slate-100 text-slate-500 px-4 py-2 rounded-lg text-sm font-bold transition-all" onclick="Boako.Together.switchTab('MINE')">🙋 내 모임</button>
-                </div>
-                <button onclick="Boako.Together.openWriteModal()" class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-sky-700 transition-colors">+ 모집</button>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:12px;">
+                <button id="together-tab-btn-BOARD" class="together-tab-btn bg-slate-800 text-white px-3 py-2 rounded-lg text-xs font-bold transition-all" onclick="Boako.Together.switchTab('BOARD')">📋 전체 모집</button>
+                <button id="together-tab-btn-MINE" class="together-tab-btn bg-slate-100 text-slate-500 px-3 py-2 rounded-lg text-xs font-bold transition-all" onclick="Boako.Together.switchTab('MINE')">🙋 내 모임</button>
+                <button id="together-tab-btn-FIND_GAME" class="together-tab-btn bg-slate-100 text-slate-500 px-3 py-2 rounded-lg text-xs font-bold transition-all" onclick="Boako.Together.switchTab('FIND_GAME')">🎯 게임 찾기</button>
+                <button onclick="Boako.Together.openWriteModal()" class="bg-sky-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-sky-700 transition-colors ml-auto">+ 모집</button>
             </div>
 
             <div id="together-list-container" class="grid grid-cols-1 gap-3">
                 <div style="text-align:center; padding:50px 0; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>
             </div>
+            <div id="together-findgame-container" class="hidden"></div>
 
             <div id="together-modal-root"></div>
         `;
