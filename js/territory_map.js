@@ -6,14 +6,17 @@
  *       가중치로 쓰는 weighted Voronoi 근사 — 절대 RP가 아니라 상대 비중이라 모두가 같이
  *       커져도 화면상 크기는 그대로, 상대 순위가 바뀔 때만 경계가 움직임).
  * 팀 소속: team_members.is_active 기준 "지금" 소속으로 묶음 (기록 시점 스냅샷 b_all_team 아님).
- * 좌표: golden-angle spiral(해바라기씨 배치) — 개체가 늘어나도 기존 개체 좌표는 안 흔들리고
- *       새 개체만 바깥쪽에 추가됨. 정렬 기준은 그 개체의 최근 90일 내 "첫 활동일".
+ * 🌟 [좌표 방식 변경] 방향(각도)은 golden-angle spiral로 개체별 영구 고정(개체 늘어나도 기존
+ *    개체 방향은 안 흔들림, 정렬 기준은 "최근 90일 내 첫 활동일"). 대신 중심으로부터의 거리는
+ *    고정이 아니라 "그날의 순위"로 매번 다시 계산 — 1등은 항상 정중앙(거리 0), 순위가 밀릴수록
+ *    자기 방향선을 따라 바깥쪽으로. 그래서 신흥 강자는 가장자리에서 나타나 중앙으로 다가오며
+ *    커지고, 밀리는 쪽은 중앙에서 바깥으로 밀려남 — 보로노이 경계 밀림과 합쳐져 서로 부딪히며
+ *    영역을 다투는 느낌을 냄. 팀 안 팀원 배치도 팀 내부 순위 기준으로 동일하게 적용.
  * 시각화: 화면 전체를 빈틈없이 채우는 보로노이 테셀레이션. 진한 경계선=팀/개인 간 경계,
- *        얇은 경계선=팀 안 팀원 간 경계. 라벨(닉네임/팀명)은 고정 좌표가 아니라 그 순간
- *        실제로 칠해진 영역의 무게중심을 따라다님 (경계가 밀려도 라벨이 안 겉돎).
- * 🌟 [수정] render() 시점마다, 슬라이더가 가리키는 날짜까지 실제 rp 누적이 0인 팀/개인(EPS 제외 순수값)은
- *    그날의 보로노이 계산에서 통째로 빼버림 — 팀 안 개별 팀원 단위로도 동일 적용. 그래서 아직
- *    창단 전이거나 활동 시작 전인 개체는 그 좌표에 미리 자리를 차지한 채로 보이지 않음.
+ *        얇은 경계선=팀 안 팀원 간 경계. 라벨(닉네임/팀명)은 실제로 칠해진 영역의 무게중심을
+ *        따라다님 (경계가 밀려도 라벨이 안 겉돎).
+ * 🌟 그 날짜까지 실제 rp 누적이 0인 팀/개인(EPS 제외 순수값)은 그날의 계산에서 통째로 제외
+ *    (아직 창단/활동 전인 개체는 안 보임) — 팀 안 개별 팀원 단위로도 동일 적용.
  * 클릭 동작: 아직 미정이라 클릭 핸들러 없음 (추후 결정 시 추가).
  */
 Boako.TerritoryMap = {
@@ -23,6 +26,7 @@ Boako.TerritoryMap = {
     H: 380,
     dayIndex: 89,
     topEntities: null,
+    GOLDEN: 137.5 * Math.PI / 180,
 
     HUES: [
         { 200:'#F0997B', 400:'#D85A30', 600:'#993C1D', 800:'#712B13' },
@@ -68,7 +72,7 @@ Boako.TerritoryMap = {
             <div id="tm-wrap" style="position:relative; width:100%; border-radius:16px; overflow:hidden; background:#f8fafc; border:1px solid #e2e8f0;">
                 <canvas id="tm-canvas"></canvas>
             </div>
-            <p style="font-size:11px; color:#94a3b8; font-weight:700; margin-top:10px;">최근 90일간 인증완료된 기록의 RP 비중으로 팀/개인 영역을 나눈 지도입니다. 슬라이더로 특정 날짜까지의 누적 상황을 볼 수 있어요.</p>
+            <p style="font-size:11px; color:#94a3b8; font-weight:700; margin-top:10px;">최근 90일간 인증완료된 기록의 RP 비중으로 팀/개인 영역을 나눈 지도입니다. 1등은 정중앙, 순위가 밀릴수록 바깥쪽으로 배치돼요. 슬라이더로 특정 날짜까지의 누적 상황을 볼 수 있어요.</p>
         `;
         this.init();
     },
@@ -151,13 +155,6 @@ Boako.TerritoryMap = {
         ].sort((a, b) => a.firstDay - b.firstDay);
     },
 
-    goldenAnchor: function(index, scale, cx, cy) {
-        const GOLDEN = 137.5 * Math.PI / 180;
-        const r = scale * Math.sqrt(index + 1);
-        const a = index * GOLDEN;
-        return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-    },
-
     weightOf: function(share) { return Math.sqrt(Math.max(0, share)); },
 
     setupDom: function() {
@@ -205,18 +202,15 @@ Boako.TerritoryMap = {
         this.computeAnchors();
     },
 
+    // 🌟 방향(각도)만 개체별로 영구 고정. 거리(중심에서 얼마나 떨어졌는지)는 render()에서
+    // 그날의 순위로 매번 다시 계산함 — 그래서 여기선 반지름 스텝(스케일)만 같이 갱신해둠.
     computeAnchors: function() {
-        const cx = this.W / 2, cy = this.H / 2;
-        const scaleTop = this.W / 30;
-        const scaleMember = scaleTop * 0.7;
+        this.scaleTop = this.W / 30;
+        this.scaleMember = this.scaleTop * 0.7;
         this.topEntities.forEach((e, i) => {
-            const a = this.goldenAnchor(i, scaleTop, cx, cy);
-            e.cx = a.x; e.cy = a.y;
+            e.angle = i * this.GOLDEN;
             if (e.kind === 'team') {
-                e.team.memberList.forEach((m, mi) => {
-                    const off = this.goldenAnchor(mi, scaleMember, 0, 0);
-                    m.dx = off.x; m.dy = off.y;
-                });
+                e.team.memberList.forEach((m, mi) => { m.angle = mi * this.GOLDEN; });
             }
         });
     },
@@ -248,6 +242,16 @@ Boako.TerritoryMap = {
             return;
         }
 
+        // 🌟 [핵심] 그날 순위로 중심으로부터의 거리를 결정 — 1등(rankIdx 0)은 거리 0(정중앙),
+        // 순위가 밀릴수록 자기 고정 방향(e.angle)을 따라 바깥쪽으로. 방향 자체는 안 바뀜.
+        const cx = this.W / 2, cy = this.H / 2;
+        const ranked = topRaw.slice().sort((a, b) => b.value - a.value);
+        ranked.forEach((x, rankIdx) => {
+            const dist = this.scaleTop * rankIdx;
+            x.e.cx = cx + dist * Math.cos(x.e.angle);
+            x.e.cy = cy + dist * Math.sin(x.e.angle);
+        });
+
         const topSum = topRaw.reduce((s, x) => s + x.value, 0);
         topRaw.forEach(x => { x.weight = this.weightOf(x.value / topSum); });
 
@@ -257,6 +261,15 @@ Boako.TerritoryMap = {
             const activeMembers = x.e.team.memberList
                 .map((m, mi) => ({ m, mi, raw: sumUpTo(m.daily) }))
                 .filter(o => o.raw > 0);
+
+            // 팀원도 동일 원리: 방향(m.angle)은 고정, 팀 내부 그날 순위로 팀 중심에서의 거리만 결정
+            const rankedMembers = activeMembers.slice().sort((a, b) => b.raw - a.raw);
+            rankedMembers.forEach((o, rankIdx) => {
+                const dist = this.scaleMember * rankIdx;
+                o.m.dx = dist * Math.cos(o.m.angle);
+                o.m.dy = dist * Math.sin(o.m.angle);
+            });
+
             const raws = activeMembers.map(o => o.raw + EPS);
             const sum = raws.reduce((a, b) => a + b, 0);
             memberWeightsByTeam[x.e.key] = activeMembers.map((o, idx) => ({ m: o.m, mi: o.mi, weight: this.weightOf(raws[idx] / sum) }));
