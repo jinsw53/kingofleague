@@ -604,6 +604,53 @@
   let tokenRefreshTimer = null; // 🌟 [신규] 리더 탭이 만료 전에 토큰을 주기적으로 갱신하는 타이머
   let coordinationActive = false; // 🌟 initRealtimeCoordination()~teardownRealtimeCoordination() 사이에만 true
 
+  // ========================================================================
+  // 🌟 [신규] 놓친 쪽지/팀챗 재동기화 — 실시간 소켓이 끊긴 동안(리더 탭이 백그라운드에서 타이머 스로틀링으로 끊기거나
+  // 리더가 바뀌는 사이) 온 쪽지는 소켓으로 못 받고, 캐치업 대상(업적 등 5종)도 아니라서 페이지를 새로 열기 전까지
+  // 배지/목록에 안 뜨던 문제 보강. 폴링이 아니라 아래 두 시점에만 REST로 한 번 다시 불러옴:
+  //  ① 웹소켓이 (재)연결됐을 때(리더) — 팔로워 탭들에도 'resync'를 중계해서 각자 다시 불러오게 함
+  //  ② 탭이 다시 화면에 보일 때, 마지막 동기화 후 3분 넘게 지났으면
+  // 두 경우 모두 1분에 최대 1번으로 제한(소켓이 열렸다 닫히기를 반복해도 REST가 폭주하지 않게). REST라서 Realtime
+  // 동시 연결 수와는 무관. 토스트는 띄우지 않고 배지 숫자/목록만 갱신(한꺼번에 여러 개가 뜨는 소란 방지).
+  // ========================================================================
+  const RESYNC_MIN_INTERVAL_MS = 60000;
+  const RESYNC_VISIBLE_STALE_MS = 180000;
+  let _lastResyncAt = Date.now(); // 위젯 초기화 때 불러온 시점으로 시작 (initAfterLogin에서 갱신)
+  let _resyncInFlight = false;
+
+  // REST 호출 전에 토큰이 만료됐거나 임박했는지 로컬로 먼저 보고, 그때만 background에 갱신을 요청 —
+  // 여러 탭이 동시에 불필요하게 갱신을 요청하지 않도록 (리프레시 토큰은 1회용)
+  async function _ensureFreshSessionForRest() {
+    const sess = State.session;
+    if (!sess) return false;
+    if (sess.expires_at && Date.now() < sess.expires_at - 6 * 60 * 1000) return true;
+    return _refreshSessionForConnect();
+  }
+
+  // 반환: 실제로 다시 불러왔으면 true (제한/중복/세션 없음이면 false)
+  async function resyncMessages(reason) {
+    if (!State.session || _resyncInFlight) return false;
+    if (Date.now() - _lastResyncAt < RESYNC_MIN_INTERVAL_MS) return false;
+    _resyncInFlight = true;
+    _lastResyncAt = Date.now();
+    try {
+      if (!(await _ensureFreshSessionForRest())) return false;
+      boakoLog(`쪽지/팀챗 재동기화 (${reason})`);
+      await Promise.all([fetchUnreadCount(), fetchMessages(), fetchTeamChats()]);
+      // 쪽지 대화창을 보고 있는 중이면 그 대화도 최신으로 (onMessageInsert와 동일한 처리)
+      if (State.panelOpen && State.activeTab === 'messages' && State.activeConversation) {
+        await fetchThreadMessages(State.activeConversation.otherId);
+      }
+      render();
+      return true;
+    } catch (e) {
+      boakoErr('쪽지/팀챗 재동기화 실패:', e);
+      return false;
+    } finally {
+      _resyncInFlight = false;
+    }
+  }
+
   function getLeaderInfo() {
     try {
       const raw = localStorage.getItem(LEADER_KEY);
@@ -629,6 +676,8 @@
       case 'achievement-insert': onAchievementInsert(payload); break;
       case 'rival-vote-update': onRivalVoteUpdate(payload); break;
       case 'recommend-bonus-update': onRecommendBonusUpdate(payload); break;
+      // 🌟 리더가 재연결 후 다시 불러올 때 팔로워도 각자 다시 불러오게 함 (탭들이 한꺼번에 REST를 보내지 않도록 0~2초 분산)
+      case 'resync': setTimeout(() => resyncMessages('리더 중계'), Math.random() * 2000); break;
     }
   }
 
@@ -896,6 +945,9 @@
       boakoOk('웹소켓 연결 성공! (CSP 문제 없음)');
       if (stableTimer) clearTimeout(stableTimer);
       stableTimer = setTimeout(() => { State.reconnectAttempts = 0; }, 30000);
+      // 🌟 연결(재연결/리더 인계 포함)되면 그 사이 놓친 쪽지/팀챗을 다시 불러옴. 위젯을 막 켠 직후의 첫 연결은
+      // 1분 제한에 걸려 자연스럽게 건너뜀(이미 방금 불러왔으므로).
+      resyncMessages('웹소켓 연결됨').then((ran) => { if (ran) broadcastToFollowers('resync', {}); });
     });
     client.socketAdapter.onClose((e) => {
       boakoWarn('웹소켓 연결 종료됨:', e);
@@ -3073,6 +3125,7 @@
     State.teamId = await fetchTeamId();
     boakoLog('소속 팀 id:', State.teamId || '(없음)');
     await Promise.all([fetchMessages(), fetchTeamChats()]);
+    _lastResyncAt = Date.now(); // 방금 불러왔으므로 재동기화 타이머 기준점 갱신
     checkCatchupNotifications(); // 🌟 [신규] 캐치업 체크 — 결과 기다리지 않고 백그라운드로 진행
     initRealtimeCoordination(); // 🌟 탭 리더 선출 후, 리더 탭만 실제 웹소켓 연결을 만듦
     render();
@@ -3098,6 +3151,9 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     if (!State.session) return;
+
+    // 🌟 [신규] 오래 숨겨져 있던 탭이 다시 보이면(마지막 동기화 3분 초과) 놓친 쪽지/팀챗을 한 번 다시 불러옴
+    if (Date.now() - _lastResyncAt > RESYNC_VISIBLE_STALE_MS) resyncMessages('탭 복귀');
 
     if (isRealtimeLeader) {
       if (State.realtimeClient) return; // 이미 연결 살아있으면 할 일 없음
