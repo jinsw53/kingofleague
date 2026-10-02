@@ -589,7 +589,11 @@
   // ========================================================================
   const TAB_ID = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
   const LEADER_KEY = 'boako_realtime_leader';
-  const LEADER_TTL_MS = 6000;       // 이 시간 넘게 하트비트가 없으면 리더가 죽은 것으로 간주
+  // 🌟 [수정] 6초 → 90초. BGA는 턴제라 탭을 여러 개 켜두고 백그라운드로 방치하는 경우가 많은데, 크롬은 오래 숨겨진
+  // 탭의 타이머를 1분에 한 번 수준으로 늦춰서(intensive throttling) 6초 TTL이면 멀쩡한 리더가 "죽은 것"으로 오판돼
+  // 탭끼리 리더를 계속 뺏고 뺏기면서 소켓을 새로 여는 일이 반복될 수 있었음. 리더가 비정상 종료(탭 폐기 등)했을 때
+  // 인계까지 최대 90초 걸리지만, 놓친 알림은 캐치업으로 복구되고 정상 종료(탭 닫기/로그아웃)는 즉시 인계됨.
+  const LEADER_TTL_MS = 90000;
   const HEARTBEAT_INTERVAL_MS = 2000;
 
   let isRealtimeLeader = false;
@@ -597,6 +601,7 @@
   let followerWatchTimer = null;
   let realtimeBC = null;
   let confirmClaimTimer = null;
+  let tokenRefreshTimer = null; // 🌟 [신규] 리더 탭이 만료 전에 토큰을 주기적으로 갱신하는 타이머
   let coordinationActive = false; // 🌟 initRealtimeCoordination()~teardownRealtimeCoordination() 사이에만 true
 
   function getLeaderInfo() {
@@ -649,10 +654,19 @@
       }
       isRealtimeLeader = true;
       boakoOk(`이 탭이 실시간 연결 리더로 선출됨 (id: ${TAB_ID.slice(0, 8)})`);
+      State.intentionalDisconnect = false; // 🌟 로그아웃 후 같은 탭에서 재로그인한 경우에도 연결되도록 이전 해제 플래그 초기화
       _doConnect(); // 진짜 웹소켓 연결은 리더 탭에서만 생성
       leaderHeartbeatTimer = setInterval(() => {
+        // 🌟 [버그수정] 하트비트를 쓰기 전에 내가 아직 리더인지 확인 — 이전엔 무조건 덮어써서, 타이머가 늦어진 사이
+        // 다른 탭이 리더를 이어받아도 원래 리더가 자기가 리더인 줄 알고 소켓을 계속 들고 있어 리더가 둘 이상 생길 수 있었음.
+        const info = getLeaderInfo();
+        if (info && info.tabId !== TAB_ID && isLeaderInfoAlive(info)) {
+          stepDownFromLeader('다른 탭이 리더 자리를 이어받음(하트비트 확인)');
+          return;
+        }
         localStorage.setItem(LEADER_KEY, JSON.stringify({ tabId: TAB_ID, ts: Date.now() }));
       }, HEARTBEAT_INTERVAL_MS);
+      _startTokenRefreshTimer();
       // 🌟 [신규] 시즌 스플래시(팀 소속자 전용) — 사이트 season_splash.js와 완전히 동일한 디자인/애니메이션/사운드.
       // enqueueFullscreenOverlay 큐에 태워서 업적/라이벌결과/추천보너스/④⑤⑥⑦활성화와 자동으로 안 겹치게 함.
       checkSeasonSplash();
@@ -660,6 +674,55 @@
       // 리더 탭에서만 체크해서 중복 방지. 크론이 미리 계산해둔 대기열을 조회만 함.
       checkActivationOverlayQueue();
     }, CLAIM_CONFIRM_DELAY_MS);
+  }
+
+  // 🌟 [신규] 리더 자리를 다른 탭에 넘겨줬을 때 이 탭의 실시간 연결을 정리하고 팔로워로 내려감.
+  // State.realtimeClient를 먼저 비워야 onClose가 "내 소켓이 끊김"으로 보고 재연결을 예약하지 않음.
+  function stepDownFromLeader(reason) {
+    if (!isRealtimeLeader) return;
+    boakoWarn(`리더 자리를 내려놓음 — ${reason}`);
+    if (leaderHeartbeatTimer) { clearInterval(leaderHeartbeatTimer); leaderHeartbeatTimer = null; }
+    _stopTokenRefreshTimer();
+    if (State.reconnectTimer) { clearTimeout(State.reconnectTimer); State.reconnectTimer = null; }
+    State.reconnectAttempts = 0;
+    const client = State.realtimeClient;
+    State.realtimeClient = null;
+    if (client) { try { client.disconnect(); } catch (e) { /* noop */ } }
+    becomeFollower();
+  }
+
+  // 🌟 [신규] 다른 탭이 리더 키를 덮어쓰면 하트비트 주기를 기다리지 않고 즉시 내려옴
+  // (storage 이벤트는 타이머와 달리 백그라운드 탭에서도 늦춰지지 않음)
+  window.addEventListener('storage', (e) => {
+    if (e.key !== LEADER_KEY || !coordinationActive || !isRealtimeLeader) return;
+    const info = getLeaderInfo();
+    if (info && info.tabId !== TAB_ID && isLeaderInfoAlive(info)) {
+      stepDownFromLeader('다른 탭이 리더 자리를 이어받음(storage 이벤트)');
+    }
+  });
+
+  // 🌟 [신규] 리더 탭이 1분마다 background.js에 세션을 요청 — 만료 5분 전이면 거기서 리프레시해서 돌려줌.
+  // 토큰이 바뀌었으면 살아있는 연결에도 새 토큰을 적용해서, 연결이 오래 유지돼도 토큰 만료로 구독이 죽지 않게 함.
+  // (리프레시 토큰은 1회용이라 여러 탭이 동시에 갱신하면 꼬일 수 있어서 리더 탭만 수행)
+  const TOKEN_REFRESH_CHECK_MS = 60000;
+  function _startTokenRefreshTimer() {
+    _stopTokenRefreshTimer();
+    tokenRefreshTimer = setInterval(_tokenRefreshTick, TOKEN_REFRESH_CHECK_MS);
+  }
+  function _stopTokenRefreshTimer() {
+    if (tokenRefreshTimer) { clearInterval(tokenRefreshTimer); tokenRefreshTimer = null; }
+  }
+  async function _tokenRefreshTick() {
+    if (!isRealtimeLeader || !State.session) return;
+    const before = State.session.access_token;
+    const ok = await _refreshSessionForConnect();
+    if (!ok || !isRealtimeLeader || !State.session) return;
+    if (State.session.access_token !== before && State.realtimeClient) {
+      try {
+        State.realtimeClient.setAuth(State.session.access_token);
+        boakoLog('만료 전 토큰 갱신 — 실시간 연결에 새 토큰 적용');
+      } catch (e) { boakoErr('새 토큰을 실시간 연결에 적용 실패:', e); }
+    }
   }
 
   function becomeFollower() {
@@ -715,6 +778,7 @@
 
   function teardownRealtimeCoordination() {
     coordinationActive = false;
+    _stopTokenRefreshTimer();
     if (leaderHeartbeatTimer) { clearInterval(leaderHeartbeatTimer); leaderHeartbeatTimer = null; }
     if (followerWatchTimer) { clearInterval(followerWatchTimer); followerWatchTimer = null; }
     if (confirmClaimTimer) { clearTimeout(confirmClaimTimer); confirmClaimTimer = null; }
@@ -748,7 +812,10 @@
     if (State.intentionalDisconnect) return; // 로그아웃 등 의도적 해제면 재연결 안 함
     if (State.reconnectTimer) return; // 이미 예약돼 있으면 중복 예약 방지
 
-    const delay = Math.min(2000 * Math.pow(2, State.reconnectAttempts), 30000);
+    // 🌟 [수정] 상한 30초 → 5분. 연속 실패가 쌓이면 간격이 계속 늘어남(연결이 30초 이상 유지돼야 횟수가 0으로 돌아옴).
+    // 이전엔 서버가 계속 거절하는 경우 30초마다 영원히 재접속해서 한 명이 하루 수천 번 연결을 만들 수 있었음.
+    // 네트워크가 복구되거나(online) 탭이 다시 보이면 대기 없이 즉시 재시도하므로 정상 복구는 느려지지 않음.
+    const delay = Math.min(2000 * Math.pow(2, State.reconnectAttempts), 300000);
     State.reconnectAttempts += 1;
     boakoWarn(`${(delay / 1000).toFixed(0)}초 후 실시간 연결 재시도 (${State.reconnectAttempts}번째 시도)`);
 
@@ -758,22 +825,27 @@
         try { State.realtimeClient.disconnect(); } catch (e) { /* noop */ }
         State.realtimeClient = null;
       }
-      if (!State.intentionalDisconnect && State.session) _doConnect();
+      if (!State.intentionalDisconnect && State.session && isRealtimeLeader) _doConnect();
     }, delay);
   }
 
   // 🌟 [버그수정] 연결을 새로 만들기 직전에 background.js에 세션을 다시 요청해서 (만료 5분 전이면 거기서
   // 리프레시까지 해줌) 항상 유효한 access_token으로 연결. 이전엔 페이지 로드 때 받은 토큰을 계속 재사용해서,
   // 탭을 오래 켜두면 만료된 토큰으로 재접속을 무한 반복(Realtime 동시 연결 폭증)할 수 있었음.
-  async function _refreshSessionForConnect() {
-    try {
-      const res = await sendBgMessage('getArchiveSession');
-      if (res?.session) {
-        State.session = res.session;
-        return true;
-      }
-    } catch (e) { /* 아래에서 실패 처리 */ }
-    return false;
+  let _refreshInFlight = null; // 🌟 연결/주기 갱신이 동시에 background에 요청하지 않도록 한 번에 하나만
+  function _refreshSessionForConnect() {
+    if (_refreshInFlight) return _refreshInFlight;
+    _refreshInFlight = (async () => {
+      try {
+        const res = await sendBgMessage('getArchiveSession');
+        if (res?.session) {
+          State.session = res.session;
+          return true;
+        }
+      } catch (e) { /* 아래에서 실패 처리 */ }
+      return false;
+    })().finally(() => { _refreshInFlight = null; });
+    return _refreshInFlight;
   }
 
   let _connectInFlight = false; // 🌟 세션 갱신(비동기) 중에 _doConnect가 또 불려서 소켓이 2개 생기는 것 방지
@@ -793,7 +865,8 @@
         State.session = null;
         return;
       }
-      if (State.intentionalDisconnect) return; // 갱신 대기 중에 로그아웃/해제됐으면 연결하지 않음
+      // 갱신 대기 중에 로그아웃/해제됐거나 리더 자리를 잃었으면 연결하지 않음
+      if (State.intentionalDisconnect || !isRealtimeLeader) return;
       _doConnectNow();
     } finally {
       _connectInFlight = false;
@@ -3043,6 +3116,15 @@
         tryClaimWithJitter();
       }
     }
+  });
+
+  // 🌟 [신규] 네트워크가 복구되면 백오프 대기(최대 5분)를 기다리지 않고 리더 탭이 바로 재연결
+  window.addEventListener('online', () => {
+    if (!isRealtimeLeader || !State.session || State.realtimeClient) return;
+    boakoLog('네트워크 복구 감지(리더) — 즉시 재연결 시도');
+    if (State.reconnectTimer) { clearTimeout(State.reconnectTimer); State.reconnectTimer = null; }
+    State.reconnectAttempts = 0;
+    _doConnect();
   });
 
   if (document.readyState === 'loading') {
