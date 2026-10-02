@@ -762,12 +762,45 @@
     }, delay);
   }
 
-  function _doConnect() {
+  // 🌟 [버그수정] 연결을 새로 만들기 직전에 background.js에 세션을 다시 요청해서 (만료 5분 전이면 거기서
+  // 리프레시까지 해줌) 항상 유효한 access_token으로 연결. 이전엔 페이지 로드 때 받은 토큰을 계속 재사용해서,
+  // 탭을 오래 켜두면 만료된 토큰으로 재접속을 무한 반복(Realtime 동시 연결 폭증)할 수 있었음.
+  async function _refreshSessionForConnect() {
+    try {
+      const res = await sendBgMessage('getArchiveSession');
+      if (res?.session) {
+        State.session = res.session;
+        return true;
+      }
+    } catch (e) { /* 아래에서 실패 처리 */ }
+    return false;
+  }
+
+  let _connectInFlight = false; // 🌟 세션 갱신(비동기) 중에 _doConnect가 또 불려서 소켓이 2개 생기는 것 방지
+
+  async function _doConnect() {
     if (typeof BoakoRealtimeClient === 'undefined') {
       boakoErr('BoakoRealtimeClient 없음 — 실시간 연결 시도 자체를 할 수 없음');
       return;
     }
+    if (_connectInFlight) return;
+    _connectInFlight = true;
+    try {
+      const ok = await _refreshSessionForConnect();
+      if (!ok) {
+        // 세션이 죽었거나(로그아웃/리프레시 실패) 확장 컨텍스트가 무효화된 상태 — 재접속 루프를 돌리지 않고 멈춤
+        boakoWarn('유효한 세션을 받지 못해 실시간 재연결을 중단함');
+        State.session = null;
+        return;
+      }
+      if (State.intentionalDisconnect) return; // 갱신 대기 중에 로그아웃/해제됐으면 연결하지 않음
+      _doConnectNow();
+    } finally {
+      _connectInFlight = false;
+    }
+  }
 
+  function _doConnectNow() {
     // 🌟 [버그수정] 이전 연결을 확실히 끊고 시작 (경합 방지, Realtime 연결 폭증 원인)
     if (State.realtimeClient) {
       try { State.realtimeClient.disconnect(); } catch (e) { /* noop */ }
@@ -783,12 +816,17 @@
     // 🌟 [버그수정] onOpen/onClose/onError는 client(RealtimeClient) 최상위가 아니라
     // client.socketAdapter(내부 소켓 래퍼)에 있음 — 연결 단계별 상태를 전부 로그로 남김.
     // CSP가 막으면 보통 onError가 뜨거나, onOpen이 영원히 안 뜸
+    // 🌟 [버그수정] 열리자마자 바로 0으로 리셋하면 "열렸다가 즉시 서버가 끊는" 경우 재시도 지연이 계속 2초로
+    // 초기화돼 빠른 재접속 루프가 됨 → 30초 이상 연결이 유지된 뒤에만 리셋
+    let stableTimer = null;
     client.socketAdapter.onOpen(() => {
       boakoOk('웹소켓 연결 성공! (CSP 문제 없음)');
-      State.reconnectAttempts = 0; // 정상 연결됐으니 다음에 끊기면 다시 짧은 지연부터 재시도
+      if (stableTimer) clearTimeout(stableTimer);
+      stableTimer = setTimeout(() => { State.reconnectAttempts = 0; }, 30000);
     });
     client.socketAdapter.onClose((e) => {
       boakoWarn('웹소켓 연결 종료됨:', e);
+      if (stableTimer) { clearTimeout(stableTimer); stableTimer = null; }
       // 🌟 [버그수정] 자기 자신의 소켓일 때만 정리 (새 연결로 교체된 뒤 뒤늦은 신호가 덮어쓰는 것 방지)
       if (State.realtimeClient === client) {
         State.realtimeClient = null;
