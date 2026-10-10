@@ -1,7 +1,11 @@
 /**
  * [MAIN] 스크립트 실행 진입점
  */
-window.onload = () => {
+window.onload = async () => {
+    // 🌟 [신규] 새로고침 시 보던 화면 복원 모듈 — Auth.init()이 첫 화면을 그리기 전에 먼저 장착해야 함.
+    // 로딩에 실패해도 사이트 동작에는 영향 없도록 try/catch.
+    try { await Boako.Util.loadScript('js/state_restore.js'); } catch (e) { console.warn('state_restore 로드 실패', e); }
+
     let authInit;
     if (Boako && Boako.Auth) {
         authInit = Boako.Auth.init();
