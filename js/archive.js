@@ -954,7 +954,16 @@ Boako.Archive = {
             </button>
         `;
 
-        for (let i = 1; i <= totalPages; i++) {
+        // 현재 페이지 기준 최대 5개만 표시 (나머지는 좌우 화살표로 이동)
+        const WINDOW = 5;
+        let start = Math.max(1, this.currentPage - Math.floor(WINDOW / 2));
+        let end = start + WINDOW - 1;
+        if (end > totalPages) {
+            end = totalPages;
+            start = Math.max(1, end - WINDOW + 1);
+        }
+
+        for (let i = start; i <= end; i++) {
             if (i === this.currentPage) {
                 pHTML += `<button class="w-9 h-9 rounded-xl bg-indigo-600 text-white font-black text-xs shadow-md border border-indigo-600">${i}</button>`;
             } else {
