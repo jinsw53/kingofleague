@@ -8,10 +8,16 @@
  * 🌟 [신규] 카톡 공유 딥링크(?view=xxx&post=yyy) 지원 — PC main.js와 동일한 원리로,
  *    MobileShell.init()이 기본 탭(소식지)을 그리는 것과 경쟁하지 않도록 init이 끝난 뒤 덮어씀.
  */
-window.onload = () => {
+window.onload = async () => {
+    // 🌟 [신규] 새로고침 시 보던 화면 복원 모듈 — MobileShell.init()이 기본 탭을 그리기 전에 먼저 장착해야 함.
+    try { await Boako.Util.loadScript('/js/state_restore.js'); } catch (e) { console.warn('state_restore 로드 실패', e); }
+
     let shellInit;
     if (Boako && Boako.MobileShell) {
         shellInit = Boako.MobileShell.init();
+        // init이 끝나면 저장된 화면을 복원(없으면 기록만 시작). 딥링크 처리보다 먼저 등록해야 함.
+        const ready = () => { if (Boako.StateRestore && Boako.StateRestore.mobileReady) Boako.StateRestore.mobileReady(); };
+        Promise.resolve(shellInit).then(ready, ready);
     } else {
         console.error("모바일 셸 모듈 로딩에 실패했습니다.");
         return;
