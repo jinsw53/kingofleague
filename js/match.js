@@ -246,8 +246,8 @@ Boako.Match = {
                 const sponsorUrl = (currentSeason?.title_sponsor_url_approved && currentSeason?.title_sponsor_url) ? currentSeason.title_sponsor_url : null;
                 const sponsorBadgeHtml = sponsorName
                     ? (sponsorUrl
-                        ? `<a href="${Boako.Util.safeHref(sponsorUrl)}" target="_blank" rel="noopener noreferrer" class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner" style="display:block; text-decoration:none;">🏷️ ${sponsorName}배 보아코 팀 리그</a>`
-                        : `<div class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner">🏷️ ${sponsorName}배 보아코 팀 리그</div>`)
+                        ? `<a href="${Boako.Util.safeHref(sponsorUrl)}" target="_blank" rel="noopener noreferrer" class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner" style="display:block; text-decoration:none;">🏷️ ${Boako.Util.escapeHtml(sponsorName)}배 보아코 팀 리그</a>`
+                        : `<div class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner">🏷️ ${Boako.Util.escapeHtml(sponsorName)}배 보아코 팀 리그</div>`)
                     : '';
                 
                 logoEl.innerHTML = sponsorBadgeHtml + logoHtml + dateHtml;

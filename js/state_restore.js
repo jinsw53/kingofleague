@@ -158,7 +158,11 @@
     function parseArgs(src) {
         if (!src) return [];
         try { return JSON.parse('[' + src + ']'); } catch (e) { }
-        return new Function('return [' + src + ']')();
+        // 작은따옴표 문자열만 JSON으로 변환해 재시도 (코드 실행 없음)
+        try {
+            const conv = src.replace(/'((?:[^'\\]|\\.)*)'/g, (m, body) => JSON.stringify(body.replace(/\\(.)/g, '$1')));
+            return JSON.parse('[' + conv + ']');
+        } catch (e) { return []; }
     }
     async function applyEntry(e) {
         if (e.t === 'c') {

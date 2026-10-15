@@ -78,7 +78,7 @@ Boako.League.refreshSponsorBadge = async function(seasonNo) {
 
         const tag = sponsor.url ? 'a' : 'div';
         const linkAttrs = sponsor.url ? `href="${Boako.Util.safeHref(sponsor.url)}" target="_blank" rel="noopener noreferrer"` : '';
-        badgeEl.innerHTML = `<${tag} ${linkAttrs} class="inline-block bg-violet-600 text-white text-[11px] font-black px-4 py-1.5 rounded-b-xl shadow-sm mt-0" style="text-decoration:none;">🏷️ ${sponsor.name}배 보아코 팀 리그</${tag}>`;
+        badgeEl.innerHTML = `<${tag} ${linkAttrs} class="inline-block bg-violet-600 text-white text-[11px] font-black px-4 py-1.5 rounded-b-xl shadow-sm mt-0" style="text-decoration:none;">🏷️ ${Boako.Util.escapeHtml(sponsor.name)}배 보아코 팀 리그</${tag}>`;
     } catch (e) {
         console.error('리그 스폰서 배지 갱신 실패:', e);
     }
