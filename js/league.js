@@ -2629,7 +2629,7 @@ Boako.League.KOL.fireSingleHit = function(stage, stageRect, center, fxLayer, cen
 
 // events: 같은 공격팀이 만든 공격 이벤트 배열. 중앙 진입 1회 → 순차 타격 N회 → 복귀 1회
 Boako.League.KOL.playAttackSequence = function(events, isReplay) {
-    return new Promise(async resolve => {
+    return new Promise(resolve => { (async () => {
         if (!events || events.length === 0) { resolve(); return; }
 
         const stage = document.querySelector('.kol-arena-stage');
@@ -2668,7 +2668,11 @@ Boako.League.KOL.playAttackSequence = function(events, isReplay) {
             attackerEl.classList.remove('kol-token-attacking');
             resolve();
         }, 550);
-    });
+    })().catch(e => {
+        console.error('공격 연출 실패:', e);
+        document.querySelectorAll('.kol-token-attacking').forEach(el => el.classList.remove('kol-token-attacking'));
+        resolve();
+    }); });
 };
 
 Boako.League.KOL.playRecoveryAnimation = function(ev, isReplay) {

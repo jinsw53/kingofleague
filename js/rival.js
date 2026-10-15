@@ -369,10 +369,10 @@ Boako.Rival = {
                                     
                                     <div class="flex flex-col items-center gap-2 flex-1">
                                         <div class="w-16 h-16 rounded-full bg-slate-200 border-4 ${isPerfectMatch ? 'border-red-400' : 'border-slate-100'} flex items-center justify-center text-slate-500 font-black text-xl shadow-lg relative overflow-visible">
-                                            ${profileSrc ? `<img src="${Boako.Util.cdn(profileSrc)}" class="w-full h-full object-cover rounded-full">` : match.rival_nickname.charAt(0)}
+                                            ${profileSrc ? `<img src="${Boako.Util.cdn(profileSrc)}" class="w-full h-full object-cover rounded-full">` : Boako.Util.escapeHtml(match.rival_nickname.charAt(0))}
                                             ${matchBadge}
                                         </div>
-                                        <div class="text-sm font-black text-slate-800">${match.rival_nickname} (${match.rival_record_count}회)</div>
+                                        <div class="text-sm font-black text-slate-800">${Boako.Util.escapeHtml(match.rival_nickname)} (${match.rival_record_count}회)</div>
                                     </div>
                                 </div>
 

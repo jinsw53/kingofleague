@@ -185,7 +185,12 @@ Boako.Achievements = {
 
             // 🌟 시즌 로고/OO매니아 게임 로고까지 합성된 배지 HTML (정사각형 강제 없이 원본 비율 유지)
             const itemId = uaId ? `achv_${achievement.code}_${uaId}` : null;
-            let badgeHtml = itemId ? await Boako.Achievements.renderBadgeHTML(itemId, seasonNo, meta, 140) : null;
+            let badgeHtml = null;
+            try {
+                badgeHtml = itemId ? await Boako.Achievements.renderBadgeHTML(itemId, seasonNo, meta, 140) : null;
+            } catch (e) {
+                console.error('업적 배지 렌더 실패:', e);
+            }
             if (!badgeHtml) {
                 badgeHtml = achievement.badge_icon_url
                     ? `<img src="${Boako.Util.cdn(achievement.badge_icon_url)}" style="height:140px; width:auto; display:block;">`
