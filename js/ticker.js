@@ -209,7 +209,7 @@ Boako.Ticker = {
 
         const renderChip = (item) => {
             const clickable = item.link_type
-                ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')"`
+                ? `onclick="Boako.Util.navigateToLink('${Boako.Util.escapeJsAttr(item.link_type)}', '${Boako.Util.escapeJsAttr(item.link_id)}')"`
                 : '';
             return `<span class="ticker-item" ${clickable}>${Boako.Ticker.icon(item)} ${Boako.Ticker.escapeHtml(item.title)}</span>`;
         };

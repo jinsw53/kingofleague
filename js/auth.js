@@ -423,7 +423,7 @@ Boako.Auth = {
                 membershipBadgeHtml = `
                 <span class="badge-premium" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; margin-top:12px; padding:4px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:12px; font-weight:900; color:#1e40af; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
                     <img src="${Boako.Util.cdn(teamLogo)}" style="width:16px; height:16px; border-radius:50%; object-fit:cover; border:1px solid #93c5fd;"> 
-                    ${teamName} 멤버
+                    ${Boako.Util.escapeHtml(teamName)} 멤버
                 </span>`;
             }
 
@@ -433,7 +433,7 @@ Boako.Auth = {
                 <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.45); color:#fff; font-size:9px; font-weight:800; text-align:center; padding:2px 0; opacity:0; transition:opacity .15s;" class="avatar-hover-hint">사진 변경</div>
             </div>
             <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                <strong>${user.nickname || '사용자'}</strong>
+                <strong>${Boako.Util.escapeHtml(user.nickname || '사용자')}</strong>
                 <button class="btn-edit-small" onclick="(async () => { if (!window.Boako.Shop) await Boako.Util.loadScript('js/shop.js'); Boako.Shop.buyItem('item_ticket_nick'); })()">수정</button>
             </div>
             <div style="margin-top: 8px; display: flex; justify-content: center; gap: 5px; flex-wrap: wrap;">
@@ -703,7 +703,7 @@ Boako.Auth = {
                         const team = teamsMap[teamId];
                         const season = seasonsMap[item.season_no];
                         const name = team ? `${team.team_name} 서포터즈` : '서포터즈 배지';
-                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}">${buildUniformHtml(team?.logo_url, season?.uniform_image_url, '26px')}</div>`;
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${Boako.Util.escapeHtml(name)}">${buildUniformHtml(team?.logo_url, season?.uniform_image_url, '26px')}</div>`;
                     }
 
                     if (isAchievement) {
@@ -717,9 +717,9 @@ Boako.Auth = {
 
                     // 🌟 정사각형/원형 강제 금지: 높이만 고정, 폭은 원본 비율 그대로
                     if (icon.startsWith('http')) {
-                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><img src="${Boako.Util.cdn(icon)}" style="height: 26px; width:auto; object-fit: contain; display:block;"></div>`;
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${Boako.Util.escapeHtml(name)}"><img src="${Boako.Util.cdn(icon)}" style="height: 26px; width:auto; object-fit: contain; display:block;"></div>`;
                     } else {
-                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${name}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
+                        return `<div class="badge-zoom-wrap badge-zoom-sm" title="${Boako.Util.escapeHtml(name)}"><span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">${icon}</span></div>`;
                     }
                 }));
                 badgeArea.innerHTML = badgeHtmlList.join('');
@@ -958,7 +958,7 @@ Boako.Auth = {
                             <i data-lucide="external-link" class="w-3.5 h-3.5"></i> BGA에서 내 닉네임 확인하러 가기
                         </a>
 
-                        <input type="text" id="bga-nick-input" value="${Boako.state.user.nickname || ''}" placeholder="대소문자 구별하여 정확히 입력" class="w-full border-2 border-slate-200 rounded-xl p-3.5 text-center font-black text-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all mb-5 placeholder:text-sm placeholder:font-normal">
+                        <input type="text" id="bga-nick-input" value="${Boako.Util.escapeHtml(Boako.state.user.nickname || '')}" placeholder="대소문자 구별하여 정확히 입력" class="w-full border-2 border-slate-200 rounded-xl p-3.5 text-center font-black text-lg text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all mb-5 placeholder:text-sm placeholder:font-normal">
                         
                         <button onclick="Boako.Auth.saveInitialNick()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-4 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
                             <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i> 확인 및 설정 완료

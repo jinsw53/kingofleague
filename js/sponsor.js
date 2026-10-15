@@ -35,7 +35,7 @@ Boako.Sponsor = {
 
         const bannerHtml = current ? `
             <a href="${Boako.Util.safeHref(current.link_url)}" target="${current.link_url ? '_blank' : '_self'}" style="display:flex; align-items:center; height:56px;">
-                <img src="${Boako.Util.cdn(current.image_url)}" alt="${current.name}" style="max-height:56px; max-width:200px; object-fit:contain;">
+                <img src="${Boako.Util.cdn(current.image_url)}" alt="${Boako.Util.escapeHtml(current.name)}" style="max-height:56px; max-width:200px; object-fit:contain;">
             </a>
         ` : '';
 
@@ -59,7 +59,7 @@ Boako.Sponsor = {
                             <div class="flex items-center gap-3 border border-slate-200 rounded-xl px-3 py-2">
                                 <img src="${Boako.Util.cdn(b.image_url)}" style="width:40px; height:40px; object-fit:contain; background:#f8fafc; border-radius:6px;">
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-bold text-sm truncate">${b.name}</div>
+                                    <div class="font-bold text-sm truncate">${Boako.Util.escapeHtml(b.name)}</div>
                                     <div class="text-[11px] text-slate-400">${b.is_active ? '노출중' : '숨김'} · 순서 ${b.display_order}</div>
                                 </div>
                                 <button onclick="Boako.Sponsor.editBanner(${b.id})" class="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg">수정</button>
@@ -88,7 +88,7 @@ Boako.Sponsor = {
                     <h3 class="font-black text-base mb-4">${id ? '배너 수정' : '새 배너 추가'}</h3>
                     <input type="hidden" id="sponsor-form-id" value="${banner.id || ''}">
                     <label class="text-xs font-bold text-slate-500 block mb-1">후원사명</label>
-                    <input type="text" id="sponsor-form-name" value="${banner.name}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3">
+                    <input type="text" id="sponsor-form-name" value="${Boako.Util.escapeHtml(banner.name)}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3">
                     <label class="text-xs font-bold text-slate-500 block mb-1">이미지 URL</label>
                     <input type="text" id="sponsor-form-image" value="${banner.image_url}" placeholder="https://..." class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3">
                     <label class="text-xs font-bold text-slate-500 block mb-1">클릭 시 이동 링크 (선택)</label>

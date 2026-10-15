@@ -204,7 +204,7 @@ Boako.Achievements = {
                     <div class="achv-badge-pop" style="display:flex; align-items:center; justify-content:center;">${badgeHtml}</div>
                     <div style="font-size:13px; font-weight:900; color:#c4b5fd; letter-spacing:0.12em; text-transform:uppercase;">업적 달성!</div>
                     <div style="font-size:26px; font-weight:900; color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.45); line-height:1.35;">
-                        ${achievement.name}${gameName ? `<br><span style="font-size:16px; color:#cbd5e1; font-weight:700;">(${gameName})</span>` : ''}
+                        ${Boako.Util.escapeHtml(achievement.name)}${gameName ? `<br><span style="font-size:16px; color:#cbd5e1; font-weight:700;">(${Boako.Util.escapeHtml(gameName)})</span>` : ''}
                     </div>
                     ${achievement.description ? `<div style="font-size:14px; font-weight:600; color:#cbd5e1; margin-top:-8px;">${achievement.description}</div>` : ''}
                     <div style="font-size:16px; font-weight:900; color:#fbbf24; background:rgba(0,0,0,0.3); padding:7px 20px; border-radius:999px;">

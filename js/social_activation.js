@@ -43,7 +43,7 @@ Boako.SocialActivation = {
                         <span style="font-size:30px;">${emoji}</span>
                     </div>
 
-                    <div style="font-size:19px; font-weight:900; color:#fff; line-height:1.4;">${title}</div>
+                    <div style="font-size:19px; font-weight:900; color:#fff; line-height:1.4;">${Boako.Util.escapeHtml(title)}</div>
 
                     <p style="font-size:13px; font-weight:700; color:#cbd5e1; line-height:1.6; margin:0;">
                         ${bodyText}

@@ -23,7 +23,7 @@ Boako.PowerAnalysis = {
         container.innerHTML = `
             <div class="main-banner" style="background: linear-gradient(135deg, #4338ca 0%, #1e1b4b 100%); flex-direction:column; gap:6px;">
                 <h1>🔬 전력분석실</h1>
-                <p style="font-size:14px; font-weight:700; opacity:0.9;">${Boako.state.user?.nickname || ''} 님의 개인 활동 리포트</p>
+                <p style="font-size:14px; font-weight:700; opacity:0.9;">${Boako.Util.escapeHtml(Boako.state.user?.nickname || '')} 님의 개인 활동 리포트</p>
             </div>
             <div id="pa-content-area">
                 <div class="text-center py-20 text-slate-400 font-bold animate-pulse">데이터 분석 중...</div>
@@ -144,7 +144,7 @@ Boako.PowerAnalysis = {
 
         // 🌟 탐험도 카드 안, 진행바 아래에 보여줄 미리보기 로고 (많이 한 순 최대 6개, 겹쳐서 스택)
         const previewLogos = this._playedGamesList.slice(0, 6).map((g, idx) => `
-            <img src="${g.logo ? Boako.Util.cdn(g.logo) : PA_DEFAULT_LOGO}" title="${g.name}"
+            <img src="${g.logo ? Boako.Util.cdn(g.logo) : PA_DEFAULT_LOGO}" title="${Boako.Util.escapeHtml(g.name)}"
                  style="width:28px; height:28px; border-radius:8px; object-fit:contain; background:#f8fafc; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); margin-left:${idx === 0 ? '0' : '-10px'}; position:relative; z-index:${10 - idx};">
         `).join('');
         const explorePreviewHtml = this._playedGamesList.length > 0
@@ -190,7 +190,7 @@ Boako.PowerAnalysis = {
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#f8fafc; border-radius:10px; margin-bottom:8px;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-size:16px;">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
-                        <span style="font-weight:800; color:#1e293b;">${name}</span>
+                        <span style="font-weight:800; color:#1e293b;">${Boako.Util.escapeHtml(name)}</span>
                     </div>
                     <span style="font-weight:900; color:#4338ca; font-size:13px;">${s.count}회</span>
                 </div>
@@ -202,7 +202,7 @@ Boako.PowerAnalysis = {
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#fffbeb; border-radius:10px; margin-bottom:8px;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-size:16px;">${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
-                        <span style="font-weight:800; color:#1e293b;">${name}</span>
+                        <span style="font-weight:800; color:#1e293b;">${Boako.Util.escapeHtml(name)}</span>
                     </div>
                     <span style="font-weight:900; color:#d97706; font-size:13px;">${count}회 참여</span>
                 </div>
@@ -246,7 +246,7 @@ Boako.PowerAnalysis = {
                     <div style="position:relative; margin-bottom:20px;">
                         <div style="position:absolute; left:-24px; top:4px; width:12px; height:12px; border-radius:50%; background:${isCurrent ? '#4338ca' : '#cbd5e1'}; border:2px solid #fff; box-shadow:0 0 0 2px ${isCurrent ? '#c7d2fe' : '#f1f5f9'};"></div>
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <span style="font-weight:900; font-size:15px; color:#1e293b;">${t.team_name}</span>
+                            <span style="font-weight:900; font-size:15px; color:#1e293b;">${Boako.Util.escapeHtml(t.team_name)}</span>
                             ${isCurrent ? `<span style="background:#eef2ff; color:#4338ca; font-size:10px; font-weight:900; padding:3px 8px; border-radius:99px;">현재 소속중</span>` : ''}
                         </div>
                         <div style="font-size:12px; color:#94a3b8; font-weight:700; margin-top:4px;">
@@ -279,7 +279,7 @@ Boako.PowerAnalysis = {
                 ${list.map(g => `
                     <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-slate-200 bg-slate-50">
                         <img src="${g.logo ? Boako.Util.cdn(g.logo) : PA_DEFAULT_LOGO}" loading="lazy" decoding="async" class="w-12 h-12 rounded-lg object-contain bg-white border border-slate-100 p-1">
-                        <span class="text-xs font-black text-slate-700 text-center leading-tight">${g.name}</span>
+                        <span class="text-xs font-black text-slate-700 text-center leading-tight">${Boako.Util.escapeHtml(g.name)}</span>
                         <span class="text-[10px] font-bold text-cyan-600">${g.count}회</span>
                     </div>
                 `).join('')}

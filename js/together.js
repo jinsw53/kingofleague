@@ -269,7 +269,7 @@ Boako.Together = {
         else statusBadge = `<span class="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 text-sky-600 bg-sky-50">🙋 모집중</span>`;
 
         const avatarsHtml = participants.slice(0, 6).map(u => `
-            <img src="${Boako.Util.cdn(u.custom_avatar_url || u.profile_url || TOGETHER_DEFAULT_AVATAR)}" title="${u.full_name || '익명'}" class="w-6 h-6 rounded-full object-cover border-2 border-white -ml-2 first:ml-0 bg-slate-200">
+            <img src="${Boako.Util.cdn(u.custom_avatar_url || u.profile_url || TOGETHER_DEFAULT_AVATAR)}" title="${Boako.Util.escapeHtml(u.full_name || '익명')}" class="w-6 h-6 rounded-full object-cover border-2 border-white -ml-2 first:ml-0 bg-slate-200">
         `).join('');
 
         const namesText = participants.map(u => u.full_name || '익명').join(', ');
@@ -348,7 +348,7 @@ Boako.Together = {
                     <img src="${Boako.Util.cdn(m.avatar || TOGETHER_DEFAULT_AVATAR)}" class="w-11 h-11 rounded-full object-cover bg-slate-100" style="border:2px solid ${m.isSelf ? '#0ea5e9' : '#e2e8f0'};">
                     ${!m.isSelf ? `<div onclick="Boako.Together.removePartyMember('${m.user_id}')" class="hidden group-hover:flex absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-black items-center justify-center cursor-pointer" style="box-shadow:0 0 0 2px #fff;">×</div>` : ''}
                 </div>
-                <div class="text-[10.5px] font-bold ${m.isSelf ? 'text-sky-700' : 'text-slate-600'} mt-1 truncate" style="max-width:52px;" title="${m.full_name}">${m.full_name}</div>
+                <div class="text-[10.5px] font-bold ${m.isSelf ? 'text-sky-700' : 'text-slate-600'} mt-1 truncate" style="max-width:52px;" title="${Boako.Util.escapeHtml(m.full_name)}">${Boako.Util.escapeHtml(m.full_name)}</div>
             </div>
         `).join('');
 
@@ -421,9 +421,9 @@ Boako.Together = {
             return;
         }
         resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto dropdown-scroll">${filtered.map(p => `
-            <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.addPartyMember('${p.id}', '${p.full_name.replace(/'/g, "\\'")}', '${(p.custom_avatar_url || p.profile_url || '').replace(/'/g, "\\'")}')">
+            <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.addPartyMember('${p.id}', '${Boako.Util.escapeJsAttr(p.full_name)}', '${Boako.Util.escapeJsAttr((p.custom_avatar_url || p.profile_url || ''))}')">
                 <img src="${Boako.Util.cdn(p.custom_avatar_url || p.profile_url || TOGETHER_DEFAULT_AVATAR)}" class="w-6 h-6 rounded-full object-cover bg-slate-100">
-                <span class="text-xs font-bold text-slate-700">${p.full_name}</span>
+                <span class="text-xs font-bold text-slate-700">${Boako.Util.escapeHtml(p.full_name)}</span>
             </div>
         `).join('')}</div>`;
         Boako.Together._positionPartySearchResults();
@@ -532,10 +532,10 @@ Boako.Together = {
         };
 
         const renderCard = (g) => `
-            <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-sky-300 transition-colors" onclick="Boako.Together.openGamePage('${g.game_name.replace(/'/g, "\\'")}')">
+            <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-sky-300 transition-colors" onclick="Boako.Together.openGamePage('${Boako.Util.escapeJsAttr(g.game_name)}')">
                 <img src="${Boako.Util.cdn(logoMap[g.game_name] || TOGETHER_DEFAULT_LOGO)}" class="w-10 h-10 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0">
                 <div class="min-w-0">
-                    <div class="text-sm font-black text-slate-800 truncate">${g.game_name}</div>
+                    <div class="text-sm font-black text-slate-800 truncate">${Boako.Util.escapeHtml(g.game_name)}</div>
                     <div class="text-[11px] font-bold text-slate-500">${g.count} / ${total}명 플레이</div>
                     ${renderPlayerRange(g.game_name)}
                 </div>
@@ -574,9 +574,9 @@ Boako.Together = {
         }
 
         resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto dropdown-scroll">${data.map(g => `
-            <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.selectGame('${g.game_name.replace(/'/g, "\\'")}')">
+            <div class="flex items-center gap-2 p-2 hover:bg-sky-50 cursor-pointer transition-colors" onclick="Boako.Together.selectGame('${Boako.Util.escapeJsAttr(g.game_name)}')">
                 <img src="${Boako.Util.cdn(g.image_url || TOGETHER_DEFAULT_LOGO)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
-                <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
+                <span class="text-xs font-bold text-slate-700">${Boako.Util.escapeHtml(g.game_name)}</span>
             </div>
         `).join('')}</div>`;
         resultsBox.classList.remove('hidden');

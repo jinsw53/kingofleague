@@ -69,8 +69,8 @@ Boako.RecordVerify = {
                      class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center cursor-pointer hover:border-indigo-400 hover:shadow transition-all group">
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="text-xs font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">${item.b_all_team || '무소속'}</span>
-                            <h4 class="font-black text-slate-800 group-hover:text-indigo-600 transition-colors">${item.nickname} - ${item.game_name}</h4>
+                            <span class="text-xs font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">${Boako.Util.escapeHtml(item.b_all_team || '무소속')}</span>
+                            <h4 class="font-black text-slate-800 group-hover:text-indigo-600 transition-colors">${Boako.Util.escapeHtml(item.nickname)} - ${Boako.Util.escapeHtml(item.game_name)}</h4>
                         </div>
                         <p class="text-sm font-bold text-indigo-600 mt-1">${Math.floor(item.rp)} RP</p>
                         ${conditionBadge}

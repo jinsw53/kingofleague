@@ -263,7 +263,7 @@ Boako.Schedule = {
                         <div style="font-size:13px; color:#64748b; font-weight:800; margin-bottom:6px;">⏰ ${timeStr}</div>
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             ${typeBadge}
-                            <span style="font-size:16px; font-weight:900; color:#0f172a;">${item.title}</span>
+                            <span style="font-size:16px; font-weight:900; color:#0f172a;">${Boako.Util.escapeHtml(item.title)}</span>
                         </div>
                     </div>
                     <div style="flex-shrink:0; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">

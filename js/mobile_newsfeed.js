@@ -149,7 +149,7 @@ Boako.MobileNewsfeed = {
             const style = TIER_STYLE[game.tier] || TIER_STYLE.NORMAL;
             const borderStyle = i < games.length - 1 ? 'border-right:1px solid #f1f5f9;' : '';
             return `
-                <div onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; padding:10px 4px; cursor:pointer; ${borderStyle} min-width:0;">
+                <div onclick="Boako.Util.navigateToLink('GAME', '${Boako.Util.escapeJsAttr(game.name)}')" style="flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; padding:10px 4px; cursor:pointer; ${borderStyle} min-width:0;">
                     <span style="font-size:9px; font-weight:900; color:${style.color}; background:${style.bg}; padding:1px 6px; border-radius:6px; margin-bottom:6px;">${TIER_LABEL[game.tier] || game.tier}</span>
                     <div style="width:40px; height:40px; border-radius:8px; background:#f8fafc; display:flex; align-items:center; justify-content:center; margin-bottom:5px; overflow:hidden;">
                         ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span style="font-size:18px;">🎲</span>`}

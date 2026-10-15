@@ -29,7 +29,7 @@ Boako.MobileTeam = {
             Boako.MobileTeam.draw();
         } catch (e) {
             console.error('모바일 팀 순위 로드 실패:', e);
-            container.innerHTML = `<div style="padding:40px 16px; text-align:center; color:#ef4444; font-weight:700; font-size:13px;">로드 실패: ${e.message}</div>`;
+            container.innerHTML = `<div style="padding:40px 16px; text-align:center; color:#ef4444; font-weight:700; font-size:13px;">로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 
@@ -97,10 +97,10 @@ Boako.MobileTeam = {
                 const isOpen = expandedTeam === r.team_name;
                 return `
                     <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
-                        <div onclick="Boako.MobileTeam.toggle('${r.team_name.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer;">
+                        <div onclick="Boako.MobileTeam.toggle('${Boako.Util.escapeJsAttr(r.team_name)}')" style="display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer;">
                             <div style="width:26px; height:26px; border-radius:50%; background:${bd.bg}; color:${bd.text}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex-shrink:0;">${r._rank ?? '-'}</div>
                             <img src="${Boako.Util.cdn(r.logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png')}" style="width:26px; height:26px; border-radius:6px; object-fit:contain; background:#f8fafc; border:1px solid #f1f5f9; flex-shrink:0;">
-                            <span style="flex:1; font-size:13px; font-weight:900; color:#1e293b; min-width:0;">${r.team_name}</span>
+                            <span style="flex:1; font-size:13px; font-weight:900; color:#1e293b; min-width:0;">${Boako.Util.escapeHtml(r.team_name)}</span>
                             <span style="font-size:12.5px; font-weight:900; color:#4338ca; white-space:nowrap;">🏆 ${Number(r.total_lp).toLocaleString()} LP</span>
                             <span style="font-size:13px; color:#cbd5e1;">${isOpen ? '▲' : '▼'}</span>
                         </div>
@@ -112,7 +112,7 @@ Boako.MobileTeam = {
         container.innerHTML = `
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
                 <div>
-                    <div style="font-size:15px; font-weight:900; color:#1e293b;">${seasonInfo?.title || ''}</div>
+                    <div style="font-size:15px; font-weight:900; color:#1e293b;">${Boako.Util.escapeHtml(seasonInfo?.title || '')}</div>
                     <div style="font-size:11px; color:#94a3b8; font-weight:700; margin-top:1px;">${_isCurrent ? '🔴 실시간 집계 중' : '✅ 시즌 종료, 확정 기록'}</div>
                 </div>
                 <button onclick="Boako.MobileTeam.openSeasonSheet()" style="display:flex; align-items:center; gap:5px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:900; color:#334155;">
@@ -185,7 +185,7 @@ Boako.MobileTeam = {
     openSeasonSheet: () => {
         const html = Boako.MobileTeam.State.seasons.map(s => `
             <div onclick="Boako.MobileTeam.changeSeason(${s.season_no})" style="display:flex; align-items:center; justify-content:space-between; padding:13px 6px; font-size:14px; font-weight:800; ${s.season_no === Boako.MobileTeam.State.selectedSeason ? 'color:#4338ca;' : 'color:#334155;'}">
-                <span>${s.title}</span>
+                <span>${Boako.Util.escapeHtml(s.title)}</span>
                 ${s.is_current ? `<span style="font-size:10px; color:#ef4444; font-weight:900;">🔴 진행중</span>` : ''}
             </div>
         `).join('');

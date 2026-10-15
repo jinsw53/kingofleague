@@ -82,7 +82,7 @@ Boako.AdminReview = {
 
             <div style="margin-bottom:20px;">
                 <label for="edit-game-name" style="font-size:11px; font-weight:900; color:#64748b; display:block; margin-bottom:8px;">게임명</label>
-                <input id="edit-game-name" type="text" value="${game.game_name || ''}" style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:12px; font-weight:800;">
+                <input id="edit-game-name" type="text" value="${Boako.Util.escapeHtml(game.game_name || '')}" style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:12px; font-weight:800;">
             </div>
 
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:20px;">
@@ -236,9 +236,9 @@ Boako.AdminReview = {
             return;
         }
         resultsBox.innerHTML = data.map(g => `
-            <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer" onclick="Boako.AdminReview.resolveBgaMatch(${pendingId}, '${g.id}', '${g.game_name.replace(/'/g, "\\'")}')">
+            <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer" onclick="Boako.AdminReview.resolveBgaMatch(${pendingId}, '${g.id}', '${Boako.Util.escapeJsAttr(g.game_name)}')">
                 <img src="${Boako.Util.cdn(g.image_url) || ''}" class="w-8 h-8 rounded object-contain bg-slate-50 border border-slate-100 shrink-0">
-                <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
+                <span class="text-xs font-bold text-slate-700">${Boako.Util.escapeHtml(g.game_name)}</span>
             </div>
         `).join('');
         resultsBox.classList.remove('hidden');

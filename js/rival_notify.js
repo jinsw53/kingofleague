@@ -180,7 +180,7 @@ Boako.RivalNotify = {
 
             const avatarHtml = (person, size) => person?.avatar
                 ? `<img src="${person.avatar}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; display:block;">`
-                : `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:${Math.round(size*0.4)}px; font-weight:900;">${(person?.name || '?').charAt(0)}</div>`;
+                : `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:${Math.round(size*0.4)}px; font-weight:900;">${Boako.Util.escapeHtml((person?.name || '?').charAt(0))}</div>`;
 
             const overlay = document.createElement('div');
             overlay.id = 'rival-vote-result-overlay';
@@ -191,7 +191,7 @@ Boako.RivalNotify = {
             `;
             overlay.innerHTML = `
                 <div style="display:flex; flex-direction:column; align-items:center; gap:18px; text-align:center; padding:28px; max-width:440px;">
-                    <div style="font-size:12px; font-weight:900; color:#94a3b8; letter-spacing:0.14em; text-transform:uppercase;">${gameName} · 라이벌전 결과</div>
+                    <div style="font-size:12px; font-weight:900; color:#94a3b8; letter-spacing:0.14em; text-transform:uppercase;">${Boako.Util.escapeHtml(gameName)} · 라이벌전 결과</div>
 
                     <div style="display:flex; align-items:center; justify-content:center; gap:14px;">
                         <!-- 승자: 크게 -->
@@ -201,7 +201,7 @@ Boako.RivalNotify = {
                                     ${avatarHtml(winner, 84)}
                                 </div>
                             </div>
-                            <div style="font-size:16px; font-weight:900; color:#fff;">${winner?.name || '승자'}</div>
+                            <div style="font-size:16px; font-weight:900; color:#fff;">${Boako.Util.escapeHtml(winner?.name || '승자')}</div>
                             <div style="font-size:10px; font-weight:900; letter-spacing:0.1em; color:#78350f; background:linear-gradient(135deg,#fde68a,#fbbf24); padding:3px 12px; border-radius:999px;">🏆 WINNER</div>
                         </div>
 
@@ -212,7 +212,7 @@ Boako.RivalNotify = {
                             <div style="border-radius:50%; padding:3px; background:#334155;">
                                 ${avatarHtml(loser, 56)}
                             </div>
-                            <div style="font-size:13px; font-weight:800; color:#cbd5e1;">${loser?.name || '패자'}</div>
+                            <div style="font-size:13px; font-weight:800; color:#cbd5e1;">${Boako.Util.escapeHtml(loser?.name || '패자')}</div>
                             <div style="font-size:9px; font-weight:900; letter-spacing:0.1em; color:#94a3b8; background:#1e293b; padding:2px 10px; border-radius:999px;">LOSER</div>
                         </div>
                     </div>

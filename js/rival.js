@@ -187,7 +187,7 @@ Boako.Rival = {
                     const defenderAvatar = avatarMap[m.defender_id];
                     const avatarHtml = (url, name) => url
                         ? `<img src="${Boako.Util.cdn(url)}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-200">`
-                        : `<div class="w-12 h-12 rounded-full bg-slate-200 border-2 border-slate-200 flex items-center justify-center text-slate-500 font-black text-base">${(name || '?').charAt(0)}</div>`;
+                        : `<div class="w-12 h-12 rounded-full bg-slate-200 border-2 border-slate-200 flex items-center justify-center text-slate-500 font-black text-base">${Boako.Util.escapeHtml((name || '?').charAt(0))}</div>`;
 
                     let actionHtml;
                     if (!Boako.state.user) {
@@ -204,8 +204,8 @@ Boako.Rival = {
                     } else {
                         actionHtml = `
                             <div class="flex gap-2">
-                                <button onclick="Boako.Rival.castVote('${s.reference_id}', '${m.challenger_id}', this)" class="flex-1 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-black py-2.5 rounded-lg transition-colors">📣 ${challengerName} 응원</button>
-                                <button onclick="Boako.Rival.castVote('${s.reference_id}', '${m.defender_id}', this)" class="flex-1 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-black py-2.5 rounded-lg transition-colors">📣 ${defenderName} 응원</button>
+                                <button onclick="Boako.Rival.castVote('${s.reference_id}', '${m.challenger_id}', this)" class="flex-1 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-black py-2.5 rounded-lg transition-colors">📣 ${Boako.Util.escapeHtml(challengerName)} 응원</button>
+                                <button onclick="Boako.Rival.castVote('${s.reference_id}', '${m.defender_id}', this)" class="flex-1 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-black py-2.5 rounded-lg transition-colors">📣 ${Boako.Util.escapeHtml(defenderName)} 응원</button>
                             </div>
                         `;
                     }
@@ -216,16 +216,16 @@ Boako.Rival = {
                                 <span class="text-[11px] font-black bg-red-500 text-white px-2 py-1 rounded-md">⚡ 라이벌전</span>
                                 <span class="text-[11px] text-slate-400 font-bold">⏰ ${dt}</span>
                             </div>
-                            <div class="text-center font-black text-slate-800 text-base mb-3">${s.game_name}</div>
+                            <div class="text-center font-black text-slate-800 text-base mb-3">${Boako.Util.escapeHtml(s.game_name)}</div>
                             <div class="flex items-center justify-center gap-4 mb-3">
                                 <div class="flex flex-col items-center gap-1.5 flex-1">
                                     ${avatarHtml(challengerAvatar, challengerName)}
-                                    <span class="text-xs font-black text-slate-700 truncate max-w-full">${challengerName}</span>
+                                    <span class="text-xs font-black text-slate-700 truncate max-w-full">${Boako.Util.escapeHtml(challengerName)}</span>
                                 </div>
                                 <div class="text-sm font-black text-slate-300 italic shrink-0 pb-4">VS</div>
                                 <div class="flex flex-col items-center gap-1.5 flex-1">
                                     ${avatarHtml(defenderAvatar, defenderName)}
-                                    <span class="text-xs font-black text-slate-700 truncate max-w-full">${defenderName}</span>
+                                    <span class="text-xs font-black text-slate-700 truncate max-w-full">${Boako.Util.escapeHtml(defenderName)}</span>
                                 </div>
                             </div>
                             ${actionHtml}
@@ -336,7 +336,7 @@ Boako.Rival = {
                                     <img src="${Boako.Util.cdn(logoSrc)}" class="w-full h-full object-contain drop-shadow-sm" onerror="this.src='https://placehold.co/150x150?text=GAME'">
                                 </div>
                                 
-                                <span class="text-[15px] group-hover:text-red-600 transition-colors">${match.game_name}</span>
+                                <span class="text-[15px] group-hover:text-red-600 transition-colors">${Boako.Util.escapeHtml(match.game_name)}</span>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-[11px] font-black bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200">내 기록: ${match.my_record_count}회</span>
@@ -353,7 +353,7 @@ Boako.Rival = {
                                         <img src="${Boako.Util.cdn(logoSrc)}" class="w-full h-full object-contain drop-shadow-md" onerror="this.src='https://placehold.co/150x150?text=GAME'">
                                     </div>
                                     
-                                    <h3 class="font-black text-2xl text-slate-800 tracking-tight">${match.game_name}</h3>
+                                    <h3 class="font-black text-2xl text-slate-800 tracking-tight">${Boako.Util.escapeHtml(match.game_name)}</h3>
                                     <p class="text-xs text-slate-400 font-bold mt-1">기록 차이: ${isPerfectMatch ? '0회 (완벽한 동급)' : match.count_diff + '회'}</p>
                                 </div>
 
@@ -376,7 +376,7 @@ Boako.Rival = {
                                     </div>
                                 </div>
 
-                                <button onclick="Boako.Rival.executeChallenge('${match.rival_id}', '${match.game_name}')" class="w-full max-w-xs bg-slate-900 hover:bg-red-600 text-white text-[15px] font-black px-6 py-3.5 rounded-xl transition-all hover:scale-105 hover:shadow-lg flex justify-center items-center gap-2">
+                                <button onclick="Boako.Rival.executeChallenge('${match.rival_id}', '${Boako.Util.escapeJsAttr(match.game_name)}')" class="w-full max-w-xs bg-slate-900 hover:bg-red-600 text-white text-[15px] font-black px-6 py-3.5 rounded-xl transition-all hover:scale-105 hover:shadow-lg flex justify-center items-center gap-2">
                                     <i data-lucide="swords" class="w-5 h-5"></i> 매치 도전장 발송
                                 </button>
                             </div>

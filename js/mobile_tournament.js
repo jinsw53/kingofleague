@@ -301,7 +301,7 @@ Boako.MobileTournament = {
             return;
         }
         resultsBox.innerHTML = `<div class="dropdown-scroll" style="max-height:200px; overflow-y:auto;">${data.map(g => `
-            <div onclick="Boako.MobileTournament.selectGame('${g.game_name.replace(/'/g, "\\'")}')" style="display:flex; align-items:center; gap:8px; padding:9px 10px;">
+            <div onclick="Boako.MobileTournament.selectGame('${Boako.Util.escapeJsAttr(g.game_name)}')" style="display:flex; align-items:center; gap:8px; padding:9px 10px;">
                 <img src="${Boako.Util.cdn(g.image_url || Boako.MobileTournament.DEFAULT_LOGO_FALLBACK)}" style="width:24px; height:24px; border-radius:6px; object-fit:contain; background:#f8fafc; border:1px solid #f1f5f9;">
                 <span style="font-size:12.5px; font-weight:700; color:#334155;">${Boako.MobileTournament.escapeHtml(g.game_name)}</span>
             </div>

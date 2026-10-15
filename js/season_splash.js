@@ -101,7 +101,7 @@ Boako.SeasonSplash = {
     if (champion) {
       eyebrowClass = 'champion';
       eyebrowText = '🏆 시즌 종료';
-      titleHtml = `${champion.team_name}<br><span style="font-size:16px; color:#fde68a; font-weight:700;">시즌 ${season.season_no} 우승팀</span>`;
+      titleHtml = `${Boako.Util.escapeHtml(champion.team_name)}<br><span style="font-size:16px; color:#fde68a; font-weight:700;">시즌 ${season.season_no} 우승팀</span>`;
       subText = '치열했던 이번 시즌, 축하드려요!';
       badgeText = '🎉 최종 우승';
     } else {

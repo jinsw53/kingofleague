@@ -144,7 +144,7 @@ Boako.TeamList = {
                 } else if (alreadyInTeam) {
                     actionBtn = `<button disabled title="이미 소속된 팀이 있습니다. 이적을 원하시면 먼저 탈퇴해 주세요." class="w-full mt-3 bg-slate-100 text-slate-400 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed border border-slate-200 text-center tracking-wide">가입 신청 불가</button>`;
                 } else {
-                    actionBtn = `<button onclick="Boako.TeamList.requestJoin('${team.team_name}', '${leaderName}', ${team.id})" class="w-full mt-3 bg-slate-900 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 tracking-wide text-center">가입 신청</button>`;
+                    actionBtn = `<button onclick="Boako.TeamList.requestJoin('${Boako.Util.escapeJsAttr(team.team_name)}', '${Boako.Util.escapeJsAttr(leaderName)}', ${team.id})" class="w-full mt-3 bg-slate-900 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 tracking-wide text-center">가입 신청</button>`;
                 }
 
                 // 🌟 모집 마감된 팀은 공유할 이유가 없으니(더 이상 못 들어오니) 모집 중일 때만 공유 버튼 노출
@@ -161,7 +161,7 @@ Boako.TeamList = {
                         <div class="p-5 flex-1 flex flex-col">
                             
                             <div class="flex items-center mb-1">
-                                <h3 class="text-xl font-black text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1">${team.team_name}</h3>
+                                <h3 class="text-xl font-black text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1">${Boako.Util.escapeHtml(team.team_name)}</h3>
                                 ${hotBadge}
                             </div>
                             
@@ -173,7 +173,7 @@ Boako.TeamList = {
                                         <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-300 shadow-sm">
                                             <img src="${Boako.Util.cdn(leaderAvatar)}" class="w-full h-full object-cover">
                                         </div>
-                                        <span class="text-xs font-black text-slate-600">${leaderName}</span>
+                                        <span class="text-xs font-black text-slate-600">${Boako.Util.escapeHtml(leaderName)}</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         ${shareBtn}

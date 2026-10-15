@@ -525,7 +525,7 @@ if (window.sfx) window.sfx.buy();
                 <div onclick="Boako.Shop.selectSupporterTeam(${t.id})" class="relative flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 cursor-pointer transition-all ${isSelected ? 'border-violet-600 bg-violet-50 shadow-md' : 'border-slate-200 bg-white hover:border-violet-300 hover:shadow-sm'}">
                     ${rankBadge}
                     <img src="${Boako.Util.cdn(t.logo_url) || DEFAULT_LOGO}" class="w-10 h-10 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1">
-                    <span class="text-[10px] font-black text-slate-700 text-center truncate w-full">${t.team_name}</span>
+                    <span class="text-[10px] font-black text-slate-700 text-center truncate w-full">${Boako.Util.escapeHtml(t.team_name)}</span>
                 </div>
             `;
         }).join('');
@@ -544,7 +544,7 @@ if (window.sfx) window.sfx.buy();
         const rankEl = document.getElementById('supporter-preview-rank');
 
         if (badgeEl && team) badgeEl.innerHTML = Boako.Shop.getUniformPreviewHTML(team.logo_url, state.uniformImage, '80px');
-        if (nameEl && team) nameEl.innerHTML = `<span class="text-violet-700">${team.team_name}</span> 서포터즈 배지`;
+        if (nameEl && team) nameEl.innerHTML = `<span class="text-violet-700">${Boako.Util.escapeHtml(team.team_name)}</span> 서포터즈 배지`;
         if (rankEl) rankEl.innerText = rank ? `현재 시즌 실시간 순위 🏅 ${rank}위` : '이번 시즌 아직 순위 집계 전';
 
         if (window.sfx) window.sfx.click();

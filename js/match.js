@@ -304,7 +304,7 @@ Boako.Match = {
             console.error("대항전 데이터 로드 에러:", err);
             document.getElementById('match-ban-content').innerHTML = `
                 <div class="bg-red-50 text-red-500 p-6 rounded-xl font-bold border border-red-200 text-center">
-                    🚨 데이터를 불러오는 중 오류가 발생했습니다.<br><span class="text-sm font-normal">${err.message}</span>
+                    🚨 데이터를 불러오는 중 오류가 발생했습니다.<br><span class="text-sm font-normal">${Boako.Util.escapeHtml(err.message)}</span>
                 </div>
             `;
         }
@@ -387,7 +387,7 @@ Boako.Match = {
                         }
                     </div>
                     
-                    <h4 class="font-black text-sm break-keep mb-3 ${textClass}">${game.game_name}</h4>
+                    <h4 class="font-black text-sm break-keep mb-3 ${textClass}">${Boako.Util.escapeHtml(game.game_name)}</h4>
                     
                     ${isBanned ? `
                         <div class="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-lg w-full truncate border border-red-100">
@@ -451,7 +451,7 @@ Boako.Match = {
                             </div>
                             
                             <div class="flex flex-col justify-center">
-                                <h3 class="font-black text-white text-lg ${isEntryOpen ? 'group-hover:text-indigo-300 transition-colors' : ''} mb-1">${game.game_name}</h3>
+                                <h3 class="font-black text-white text-lg ${isEntryOpen ? 'group-hover:text-indigo-300 transition-colors' : ''} mb-1">${Boako.Util.escapeHtml(game.game_name)}</h3>
                                 <div class="flex items-center gap-2">
                                     ${!isEntryOpen ? `
                                         <span class="px-2 py-0.5 bg-indigo-500/30 text-indigo-100 text-[10px] font-bold rounded border border-indigo-400/30">${game.tournament_format || '룰셋 미정'}</span>
@@ -480,7 +480,7 @@ Boako.Match = {
                                 </button>
                             ` : ''}
                             
-                            <button onclick="Boako.Match.Chat.open(${game.season_no}, '${game.game_name}', ${game.entry_count || 0}, '${game.tournament_format || 'SWISS'}')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
+                            <button onclick="Boako.Match.Chat.open(${game.season_no}, '${Boako.Util.escapeJsAttr(game.game_name)}', ${game.entry_count || 0}, '${game.tournament_format || 'SWISS'}')" class="bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-indigo-600 transition-colors shadow-sm flex items-center gap-2">
                                 💬 소통 채널
                             </button>
                         </div>
@@ -494,9 +494,9 @@ Boako.Match = {
                                         <div class="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shadow-sm flex items-center justify-center mb-2 z-10">
                                             ${entry.teams?.logo_url ? `<img src="${Boako.Util.cdn(entry.teams.logo_url)}" class="w-full h-full object-cover">` : '<span class="text-xl">🏴</span>'}
                                         </div>
-                                        <span class="text-indigo-600 font-black text-sm mb-2 block relative z-10">${entry.team_name}</span>
+                                        <span class="text-indigo-600 font-black text-sm mb-2 block relative z-10">${Boako.Util.escapeHtml(entry.team_name)}</span>
                                         <div class="text-slate-700 font-bold text-sm bg-slate-50 py-3 rounded-lg border border-slate-200 relative z-10 w-full">
-                                            ${entry.player_name}
+                                            ${Boako.Util.escapeHtml(entry.player_name)}
                                         </div>
                                     </div>
                                 `).join('')}
@@ -652,7 +652,7 @@ Boako.Match = {
                 html += `
                     <tr class="${rowBg} transition-colors cursor-pointer group" onclick="Boako.Match.toggleScoreDetail('${safeId}')">
                         <td class="py-4 px-2">${rankBadge}</td>
-                        <td class="py-4 px-3 text-left font-black text-slate-800 text-base group-hover:text-indigo-600 transition-colors">${team.teamName}</td>
+                        <td class="py-4 px-3 text-left font-black text-slate-800 text-base group-hover:text-indigo-600 transition-colors">${Boako.Util.escapeHtml(team.teamName)}</td>
                         <td class="py-4 px-2">
                             <span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-black text-sm border border-indigo-100 whitespace-nowrap">🏆 ${team.totalScore} LP</span>
 
@@ -683,7 +683,7 @@ Boako.Match = {
                             <div class="w-8 h-8 shrink-0 bg-slate-50 rounded-lg p-1 border border-slate-100 flex justify-center items-center">
                                 ${game.game_logo_url ? `<img src="${Boako.Util.cdn(game.game_logo_url)}" class="max-w-full max-h-full object-contain">` : `<span>🎲</span>`}
                             </div>
-                            <span class="text-[11px] font-bold text-slate-600 truncate" title="${game.game_name}">${game.game_name}</span>
+                            <span class="text-[11px] font-bold text-slate-600 truncate" title="${Boako.Util.escapeHtml(game.game_name)}">${Boako.Util.escapeHtml(game.game_name)}</span>
                         </div>
                     `;
 
@@ -757,7 +757,7 @@ Boako.Match = {
                         
                         <div class="bg-indigo-600 px-5 py-4 flex justify-between items-center text-white shrink-0 shadow-md z-10">
                             <div>
-                                <h2 class="text-lg font-black flex items-center gap-2">💬 [${gameName}] 소통 채널</h2>
+                                <h2 class="text-lg font-black flex items-center gap-2">💬 [${Boako.Util.escapeHtml(gameName)}] 소통 채널</h2>
                                 <div class="flex items-center gap-2 mt-1">
                                     <p class="text-indigo-200 text-xs font-bold">참여자 전원 일치 일정 투표</p>
                                     <span class="bg-indigo-800 text-indigo-100 text-[10px] font-black px-1.5 py-0.5 rounded">엔트리 ${entryCount}명 (${format})</span>
@@ -1371,7 +1371,7 @@ Boako.Match = {
 
             const isMe = String(msg.sender_id) === String(Boako.state.user.id);
             const senderName = Boako.Util.escapeHtml(msg.profiles?.full_name || msg.sender_name_override || "참여자");
-            const teamBadge = msg.team_name ? `<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] mr-1 font-black shadow-sm">[${msg.team_name}]</span>` : '';
+            const teamBadge = msg.team_name ? `<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] mr-1 font-black shadow-sm">[${Boako.Util.escapeHtml(msg.team_name)}]</span>` : '';
 
             const html = isMe ? `
                 <div class="flex flex-col items-end gap-1 animate-in slide-in-from-right-2 duration-200">

@@ -136,12 +136,12 @@ Boako.Board = {
             }
             if (b.isSupporter) {
                 return b.icon
-                    ? `<img src="${Boako.Util.cdn(b.icon)}" style="height:16px; width:auto; object-fit:contain; display:inline-block; vertical-align:middle;" title="${b.name}">`
-                    : `<span title="${b.name}">🛡️</span>`;
+                    ? `<img src="${Boako.Util.cdn(b.icon)}" style="height:16px; width:auto; object-fit:contain; display:inline-block; vertical-align:middle;" title="${Boako.Util.escapeHtml(b.name)}">`
+                    : `<span title="${Boako.Util.escapeHtml(b.name)}">🛡️</span>`;
             }
             return (b.icon && b.icon.startsWith('http'))
-                ? `<img src="${Boako.Util.cdn(b.icon)}" style="height:16px; width:auto; object-fit:contain; display:inline-block; vertical-align:middle;" title="${b.name}">`
-                : `<span title="${b.name}">${b.icon || '🏅'}</span>`;
+                ? `<img src="${Boako.Util.cdn(b.icon)}" style="height:16px; width:auto; object-fit:contain; display:inline-block; vertical-align:middle;" title="${Boako.Util.escapeHtml(b.name)}">`
+                : `<span title="${Boako.Util.escapeHtml(b.name)}">${b.icon || '🏅'}</span>`;
         }).join('');
     },
 
@@ -662,7 +662,7 @@ Boako.Board = {
             return `
             <div onclick="Boako.Board.openDetail(${p.id})" class="flex items-center justify-between gap-4 bg-white border ${p.is_notice ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'} rounded-xl px-5 py-4 cursor-pointer hover:shadow-md transition-shadow">
                 <div class="flex items-center gap-3 min-w-0 flex-1">
-                    ${p.is_notice ? `<span class="text-[10px] font-black bg-amber-500 text-white px-2 py-1 rounded-md shrink-0">공지</span>` : `<span class="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-md shrink-0">${p.category}</span>`}
+                    ${p.is_notice ? `<span class="text-[10px] font-black bg-amber-500 text-white px-2 py-1 rounded-md shrink-0">공지</span>` : `<span class="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-md shrink-0">${Boako.Util.escapeHtml(p.category)}</span>`}
                     ${p.game_name ? `<span class="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md shrink-0">🎲 ${Boako.Board.escapeHtml(p.game_name)}</span>` : ''}
                     <span class="font-bold text-slate-800 truncate">${Boako.Board.escapeHtml(p.title)}</span>
                     ${commentCountMap[p.id] ? `<span class="text-teal-600 text-xs font-black shrink-0">[${commentCountMap[p.id]}]</span>` : ''}
@@ -908,9 +908,9 @@ Boako.Board = {
         }
 
         resultsBox.innerHTML = data.map(g => `
-            <div class="flex items-center gap-2 p-2 hover:bg-teal-50 cursor-pointer transition-colors" onclick="Boako.Board.selectGame('${g.game_name.replace(/'/g, "\\'")}')">
+            <div class="flex items-center gap-2 p-2 hover:bg-teal-50 cursor-pointer transition-colors" onclick="Boako.Board.selectGame('${Boako.Util.escapeJsAttr(g.game_name)}')">
                 <img src="${Boako.Util.cdn(g.image_url) || ''}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
-                <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
+                <span class="text-xs font-bold text-slate-700">${Boako.Util.escapeHtml(g.game_name)}</span>
             </div>
         `).join('');
         resultsBox.classList.remove('hidden');
@@ -1125,7 +1125,7 @@ Boako.Board = {
 
         return `
             <span class="font-bold text-slate-700 ${isMe ? '' : 'cursor-pointer hover:text-teal-600 hover:underline'}"
-                  ${isMe ? '' : `onclick="Boako.Board.openMessageModal('${authorId}', '${(name || '').replace(/'/g, "\\'")}')"`}>${name}</span>
+                  ${isMe ? '' : `onclick="Boako.Board.openMessageModal('${authorId}', '${Boako.Util.escapeJsAttr((name || ''))}')"`}>${Boako.Util.escapeHtml(name)}</span>
             ${badgeHtml ? `<span class="inline-flex items-center gap-0.5 ml-1">${badgeHtml}</span>` : ''}
         `;
     },
@@ -1167,7 +1167,7 @@ Boako.Board = {
                 <section class="section-card">
                     <div class="card-body">
                         <div class="flex items-center gap-2 mb-2">
-                            ${post.is_notice ? `<span class="text-[11px] font-black bg-amber-500 text-white px-2.5 py-1 rounded-md">공지</span>` : `<span class="text-[11px] font-black bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md">${post.category}</span>`}
+                            ${post.is_notice ? `<span class="text-[11px] font-black bg-amber-500 text-white px-2.5 py-1 rounded-md">공지</span>` : `<span class="text-[11px] font-black bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md">${Boako.Util.escapeHtml(post.category)}</span>`}
                             ${post.game_name ? `<span class="text-[11px] font-bold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-md">🎲 ${Boako.Board.escapeHtml(post.game_name)}</span>` : ''}
                         </div>
                         <h1 class="text-2xl font-black text-slate-900 mb-3">${Boako.Board.escapeHtml(post.title)}</h1>
@@ -1331,11 +1331,11 @@ Boako.Board = {
             <div id="board-msg-modal-overlay" class="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
                 <div class="bg-white rounded-2xl w-full max-w-sm p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-black text-base">💬 ${authorName} 님에게 쪽지</h3>
+                        <h3 class="font-black text-base">💬 ${Boako.Util.escapeHtml(authorName)} 님에게 쪽지</h3>
                         <button onclick="document.getElementById('board-msg-modal-overlay').remove()" class="text-slate-400 font-black text-xl">×</button>
                     </div>
                     <textarea id="board-msg-input" rows="4" placeholder="메시지를 입력하세요" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3"></textarea>
-                    <button onclick="Boako.Board.sendMessage('${authorId}', '${authorName.replace(/'/g, "\\'")}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-xl">보내기</button>
+                    <button onclick="Boako.Board.sendMessage('${authorId}', '${Boako.Util.escapeJsAttr(authorName)}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-xl">보내기</button>
                 </div>
             </div>
         `;

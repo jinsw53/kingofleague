@@ -364,7 +364,7 @@ Boako.TerritoryMap = {
                     const mCenter = centroidOf(ownerCentroid, m.name, e.cx + m.dx, e.cy + m.dy);
                     const mel = this.labelDivs[m.name];
                     mel.style.left = mCenter.x + 'px'; mel.style.top = mCenter.y + 'px';
-                    mel.innerHTML = `<div style="font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${m.name}</div>`;
+                    mel.innerHTML = `<div style="font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${Boako.Util.escapeHtml(m.name)}</div>`;
                 });
             } else {
                 const total = sumUpTo(e.solo.daily);

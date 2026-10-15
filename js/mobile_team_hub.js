@@ -368,7 +368,7 @@ Boako.MobileTeamHub = {
             `;
         } catch (e) {
             console.error('모바일 지갑 로드 실패:', e);
-            wrap.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444; font-weight:700; font-size:12px;">오류: ${e.message}</div>`;
+            wrap.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444; font-weight:700; font-size:12px;">오류: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 
@@ -536,7 +536,7 @@ Boako.MobileTeamHub = {
 
         } catch (e) {
             console.error('대항전 일정 로드 실패:', e);
-            container.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700; font-size:12px;">일정 로드 실패: ${e.message}</div>`;
+            container.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700; font-size:12px;">일정 로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 
@@ -662,7 +662,7 @@ Boako.MobileTeamHub = {
             if (window.lucide) window.lucide.createIcons();
         } catch (e) {
             console.error('챌린지 탭 로드 실패:', e);
-            wrap.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700; font-size:12px;">오류: ${e.message}</div>`;
+            wrap.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700; font-size:12px;">오류: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 

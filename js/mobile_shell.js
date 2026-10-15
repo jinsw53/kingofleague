@@ -245,7 +245,7 @@ Boako.MobileShell = {
                         보드게임 아레나에서 사용 중인<br><span style="color:#ef4444;">정확한 닉네임</span>을 입력해주세요.
                     </div>
                     <a href="https://boardgamearena.com/" target="_blank" rel="noopener" style="display:block; text-align:center; font-size:12px; font-weight:900; color:#4f46e5; margin-bottom:16px;">BGA에서 내 닉네임 확인하러 가기 →</a>
-                    <input type="text" id="mobile-nick-input" value="${Boako.state.user.nickname || ''}" placeholder="대소문자 구별하여 정확히 입력" style="width:100%; border:2px solid #e2e8f0; border-radius:12px; padding:14px; text-align:center; font-weight:900; font-size:16px; color:#1e293b;">
+                    <input type="text" id="mobile-nick-input" value="${Boako.Util.escapeHtml(Boako.state.user.nickname || '')}" placeholder="대소문자 구별하여 정확히 입력" style="width:100%; border:2px solid #e2e8f0; border-radius:12px; padding:14px; text-align:center; font-weight:900; font-size:16px; color:#1e293b;">
                 </div>
                 <div style="flex:1;"></div>
                 <button onclick="Boako.MobileShell.saveInitialNick()" style="width:100%; background:#1e293b; color:#fff; font-weight:900; font-size:14px; padding:15px; border-radius:12px;">확인 및 설정 완료</button>
@@ -669,7 +669,7 @@ Boako.MobileShell = {
         const teamBadgeHtml = Boako.state.team?.info
             ? `<div style="display:inline-flex; align-items:center; gap:5px; margin-top:6px; padding:4px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:11px; font-weight:900; color:#1e40af;">
                    <img src="${Boako.Util.cdn(Boako.state.team.info.logo_url || '')}" style="width:14px; height:14px; border-radius:50%; object-fit:cover; border:1px solid #93c5fd;">
-                   ${Boako.state.team.info.team_name} 멤버
+                   ${Boako.Util.escapeHtml(Boako.state.team.info.team_name)} 멤버
                </div>`
             : `<div style="margin-top:6px; padding:4px 8px; background:#f1f5f9; border-radius:6px; font-size:11px; font-weight:700; color:#64748b;">🛡️ 아카이브 멤버</div>`;
 
@@ -678,7 +678,7 @@ Boako.MobileShell = {
                 <div style="width:56px; height:56px; border-radius:50%; background:#e2e8f0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:26px;">
                     ${displayAvatarUrl ? `<img src="${Boako.Util.safeAttrUrl(displayAvatarUrl)}" style="width:100%; height:100%; object-fit:cover;">` : '👤'}
                 </div>
-                <span style="font-size:14px; font-weight:900;">${user.nickname || '사용자'}</span>
+                <span style="font-size:14px; font-weight:900;">${Boako.Util.escapeHtml(user.nickname || '사용자')}</span>
                 ${teamBadgeHtml}
             </div>
             <div style="display:flex; flex-direction:column; gap:2px;">

@@ -159,7 +159,7 @@ Boako.MobileArchive = {
         const cardsHtml = this.filteredRecords.map(rec => {
             const isFreeAgent = !rec.b_all_team;
             const teamLogoHtml = (rec.logo_url && !isFreeAgent)
-                ? `<img src="${Boako.Util.cdn(rec.logo_url)}" style="width:12px; height:12px; border-radius:2px; object-fit:contain; flex-shrink:0;" alt="${rec.b_all_team}">`
+                ? `<img src="${Boako.Util.cdn(rec.logo_url)}" style="width:12px; height:12px; border-radius:2px; object-fit:contain; flex-shrink:0;" alt="${Boako.Util.escapeHtml(rec.b_all_team)}">`
                 : `<span style="font-size:10px; flex-shrink:0;">👤</span>`;
 
             const rpHtml = isFreeAgent
@@ -181,17 +181,17 @@ Boako.MobileArchive = {
                 <div style="background:#fff; border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,.05); padding:14px; margin-bottom:10px;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                         <div style="min-width:0;">
-                            <div style="font-weight:900; font-size:15px; color:#0f172a;">${rec.nickname || 'Unknown'}</div>
+                            <div style="font-weight:900; font-size:15px; color:#0f172a;">${Boako.Util.escapeHtml(rec.nickname || 'Unknown')}</div>
                             <div style="display:flex; align-items:center; gap:4px; margin-top:3px;">
                                 ${teamLogoHtml}
-                                <span style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:.03em;">${rec.b_all_team || 'Free Agent'}</span>
+                                <span style="font-size:10px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:.03em;">${Boako.Util.escapeHtml(rec.b_all_team || 'Free Agent')}</span>
                             </div>
                         </div>
                         ${rpHtml}
                     </div>
 
                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
-                        <span style="font-weight:800; font-size:13.5px; color:#312e81;">${rec.game_name || '-'}</span>
+                        <span style="font-weight:800; font-size:13.5px; color:#312e81;">${Boako.Util.escapeHtml(rec.game_name || '-')}</span>
                         ${rec.is_first == 1 ? `<span style="background:#ef4444; color:#fff; font-size:8px; font-weight:900; padding:1px 5px; border-radius:4px; text-transform:uppercase;">1ST</span>` : ''}
                     </div>
 
@@ -271,7 +271,7 @@ Boako.MobileArchive = {
                         <div style="display:flex; align-items:center; gap:10px; min-width:0;">
                             <span style="font-size:12px; font-weight:900; color:${rankColor(p.rank)}; min-width:38px; flex-shrink:0;">${rankMedal(p.rank)}</span>
                             <div style="min-width:0;">
-                                <div style="font-size:12.5px; font-weight:900; color:#1e293b;">${p.name}</div>
+                                <div style="font-size:12.5px; font-weight:900; color:#1e293b;">${Boako.Util.escapeHtml(p.name)}</div>
                                 <div style="display:flex; align-items:center; gap:4px; margin-top:2px;">
                                     ${teamLogoHtml}
                                     <span style="font-size:9.5px; font-weight:800; color:#94a3b8; text-transform:uppercase;">${p.team || 'Free Agent'}</span>
@@ -289,7 +289,7 @@ Boako.MobileArchive = {
                         <div style="display:flex; align-items:center; gap:10px; min-width:0;">
                             <div style="width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; flex-shrink:0; ${rankBadgeStyle}">${game.popularityRank}</div>
                             <div style="min-width:0;">
-                                <div style="font-weight:900; font-size:14.5px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gameName}</div>
+                                <div style="font-weight:900; font-size:14.5px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.Util.escapeHtml(gameName)}</div>
                                 <div style="font-size:9.5px; font-weight:800; color:#cbd5e1; text-transform:uppercase; margin-top:2px;">탭해서 순위 보기</div>
                             </div>
                         </div>

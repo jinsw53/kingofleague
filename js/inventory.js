@@ -243,7 +243,7 @@ Boako.Inventory = {
                          style="background:white; border:2px solid #10b981; border-radius:50px; padding:8px 18px; display:flex; align-items:center; gap:10px; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); transition:transform 0.2s;"
                          onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="badge-zoom-wrap badge-zoom-sm">${b.isSupporter ? this.getUniformBadgeHTML(b, '22px') : (b.isAchievement ? b.badgeHtmlSm : this.getIconHTML(b.icon, '22px'))}</div>
-                        <span style="font-weight:800; font-size:14px; color:#064e3b;">${b.name}</span>
+                        <span style="font-weight:800; font-size:14px; color:#064e3b;">${Boako.Util.escapeHtml(b.name)}</span>
                     </div>
                 `).join('');
             }
@@ -276,7 +276,7 @@ Boako.Inventory = {
                             ` : ''}
                         </div>
                         <div style="font-size:13px; font-weight:800; color:#1e293b; margin-bottom:6px; height:36px; display:flex; align-items:center; justify-content:center; word-break:keep-all; padding:0 5px;">
-                            ${item.name}
+                            ${Boako.Util.escapeHtml(item.name)}
                         </div>
                         ${expiryLabel}
                         ${item.isSupporter && item.isExpired

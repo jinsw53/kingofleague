@@ -386,7 +386,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
 
                     html = `
                     <div class="main-banner" style="margin-bottom: 20px; display:flex; flex-direction:column; gap:10px;">
-                        <h1>${team.team_name}</h1>
+                        <h1>${Boako.Util.escapeHtml(team.team_name)}</h1>
                         <div style="font-size:13px; font-weight:800; opacity:0.9; display:flex; flex-direction:column; gap:4px;">
                             <div>${currentSeasonLineHtml}</div>
                             <div>${historyLineHtml}</div>
@@ -418,13 +418,13 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                 <div class="team-profile-header">
                                     <img src="${Boako.Util.cdn(team.logo_url) || 'https://via.placeholder.com/160'}" class="team-logo-preview">
                                     <div class="team-info-txt">
-                                        <h2>${team.team_name}</h2>
+                                        <h2>${Boako.Util.escapeHtml(team.team_name)}</h2>
                                         <div id="motto-display-row" style="display:flex; align-items:center; gap:12px;">
-                                            <p style="color:var(--primary); font-weight:800; font-style:italic; font-size:20px;">"${team.team_motto || '전설의 서막'}"</p>
+                                            <p style="color:var(--primary); font-weight:800; font-style:italic; font-size:20px;">"${Boako.Util.escapeHtml(team.team_motto || '전설의 서막')}"</p>
                                             ${isLeader ? `<button class="btn-edit-small" onclick="Boako.View.toggleEdit('motto')">수정</button>` : ''}
                                         </div>
                                         <div id="motto-edit-area" style="display:none; margin-top:10px; gap:8px;">
-                                            <input type="text" id="input-motto" class="edit-input-box" style="width:250px; padding:8px;" value="${team.team_motto || ''}">
+                                            <input type="text" id="input-motto" class="edit-input-box" style="width:250px; padding:8px;" value="${Boako.Util.escapeHtml(team.team_motto || '')}">
                                             <button class="btn-edit-small" style="background:var(--primary); color:white;" onclick="Boako.Team.updateInfo('team_motto')">저장</button>
                                         </div>
                                         ${isLeader && (teamBannerStats.starEligible || team.champion_star_count > 0) ? `
@@ -439,9 +439,9 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                         <h4 style="font-weight:950; font-size:18px;">🛡️ 팀 상세 소개</h4>
                                         ${isLeader ? `<button class="btn-edit-small" onclick="Boako.View.toggleEdit('desc')">소개 수정</button>` : ''}
                                     </div>
-                                    <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap;">${team.team_desc || '소개가 없습니다.'}</p>
+                                    <p id="desc-display-txt" style="color:#64748b; font-size:15px; white-space:pre-wrap;">${Boako.Util.escapeHtml(team.team_desc || '소개가 없습니다.')}</p>
                                     <div id="desc-edit-area" style="display:none; flex-direction:column; gap:10px;">
-                                        <textarea id="textarea-desc" rows="6" class="edit-input-box">${team.team_desc || ''}</textarea>
+                                        <textarea id="textarea-desc" rows="6" class="edit-input-box">${Boako.Util.escapeHtml(team.team_desc || '')}</textarea>
                                         <button class="btn-edit-small" style="background:var(--primary); color:white; align-self:flex-end;" onclick="Boako.Team.updateInfo('team_desc')">저장</button>
                                     </div>
                                 </div>
@@ -458,14 +458,14 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                             const isMe = m.player_name === Boako.state.user.nickname;
                                             const isDraggable = isLeader;
                                             return `
-                                            <div class="member-item" ${isDraggable ? `draggable="true" ondragstart="Boako.Team.onMemberDragStart(event, '${m.player_name.replace(/'/g, "\\'")}')" ondragend="Boako.Team.onMemberDragEnd(event)" style="cursor:grab;"` : ''}>
+                                            <div class="member-item" ${isDraggable ? `draggable="true" ondragstart="Boako.Team.onMemberDragStart(event, '${Boako.Util.escapeJsAttr(m.player_name)}')" ondragend="Boako.Team.onMemberDragEnd(event)" style="cursor:grab;"` : ''}>
                                                 <div style="display:flex; align-items:center; gap:18px;">
                                                     <span class="role-tag ${m.role === 'LEADER' ? 'role-leader' : 'role-member'}">${m.role}</span>
-                                                    <strong style="font-size:16px;">${m.player_name} ${isMe ? '<small style="color:var(--primary);">(나)</small>' : ''}</strong>
+                                                    <strong style="font-size:16px;">${Boako.Util.escapeHtml(m.player_name)} ${isMe ? '<small style="color:var(--primary);">(나)</small>' : ''}</strong>
                                                     ${isDraggable ? `<small style="color:#94a3b8; font-size:11px;">↕ 드래그해서 포인트 지급</small>` : ''}
                                                 </div>
                                                 <div>
-                                                    ${isLeader && m.role !== 'LEADER' ? `<button class="btn-edit-small" style="color:red; border-color:#fee2e2;" onclick="Boako.Team.kick('${m.player_name}')">방출</button>` : ''}
+                                                    ${isLeader && m.role !== 'LEADER' ? `<button class="btn-edit-small" style="color:red; border-color:#fee2e2;" onclick="Boako.Team.kick('${Boako.Util.escapeJsAttr(m.player_name)}')">방출</button>` : ''}
                                                     ${!isLeader && isMe ? `<button class="btn-edit-small" onclick="Boako.Team.leave()">팀 탈퇴</button>` : ''}
                                                 </div>
                                             </div>`;
@@ -732,7 +732,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                                 : (item.icon || '❓'))
                                     }
                                 </div>
-                                <h3 style="font-size:20px; font-weight:900; margin-bottom:10px;">${item.name}</h3>
+                                <h3 style="font-size:20px; font-weight:900; margin-bottom:10px;">${Boako.Util.escapeHtml(item.name)}</h3>
                                 <p style="color:#64748b; font-size:14px; word-break:keep-all;">${item.description}</p>
                             </div>
                             <div style="padding:20px; border-top:1px solid #f1f5f9; background:#fafafa;">

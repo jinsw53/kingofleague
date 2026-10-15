@@ -265,7 +265,7 @@ Boako.Util = {
     renderCSelect: (id, options, selectedValue, buttonClass, onSelectFn) => {
         const selectedOpt = options.find(o => String(o.value) === String(selectedValue)) || options[0] || { label: '' };
         const itemsHtml = options.map(o => `
-            <div onclick="Boako.Util.selectCSelect('${id}', '${String(o.value).replace(/'/g, "\\'")}', '${String(o.label).replace(/'/g, "\\'")}', '${onSelectFn}')"
+            <div onclick="Boako.Util.selectCSelect('${id}', '${Boako.Util.escapeJsAttr(String(o.value))}', '${Boako.Util.escapeJsAttr(String(o.label))}', '${onSelectFn}')"
                  class="px-3 py-2 text-xs font-bold cursor-pointer hover:bg-indigo-50 transition-colors ${String(o.value) === String(selectedValue) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}">
                 ${o.label}
             </div>

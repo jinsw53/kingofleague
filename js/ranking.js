@@ -73,7 +73,7 @@ Boako.Ranking.init = async function() {
 
     } catch (e) {
         console.error('랭킹 초기화 실패:', e);
-        container.innerHTML = `<div class="text-center py-20 text-rose-500 font-bold">랭킹 데이터 로드 실패: ${e.message}</div>`;
+        container.innerHTML = `<div class="text-center py-20 text-rose-500 font-bold">랭킹 데이터 로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
     }
 };
 
@@ -198,7 +198,7 @@ Boako.Ranking.loadRankingTab = async function() {
 
     } catch (e) {
         console.error('랭킹 로드 실패:', e);
-        content.innerHTML = `<div class="text-center py-16 text-rose-500 font-bold">로드 실패: ${e.message}</div>`;
+        content.innerHTML = `<div class="text-center py-16 text-rose-500 font-bold">로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
     }
 };
 
@@ -206,7 +206,7 @@ Boako.Ranking.getRankingHTML = function(seasonInfo, isCurrent) {
     const seasonOptionsHtml = Boako.Ranking.State.seasons.map(s => `
         <div onclick="Boako.Ranking.changeSeason(${s.season_no})" class="group px-4 py-3 cursor-pointer rounded-xl font-black text-xs transition-all duration-200 flex items-center gap-2 ${s.season_no === Boako.Ranking.State.selectedSeason ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}">
             <div class="w-1.5 h-1.5 rounded-full ${s.season_no === Boako.Ranking.State.selectedSeason ? 'bg-indigo-500' : 'bg-transparent'}"></div>
-            <span class="flex-1">${s.title}</span>
+            <span class="flex-1">${Boako.Util.escapeHtml(s.title)}</span>
             ${s.is_current ? '<span class="text-[9px] text-rose-500 font-black">🔴 진행중</span>' : ''}
         </div>
     `).join('');
@@ -220,12 +220,12 @@ Boako.Ranking.getRankingHTML = function(seasonInfo, isCurrent) {
             const isExpanded = Boako.Ranking.State.expandedTeam === r.team_name;
 
 const mainRow = `
-                <tr class="rk-row border-b border-slate-100 cursor-pointer" onclick="Boako.Ranking.toggleTeamDetail('${r.team_name.replace(/'/g, "\\'")}')">
+                <tr class="rk-row border-b border-slate-100 cursor-pointer" onclick="Boako.Ranking.toggleTeamDetail('${Boako.Util.escapeJsAttr(r.team_name)}')">
                     <td class="py-3 px-3"><div class="rk-rank-badge ${rankBadgeClass}">${r._rank ?? '-'}</div></td>
                     <td class="py-3 px-3">
                         <div class="flex items-center gap-2">
                             <img src="${Boako.Util.cdn(r.logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png')}" class="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-slate-100 p-0.5">
-                            <span class="font-black text-slate-800 text-sm">${r.team_name}</span>
+                            <span class="font-black text-slate-800 text-sm">${Boako.Util.escapeHtml(r.team_name)}</span>
                             <i data-lucide="chevron-${isExpanded ? 'up' : 'down'}" class="w-3.5 h-3.5 text-slate-300"></i>
                         </div>
                     </td>
@@ -296,12 +296,12 @@ const mainRow = `
     return `
         <div class="mb-5 flex items-center justify-between">
             <div>
-                <h3 class="font-black text-slate-800 text-lg">${seasonInfo?.title || ''}</h3>
+                <h3 class="font-black text-slate-800 text-lg">${Boako.Util.escapeHtml(seasonInfo?.title || '')}</h3>
                 <p class="text-xs text-slate-400 font-bold mt-0.5">${isCurrent ? '🔴 실시간 집계 중' : '✅ 시즌 종료, 확정된 최종 기록'}</p>
             </div>
 <div class="relative z-30">
                 <button onclick="Boako.Ranking.toggleSeasonDropdown()" class="bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:shadow-md transition-all duration-200 group">
-                    <span>${seasonInfo?.title || ''}</span>
+                    <span>${Boako.Util.escapeHtml(seasonInfo?.title || '')}</span>
                     <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
                 </button>
                 <div id="rk-season-dropdown-overlay" onclick="Boako.Ranking.toggleSeasonDropdown()" class="hidden fixed inset-0 z-40 bg-transparent"></div>
@@ -449,7 +449,7 @@ Boako.Ranking.loadHofTab = async function() {
 
     } catch (e) {
         console.error('명예의 전당 로드 실패:', e);
-        content.innerHTML = `<div class="text-center py-16 text-rose-500 font-bold">로드 실패: ${e.message}</div>`;
+        content.innerHTML = `<div class="text-center py-16 text-rose-500 font-bold">로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
     }
 };
 
@@ -472,7 +472,7 @@ Boako.Ranking.getHofHTML = function() {
                 <img src="${Boako.Util.cdn(d.championTeam.logo_url) || DEFAULT_LOGO}" class="w-20 h-20 rounded-2xl object-contain bg-white/10 border border-white/20 p-2 shadow-lg">
                 <div>
                     <div class="text-[10px] font-black text-amber-300 uppercase tracking-widest mb-1">👑 시즌 우승팀</div>
-                    <div class="text-2xl font-black text-white">${d.championTeam.team_name}</div>
+                    <div class="text-2xl font-black text-white">${Boako.Util.escapeHtml(d.championTeam.team_name)}</div>
                     <div class="text-sm font-bold text-indigo-200 mt-1">🏆 ${Number(d.championTeam.total_lp).toLocaleString()} LP</div>
                 </div>
             </div>
@@ -488,7 +488,7 @@ Boako.Ranking.getHofHTML = function() {
             <img src="${Boako.Util.cdn(d.mvp.teamLogo) || DEFAULT_LOGO}" class="w-16 h-16 rounded-2xl object-contain bg-slate-50 border border-slate-100 p-1.5">
             <div>
                 <div class="text-[10px] font-black text-violet-500 uppercase tracking-widest mb-1">⭐ 시즌 MVP</div>
-                <div class="text-xl font-black text-slate-800">${d.mvp.nickname}</div>
+                <div class="text-xl font-black text-slate-800">${Boako.Util.escapeHtml(d.mvp.nickname)}</div>
                 <div class="text-xs font-bold text-slate-400 mt-1">${d.mvp.team || '무소속'} · <span class="text-amber-500">${d.mvp.rp.toLocaleString()} RP</span></div>
             </div>
         </div>
@@ -521,7 +521,7 @@ Boako.Ranking.getHofHTML = function() {
                             <div class="hcc-nickname">${g.mvp_nickname || '미정'}</div>
                             <div class="hcc-team-row">
                                 <img src="${Boako.Util.cdn(g.team_logo) || DEFAULT_LOGO}">
-                                <span>${g.team_name}</span>
+                                <span>${Boako.Util.escapeHtml(g.team_name)}</span>
                             </div>
                         </div>
                     </div>
@@ -539,7 +539,7 @@ Boako.Ranking.getHofHTML = function() {
 
     return `
         <div class="mb-5 flex items-center justify-between">
-            <h3 class="font-black text-slate-800 text-lg">${sponsorBadgeHtml}${d.seasonTitle} 명예의 전당</h3>
+            <h3 class="font-black text-slate-800 text-lg">${sponsorBadgeHtml}${Boako.Util.escapeHtml(d.seasonTitle)} 명예의 전당</h3>
 <div class="relative z-30">
                 <button onclick="Boako.Ranking.toggleHofSeasonDropdown()" class="bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:shadow-md transition-all duration-200 group">
                     <span>시즌 ${Boako.Ranking.State.hofSelectedSeason}</span>

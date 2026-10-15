@@ -221,7 +221,7 @@ Boako.Tournament = {
                     <div class="flex items-center gap-3">
                         <div class="flex flex-col items-center shrink-0" style="width:52px;">
                             <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
-                            <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
+                            <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${Boako.Util.escapeHtml(p.game_name || '종목 미정')}</div>
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="text-base font-black text-violet-700">📅 ${dateStr}</div>
@@ -243,7 +243,7 @@ Boako.Tournament = {
                 <div class="flex items-center gap-3 mb-3">
                     <div class="flex flex-col items-center shrink-0" style="width:52px;">
                         <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
-                        <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
+                        <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${Boako.Util.escapeHtml(p.game_name || '종목 미정')}</div>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="text-base font-black text-amber-700">📅 ${dateStr}</div>
@@ -307,9 +307,9 @@ Boako.Tournament = {
         }
 
         resultsBox.innerHTML = `<div class="max-h-48 overflow-y-auto dropdown-scroll">${data.map(g => `
-            <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer transition-colors" onclick="Boako.Tournament.selectGame('${g.game_name.replace(/'/g, "\\'")}', '${(g.image_url || '').replace(/'/g, "\\'")}')">
+            <div class="flex items-center gap-2 p-2 hover:bg-violet-50 cursor-pointer transition-colors" onclick="Boako.Tournament.selectGame('${Boako.Util.escapeJsAttr(g.game_name)}', '${Boako.Util.escapeJsAttr((g.image_url || ''))}')">
                 <img src="${Boako.Util.cdn(g.image_url || DEFAULT_LOGO_FALLBACK)}" class="w-6 h-6 rounded object-contain bg-slate-50 border border-slate-100">
-                <span class="text-xs font-bold text-slate-700">${g.game_name}</span>
+                <span class="text-xs font-bold text-slate-700">${Boako.Util.escapeHtml(g.game_name)}</span>
             </div>
         `).join('')}</div>`;
         resultsBox.classList.remove('hidden');
@@ -511,7 +511,7 @@ Boako.Tournament.Vote = {
                             <img src="${Boako.Util.cdn(c.image_url) || DEFAULT_LOGO_FALLBACK}" class="w-8 h-8 rounded-lg object-contain bg-white/10 border border-white/20 p-0.5 shrink-0">
                             <div class="flex-1 min-w-0">
                                 <div class="flex justify-between items-center text-xs font-bold mb-1">
-                                    <span class="truncate">${c.game_name}</span>
+                                    <span class="truncate">${Boako.Util.escapeHtml(c.game_name)}</span>
                                     <span class="opacity-80 shrink-0 ml-2">${pct}%</span>
                                 </div>
                                 <div class="h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -566,7 +566,7 @@ Boako.Tournament.Vote = {
             <div onclick="Boako.Tournament.Vote.vote('${g.game_id}', this)" class="relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-slate-200 bg-white hover:border-violet-400 hover:shadow-md cursor-pointer transition-all">
                 ${g.vote_count > 0 ? `<span class="absolute -top-1.5 -right-1.5 bg-violet-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm">${g.vote_count}</span>` : ''}
                 <img src="${Boako.Util.cdn(g.image_url) || DEFAULT_LOGO_FALLBACK}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
-                <span class="text-[11px] font-black text-slate-700 text-center leading-tight">${g.game_name}</span>
+                <span class="text-[11px] font-black text-slate-700 text-center leading-tight">${Boako.Util.escapeHtml(g.game_name)}</span>
                 <span class="text-[9px] font-bold ${g.playtime > 30 ? 'text-indigo-400' : 'text-violet-400'}">${g.playtime > 30 ? '🧩 월간' : '🏅 정기'} · ${g.playtime}분</span>
             </div>
         `).join('');

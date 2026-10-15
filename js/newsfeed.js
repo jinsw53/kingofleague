@@ -595,7 +595,7 @@ Boako.NewsFeed = {
     // 🌟 [신규] 메인 헤드라인 전용 — 사이드 컬럼(2칸, row-span-2)과 짝을 이루는 형태라
     // aspect-ratio 대신 row-span-2로 옆 컬럼과 정확히 같은 높이를 갖도록 함 (grid 기본 stretch 활용)
     renderHeadlineBlock: (item) => {
-        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
+        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${Boako.Util.escapeJsAttr(item.link_type)}', '${Boako.Util.escapeJsAttr(item.link_id)}')" style="cursor:pointer;"` : '';
         const img = item.thumbnail_url ? Boako.Util.cdn(item.thumbnail_url) : null;
         return `
             <div class="col-span-4 md:col-span-3 md:row-span-2 relative rounded-2xl overflow-hidden shadow-lg border border-slate-200 hover:shadow-xl transition-shadow" style="aspect-ratio: 4/3;" ${clickable}>
@@ -630,7 +630,7 @@ Boako.NewsFeed = {
             const style = TIER_STYLE[game.tier] || TIER_STYLE.NORMAL;
             const borderClass = i < games.length - 1 ? 'border-r border-slate-100' : '';
             return `
-                <div class="flex flex-col items-center justify-center text-center p-3 ${borderClass}" onclick="Boako.Util.navigateToLink('GAME', '${game.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">
+                <div class="flex flex-col items-center justify-center text-center p-3 ${borderClass}" onclick="Boako.Util.navigateToLink('GAME', '${Boako.Util.escapeJsAttr(game.name)}')" style="cursor:pointer;">
                     <span class="text-[9px] font-black px-2 py-0.5 rounded mb-2" style="color:${style.color}; background:${style.bg};">${TIER_LABEL[game.tier] || game.tier}</span>
                     <div class="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-2 overflow-hidden">
                         ${img ? `<img src="${img}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span class="text-xl">🎲</span>`}
@@ -674,7 +674,7 @@ Boako.NewsFeed = {
     },
 
     renderFillerReal: (item) => {
-        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
+        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${Boako.Util.escapeJsAttr(item.link_type)}', '${Boako.Util.escapeJsAttr(item.link_id)}')" style="cursor:pointer;"` : '';
         const img = item.thumbnail_url ? Boako.Util.cdn(item.thumbnail_url) : null;
         return `
             <div class="nf-filler-card" ${clickable}>
@@ -692,7 +692,7 @@ Boako.NewsFeed = {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         const clickable = filler.externalUrl
             ? `onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(filler.externalUrl)}')" style="cursor:pointer;"`
-            : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '');
+            : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${Boako.Util.escapeJsAttr(filler.linkType)}', '${Boako.Util.escapeJsAttr(filler.linkId)}')" style="cursor:pointer;"` : '');
         return `
             <div class="nf-filler-card" ${clickable}>
                 <div class="thumb">${img ? `<img src="${img}">` : filler.icon}</div>
@@ -711,7 +711,7 @@ Boako.NewsFeed = {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         const clickable = filler.externalUrl
             ? `onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(filler.externalUrl)}')" style="cursor:pointer;"`
-            : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '');
+            : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${Boako.Util.escapeJsAttr(filler.linkType)}', '${Boako.Util.escapeJsAttr(filler.linkId)}')" style="cursor:pointer;"` : '');
         return `
             <div class="col-span-2 md:col-span-1 bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>
                 ${img ? `<div class="h-24 overflow-hidden bg-slate-50 flex items-center justify-center p-3"><img src="${img}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;"></div>` : ''}
@@ -723,7 +723,7 @@ Boako.NewsFeed = {
     },
 
     renderCard: (item) => {
-        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${item.link_type}', '${item.link_id}')" style="cursor:pointer;"` : '';
+        const clickable = item.link_type ? `onclick="Boako.Util.navigateToLink('${Boako.Util.escapeJsAttr(item.link_type)}', '${Boako.Util.escapeJsAttr(item.link_id)}')" style="cursor:pointer;"` : '';
         const img = item.thumbnail_url ? Boako.Util.cdn(item.thumbnail_url) : null;
 
         if (item._tier === 'headline') {

@@ -106,7 +106,7 @@ Boako.Search = {
 
         const section = (title, icon, count, itemsHtml) => count > 0 ? `
             <section class="section-card">
-                <div class="card-header" style="font-size:16px;">${icon} ${title} <span style="color:#94a3b8; font-weight:700;">(${count})</span></div>
+                <div class="card-header" style="font-size:16px;">${icon} ${Boako.Util.escapeHtml(title)} <span style="color:#94a3b8; font-weight:700;">(${count})</span></div>
                 <div class="card-body" style="padding:20px 25px;">
                     ${itemsHtml}
                 </div>
@@ -150,7 +150,7 @@ Boako.Search = {
         // id가 아니라 game_name 문자열을 link_id로 넘긴다.
         // (onclick 속성 자체가 큰따옴표라서, 인자는 반드시 작은따옴표로 감싸고 내부 작은따옴표만 이스케이프한다)
         const gamesHtml = games.map(g => `
-            <div class="search-result-item" onclick="Boako.Util.navigateToLink('GAME', '${(g.game_name || '').replace(/'/g, "\\'")}')">
+            <div class="search-result-item" onclick="Boako.Util.navigateToLink('GAME', '${Boako.Util.escapeJsAttr((g.game_name || ''))}')">
                 <div class="thumb">${g.image_url ? `<img src="${Boako.Util.cdn(g.image_url)}" style="width:100%; height:100%; object-fit:contain; border-radius:10px; background:#f8fafc;">` : '🎲'}</div>
                 <div>
                     <div class="title">${Boako.Search.escapeHtml(g.game_name)}</div>

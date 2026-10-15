@@ -603,7 +603,7 @@ Boako.Archive = {
             let logoHTML = `<span class="text-[10px]">👤</span>`;
             if (rec.logo_url && rec.b_all_team !== 'Free Agent') {
                 logoHTML = `
-                    <img src="${Boako.Util.cdn(rec.logo_url)}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${rec.b_all_team}">
+                    <img src="${Boako.Util.cdn(rec.logo_url)}" class="w-3.5 h-3.5 object-contain rounded-sm shadow-sm" alt="${Boako.Util.escapeHtml(rec.b_all_team)}">
                     <div class="fixed mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] pointer-events-none flex items-center justify-center transition-opacity duration-200"
                          style="display: none; opacity: 0; transform: translate(-50%, -100%); top: var(--archive-top, auto); left: var(--archive-left, auto);">
                         <img src="${Boako.Util.cdn(rec.logo_url)}" class="w-full h-full object-contain" alt="Large Logo">
@@ -626,17 +626,17 @@ Boako.Archive = {
                     <td class="px-4 py-4 whitespace-nowrap text-[11px] font-bold text-slate-400">${this.formatDate(rec.created_at)}</td>
                     <td class="px-4 py-4 relative" data-handler="archive-tooltip">
                         <div class="flex flex-col leading-tight">
-                            <span class="font-black text-slate-900">${rec.nickname || 'Unknown'}</span>
+                            <span class="font-black text-slate-900">${Boako.Util.escapeHtml(rec.nickname || 'Unknown')}</span>
                             <div class="flex items-center gap-1.5 mt-1 cursor-pointer">
                                 ${logoHTML}
-                                <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${rec.b_all_team || 'Free Agent'}</span>
+                                <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">${Boako.Util.escapeHtml(rec.b_all_team || 'Free Agent')}</span>
                             </div>
                         </div>
                     </td>
                     <td class="px-4 py-4">
                         <div class="flex flex-col leading-tight">
                             <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                                <span class="font-bold text-indigo-900">${rec.game_name || '-'}</span>
+                                <span class="font-bold text-indigo-900">${Boako.Util.escapeHtml(rec.game_name || '-')}</span>
                                 ${rec.is_first == 1 ? '<span class="bg-red-500 text-white text-[8px] px-1 rounded font-black tracking-tighter uppercase shadow-sm">1ST</span>' : ''}
                             </div>
                             <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
@@ -770,10 +770,10 @@ Boako.Archive = {
                             <img src="${Boako.Util.cdn((p.profile_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80').replace('http://', 'https://'))}" 
                                  class="w-14 h-14 rounded-2xl object-cover shadow-md border ${isPrevMvp ? 'border-amber-400' : 'border-slate-100'} bg-slate-50 p-0.5"
                                  onerror="this.src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'"
-                                 alt="${p.name}">
+                                 alt="${Boako.Util.escapeHtml(p.name)}">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <h3 class="mvp-name text-xl font-black text-slate-900"><span class="archive-nick-hover">${p.name}</span></h3>
+                            <h3 class="mvp-name text-xl font-black text-slate-900"><span class="archive-nick-hover">${Boako.Util.escapeHtml(p.name)}</span></h3>
                             <div class="flex items-center gap-1.5 mt-1.5 relative cursor-pointer" data-handler="ranking-tooltip">
                                 ${logoHTML}
                                 <span class="mvp-team-text text-[10px] font-black text-slate-400 uppercase tracking-widest"><span class="archive-nick-hover">${p.team || 'Free Agent'}</span></span>
@@ -879,7 +879,7 @@ Boako.Archive = {
                                 ${game.popularityRank}
                             </div>
                             <div>
-                                <h3 class="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">${gameName}</h3>
+                                <h3 class="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">${Boako.Util.escapeHtml(gameName)}</h3>
                                 <p class="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">클릭하시면 상세정보가 보입니다.</p>
                             </div>
                         </div>
@@ -921,7 +921,7 @@ Boako.Archive = {
                                                     <span>${p.team || 'Free Agent'}</span>
                                                 </div>
                                             </td>
-                                            <td class="px-5 py-3.5 font-black text-slate-800">${p.name}</td>
+                                            <td class="px-5 py-3.5 font-black text-slate-800">${Boako.Util.escapeHtml(p.name)}</td>
                                             <td class="px-5 py-3.5 text-right font-mono font-black text-indigo-600">${Math.floor(p.rp).toLocaleString()} P</td>
                                         </tr>
                                     `}).join('')}

@@ -189,10 +189,10 @@ Boako.HotIssue = {
         const nowMs = Date.now();
         container.innerHTML = items.map(item => {
             const isNew = (nowMs - new Date(item.time).getTime()) < 24 * 60 * 60 * 1000;
-            const clickable = item.linkType ? `onclick="Boako.Util.navigateToLink('${item.linkType}', '${item.linkId}')" style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; list-style:none; cursor:pointer;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color=''"` : `style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; list-style:none;"`;
+            const clickable = item.linkType ? `onclick="Boako.Util.navigateToLink('${Boako.Util.escapeJsAttr(item.linkType)}', '${Boako.Util.escapeJsAttr(item.linkId)}')" style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; list-style:none; cursor:pointer;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color=''"` : `style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; list-style:none;"`;
             return `
                 <li ${clickable}>
-                    <span style="white-space:normal; word-break:keep-all; line-height:1.4;">${item.icon} ${item.text}</span>
+                    <span style="white-space:normal; word-break:keep-all; line-height:1.4;">${item.icon} ${Boako.Util.escapeHtml(item.text)}</span>
                     ${isNew ? `<span style="flex-shrink:0; color:var(--primary); font-size:12px; font-weight:900; margin-top:2px;">NEW</span>` : ''}
                 </li>
             `;

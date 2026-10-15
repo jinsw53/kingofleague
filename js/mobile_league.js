@@ -98,7 +98,7 @@ Boako.MobileLeague = {
                     <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px;">
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                             <span style="background:#f5f3ff; color:#7c3aed; font-size:10.5px; font-weight:900; padding:3px 8px; border-radius:8px; border:1px solid #ede9fe; flex-shrink:0;">TOP ${gameRank}</span>
-                            <span style="font-size:14px; font-weight:900; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gameName}</span>
+                            <span style="font-size:14px; font-weight:900; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.Util.escapeHtml(gameName)}</span>
                         </div>
                         <div style="font-size:10.5px; color:#94a3b8; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
                             <span style="color:#7c3aed;">🔥 총 ${totalPlays}회 플레이</span>
@@ -109,10 +109,10 @@ Boako.MobileLeague = {
                             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
                                 <img src="${Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png')}" style="width:26px; height:26px; border-radius:50%; flex-shrink:0;">
                                 <div style="min-width:0;">
-                                    <div style="font-size:12.5px; font-weight:900; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${mvpName}</div>
+                                    <div style="font-size:12.5px; font-weight:900; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.Util.escapeHtml(mvpName)}</div>
                                     <div style="display:flex; align-items:center; gap:4px; margin-top:2px;">
                                         <img src="${teamLogo}" style="width:14px; height:14px; border-radius:50%; flex-shrink:0;">
-                                        <span style="font-size:10.5px; color:#64748b; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${mvpTeam}</span>
+                                        <span style="font-size:10.5px; color:#64748b; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.Util.escapeHtml(mvpTeam)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -149,7 +149,7 @@ Boako.MobileLeague = {
             popup.style.cssText = 'position:fixed; z-index:9999; background:#1e293b; color:#fff; border-radius:12px; padding:12px 14px; font-size:12.5px; max-width:220px; text-align:center; box-shadow:0 10px 24px rgba(0,0,0,0.3); visibility:hidden;';
             popup.innerHTML = `
                 ${logoHtml}
-                <div style="font-weight:900; margin-bottom:4px;">${gameName}</div>
+                <div style="font-weight:900; margin-bottom:4px;">${Boako.Util.escapeHtml(gameName)}</div>
                 <div style="display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px; opacity:0.9;">
                     <span style="background:${diffInfo.bg}; color:${diffInfo.fg}; padding:1px 6px; border-radius:5px; font-weight:900;">${diffInfo.label}</span>
                     <span style="font-weight:700;">${ownerTeam ? ownerTeam + ' 점유' : '비어있음'}</span>
@@ -220,7 +220,7 @@ Boako.MobileLeague = {
                 if (ownerTeam) {
                     // 🌟 점유된 칸 — 번호 대신 실제 팀 로고를 크게
                     const teamLogoUrl = Boako.Util.cdn(Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
-                    mainHtml = `<img src="${Boako.Util.safeAttrUrl(teamLogoUrl)}" alt="${ownerTeam}" style="width:60%; height:60%; object-fit:contain; z-index:2;">`;
+                    mainHtml = `<img src="${Boako.Util.safeAttrUrl(teamLogoUrl)}" alt="${Boako.Util.escapeHtml(ownerTeam)}" style="width:60%; height:60%; object-fit:contain; z-index:2;">`;
                     numberBadgeHtml = `<span style="position:absolute; bottom:2px; right:2px; font-size:7px; font-weight:900; color:#64748b; background:rgba(255,255,255,0.85); padding:0 3px; border-radius:4px; z-index:3;">${num}</span>`;
                 } else {
                     // 🌟 빈 칸 — 번호를 크게
@@ -252,12 +252,12 @@ Boako.MobileLeague = {
                 const diffInfo = diffColors[diffStatus] || diffColors.EASY;
                 const gameName = Boako.League.State.boardGames25[idx] || "지정 미정";
                 const statusHtml = ownerTeam
-                    ? `<span style="font-size:11px; color:#64748b; font-weight:700; flex-shrink:0;">${ownerTeam} 점유</span>`
+                    ? `<span style="font-size:11px; color:#64748b; font-weight:700; flex-shrink:0;">${Boako.Util.escapeHtml(ownerTeam)} 점유</span>`
                     : `<span style="font-size:11px; color:#cbd5e1; font-weight:700; flex-shrink:0;">비어있음</span>`;
                 return `
                     <div style="display:flex; align-items:center; gap:8px; padding:9px 2px; border-bottom:1px solid #f1f5f9;">
                         <span style="width:20px; height:20px; border-radius:50%; background:#f1f5f9; color:#334155; font-size:10.5px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${num}</span>
-                        <span style="flex:1; font-size:12.5px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gameName}</span>
+                        <span style="flex:1; font-size:12.5px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${Boako.Util.escapeHtml(gameName)}</span>
                         <span style="font-size:9px; font-weight:900; padding:2px 5px; border-radius:5px; background:${diffInfo.bg}; color:${diffInfo.fg}; flex-shrink:0;">${diffInfo.label}</span>
                         ${statusHtml}
                     </div>

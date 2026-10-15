@@ -424,7 +424,7 @@ Boako.Team = {
             resultContainer.innerHTML = listHtml;
 
         } catch (err) {
-            resultContainer.innerHTML = `<div class="text-center text-red-500 text-sm py-8 font-bold">검색 중 오류 발생:<br>${err.message}</div>`;
+            resultContainer.innerHTML = `<div class="text-center text-red-500 text-sm py-8 font-bold">검색 중 오류 발생:<br>${Boako.Util.escapeHtml(err.message)}</div>`;
         }
     },
 
@@ -741,8 +741,8 @@ Boako.Team = {
                         </div>
                         
                         <div class="p-4 text-center flex-1 flex flex-col justify-between gap-3 ${showBannedEffect ? 'bg-slate-200' : ''}">
-                            <h4 class="font-black ${textClass} text-sm break-keep leading-tight">${game.game_name}</h4>
-                            <button ${disableVote ? 'disabled' : `onclick="Boako.Team.submitBanVote('${game.id}', '${game.game_name}')"`} 
+                            <h4 class="font-black ${textClass} text-sm break-keep leading-tight">${Boako.Util.escapeHtml(game.game_name)}</h4>
+                            <button ${disableVote ? 'disabled' : `onclick="Boako.Team.submitBanVote('${game.id}', '${Boako.Util.escapeJsAttr(game.game_name)}')"`} 
                                     class="${btnClass}">
                                 ${btnText}
                             </button>
@@ -843,7 +843,7 @@ Boako.Team = {
                         </div>
 
                         <div class="p-6 overflow-y-auto custom-scrollbar bg-slate-50 flex-1">
-                            <form id="team-entry-form" onsubmit="Boako.Team.saveEntry(event, ${seasonNo}, '${teamName}')" class="space-y-4">
+                            <form id="team-entry-form" onsubmit="Boako.Team.saveEntry(event, ${seasonNo}, '${Boako.Util.escapeJsAttr(teamName)}')" class="space-y-4">
             `;
 
             finalGames.forEach(game => {
@@ -857,7 +857,7 @@ Boako.Team = {
                     // 👑 1. 팀장: 모든 팀원을 선택할 수 있는 전권 드롭다운
                     const entryCId = `entry-${game.game_name}`.replace(/\s+/g, '_');
                     selectHtml = `
-                        <input type="hidden" name="entry_game_${game.game_name}" id="hidden-${entryCId}" value="${savedPlayer}">
+                        <input type="hidden" name="entry_game_${Boako.Util.escapeHtml(game.game_name)}" id="hidden-${entryCId}" value="${Boako.Util.escapeHtml(savedPlayer)}">
                         ${Boako.Util.renderCSelect(
                             entryCId,
                             [
@@ -879,17 +879,17 @@ Boako.Team = {
                         // 다른 사람이 이미 선점한 경우 -> 수정 불가 (읽기 전용)
                         selectHtml = `
                             <select disabled class="w-full appearance-none bg-slate-100 border border-slate-200 text-slate-500 font-bold py-3 px-4 rounded-xl cursor-not-allowed text-sm">
-                                <option>${savedPlayer} 출전 예정</option>
+                                <option>${Boako.Util.escapeHtml(savedPlayer)} 출전 예정</option>
                             </select>
                             <div class="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400">🔒</div>
                             <!-- 폼 제출 시 빈값 날아가는 걸 방지하기 위해 hidden input으로 값 유지 -->
-                            <input type="hidden" name="entry_game_${game.game_name}" value="${savedPlayer}">
+                            <input type="hidden" name="entry_game_${Boako.Util.escapeHtml(game.game_name)}" value="${Boako.Util.escapeHtml(savedPlayer)}">
                         `;
                     } else {
                         // 빈자리이거나, 내가 선점한 자리인 경우 -> 본인 선택 또는 취소(미정) 가능
                         const entryCId = `entry-${game.game_name}`.replace(/\s+/g, '_');
                         selectHtml = `
-                            <input type="hidden" name="entry_game_${game.game_name}" id="hidden-${entryCId}" value="${savedPlayer}">
+                            <input type="hidden" name="entry_game_${Boako.Util.escapeHtml(game.game_name)}" id="hidden-${entryCId}" value="${Boako.Util.escapeHtml(savedPlayer)}">
                             ${Boako.Util.renderCSelect(
                                 entryCId,
                                 [
@@ -914,7 +914,7 @@ Boako.Team = {
                             ${game.game_logo_url ? `<img src="${Boako.Util.cdn(game.game_logo_url)}" class="max-h-full max-w-full object-contain">` : '<span class="text-3xl">🎲</span>'}
                         </div>
                         <div class="flex-1 text-center sm:text-left w-full">
-                            <h4 class="font-black text-slate-800 text-lg">${game.game_name}</h4>
+                            <h4 class="font-black text-slate-800 text-lg">${Boako.Util.escapeHtml(game.game_name)}</h4>
                             <p class="text-slate-400 text-xs font-bold mt-1">출전 선수를 할당하세요.</p>
                         </div>
                         
@@ -1036,7 +1036,7 @@ const { data: gameList } = await Boako.db.from('games').select('game_name, image
                     : `<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">🎲</div>`;
 
                 const opponent = (s.participants || []).find(p => p.team_name !== teamName);
-                const opponentHtml = opponent ? `<div class="text-xs text-slate-400 font-bold">vs ${opponent.team_name}</div>` : '';
+                const opponentHtml = opponent ? `<div class="text-xs text-slate-400 font-bold">vs ${Boako.Util.escapeHtml(opponent.team_name)}</div>` : '';
 
 const isCompleted = s.status === 'COMPLETED';
                 const scoreInfo = gameScoreMap[s.game_name];
@@ -1059,7 +1059,7 @@ const isCompleted = s.status === 'COMPLETED';
                     <div class="${cardClass}" ${onclickAttr}>
                         ${logoHtml}
                         <div class="flex-1 min-w-0">
-                            <div class="font-black text-slate-800 text-sm truncate">${s.game_name}</div>
+                            <div class="font-black text-slate-800 text-sm truncate">${Boako.Util.escapeHtml(s.game_name)}</div>
                             ${opponentHtml}
                             <div class="text-xs text-slate-500 font-bold mt-0.5">📅 ${dt}</div>
                             ${lpBadge}
@@ -1072,7 +1072,7 @@ const isCompleted = s.status === 'COMPLETED';
 
         } catch (e) {
             console.error('대항전 일정 로드 실패:', e);
-            container.innerHTML = `<div class="text-center py-6 text-red-400 font-bold">일정 로드 실패: ${e.message}</div>`;
+            container.innerHTML = `<div class="text-center py-6 text-red-400 font-bold">일정 로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 
@@ -1155,7 +1155,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
         } catch (e) {
             console.error('지갑 탭 로드 실패:', e);
-            container.innerHTML = `<div class="text-center py-10 text-red-400 font-bold">오류: ${e.message}</div>`;
+            container.innerHTML = `<div class="text-center py-10 text-red-400 font-bold">오류: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 
@@ -1211,7 +1211,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
         } catch (e) {
             console.error('팀 포인트 내역 로드 실패:', e);
-            container.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444; font-weight:700;">내역 로드 실패: ${e.message}</div>`;
+            container.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444; font-weight:700;">내역 로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 
@@ -1295,7 +1295,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
         document.getElementById('wallet-mode-target').classList.remove('hidden');
         document.getElementById('wallet-target-display').innerHTML = `
             <span class="wallet-target-chip">
-                ${playerName}
+                ${Boako.Util.escapeHtml(playerName)}
                 <button onclick="Boako.Team.clearWalletTarget()">✕</button>
             </span>
         `;
@@ -1478,7 +1478,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
         } catch (e) {
             console.error('챌린지 탭 로드 실패:', e);
-            container.innerHTML = `<div class="text-center py-10 text-red-400 font-bold">오류: ${e.message}</div>`;
+            container.innerHTML = `<div class="text-center py-10 text-red-400 font-bold">오류: ${Boako.Util.escapeHtml(e.message)}</div>`;
         }
     },
 

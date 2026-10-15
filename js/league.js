@@ -481,12 +481,12 @@ Boako.League.viewMatchLineup = async function(challengeId) {
             const secureAvatar = getSecureAvatar(name);
             const avatarHtml = secureAvatar 
                 ? `<img src="${secureAvatar}" class="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0" referrerpolicy="no-referrer">`
-                : `<div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-black text-slate-500 border border-slate-300 shrink-0">${name.substring(0, 2)}</div>`;
+                : `<div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-black text-slate-500 border border-slate-300 shrink-0">${Boako.Util.escapeHtml(name.substring(0, 2))}</div>`;
 
             return `
                 <div class="flex items-center gap-2 min-w-0">
                     ${avatarHtml}
-                    <span class="text-xs font-black text-slate-800 truncate leading-none py-0.5" title="${name}">${name}</span>
+                    <span class="text-xs font-black text-slate-800 truncate leading-none py-0.5" title="${Boako.Util.escapeHtml(name)}">${Boako.Util.escapeHtml(name)}</span>
                 </div>
             `;
         }).join('');
@@ -578,7 +578,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                                 <img src="${Boako.Util.cdn(p.attacker_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png')}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-violet-100 text-violet-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Challenger</span>
-                                <h4 class="font-black text-slate-800 text-sm truncate w-full">${p.attacker_team_name}</h4>
+                                <h4 class="font-black text-slate-800 text-sm truncate w-full">${Boako.Util.escapeHtml(p.attacker_team_name)}</h4>
                             </div>
                             <div class="space-y-2.5">
                                 ${attackerEntriesHtml}
@@ -589,7 +589,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                             <div class="bg-slate-800 text-white font-black text-sm px-3.5 py-1.5 rounded-full border-4 border-white shadow-md select-none tracking-widest">VS</div>
                             <div class="flex flex-col items-center text-center mt-1">
                                 <img src="${safeGameLogo}" class="w-12 h-12 object-contain bg-white/95 rounded-2xl p-1.5 shadow-md border border-slate-200 mb-1.5 backdrop-blur-sm">
-                                <span class="text-xs font-black text-slate-800 truncate max-w-[90px] block leading-tight bg-white/90 px-1.5 py-0.5 rounded shadow-sm">${p.game_name}</span>
+                                <span class="text-xs font-black text-slate-800 truncate max-w-[90px] block leading-tight bg-white/90 px-1.5 py-0.5 rounded shadow-sm">${Boako.Util.escapeHtml(p.game_name)}</span>
                                 <span class="bg-indigo-600 border border-indigo-400 px-2.5 py-0.5 text-[10px] font-black text-white rounded mt-1.5 shadow-sm">${Boako.League.formatMode(p.game_mode)}</span>
                             </div>
                         </div>
@@ -599,7 +599,7 @@ Boako.League.viewMatchLineup = async function(challengeId) {
                             <div class="bg-white/90 backdrop-blur-sm border border-slate-200 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                                 <img src="${Boako.Util.cdn(p.defender_team_logo_url || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/default_logo.png')}" class="w-16 h-16 rounded-xl object-contain bg-slate-50 border border-slate-100 p-1 mb-2 shadow-inner">
                                 <span class="text-[9px] bg-rose-100 text-rose-700 font-black px-1.5 py-0.5 rounded uppercase tracking-wider mb-1">Opponent</span>
-                                <h4 class="font-black text-slate-800 text-sm truncate w-full">${p.defender_team_name || '대기 중'}</h4>
+                                <h4 class="font-black text-slate-800 text-sm truncate w-full">${Boako.Util.escapeHtml(p.defender_team_name || '대기 중')}</h4>
                             </div>
                             <div class="space-y-2.5">
                                 ${defenderEntriesHtml}
@@ -656,7 +656,7 @@ Boako.League.renderChallenges = function() {
         if (p.proposed_games && Array.isArray(p.proposed_games)) {
             gamesHtml = p.proposed_games.map(g => {
                 const safeLogo = Boako.Util.cdn((g.logo && g.logo !== 'null') ? g.logo : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
-                return `<div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm"><img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" /><div class="flex flex-col"><span class="text-[11px] font-black text-slate-800 leading-tight">${g.name}</span><span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${Boako.League.formatMode(g.mode)}</span></div></div>`;
+                return `<div class="flex items-center gap-2 bg-violet-50 border border-violet-100/70 px-2.5 py-1.5 rounded-xl shadow-sm"><img src="${safeLogo}" class="w-5 h-5 object-contain rounded bg-white p-0.5" /><div class="flex flex-col"><span class="text-[11px] font-black text-slate-800 leading-tight">${Boako.Util.escapeHtml(g.name)}</span><span class="text-[9px] font-black text-violet-600 leading-none mt-0.5">${Boako.League.formatMode(g.mode)}</span></div></div>`;
             }).join('');
         }
 
@@ -821,7 +821,7 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
                     <div class="flex flex-wrap gap-1.5">
                         ${isPendingState 
                             ? gamesHtml 
-                            : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><img src="${Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png')}" class="w-4 h-4 object-contain rounded bg-white p-0.5" /><span class="text-xs font-black">${p.game_name}</span><span class="text-[9px] font-black text-slate-400 border-l border-slate-600 pl-2 ml-1">${Boako.League.formatMode(p.game_mode)}</span></div>`
+                            : `<div class="flex items-center gap-2 bg-slate-800 text-white px-3 py-1.5 rounded-xl shadow-sm"><img src="${Boako.Util.cdn((p.game_logo_url && p.game_logo_url !== 'null') ? p.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png')}" class="w-4 h-4 object-contain rounded bg-white p-0.5" /><span class="text-xs font-black">${Boako.Util.escapeHtml(p.game_name)}</span><span class="text-[9px] font-black text-slate-400 border-l border-slate-600 pl-2 ml-1">${Boako.League.formatMode(p.game_mode)}</span></div>`
                         }
                     </div>
                 </div>
@@ -837,7 +837,7 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
                 </div>
                 
                 <div class="flex flex-col gap-1 pt-1.5 border-t border-slate-100">
-                    ${p.defender_team_name ? `<div class="text-xs font-black text-slate-800 flex items-center gap-1"><span class="text-violet-600">${p.attacker_team_name}</span><span class="text-rose-500 text-[10px] italic mx-0.5">VS</span><span class="text-slate-800">${p.defender_team_name}</span></div>` : `<div class="text-xs font-black text-slate-400"><span class="text-slate-600">${p.attacker_team_name}</span> 팀의 전면 도발</div>`}
+                    ${p.defender_team_name ? `<div class="text-xs font-black text-slate-800 flex items-center gap-1"><span class="text-violet-600">${Boako.Util.escapeHtml(p.attacker_team_name)}</span><span class="text-rose-500 text-[10px] italic mx-0.5">VS</span><span class="text-slate-800">${Boako.Util.escapeHtml(p.defender_team_name)}</span></div>` : `<div class="text-xs font-black text-slate-400"><span class="text-slate-600">${Boako.Util.escapeHtml(p.attacker_team_name)}</span> 팀의 전면 도발</div>`}
                     <p class="text-xs font-bold text-slate-500 italic">"${Boako.Util.escapeHtml(p.message)}"</p>
                 </div>
             </div>
@@ -988,9 +988,9 @@ Boako.League.initGameSearch = function() {
                 const safeLogo = Boako.Util.cdn((g.game_logo_url && g.game_logo_url !== 'null') ? g.game_logo_url : 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
                 return `
                 <li class="p-3 hover:bg-violet-50 cursor-pointer flex items-center gap-3 border-b border-slate-100 last:border-0"
-                    onmousedown="event.preventDefault(); Boako.League.addProposedGame('${g.game_name.replace(/'/g, "\\'")}', '${safeLogo}')">
+                    onmousedown="event.preventDefault(); Boako.League.addProposedGame('${Boako.Util.escapeJsAttr(g.game_name)}', '${safeLogo}')">
                     <img src="${safeLogo}" class="w-6 h-6 object-contain rounded drop-shadow-sm bg-white" />
-                    <span class="font-bold text-slate-700 text-xs">${g.game_name}</span>
+                    <span class="font-bold text-slate-700 text-xs">${Boako.Util.escapeHtml(g.game_name)}</span>
                 </li>
             `}).join('');
             autocompleteList.classList.remove('hidden');
@@ -1039,7 +1039,7 @@ Boako.League.renderSelectedGames = function() {
                 <div class="w-7 h-7 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-center p-1 shadow-inner">
                     <img src="${safeLogo}" class="max-w-full max-h-full object-contain drop-shadow-sm" />
                 </div>
-                <span class="text-xs font-black text-slate-800">${g.name}</span>
+                <span class="text-xs font-black text-slate-800">${Boako.Util.escapeHtml(g.name)}</span>
             </div>
             <div class="flex items-center gap-2">
                 ${Boako.Util.renderCSelect(
@@ -1313,7 +1313,7 @@ Boako.League.showAcceptPopup = function(challengeId) {
                 <div class="bg-gradient-to-br from-violet-600 to-indigo-700 p-6 text-center relative">
                     <button onclick="document.getElementById('challenge-popup-root').innerHTML=''" class="absolute top-4 right-4 text-white/60 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
                     <div class="w-20 h-20 mx-auto bg-white rounded-2xl shadow-lg p-1.5 mb-3 border-2 border-white/50"><img src="${safeTeamLogo}" class="w-full h-full object-cover rounded-xl" /></div>
-                    <h3 class="text-xl font-black text-white">${p.attacker_team_name}</h3>
+                    <h3 class="text-xl font-black text-white">${Boako.Util.escapeHtml(p.attacker_team_name)}</h3>
                 </div>
                 
                 <div class="p-6 space-y-5">
@@ -1501,7 +1501,7 @@ Boako.League.showRosterModal = async function(challengeId) {
                             <div class="text-[10px] font-black text-indigo-300 mb-1 tracking-widest uppercase">Challenge Order</div>
                             <div class="font-black text-lg flex items-center gap-2">
                                 <img src="${safeGameLogo}" class="w-6 h-6 object-contain bg-white rounded p-0.5">
-                                ${p.game_name} <span class="bg-indigo-600 border border-indigo-400 px-2 py-0.5 text-xs rounded-md ml-1">${displayGameMode}</span>
+                                ${Boako.Util.escapeHtml(p.game_name)} <span class="bg-indigo-600 border border-indigo-400 px-2 py-0.5 text-xs rounded-md ml-1">${displayGameMode}</span>
                             </div>
                         </div>
                         <button onclick="Boako.League.closeRosterModal()" class="hidden md:block text-white/50 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
@@ -1578,13 +1578,13 @@ Boako.League.renderRosterList = function() {
 
         const avatarHtml = secureAvatar 
             ? `<img src="${secureAvatar}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-inner" referrerpolicy="no-referrer">`
-            : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black ${isMerc ? 'text-amber-600' : 'text-indigo-600'}">${m.nickname.substring(0,2)}</div>`;
+            : `<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black ${isMerc ? 'text-amber-600' : 'text-indigo-600'}">${Boako.Util.escapeHtml(m.nickname.substring(0,2))}</div>`;
 
         return `
-            <div onclick="Boako.League.addPlayerToSlot('${m.id}', '${m.nickname.replace(/'/g, "\\'")}', ${isMerc})" class="p-3 border rounded-xl flex justify-between items-center transition-all ${btnClass}">
+            <div onclick="Boako.League.addPlayerToSlot('${m.id}', '${Boako.Util.escapeJsAttr(m.nickname)}', ${isMerc})" class="p-3 border rounded-xl flex justify-between items-center transition-all ${btnClass}">
                 <div class="flex items-center gap-2">
                     ${avatarHtml}
-                    <span class="font-black text-xs">${m.nickname}</span>
+                    <span class="font-black text-xs">${Boako.Util.escapeHtml(m.nickname)}</span>
                 </div>
                 ${isMerc ? '<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black">용병</span>' : ''}
             </div>
@@ -1631,7 +1631,7 @@ Boako.League.renderRosterSlots = function(gameMode) {
             return `
                 <div onclick="Boako.League.removePlayerFromSlot(${idx})" class="aspect-square bg-indigo-600 rounded-xl border-2 border-indigo-400 flex flex-col items-center justify-center cursor-pointer shadow-md transform hover:scale-105 transition-all group relative">
                     <span class="absolute top-1 left-1.5 text-[9px] font-black text-indigo-300">P${idx+1}</span>
-                    <div class="font-black text-white text-xs truncate w-full text-center px-1">${slot.nickname}</div>
+                    <div class="font-black text-white text-xs truncate w-full text-center px-1">${Boako.Util.escapeHtml(slot.nickname)}</div>
                     ${slot.isMerc ? '<span class="absolute -top-2 -right-2 text-base drop-shadow-md">💎</span>' : ''}
                     <div class="absolute inset-0 bg-rose-500/90 text-white opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center font-black text-xs transition-opacity">제거</div>
                 </div>
@@ -1678,7 +1678,7 @@ Boako.League.renderRosterSlots = function(gameMode) {
             const isMerc = mercStatus[idx];
             const name = slots[idx];
             const color = name === '미지정' ? 'text-slate-400' : 'text-indigo-900';
-            return `<span class="bg-white border border-indigo-100 shadow-sm px-2 py-1 rounded-md font-black text-xs ${color}">${name} ${isMerc ? '💎' : ''}</span>`;
+            return `<span class="bg-white border border-indigo-100 shadow-sm px-2 py-1 rounded-md font-black text-xs ${color}">${Boako.Util.escapeHtml(name)} ${isMerc ? '💎' : ''}</span>`;
         }).join('<span class="text-indigo-300 font-bold text-[10px] mx-1">+</span>');
 
         return `
@@ -1828,7 +1828,7 @@ Boako.League.loadBingoBoardData = async function() {
         }
         Boako.League.State.bingoBoard = initializedBoard; Boako.League.State.boardGames25 = initializedGames; Boako.League.State.boardLogos25 = initializedGameLogos; Boako.League.State.bingoTeamLogos25 = initializedTeamLogos; Boako.League.State.missionDifficulties = initializedDiffs; Boako.League.State.teamBingoScores = scoreData || [];
         Boako.League.renderBingoBoard();
-    } catch (err) { console.error("지능형 시즌 트래커 오류:", err); if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-black text-rose-500">❌ 연산 장치 오류 (${err.message})</div>`; }
+    } catch (err) { console.error("지능형 시즌 트래커 오류:", err); if (grid) grid.innerHTML = `<div class="col-span-5 text-center py-10 font-black text-rose-500">❌ 연산 장치 오류 (${Boako.Util.escapeHtml(err.message)})</div>`; }
 };
 
 Boako.League.renderBingoBoard = function() {
@@ -1843,13 +1843,13 @@ Boako.League.renderBingoBoard = function() {
         if (diffStatus === 'HARD_CENTER_PENALTY') bgClass += " fire-border-glow border-orange-500 z-20 scale-[0.98]";
         cell.className = `h-24 rounded-2xl border flex flex-col items-center justify-center transition-all text-center relative overflow-hidden group cursor-pointer ${bgClass}`;
         const gameLogoOpacity = ownerTeam ? "opacity-20 grayscale transition-all duration-300 group-hover:opacity-10" : "opacity-100 drop-shadow-md";
-        const gameImageHtml = gameLogoUrl ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-3"><img src="${Boako.Util.cdn(gameLogoUrl)}" alt="${gameName}" class="w-[65%] h-auto max-h-full object-contain ${gameLogoOpacity}"></div>` : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
-        let massiveOverlayHtml = ''; if (ownerTeam) { const teamLogoUrl = Boako.Util.cdn(Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'); massiveOverlayHtml = `<div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-2 pointer-events-none"><img src="${teamLogoUrl}" alt="${ownerTeam}" class="w-14 h-14 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300"></div>`; }
+        const gameImageHtml = gameLogoUrl ? `<div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 pb-3"><img src="${Boako.Util.cdn(gameLogoUrl)}" alt="${Boako.Util.escapeHtml(gameName)}" class="w-[65%] h-auto max-h-full object-contain ${gameLogoOpacity}"></div>` : `<div class="absolute inset-0 flex items-center justify-center pointer-events-none text-3xl pb-3 z-10 ${gameLogoOpacity}">🎲</div>`;
+        let massiveOverlayHtml = ''; if (ownerTeam) { const teamLogoUrl = Boako.Util.cdn(Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'); massiveOverlayHtml = `<div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] transition-all pb-2 pointer-events-none"><img src="${teamLogoUrl}" alt="${Boako.Util.escapeHtml(ownerTeam)}" class="w-14 h-14 object-contain drop-shadow-xl transform group-hover:scale-110 transition-transform duration-300"></div>`; }
         let diffBadgeHtml = ''; if (diffStatus === 'HARD_CENTER_PENALTY') { diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-[7px] px-1.5 py-0.5 rounded shadow-sm pointer-events-none">🔥 CENTER</span>`; } else { const diffColors = { EASY: "bg-emerald-500/90 text-white", NORMAL: "bg-blue-500/90 text-white", HARD: "bg-rose-500/90 text-white" }; diffBadgeHtml = `<span class="absolute top-1 right-1 z-30 ${diffColors[diffStatus] || 'bg-slate-500'} font-black text-[7px] px-1 py-0.5 rounded shadow-sm pointer-events-none">${diffStatus}</span>`; }
         const crownHtml = isWinner ? `<span class="absolute top-1 ${diffStatus === 'HARD_CENTER_PENALTY' ? 'right-12' : 'right-8'} text-xs text-amber-400 animate-bounce z-30 pointer-events-none">👑</span>` : '';
-        const gameLabelHtml = `<div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30 pointer-events-none"><div class="w-full px-1 bg-white/90 backdrop-blur-md py-0.5 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[18px]"><span class="text-[8px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${gameName}</span></div></div>`;
+        const gameLabelHtml = `<div class="absolute bottom-1.5 left-0 w-full px-1.5 z-30 pointer-events-none"><div class="w-full px-1 bg-white/90 backdrop-blur-md py-0.5 rounded-sm border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[18px]"><span class="text-[8px] font-black text-slate-800 tracking-tight leading-tight line-clamp-1 truncate">${Boako.Util.escapeHtml(gameName)}</span></div></div>`;
         cell.innerHTML = `${gameImageHtml}${massiveOverlayHtml}${diffBadgeHtml}${crownHtml}${gameLabelHtml}`;
-        cell.addEventListener('mouseenter', () => { globalTooltip.innerHTML = `${gameLogoUrl ? `<img src="${Boako.Util.cdn(gameLogoUrl)}" class="w-20 h-20 object-contain mb-3 drop-shadow-md" alt="Game Logo">` : `<div class="text-4xl mb-2">🎲</div>`}<div class="text-xs font-black text-slate-800 text-center w-full break-keep">${gameName}</div><div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"></div>`; globalTooltip.style.display = 'flex'; setTimeout(() => { globalTooltip.style.opacity = '1'; }, 10); });
+        cell.addEventListener('mouseenter', () => { globalTooltip.innerHTML = `${gameLogoUrl ? `<img src="${Boako.Util.cdn(gameLogoUrl)}" class="w-20 h-20 object-contain mb-3 drop-shadow-md" alt="Game Logo">` : `<div class="text-4xl mb-2">🎲</div>`}<div class="text-xs font-black text-slate-800 text-center w-full break-keep">${Boako.Util.escapeHtml(gameName)}</div><div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-3 h-3 bg-white border-r border-b border-slate-200 rotate-45"></div>`; globalTooltip.style.display = 'flex'; setTimeout(() => { globalTooltip.style.opacity = '1'; }, 10); });
         cell.addEventListener('mousemove', (e) => { globalTooltip.style.top = `${e.clientY - 15}px`; globalTooltip.style.left = `${e.clientX}px`; });
         cell.addEventListener('mouseleave', () => { globalTooltip.style.opacity = '0'; setTimeout(() => { if (globalTooltip.style.opacity === '0') globalTooltip.style.display = 'none'; }, 200); });
         grid.appendChild(cell);
@@ -1896,7 +1896,7 @@ Boako.League.updateStats = function() {
         if (!badgesHtml) badgesHtml = `<span class="text-slate-400 font-medium text-[10px] italic">현재 빙고 조합 연산 중...</span>`;
         html += `
             <div class="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-sm space-y-3 transition-all hover:border-slate-300">
-                <div class="flex justify-between items-center"><span class="font-black text-slate-800 text-xs flex items-center gap-1.5"><img src="${Boako.Util.cdn(teamLogoUrl)}" class="w-4 h-4 object-contain rounded-full shadow-sm bg-slate-50 border border-slate-100"> ${teamName}</span><div class="text-right flex items-center"><span class="text-indigo-600 font-black text-sm ml-0.5"><span class="flex flex-col items-end leading-tight">🏆 ${totalScore} LP<span class="text-slate-400 font-bold">획득</span></span></span></div></div>
+                <div class="flex justify-between items-center"><span class="font-black text-slate-800 text-xs flex items-center gap-1.5"><img src="${Boako.Util.cdn(teamLogoUrl)}" class="w-4 h-4 object-contain rounded-full shadow-sm bg-slate-50 border border-slate-100"> ${Boako.Util.escapeHtml(teamName)}</span><div class="text-right flex items-center"><span class="text-indigo-600 font-black text-sm ml-0.5"><span class="flex flex-col items-end leading-tight">🏆 ${totalScore} LP<span class="text-slate-400 font-bold">획득</span></span></span></div></div>
                 <div class="grid grid-cols-2 gap-2 text-center bg-slate-50 p-2 rounded-xl text-[10px] font-bold text-slate-500 border border-slate-100"><div>점유 영토 <span class="text-slate-800 font-black">${basicSlots}칸</span></div><div class="border-l border-slate-200">완성 라인 <span class="text-amber-500 font-black">${totalLines}줄</span></div></div>
                 <div class="flex flex-wrap gap-1 pt-1 border-t border-dashed border-slate-100">${badgesHtml}</div>
             </div>
@@ -2134,12 +2134,12 @@ Boako.League.drawChampionRows = function(dataList) {
         rowsHtml += `
     <tr class="hover:bg-slate-50/50 transition-colors">
         <td class="p-4 text-center font-black text-violet-600"><span class="bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100 text-xs">TOP ${gameRank}</span></td>
-        <td class="p-4 font-black text-slate-800 text-sm"><div>${gameName}</div><div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-1.5"><span class="text-violet-600">🔥 총 ${totalPlays}회 플레이</span><span class="w-0.5 h-2 bg-slate-200"></span><span class="text-blue-600">👥 ${uniquePlayers}명 참여</span></div></td>
-       <td class="p-4"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0"><img src="${Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png')}" alt="CHAMPION BADGE" class="w-full h-full object-contain"></div><span class="font-extrabold text-slate-900">${mvpName}</span></div></td>
+        <td class="p-4 font-black text-slate-800 text-sm"><div>${Boako.Util.escapeHtml(gameName)}</div><div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-1.5"><span class="text-violet-600">🔥 총 ${totalPlays}회 플레이</span><span class="w-0.5 h-2 bg-slate-200"></span><span class="text-blue-600">👥 ${uniquePlayers}명 참여</span></div></td>
+       <td class="p-4"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0"><img src="${Boako.Util.cdn('https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/CHAMPION.png')}" alt="CHAMPION BADGE" class="w-full h-full object-contain"></div><span class="font-extrabold text-slate-900">${Boako.Util.escapeHtml(mvpName)}</span></div></td>
        <td class="p-4 text-slate-500 font-bold relative group/handler">
             <div class="flex items-center gap-2">
                 <div class="w-6 h-6 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center shadow-sm shrink-0 relative cursor-pointer"><img src="${Boako.Util.cdn(row.mvp_team_logo) || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" alt="TEAM LOGO" class="w-full h-full object-contain rounded-full"></div>
-                <span class="cursor-pointer">${mvpTeam}</span>
+                <span class="cursor-pointer">${Boako.Util.escapeHtml(mvpTeam)}</span>
                 <div class="invisible opacity-0 group-hover/handler:visible group-hover/handler:opacity-100 fixed -translate-x-1/2 -translate-y-full mb-2 w-32 h-32 p-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] transition-all duration-200 pointer-events-none flex items-center justify-center" style="top: var(--tooltip-top, auto); left: var(--tooltip-left, auto);">
                     <img src="${Boako.Util.cdn(row.mvp_team_logo) || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png'}" alt="LARGE TEAM LOGO" class="w-full h-full object-contain">
                     <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-white border-r border-b border-slate-200 rotate-45"></div>
@@ -2415,7 +2415,7 @@ Boako.League.getKingOfLeagueHTML = function() {
             return `
                 <div class="kol-token${isMe ? ' kol-token-me' : ''}" data-team-id="${t.id}" style="left:${x}%; top:${y}%;">
                     <img src="${Boako.Util.safeAttrUrl(t.logo_url || DEFAULT_LOGO)}" class="kol-token-logo">
-                    <div class="kol-token-name">${t.team_name}</div>
+                    <div class="kol-token-name">${Boako.Util.escapeHtml(t.team_name)}</div>
                     <div class="kol-token-hearts">${heartsHtml}</div>
                 </div>
             `;
@@ -2464,7 +2464,7 @@ Boako.League.getKingOfLeagueHTML = function() {
         const totalPool = rows[0].total_lp_pool;
         const rowsHtml = rows.map((r, idx) => `
             <div class="flex items-center justify-between py-1.5 ${idx !== rows.length - 1 ? 'border-b border-slate-100' : ''}">
-                <span class="text-xs font-black text-slate-700">${idx + 1}. ${r.team_name}</span>
+                <span class="text-xs font-black text-slate-700">${idx + 1}. ${Boako.Util.escapeHtml(r.team_name)}</span>
                 <span class="text-xs font-black text-indigo-600">🏆 ${r.lp_awarded.toLocaleString()} LP <span class="text-slate-400 font-bold">(하트 ${r.hearts_at_settlement})</span></span>
             </div>
         `).join('');
@@ -2491,7 +2491,7 @@ Boako.League.getKingOfLeagueHTML = function() {
     return `
         <div class="space-y-8">
             <div class="text-center py-2 border-b border-slate-100">
-                <span class="bg-violet-100 text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">${state.seasonTitle || ''}</span>
+                <span class="bg-violet-100 text-violet-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">${Boako.Util.escapeHtml(state.seasonTitle || '')}</span>
                 ${statusBadgeHtml}
                 <h4 class="font-black text-slate-800 text-lg mt-2">🏅 킹 오브 리그 아레나</h4>
                 <p class="text-xs text-slate-400 font-bold mt-1">${descText}</p>
@@ -2542,16 +2542,16 @@ Boako.League.KOL.renderEventLogHtml = function() {
 
         if (e.event_type === 'RECOVERY') {
             iconHtml = `<span class="text-emerald-500">💚</span>`;
-            textHtml = `<span class="font-black text-slate-800">${defenderName}</span>이(가) <span class="font-bold text-emerald-600">${e.game_name}</span> 완료로 하트 ${Math.abs(e.hearts_change)}개 회복`;
+            textHtml = `<span class="font-black text-slate-800">${Boako.Util.escapeHtml(defenderName)}</span>이(가) <span class="font-bold text-emerald-600">${Boako.Util.escapeHtml(e.game_name)}</span> 완료로 하트 ${Math.abs(e.hearts_change)}개 회복`;
             badgeClass = 'bg-emerald-50 border-emerald-100';
         } else if (e.event_type === 'ENHANCED_ATTACK') {
             iconHtml = `<span class="text-rose-600">🔥</span>`;
             const ratioTxt = e.user_ratio_snapshot != null ? ` (유저비율 ${Math.round(e.user_ratio_snapshot * 100)}%)` : '';
-            textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 강화공격 → <span class="font-black text-rose-600">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}${ratioTxt}`;
+            textHtml = `<span class="font-black text-violet-700">${Boako.Util.escapeHtml(attackerName || '?')}</span>의 <span class="font-bold text-slate-700">${Boako.Util.escapeHtml(e.game_name)}</span> 강화공격 → <span class="font-black text-rose-600">${Boako.Util.escapeHtml(defenderName)}</span> 하트 -${Math.abs(e.hearts_change)}${ratioTxt}`;
             badgeClass = 'bg-rose-50 border-rose-100';
         } else {
             iconHtml = `<span class="text-orange-500">⚔️</span>`;
-            textHtml = `<span class="font-black text-violet-700">${attackerName || '?'}</span>의 <span class="font-bold text-slate-700">${e.game_name}</span> 선점 공격 → <span class="font-black text-rose-500">${defenderName}</span> 하트 -${Math.abs(e.hearts_change)}`;
+            textHtml = `<span class="font-black text-violet-700">${Boako.Util.escapeHtml(attackerName || '?')}</span>의 <span class="font-bold text-slate-700">${Boako.Util.escapeHtml(e.game_name)}</span> 선점 공격 → <span class="font-black text-rose-500">${Boako.Util.escapeHtml(defenderName)}</span> 하트 -${Math.abs(e.hearts_change)}`;
             badgeClass = 'bg-orange-50 border-orange-100';
         }
 
