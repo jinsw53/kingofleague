@@ -55,8 +55,10 @@ Boako.Ticker = {
 
     // 🌟 리더가 실제 이벤트를 받으면 로컬 갱신 + 팔로워 탭에 중계
     _onRemoteChange: () => {
-        Boako.Ticker.init();
-        Boako.RealtimeCoordinator.broadcast('ticker:refresh', null);
+        Boako.Util.debounce('ticker', () => {
+            Boako.Ticker.init();
+            Boako.RealtimeCoordinator.broadcast('ticker:refresh', null);
+        });
     },
 
     fetchItems: async () => {

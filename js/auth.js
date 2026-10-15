@@ -797,8 +797,10 @@ Boako.Auth = {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._tournamentBadgeChannel) return;
         Boako.Auth._tournamentBadgeChannel = Boako.db.channel('tournament-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
-                Boako.Auth.checkTournamentBadge();
-                Boako.RealtimeCoordinator.broadcast('auth:tournament-badge-change', null);
+                Boako.Util.debounce('badge-tournament', () => {
+                    Boako.Auth.checkTournamentBadge();
+                    Boako.RealtimeCoordinator.broadcast('auth:tournament-badge-change', null);
+                });
             })
             .subscribe();
     },
@@ -852,12 +854,16 @@ Boako.Auth = {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._boardRequestBadgeChannel) return;
         Boako.Auth._boardRequestBadgeChannel = Boako.db.channel('board-request-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
-                Boako.Auth.checkBoardRequestBadge();
-                Boako.RealtimeCoordinator.broadcast('auth:board-request-badge-change', null);
+                Boako.Util.debounce('badge-board', () => {
+                    Boako.Auth.checkBoardRequestBadge();
+                    Boako.RealtimeCoordinator.broadcast('auth:board-request-badge-change', null);
+                });
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => {
-                Boako.Auth.checkBoardRequestBadge();
-                Boako.RealtimeCoordinator.broadcast('auth:board-request-badge-change', null);
+                Boako.Util.debounce('badge-board', () => {
+                    Boako.Auth.checkBoardRequestBadge();
+                    Boako.RealtimeCoordinator.broadcast('auth:board-request-badge-change', null);
+                });
             })
             .subscribe();
     },
@@ -891,8 +897,10 @@ Boako.Auth = {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._togetherBadgeChannel) return;
         Boako.Auth._togetherBadgeChannel = Boako.db.channel('together-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
-                Boako.Auth.checkTogetherBadge();
-                Boako.RealtimeCoordinator.broadcast('auth:together-badge-change', null);
+                Boako.Util.debounce('badge-together', () => {
+                    Boako.Auth.checkTogetherBadge();
+                    Boako.RealtimeCoordinator.broadcast('auth:together-badge-change', null);
+                });
             })
             .subscribe();
     },

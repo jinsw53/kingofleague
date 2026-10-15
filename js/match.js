@@ -1370,13 +1370,13 @@ Boako.Match = {
             if (!container) return;
 
             const isMe = String(msg.sender_id) === String(Boako.state.user.id);
-            const senderName = msg.profiles?.full_name || msg.sender_name_override || "참여자";
+            const senderName = Boako.Util.escapeHtml(msg.profiles?.full_name || msg.sender_name_override || "참여자");
             const teamBadge = msg.team_name ? `<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] mr-1 font-black shadow-sm">[${msg.team_name}]</span>` : '';
 
             const html = isMe ? `
                 <div class="flex flex-col items-end gap-1 animate-in slide-in-from-right-2 duration-200">
                     <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%] text-sm shadow-md break-words font-medium">
-                        ${msg.content.replace(/\n/g, '<br>')}
+                        ${Boako.Util.escapeHtml(msg.content).replace(/\n/g, '<br>')}
                     </div>
                 </div>
             ` : `
@@ -1385,7 +1385,7 @@ Boako.Match = {
                         ${teamBadge} ${senderName}
                     </span>
                     <div class="bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%] text-sm shadow-md break-words font-medium">
-                        ${msg.content.replace(/\n/g, '<br>')}
+                        ${Boako.Util.escapeHtml(msg.content).replace(/\n/g, '<br>')}
                     </div>
                 </div>
             `;

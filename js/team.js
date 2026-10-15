@@ -411,9 +411,9 @@ Boako.Team = {
                             <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border border-slate-200 flex-shrink-0">
                                 ${secureProfileUrl ? `<img src="${Boako.Util.cdn(secureProfileUrl)}" class="w-full h-full object-cover">` : '<span class="text-xl">👤</span>'}
                             </div>
-                            <span class="font-black text-slate-700 text-sm">${u.full_name}</span>
+                            <span class="font-black text-slate-700 text-sm">${Boako.Util.escapeHtml(u.full_name)}</span>
                         </div>
-                        <button onclick="Boako.Team.executeInvite('${u.id}', '${u.full_name}')" class="bg-white border border-emerald-500 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm whitespace-nowrap">
+                        <button onclick="Boako.Team.executeInvite('${u.id}', '${Boako.Util.escapeJsAttr(u.full_name)}')" class="bg-white border border-emerald-500 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm whitespace-nowrap">
                             💌 스카웃
                         </button>
                     </div>
@@ -1739,7 +1739,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
             if (!container) return;
 
             const isMe = msg.sender_id === Boako.state.user.id;
-            const senderName = msg.profiles?.full_name || "알 수 없음";
+            const senderName = Boako.Util.escapeHtml(msg.profiles?.full_name || "알 수 없음");
 
             // 🌟 내 메시지에는 안읽음 인원수 배지(own-msg-unread)를 붙임. msg.id가 아직 없으면(전송 직후 낙관적 렌더링)
             // data-msg-id를 비워두고, send()에서 실제 id를 받은 후 채워넣음.
@@ -1747,14 +1747,14 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 <div class="flex justify-end items-end gap-1.5 own-msg-wrap" data-msg-id="${msg.id || ''}" data-sender-id="${msg.sender_id}">
                     <span class="own-msg-unread text-[10px] font-bold text-amber-500 mb-0.5"></span>
                     <div class="bg-blue-600 text-white rounded-l-xl rounded-tr-xl px-4 py-2 max-w-[70%] text-sm shadow-sm break-words">
-                        ${msg.content}
+                        ${Boako.Util.escapeHtml(msg.content)}
                     </div>
                 </div>
             ` : `
                 <div class="flex flex-col items-start gap-1">
                     <span class="text-[11px] font-bold text-slate-500 ml-1">${senderName}</span>
                     <div class="bg-white border border-slate-200 text-slate-800 rounded-r-xl rounded-tl-xl px-4 py-2 max-w-[70%] text-sm shadow-sm break-words">
-                        ${msg.content}
+                        ${Boako.Util.escapeHtml(msg.content)}
                     </div>
                 </div>
             `;

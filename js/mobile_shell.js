@@ -343,11 +343,16 @@ Boako.MobileShell = {
 
     _subscribeMessengerAsLeader: () => {
         if (!Boako.MobileShell._messengerChannel) {
+            // 🛡️ 전체 사용자의 쪽지를 받지 않고 내가 받는/보내는 쪽지만 구독 (DB 부하 감소)
+            const _onMsg = async (payload) => {
+                await Boako.MobileShell._onDmInsert(payload.new);
+                if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('dm', payload.new);
+            };
+            const _myUid = Boako.state.user.id;
             Boako.MobileShell._messengerChannel = Boako.db.channel('mobile-messages-changes')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-                    await Boako.MobileShell._onDmInsert(payload.new);
-                    if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('dm', payload.new);
-                }).subscribe();
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${_myUid}` }, _onMsg)
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${_myUid}` }, _onMsg)
+                .subscribe();
         }
 
         // 🌟 [4단계 추가] 그룹채팅 3종 + 부가 상태변화 3종, PC와 동일한 반응(방 목록 갱신/열려있으면
@@ -384,8 +389,10 @@ Boako.MobileShell = {
 
     // 🌟 리더가 더보기 배지 변화를 받으면 로컬 반응 + 팔로워 탭에 중계
     _onMoreBadgeChange: () => {
-        Boako.MobileShell.refreshMoreBadge();
-        if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('more-badge', null);
+        Boako.Util.debounce('more-badge', () => {
+            Boako.MobileShell.refreshMoreBadge();
+            if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('more-badge', null);
+        });
     },
 
     // 🌟 리더/팔로워 공통 반응 로직 (쪽지)

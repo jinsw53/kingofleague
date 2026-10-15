@@ -465,11 +465,16 @@ Boako.Messenger = {
     _subscribeChannelsAsLeader: () => {
         if (!Boako.state.user || Boako.Messenger.realtimeChannels.length > 0) return;
 
+        // 🛡️ 전체 사용자의 쪽지를 받지 않고 내가 받는/보내는 쪽지만 구독 (DB 부하 감소)
+        const _onMsg = (payload) => {
+            Boako.Messenger._onMessageInsert(payload.new);
+            Boako.RealtimeCoordinator.broadcast('messenger:message-insert', payload.new);
+        };
+        const _myUid = Boako.state.user.id;
         const msgChannel = Boako.db.channel('messages-changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-                Boako.Messenger._onMessageInsert(payload.new);
-                Boako.RealtimeCoordinator.broadcast('messenger:message-insert', payload.new);
-            }).subscribe();
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${_myUid}` }, _onMsg)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${_myUid}` }, _onMsg)
+            .subscribe();
 
         const matchChannel = Boako.db.channel('grandprix-chats-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, (payload) => {
@@ -764,7 +769,7 @@ Boako.Messenger = {
                     <div onclick="Boako.Messenger.View.openRoom('${room.id}')" class="p-3 rounded-xl border cursor-pointer transition-all group ${activeClass} flex items-center gap-3 relative">
                         <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center text-slate-500 font-black">${icon}</div>
                         <div class="flex-1 min-w-0 pr-4">
-                            <div class="font-bold text-sm text-slate-800 truncate flex items-center">${room.title} ${room.badge}</div>
+                            <div class="font-bold text-sm text-slate-800 truncate flex items-center">${Boako.Util.escapeHtml(room.title)} ${room.badge}</div>
                             <div class="text-xs text-slate-500 truncate mt-0.5">${room.lastMessage}</div>
                         </div>
                         <div>${unreadBadge}</div>
@@ -823,7 +828,7 @@ Boako.Messenger = {
             } else if (room.isChallengeChat) {
                 bannerHtml = `
                     <div class="bg-rose-900 border-b border-rose-800 p-3 px-5 flex items-center justify-between shadow-sm z-10">
-                        <div class="font-black text-white text-sm flex items-center gap-2"><span class="animate-pulse">🔥</span> ${room.title}</div>
+                        <div class="font-black text-white text-sm flex items-center gap-2"><span class="animate-pulse">🔥</span> ${Boako.Util.escapeHtml(room.title)}</div>
                         <div class="flex gap-2">
                             <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                         </div>
@@ -831,7 +836,7 @@ Boako.Messenger = {
             } else if (room.isTogether) {
                 bannerHtml = `
                     <div class="bg-sky-900 border-b border-sky-800 p-3 px-5 flex items-center justify-between shadow-sm z-10">
-                        <div class="font-black text-white text-sm flex items-center gap-2">🎲 ${room.title}</div>
+                        <div class="font-black text-white text-sm flex items-center gap-2">🎲 ${Boako.Util.escapeHtml(room.title)}</div>
                         <div class="flex gap-2">
                             <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                         </div>
@@ -839,7 +844,7 @@ Boako.Messenger = {
             } else if (room.isMatch) {
                 bannerHtml = `
                     <div class="bg-indigo-50 border-b border-indigo-100 p-3 px-5 flex items-center justify-between shadow-sm z-10">
-                        <div class="font-black text-indigo-900 text-sm flex items-center gap-2"><span class="animate-pulse">🔴</span> 이 대화방은 ${room.title} 전용 공간입니다.</div>
+                        <div class="font-black text-indigo-900 text-sm flex items-center gap-2"><span class="animate-pulse">🔴</span> 이 대화방은 ${Boako.Util.escapeHtml(room.title)} 전용 공간입니다.</div>
                         <div class="flex gap-2">
                             <a href="${Boako.config.discordInviteUrl}" target="_blank" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm">🎮 디스코드 입장</a>
                             <button onclick="Boako.Messenger.hideRoom('${roomId}')" class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-100">나가기</button>
@@ -849,7 +854,7 @@ Boako.Messenger = {
             } else {
                 bannerHtml = `
                     <div class="bg-white border-b border-slate-200 p-4 font-black text-slate-800 shadow-sm z-10 flex items-center justify-between">
-                        <span>${room.title}</span>
+                        <span>${Boako.Util.escapeHtml(room.title)}</span>
                         <button onclick="Boako.Messenger.hideRoom('${roomId}')" class="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200">방 나가기</button>
                     </div>`;
             }
@@ -858,7 +863,7 @@ Boako.Messenger = {
             room.messages.forEach(msg => {
                 const isMe = msg.sender_id === Boako.state.user.id;
                 const timeStr = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-                const senderName = (room.isMatchChannel || room.isTogether || room.isChallengeChat) ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override;
+                const senderName = Boako.Util.escapeHtml((room.isMatchChannel || room.isTogether || room.isChallengeChat) ? (msg.profiles?.full_name || '참여자') : msg.sender_name_override);
 
                 if (msg.type === 'POLL') {
                     const poll = msg;
@@ -958,15 +963,15 @@ Boako.Messenger = {
                     messagesHtml += `<div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${senderName}</div>` : ''}<div class="flex items-end gap-2">${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}<div class="bg-white border border-blue-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800"><div class="font-black text-blue-600 text-xs mb-2">${isJoin ? '🛡️ 입단 지원' : '💌 스카웃 제안'}</div><div class="text-sm font-bold bg-slate-50 p-2.5 rounded-lg text-center border">[${pData.team_name}] 합류</div>${btnHtml}</div>${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}</div></div>`;
                 } else if (msg.type === 'TOGETHER_CHAT' || msg.type === 'CHALLENGE_CHAT') {
                     if (isMe) {
-                        messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%]"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-sky-600 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${msg.content.replace(/\n/g, '<br>')}</div></div>`;
+                        messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%]"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-sky-600 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${Boako.Util.escapeHtml(msg.content).replace(/\n/g, '<br>')}</div></div>`;
                     } else {
-                        messagesHtml += `<div class="flex items-end justify-start gap-2 self-start max-w-[85%]"><div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed"><div class="font-bold text-xs text-slate-800 mb-1">${senderName}</div>${msg.content.replace(/\n/g, '<br>')}</div><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span></div>`;
+                        messagesHtml += `<div class="flex items-end justify-start gap-2 self-start max-w-[85%]"><div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed"><div class="font-bold text-xs text-slate-800 mb-1">${senderName}</div>${Boako.Util.escapeHtml(msg.content).replace(/\n/g, '<br>')}</div><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span></div>`;
                     }
                 } else {
                     if (isMe) {
-                        messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%]"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-indigo-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${msg.content.replace(/\n/g, '<br>')}</div></div>`;
+                        messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%]"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-indigo-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${Boako.Util.escapeHtml(msg.content).replace(/\n/g, '<br>')}</div></div>`;
                     } else {
-                        messagesHtml += `<div class="flex items-end justify-start gap-2 self-start max-w-[85%]"><div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed"><div class="font-bold text-xs text-slate-800 mb-1">${senderName}</div>${msg.content.replace(/\n/g, '<br>')}</div><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span></div>`;
+                        messagesHtml += `<div class="flex items-end justify-start gap-2 self-start max-w-[85%]"><div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed"><div class="font-bold text-xs text-slate-800 mb-1">${senderName}</div>${Boako.Util.escapeHtml(msg.content).replace(/\n/g, '<br>')}</div><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span></div>`;
                     }
                 }
             });

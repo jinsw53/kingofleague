@@ -298,16 +298,16 @@ Boako.Together = {
                 <div class="flex items-center gap-3 mb-2">
                     <div class="flex flex-col items-center shrink-0" style="width:52px;">
                         <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
-                        <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${p.game_name || '종목 미정'}</div>
+                        <div class="text-[9px] font-bold text-slate-500 text-center mt-1 truncate w-full">${Boako.Util.escapeHtml(p.game_name || '종목 미정')}</div>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="text-base font-black text-sky-700">📅 ${dateStr}</div>
-                        <div class="text-[11px] text-slate-400 truncate">${p.title || ''}</div>
+                        <div class="text-[11px] text-slate-400 truncate">${Boako.Util.escapeHtml(p.title || '')}</div>
                     </div>
                     ${shareBtn}
                     ${statusBadge}
                 </div>
-                ${p.content ? `<div class="bg-sky-50/60 border border-sky-100 rounded-lg p-3 mb-3"><p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${p.content}</p></div>` : ''}
+                ${p.content ? `<div class="bg-sky-50/60 border border-sky-100 rounded-lg p-3 mb-3"><p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${Boako.Util.escapeHtml(p.content)}</p></div>` : ''}
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">${avatarsHtml}</div>
                     <span class="text-[11px] text-slate-500 font-bold">👥 ${p.current_count} / ${p.max_participants}명</span>

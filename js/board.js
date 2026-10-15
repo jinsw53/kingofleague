@@ -148,25 +148,34 @@ Boako.Board = {
     // 붙여넣기/드래그로 들어온 리치 HTML에서 위험 요소 제거
     // (script/style 태그, on* 속성, javascript: 링크, 유튜브 외 iframe)
     sanitizeContent: (html) => {
-        const div = document.createElement('div');
-        div.innerHTML = html;
-        div.querySelectorAll('script, style, object, embed').forEach(el => el.remove());
+        // 🛡️ <template>으로 파싱하면 <img onerror> 같은 게 정화 전에 실행되지 않음
+        const tpl = document.createElement('template');
+        tpl.innerHTML = html;
+        const div = tpl.content;
+        div.querySelectorAll('script, style, object, embed, link, meta, base, form, svg, math').forEach(el => el.remove());
         div.querySelectorAll('iframe').forEach(el => {
             const src = el.getAttribute('src') || '';
             if (!/^https:\/\/www\.youtube-nocookie\.com\/embed\//.test(src)) {
                 el.remove();
+            } else {
+                el.removeAttribute('srcdoc');
             }
         });
         div.querySelectorAll('*').forEach(el => {
             [...el.attributes].forEach(attr => {
                 const name = attr.name.toLowerCase();
-                const value = attr.value.toLowerCase();
-                if (name.startsWith('on') || value.startsWith('javascript:')) {
+                // 공백/제어문자를 끼워넣은 우회(java\nscript:)까지 막기 위해 정규화 후 검사
+                const value = attr.value.toLowerCase().replace(/[\u0000-\u0020\u007f-\u009f]/g, '');
+                if (name.startsWith('on') || name === 'srcdoc' || name === 'formaction' ||
+                    /^(javascript|vbscript):/.test(value) ||
+                    (/^data:/.test(value) && !(name === 'src' && /^data:image\/(png|jpe?g|gif|webp);/.test(value)))) {
                     el.removeAttribute(attr.name);
                 }
             });
         });
-        return div.innerHTML;
+        const out = document.createElement('div');
+        out.appendChild(div);
+        return out.innerHTML;
     },
 
     timeAgo: (iso) => {
@@ -796,7 +805,7 @@ Boako.Board = {
 
                         <div id="board-input-content" contenteditable="true"
                              class="w-full min-h-[400px] border border-slate-200 rounded-lg px-3 py-3 text-sm leading-relaxed focus:outline-none focus:border-teal-500"
-                             style="overflow-y:auto;" data-placeholder="내용을 입력하세요...">${draft?.content || ''}</div>
+                             style="overflow-y:auto;" data-placeholder="내용을 입력하세요...">${Boako.Board.sanitizeContent(draft?.content || '')}</div>
                         <div id="board-upload-indicator" class="hidden text-xs text-teal-600 font-bold mt-2">이미지 업로드 중...</div>
 
                         <div class="flex gap-2 mt-4">
@@ -1175,7 +1184,7 @@ Boako.Board = {
                                 </div>` : ''}
                             </div>
                         </div>
-                        <div class="prose max-w-none text-slate-800 leading-relaxed">${post.content}</div>
+                        <div class="prose max-w-none text-slate-800 leading-relaxed">${Boako.Board.sanitizeContent(post.content || '')}</div>
 
                         <div class="flex justify-center mt-6 pt-4 border-t border-slate-100">
                             ${isAuthor
@@ -1276,7 +1285,7 @@ Boako.Board = {
                     <div class="flex justify-end mb-2">
                         <button type="button" onclick="Boako.Board.toggleStrikethrough('board-edit-content')" title="선택한 글자에 취소선 (Ctrl/Cmd+Shift+X)" class="bg-slate-600 hover:bg-slate-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors" style="text-decoration:line-through;">S 취소선</button>
                     </div>
-                    <div id="board-edit-content" contenteditable="true" class="w-full min-h-[240px] border border-slate-200 rounded-lg px-3 py-3 text-sm leading-relaxed">${post.content}</div>
+                    <div id="board-edit-content" contenteditable="true" class="w-full min-h-[240px] border border-slate-200 rounded-lg px-3 py-3 text-sm leading-relaxed">${Boako.Board.sanitizeContent(post.content || '')}</div>
                     <button onclick="Boako.Board.submitEdit()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-3 rounded-xl mt-4">저장</button>
                 </div>
             </div>

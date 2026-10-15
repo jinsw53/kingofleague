@@ -214,7 +214,9 @@ Boako.HotIssue = {
 
     // 🌟 리더가 실제 이벤트를 받으면 로컬 갱신 + 팔로워 탭에 중계
     _onRemoteChange: () => {
-        Boako.HotIssue.init();
-        Boako.RealtimeCoordinator.broadcast('hot-issue:refresh', null);
+        Boako.Util.debounce('hot-issue', () => {
+            Boako.HotIssue.init();
+            Boako.RealtimeCoordinator.broadcast('hot-issue:refresh', null);
+        });
     }
 };

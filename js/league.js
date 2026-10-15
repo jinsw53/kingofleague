@@ -840,7 +840,7 @@ const isPendingState = currentStatus === 'PENDING' || prevStatus === 'PENDING';
                 
                 <div class="flex flex-col gap-1 pt-1.5 border-t border-slate-100">
                     ${p.defender_team_name ? `<div class="text-xs font-black text-slate-800 flex items-center gap-1"><span class="text-violet-600">${p.attacker_team_name}</span><span class="text-rose-500 text-[10px] italic mx-0.5">VS</span><span class="text-slate-800">${p.defender_team_name}</span></div>` : `<div class="text-xs font-black text-slate-400"><span class="text-slate-600">${p.attacker_team_name}</span> 팀의 전면 도발</div>`}
-                    <p class="text-xs font-bold text-slate-500 italic">"${p.message}"</p>
+                    <p class="text-xs font-bold text-slate-500 italic">"${Boako.Util.escapeHtml(p.message)}"</p>
                 </div>
             </div>
             <div class="flex items-center justify-end md:flex-col md:justify-center shrink-0 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5 min-w-[150px]">

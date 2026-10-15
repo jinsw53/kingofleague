@@ -225,7 +225,7 @@ Boako.Tournament = {
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="text-base font-black text-violet-700">📅 ${dateStr}</div>
-                            <div class="text-[11px] text-slate-400 truncate">${p.title}</div>
+                            <div class="text-[11px] text-slate-400 truncate">${Boako.Util.escapeHtml(p.title)}</div>
                         </div>
                         <button onclick="event.stopPropagation(); Boako.Tournament.shareToKakao(${p.id})" class="shrink-0 w-7 h-7 rounded-full bg-yellow-50 hover:bg-yellow-100 flex items-center justify-center text-sm transition-colors" title="카톡으로 공유">💬</button>
                         <span class="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">🔗</span>
@@ -247,13 +247,13 @@ Boako.Tournament = {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="text-base font-black text-amber-700">📅 ${dateStr}</div>
-                        <div class="text-[11px] text-slate-400 truncate">${p.title}</div>
+                        <div class="text-[11px] text-slate-400 truncate">${Boako.Util.escapeHtml(p.title)}</div>
                     </div>
                     <span class="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${isFulfilled ? 'text-slate-400 bg-slate-100' : 'text-amber-600 bg-amber-50'}">
                         ${isFulfilled ? '✅ 완료' : '🙋 대기'}
                     </span>
                 </div>
-                ${p.content ? `<div class="bg-amber-50/60 border border-amber-100 rounded-lg p-3 mb-3"><p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${p.content}</p></div>` : ''}
+                ${p.content ? `<div class="bg-amber-50/60 border border-amber-100 rounded-lg p-3 mb-3"><p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${Boako.Util.escapeHtml(p.content)}</p></div>` : ''}
                 <div class="flex items-center justify-between">
                     ${p.max_participants ? `<span class="text-[11px] text-slate-400 font-bold">👥 희망 인원 ${p.max_participants}명</span>` : '<span></span>'}
                 </div>

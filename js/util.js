@@ -32,6 +32,16 @@
  *    공통으로 재사용. index.html/mobile/index.html에서 Kakao JS SDK 로드+init 완료를 전제로 함.
  */
 Boako.Util = {
+    // ⏱️ [리얼타임 부하 완화] 같은 key 로 연달아 오는 실시간 이벤트를 모아서 한 번만 처리(+접속자 동시 재조회 분산용 랜덤 지연)
+    _debTimers: {},
+    debounce: (key, fn, ms) => {
+        clearTimeout(Boako.Util._debTimers[key]);
+        Boako.Util._debTimers[key] = setTimeout(fn, (ms || 1200) + Math.random() * 1500);
+    },
+    // 🛡️ [보안] 사용자 입력(채팅/닉네임/글 내용 등)을 innerHTML 에 넣기 전에 반드시 통과시키는 이스케이프
+    escapeHtml: (str) => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+    // 🛡️ [보안] onclick="fn('...')" 처럼 HTML 속성 안의 JS 문자열 리터럴에 값을 넣을 때 사용
+    escapeJsAttr: (str) => String(str ?? '').replace(/[\\'"<>&\n\r`$]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')),
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
     toast: (msg) => {
         const t = document.getElementById('boako-toast');
@@ -207,12 +217,12 @@ Boako.Util = {
                     break;
                 // 🌟 [신규] 5연속 전적 기록("수배전단") 소식 클릭 시 전적기록실로 이동
                 case 'ARCHIVE':
-                    await Boako.View.render('archive');
+                    await Boako.View.render('records');
                     break;
                 // 🌟 [신규] 매일 자동 생성되는 "어제의 영향력 지도" 소식지 클릭 시
                 // 전적기록실을 열고 "히스토리" 탭으로 바로 전환
                 case 'TERRITORY_MAP':
-                    await Boako.View.render('archive');
+                    await Boako.View.render('records');
                     setTimeout(() => {
                         if (Boako.Archive && typeof Boako.Archive.switchTab === 'function') {
                             Boako.Archive.switchTab('territory_map');
