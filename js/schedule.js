@@ -267,7 +267,7 @@ Boako.Schedule = {
                         </div>
                     </div>
                     <div style="flex-shrink:0; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-                        ${item.subtitle ? `<span style="font-size:14px; font-weight:bold; color:#334155; background:#f1f5f9; padding:6px 14px; border-radius:8px;">${item.subtitle}</span>` : ''}
+                        ${item.subtitle ? `<span style="font-size:14px; font-weight:bold; color:#334155; background:#f1f5f9; padding:6px 14px; border-radius:8px;">${Boako.Util.escapeHtml(item.subtitle)}</span>` : ''}
                         <div style="display:flex; gap:6px; align-items:center;">
                             ${item.sourceType ? sourceBtn : kakaoBtn}
                             ${linkBtn}

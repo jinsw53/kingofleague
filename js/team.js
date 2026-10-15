@@ -1192,7 +1192,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
                     <li style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #f1f5f9;">
                         <div>
                             <div style="font-size:12px; color:#94a3b8; font-weight:600; margin-bottom:3px;">${date}</div>
-                            <div style="font-size:15px; font-weight:800; color:#334155;">${log.description}</div>
+                            <div style="font-size:15px; font-weight:800; color:#334155;">${Boako.Util.escapeHtml(log.description)}</div>
                         </div>
                         <div style="font-size:16px; font-weight:900; color:${color}; white-space:nowrap;">
                             ${sign}${log.point_change.toLocaleString()} P

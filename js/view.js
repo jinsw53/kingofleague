@@ -766,7 +766,7 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                     <li style="display:flex; justify-content:space-between; align-items:center; padding:18px 30px; border-bottom:1px solid #f1f5f9;">
                                         <div>
                                             <div style="font-size:13px; color:#94a3b8; font-weight:600; margin-bottom:4px;">${date}</div>
-                                            <div style="font-size:16px; font-weight:800; color:#334155;">${log.description}</div>
+                                            <div style="font-size:16px; font-weight:800; color:#334155;">${Boako.Util.escapeHtml(log.description)}</div>
                                         </div>
                                         <div style="font-size:18px; font-weight:900; color:${color};">
                                             ${sign}${log.point_change.toLocaleString()} P
