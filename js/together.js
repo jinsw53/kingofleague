@@ -312,7 +312,7 @@ Boako.Together = {
                     <div class="flex items-center">${avatarsHtml}</div>
                     <span class="text-[11px] text-slate-500 font-bold">👥 ${p.current_count} / ${p.max_participants}명</span>
                 </div>
-                ${namesText ? `<div class="text-[10px] text-slate-400 font-bold mt-1 truncate" title="${namesText}">${namesText}</div>` : ''}
+                ${namesText ? `<div class="text-[10px] text-slate-400 font-bold mt-1 truncate" title="${Boako.Util.escapeHtml(namesText)}">${Boako.Util.escapeHtml(namesText)}</div>` : ''}
                 ${actionHtml}
             </div>
         `;
