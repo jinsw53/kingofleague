@@ -511,7 +511,7 @@ Boako.Together = {
     openGamePage: (gameName) => {
         const bgaUrl = Boako.Together.State.findGameResults?.bgaUrlMap?.[gameName];
         if (bgaUrl) {
-            window.open(bgaUrl, '_blank');
+            Boako.Util.openExternal(bgaUrl);
         } else {
             Boako.Util.toast('이 게임의 아레나 링크 정보가 없어요.');
         }

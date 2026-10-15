@@ -217,7 +217,7 @@ Boako.Tournament = {
 
         if (p.type === 'ANNOUNCEMENT') {
             return `
-                <div id="tournament-post-${p.id}" class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="window.open('${p.source_url}', '_blank')">
+                <div id="tournament-post-${p.id}" class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(p.source_url)}')">
                     <div class="flex items-center gap-3">
                         <div class="flex flex-col items-center shrink-0" style="width:52px;">
                             <img src="${Boako.Util.cdn(gameLogo)}" class="w-12 h-12 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1">
@@ -259,9 +259,9 @@ Boako.Tournament = {
                 </div>
                 ${!isFulfilled
                     ? (gameBgaUrl
-                        ? `<a href="${gameBgaUrl}" target="_blank" class="block text-center mt-3 text-xs font-black text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg py-2 transition-colors">🎮 이 게임 아레나 페이지 열기 → 개최 후 크롬 확장으로 등록 시 자동 매칭</a>`
+                        ? `<a href="${Boako.Util.safeHref(gameBgaUrl)}" target="_blank" class="block text-center mt-3 text-xs font-black text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg py-2 transition-colors">🎮 이 게임 아레나 페이지 열기 → 개최 후 크롬 확장으로 등록 시 자동 매칭</a>`
                         : `<div class="text-center mt-3 text-[11px] text-slate-400 font-bold">🎯 아레나에서 토너먼트 개최 후, 크롬 확장으로 등록 시 자동으로 매칭됩니다</div>`)
-                    : `<a href="${p.source_url}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
+                    : `<a href="${Boako.Util.safeHref(p.source_url)}" target="_blank" class="block text-center mt-3 text-xs font-bold text-violet-600">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
     },

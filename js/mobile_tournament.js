@@ -166,7 +166,7 @@ Boako.MobileTournament = {
 
         if (p.type === 'ANNOUNCEMENT') {
             return `
-                <div id="tournament-post-${p.id}" onclick="window.open('${p.source_url}', '_blank')" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; cursor:pointer;">
+                <div id="tournament-post-${p.id}" onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(p.source_url)}')" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; cursor:pointer;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <img src="${Boako.Util.cdn(gameLogo)}" style="width:44px; height:44px; border-radius:10px; object-fit:contain; background:#f8fafc; border:1px solid #f1f5f9; padding:4px; flex-shrink:0;">
                         <div style="flex:1; min-width:0;">
@@ -199,9 +199,9 @@ Boako.MobileTournament = {
                 ${p.max_participants ? `<div style="font-size:11px; color:#94a3b8; font-weight:700;">👥 희망 인원 ${p.max_participants}명</div>` : ''}
                 ${!isFulfilled
                     ? (gameBgaUrl
-                        ? `<a href="${gameBgaUrl}" target="_blank" style="display:block; text-align:center; margin-top:10px; font-size:11.5px; font-weight:900; color:#d97706; background:#fffbeb; border-radius:10px; padding:9px;">🎮 이 게임 아레나 페이지 열기</a>`
+                        ? `<a href="${Boako.Util.safeHref(gameBgaUrl)}" target="_blank" style="display:block; text-align:center; margin-top:10px; font-size:11.5px; font-weight:900; color:#d97706; background:#fffbeb; border-radius:10px; padding:9px;">🎮 이 게임 아레나 페이지 열기</a>`
                         : `<div style="text-align:center; margin-top:10px; font-size:10.5px; color:#94a3b8; font-weight:700;">🎯 아레나에서 개최 후 확장으로 등록 시 자동 매칭됩니다</div>`)
-                    : `<a href="${p.source_url}" target="_blank" style="display:block; text-align:center; margin-top:10px; font-size:11.5px; font-weight:700; color:#7c3aed;">🔗 개설된 토너먼트 바로가기</a>`}
+                    : `<a href="${Boako.Util.safeHref(p.source_url)}" target="_blank" style="display:block; text-align:center; margin-top:10px; font-size:11.5px; font-weight:700; color:#7c3aed;">🔗 개설된 토너먼트 바로가기</a>`}
             </div>
         `;
     },

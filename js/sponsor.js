@@ -34,7 +34,7 @@ Boako.Sponsor = {
         const current = Boako.Sponsor.banners[0];
 
         const bannerHtml = current ? `
-            <a href="${current.link_url || '#'}" target="${current.link_url ? '_blank' : '_self'}" style="display:flex; align-items:center; height:56px;">
+            <a href="${Boako.Util.safeHref(current.link_url)}" target="${current.link_url ? '_blank' : '_self'}" style="display:flex; align-items:center; height:56px;">
                 <img src="${Boako.Util.cdn(current.image_url)}" alt="${current.name}" style="max-height:56px; max-width:200px; object-fit:contain;">
             </a>
         ` : '';

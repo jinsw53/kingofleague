@@ -429,7 +429,7 @@ Boako.Auth = {
 
             area.innerHTML = `
             <div class="user-avatar" onclick="Boako.Auth.openAvatarModal()" title="클릭해서 프로필 사진 변경" style="display: flex; align-items: center; justify-content: center; overflow: hidden; p-0; cursor:pointer; position:relative;">
-                ${displayAvatarUrl ? `<img src="${displayAvatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
+                ${displayAvatarUrl ? `<img src="${Boako.Util.safeAttrUrl(displayAvatarUrl)}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">` : '👤'}
                 <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.45); color:#fff; font-size:9px; font-weight:800; text-align:center; padding:2px 0; opacity:0; transition:opacity .15s;" class="avatar-hover-hint">사진 변경</div>
             </div>
             <div style="display:flex; align-items:center; justify-content:center; gap:8px;">

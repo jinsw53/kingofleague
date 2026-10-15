@@ -691,7 +691,7 @@ Boako.NewsFeed = {
     renderSupplementFiller: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         const clickable = filler.externalUrl
-            ? `onclick="window.open('${filler.externalUrl.replace(/'/g, "\\'")}', '_blank')" style="cursor:pointer;"`
+            ? `onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(filler.externalUrl)}')" style="cursor:pointer;"`
             : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '');
         return `
             <div class="nf-filler-card" ${clickable}>
@@ -710,7 +710,7 @@ Boako.NewsFeed = {
     renderSupplementPadCard: (filler) => {
         const img = filler.image ? Boako.Util.cdn(filler.image) : null;
         const clickable = filler.externalUrl
-            ? `onclick="window.open('${filler.externalUrl.replace(/'/g, "\\'")}', '_blank')" style="cursor:pointer;"`
+            ? `onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(filler.externalUrl)}')" style="cursor:pointer;"`
             : (filler.linkType ? `onclick="Boako.Util.navigateToLink('${filler.linkType}', '${filler.linkId}')" style="cursor:pointer;"` : '');
         return `
             <div class="col-span-2 md:col-span-1 bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 flex flex-col hover:shadow-md transition-shadow" ${clickable}>

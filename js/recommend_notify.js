@@ -160,7 +160,7 @@ Boako.RecommendNotify = {
                     <div style="font-size:12px; font-weight:900; color:#fbbf24; letter-spacing:0.14em; text-transform:uppercase;">⭐ 오늘의 추천 게임 보너스</div>
 
                     <div style="width:96px; height:96px; border-radius:20px; background:#fff; display:flex; align-items:center; justify-content:center; padding:10px; box-shadow:0 0 24px rgba(251,191,36,0.35);">
-                        ${logoUrl ? `<img src="${logoUrl}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span style="font-size:40px;">🎲</span>`}
+                        ${logoUrl ? `<img src="${Boako.Util.safeAttrUrl(logoUrl)}" style="max-width:100%; max-height:100%; object-fit:contain;">` : `<span style="font-size:40px;">🎲</span>`}
                     </div>
 
                     <div style="font-size:19px; font-weight:900; color:#fff;">${Boako.RecommendNotify.escapeHtml(claimRow.game_name)}</div>

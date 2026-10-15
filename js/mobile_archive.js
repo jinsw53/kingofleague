@@ -174,7 +174,7 @@ Boako.MobileArchive = {
                 : `<i data-lucide="help-circle" style="color:#cbd5e1; width:15px; height:15px; opacity:.5;"></i>`;
 
             const linkHtml = rec.post_url
-                ? `<a href="${rec.post_url}" target="_blank" style="display:flex; align-items:center; justify-content:center; width:22px; height:22px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:6px; color:#94a3b8;"><i data-lucide="external-link" style="width:11px; height:11px;"></i></a>`
+                ? `<a href="${Boako.Util.safeHref(rec.post_url)}" target="_blank" style="display:flex; align-items:center; justify-content:center; width:22px; height:22px; background:#f8fafc; border:1px solid #f1f5f9; border-radius:6px; color:#94a3b8;"><i data-lucide="external-link" style="width:11px; height:11px;"></i></a>`
                 : '';
 
             return `

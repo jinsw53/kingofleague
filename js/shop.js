@@ -328,7 +328,7 @@ if (window.sfx) window.sfx.buy();
                                 <div class="flex justify-between items-start gap-3 mb-2">
                                     <div class="min-w-0">
                                         <div class="font-black text-sm">시즌 ${s.season_no} · ${s.title_sponsor_name || '(스폰서명 없음)'}배</div>
-                                        <a href="${s.title_sponsor_url}" target="_blank" class="text-[11px] text-indigo-500 font-bold break-all hover:underline">${s.title_sponsor_url}</a>
+                                        <a href="${Boako.Util.safeHref(s.title_sponsor_url)}" target="_blank" class="text-[11px] text-indigo-500 font-bold break-all hover:underline">${s.title_sponsor_url}</a>
                                     </div>
                                     <span class="shrink-0 text-[10px] font-black px-2 py-1 rounded-full ${s.title_sponsor_url_approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
                                         ${s.title_sponsor_url_approved ? '✅ 승인됨' : '⏳ 승인 대기'}

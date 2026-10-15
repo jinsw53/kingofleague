@@ -246,7 +246,7 @@ Boako.Match = {
                 const sponsorUrl = (currentSeason?.title_sponsor_url_approved && currentSeason?.title_sponsor_url) ? currentSeason.title_sponsor_url : null;
                 const sponsorBadgeHtml = sponsorName
                     ? (sponsorUrl
-                        ? `<a href="${sponsorUrl}" target="_blank" rel="noopener noreferrer" class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner" style="display:block; text-decoration:none;">🏷️ ${sponsorName}배 보아코 팀 리그</a>`
+                        ? `<a href="${Boako.Util.safeHref(sponsorUrl)}" target="_blank" rel="noopener noreferrer" class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner" style="display:block; text-decoration:none;">🏷️ ${sponsorName}배 보아코 팀 리그</a>`
                         : `<div class="text-[11px] font-black bg-white/20 text-white px-3 py-1 rounded-lg w-max shadow-inner">🏷️ ${sponsorName}배 보아코 팀 리그</div>`)
                     : '';
                 
@@ -697,7 +697,7 @@ Boako.Match = {
                         if (detail.penaltyReason) {
                             // 페널티 UI
                             html += `
-                                <a href="${detail.url}" target="_blank" class="block text-center cell-penalty cursor-pointer" data-tooltip="${detail.penaltyReason} | ${detail.date}">
+                                <a href="${Boako.Util.safeHref(detail.url)}" target="_blank" class="block text-center cell-penalty cursor-pointer" data-tooltip="${detail.penaltyReason} | ${detail.date}">
                                     <div class="bg-red-50 text-red-600 border border-red-200 rounded-lg py-1 flex items-center justify-center gap-1.5 hover:bg-red-100 transition-colors">
                                         <span class="score-original !mr-0">${detail.originalScore}</span>
                                         <span class="font-black text-sm">🏆 ${detail.score} LP</span>
@@ -709,7 +709,7 @@ Boako.Match = {
                             const isZero = detail.score === 0;
                             const scoreClass = isZero ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100";
                             html += `
-                                <a href="${detail.url}" target="_blank" title="진행: ${detail.date} (클릭 시 BGA 기록 확인)" class="block text-center ${scoreClass} border rounded-lg py-1 font-black text-sm transition-colors">
+                                <a href="${Boako.Util.safeHref(detail.url)}" target="_blank" title="진행: ${detail.date} (클릭 시 BGA 기록 확인)" class="block text-center ${scoreClass} border rounded-lg py-1 font-black text-sm transition-colors">
                                     🏆 ${detail.score} LP
                                 </a>
                             `;

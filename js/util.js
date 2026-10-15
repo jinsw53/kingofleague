@@ -134,11 +134,34 @@ Boako.Util = {
 
     // 🌟 [신규] 이미지 URL을 클라우드플레어 CDN 주소로 바꿔치는 함수
     // 저장은 원본 슈파베이스 주소 그대로 두고, 화면에 그릴 때만 여기를 거쳐서 캐싱 혜택을 받음
+    // 🔒 [보안] URL을 HTML 속성/CSS url()/JS 문자열 어디에 넣어도 안 깨지도록 따옴표·공백·꺾쇠·역슬래시를 %XX로 바꿈
+    _neutralizeUrl: (u) => String(u).replace(/[\s"'<>`\\]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')),
+    // 🔒 [보안] <img src> / url() 용 — javascript:/vbscript:/data:(이미지 제외) 차단 + 속성 탈출 문자 무력화
+    safeAttrUrl: (u) => {
+        if (!u || typeof u !== 'string') return '';
+        if (/^\s*(javascript:|vbscript:|data:(?!image\/(png|jpe?g|gif|webp)[;,]))/i.test(u)) return '';
+        return Boako.Util._neutralizeUrl(u.trim());
+    },
+    // 🔒 [보안] 링크(href)/새 창 열기용 — http(s)만 허용. 아니면 빈 문자열
+    safeUrl: (u) => {
+        if (!u || typeof u !== 'string') return '';
+        const t = u.trim();
+        if (!/^https?:\/\//i.test(t)) return '';
+        return Boako.Util._neutralizeUrl(t);
+    },
+    // href="..." 안에 바로 넣는 용도 (유효하지 않으면 '#')
+    safeHref: (u) => Boako.Util.escapeHtml(Boako.Util.safeUrl(u) || '#'),
+    // onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(url)}')" 형태로 사용
+    openExternal: (u) => {
+        const s = Boako.Util.safeUrl(u);
+        if (s) window.open(s, '_blank', 'noopener,noreferrer');
+    },
     cdn: (url) => {
         if (!url || typeof url !== 'string') return url;
-        return url
+        const rewritten = url
             .replace(/^http:\/\//i, 'https://')
             .replace('qrredwrxdnvqwdxzanba.supabase.co', 'cdn.boakoarchive.co.kr');
+        return Boako.Util.safeAttrUrl(rewritten);
     },
 
     // 🌟 [신규] 헤더 통합 검색바 실행 — 입력값을 읽어서 검색 결과 페이지로 이동

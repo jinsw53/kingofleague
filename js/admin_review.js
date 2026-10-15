@@ -201,7 +201,7 @@ Boako.AdminReview = {
                         ${list.length === 0 ? `<div class="text-center py-10 text-slate-400 font-bold text-sm">대기 중인 항목이 없습니다.</div>` : list.map(p => `
                             <div class="border border-slate-200 rounded-xl p-3" id="bga-match-row-${p.id}">
                                 <div class="flex items-center justify-between gap-2 mb-2">
-                                    <a href="${p.url}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline truncate">${p.slug} 🔗</a>
+                                    <a href="${Boako.Util.safeHref(p.url)}" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline truncate">${p.slug} 🔗</a>
                                     ${p.is_beta ? `<span class="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">🚧 베타</span>` : ''}
                                 </div>
                                 ${p.title_image_url

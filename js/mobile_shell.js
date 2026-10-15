@@ -676,7 +676,7 @@ Boako.MobileShell = {
         wrap.innerHTML = `
             <div style="display:flex; flex-direction:column; align-items:center; gap:8px; padding-bottom:16px; border-bottom:1px solid #e2e8f0; margin-bottom:14px;">
                 <div style="width:56px; height:56px; border-radius:50%; background:#e2e8f0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:26px;">
-                    ${displayAvatarUrl ? `<img src="${displayAvatarUrl}" style="width:100%; height:100%; object-fit:cover;">` : '👤'}
+                    ${displayAvatarUrl ? `<img src="${Boako.Util.safeAttrUrl(displayAvatarUrl)}" style="width:100%; height:100%; object-fit:cover;">` : '👤'}
                 </div>
                 <span style="font-size:14px; font-weight:900;">${user.nickname || '사용자'}</span>
                 ${teamBadgeHtml}

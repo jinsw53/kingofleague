@@ -533,7 +533,7 @@ Boako.Ranking.getHofHTML = function() {
     // 🌟 타이틀 스폰서가 있으면 시즌 제목 앞에 배지로 표시 (승인된 URL 있으면 클릭 가능하게)
     const sponsorBadgeHtml = d.titleSponsorName
         ? (d.titleSponsorUrl
-            ? `<a href="${d.titleSponsorUrl}" target="_blank" rel="noopener noreferrer" class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle" style="text-decoration:none;">🏷️ ${d.titleSponsorName}배</a>`
+            ? `<a href="${Boako.Util.safeHref(d.titleSponsorUrl)}" target="_blank" rel="noopener noreferrer" class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle" style="text-decoration:none;">🏷️ ${d.titleSponsorName}배</a>`
             : `<span class="inline-block bg-violet-100 text-violet-700 text-xs font-black px-2.5 py-1 rounded-lg mr-2 align-middle">🏷️ ${d.titleSponsorName}배</span>`)
         : '';
 
@@ -684,7 +684,7 @@ Boako.Ranking.loadPrizeBanner = async function() {
         if (headerEl) {
             const badgeHtml = data.title_sponsor_name
                 ? (data.title_sponsor_url
-                    ? `<a href="${data.title_sponsor_url}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px; text-decoration:none; color:inherit;">🏷️ ${data.title_sponsor_name}배</a>`
+                    ? `<a href="${Boako.Util.safeHref(data.title_sponsor_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px; text-decoration:none; color:inherit;">🏷️ ${data.title_sponsor_name}배</a>`
                     : `<span style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px;">🏷️ ${data.title_sponsor_name}배</span>`)
                 : '';
             const logoHtml = data.season_logo_url

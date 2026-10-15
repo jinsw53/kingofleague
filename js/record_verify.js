@@ -65,7 +65,7 @@ Boako.RecordVerify = {
                 : `<span class="inline-block mt-1 px-2 py-0.5 bg-sky-100 text-sky-800 text-xs rounded font-bold">🛡️ 첫 승 기록 확인</span>`;
 
             return `
-                <div onclick="window.open('${item.post_url || '#'}', '_blank')" 
+                <div onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(item.post_url || '')}')" 
                      class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center cursor-pointer hover:border-indigo-400 hover:shadow transition-all group">
                     <div>
                         <div class="flex items-center gap-2">

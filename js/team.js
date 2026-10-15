@@ -248,7 +248,7 @@ Boako.Team = {
             titleEl.innerText = `🌟 우승 별 붙이기 (시즌 ${winSeasonNo})`;
             descEl.innerText = '별을 드래그해서 로고 위 원하는 위치에 놓아주세요.';
             wrap.innerHTML = `
-                <img src="${team.logo_url}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
+                <img src="${Boako.Util.safeAttrUrl(team.logo_url)}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
                 <div class="star-drag" style="position:absolute; left:50%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="0.5" data-rel-y="0.15">${starSvg}</div>
             `;
             switchEl.innerHTML = (team.champion_star_count > 0)
@@ -266,7 +266,7 @@ Boako.Team = {
                 return `<div class="star-drag" style="position:absolute; left:${x * 100}%; top:15%; transform:translate(-50%,-50%); width:15%; cursor:grab; touch-action:none;" data-rel-x="${x}" data-rel-y="0.15">${starSvg}</div>`;
             }).join('');
             wrap.innerHTML = `
-                <img src="${team.logo_url_origin}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
+                <img src="${Boako.Util.safeAttrUrl(team.logo_url_origin)}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;">
                 ${initialStars}
             `;
             switchEl.innerHTML = winSeasonNo
@@ -1048,7 +1048,7 @@ const isCompleted = s.status === 'COMPLETED';
                     : 'bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer';
 
                 const onclickAttr = isCompleted && tournamentUrl
-                    ? `onclick="window.open('${tournamentUrl}', '_blank')"`
+                    ? `onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(tournamentUrl)}')"`
                     : `onclick="Boako.Team.openMatchRoom('${s.reference_id}')"`;
 
                 const lpBadge = isCompleted && lpEarned !== null

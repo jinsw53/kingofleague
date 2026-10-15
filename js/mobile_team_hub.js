@@ -518,7 +518,7 @@ Boako.MobileTeamHub = {
                     : '';
 
                 const clickAttr = isCompleted && tournamentUrl
-                    ? `onclick="window.open('${tournamentUrl}', '_blank')"`
+                    ? `onclick="Boako.Util.openExternal('${Boako.Util.escapeJsAttr(tournamentUrl)}')"`
                     : `onclick="Boako.Util.toast('💬 일정 조율은 쪽지함 포팅 후 연결될 예정이에요!')"`;
 
                 return `

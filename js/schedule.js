@@ -249,7 +249,7 @@ Boako.Schedule = {
             const dateObj = new Date(item.scheduled_time);
             const timeStr = dateObj.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true });
             const typeBadge = `<span style="background:${meta.color}; color:white; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:bold; white-space:nowrap;">${meta.icon} ${meta.label}</span>`;
-            const linkBtn = item.linkUrl ? `<a href="${item.linkUrl}" target="_blank" style="font-size:12px; font-weight:800; color:${meta.color}; text-decoration:underline; white-space:nowrap;">바로가기 🔗</a>` : '';
+            const linkBtn = item.linkUrl ? `<a href="${Boako.Util.safeHref(item.linkUrl)}" target="_blank" style="font-size:12px; font-weight:800; color:${meta.color}; text-decoration:underline; white-space:nowrap;">바로가기 🔗</a>` : '';
             const isFuture = new Date(item.scheduled_time).getTime() > Date.now();
             const kakaoBtn = isFuture ? `<button onclick='Boako.Schedule.View.addToKakaoCalendar(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="font-size:11px; font-weight:800; color:#3c1e1e; background:#FEE500; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔔 톡캘린더</button>` : '';
             const rejectBtn = (item.sourceType && isFuture) ? `<button onclick="Boako.Schedule.View.rejectBroadcastEvent('${item.sourceType}', '${item.sourceId}')" style="font-size:11px; font-weight:800; color:#64748b; background:#f1f5f9; padding:5px 10px; border-radius:8px; white-space:nowrap;">🔕 알림 취소</button>` : '';

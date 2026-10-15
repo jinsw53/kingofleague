@@ -220,7 +220,7 @@ Boako.MobileLeague = {
                 if (ownerTeam) {
                     // 🌟 점유된 칸 — 번호 대신 실제 팀 로고를 크게
                     const teamLogoUrl = Boako.Util.cdn(Boako.League.State.bingoTeamLogos25[idx] || 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png');
-                    mainHtml = `<img src="${teamLogoUrl}" alt="${ownerTeam}" style="width:60%; height:60%; object-fit:contain; z-index:2;">`;
+                    mainHtml = `<img src="${Boako.Util.safeAttrUrl(teamLogoUrl)}" alt="${ownerTeam}" style="width:60%; height:60%; object-fit:contain; z-index:2;">`;
                     numberBadgeHtml = `<span style="position:absolute; bottom:2px; right:2px; font-size:7px; font-weight:900; color:#64748b; background:rgba(255,255,255,0.85); padding:0 3px; border-radius:4px; z-index:3;">${num}</span>`;
                 } else {
                     // 🌟 빈 칸 — 번호를 크게

@@ -21,7 +21,7 @@ Boako.RivalRecommend = {
             };
 
             const avatarHtml = (url, name, size) => url
-                ? `<img src="${url}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; display:block;">`
+                ? `<img src="${Boako.Util.safeAttrUrl(url)}" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; display:block;">`
                 : `<div style="width:${size}px; height:${size}px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:${Math.round(size * 0.4)}px; font-weight:900;">${(name || '?').charAt(0)}</div>`;
 
             const myAvatar = (Boako.state.customAvatarUrl || Boako.state.kakaoAvatarUrl || null);
