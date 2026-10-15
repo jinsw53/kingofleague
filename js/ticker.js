@@ -45,11 +45,21 @@ Boako.Ticker = {
     _subscribeAsLeader: () => {
         if (!Boako.RealtimeCoordinator.isLeader()) return;
         if (Boako.Ticker._channel) return;
-        Boako.Ticker._channel = Boako.db.channel('ticker-realtime')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, () => Boako.Ticker._onRemoteChange())
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.Ticker._onRemoteChange())
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.Ticker._onRemoteChange())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.Ticker._onRemoteChange())
+        // 🌟 [통합] 전광판(ticker)과 실시간 이슈(hot_issue)가 같은 테이블을 각각 구독하던 것을
+        // 채널 하나(바인딩 5개)로 합침 — 두 모듈의 갱신 함수를 같이 호출한다.
+        // (hot_issue.js의 _subscribeAsLeader는 이 함수를 대신 호출함)
+        const both = () => {
+            Boako.Ticker._onRemoteChange();
+            if (Boako.HotIssue && Boako.HotIssue._onRemoteChange) Boako.HotIssue._onRemoteChange();
+        };
+        Boako.Ticker._channel = Boako.db.channel('feed-realtime')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, both)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, both)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, both)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, both)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements' }, () => {
+                if (Boako.HotIssue && Boako.HotIssue._onRemoteChange) Boako.HotIssue._onRemoteChange();
+            })
             .subscribe();
     },
 

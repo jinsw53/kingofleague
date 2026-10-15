@@ -202,6 +202,8 @@ Boako.HotIssue = {
     // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
     _subscribeAsLeader: () => {
         if (!Boako.RealtimeCoordinator.isLeader()) return;
+        // 🌟 [통합] ticker.js가 같은 테이블을 이미 구독하므로 채널 하나를 공유함 (ticker.js의 'feed-realtime')
+        if (Boako.Ticker && Boako.Ticker._subscribeAsLeader) { Boako.Ticker._subscribeAsLeader(); return; }
         if (Boako.HotIssue._channel) return;
         Boako.HotIssue._channel = Boako.db.channel('hot-issue-realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.HotIssue._onRemoteChange())

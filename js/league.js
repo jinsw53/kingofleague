@@ -262,10 +262,8 @@ Boako.League._subscribeAsLeader = function() {
             Boako.League._onChallengeChange(payload);
             Boako.RealtimeCoordinator.broadcast('league:challenge-change', payload);
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-            Boako.League._onProfileChange(payload);
-            Boako.RealtimeCoordinator.broadcast('league:profile-change', payload);
-        })
+        // 🌟 [부하 개선] profiles 전체 구독 제거 — 방문 기록·포인트 변경 등 모든 유저의 프로필 수정마다
+        // 이벤트가 와서 서버 부하가 컸고, 쓰이는 곳은 로스터 창이 열려 있을 때 안내 토스트 하나뿐이었음.
         .subscribe();
 };
 
