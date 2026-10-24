@@ -3,6 +3,7 @@ import json, sys, wave
 import numpy as np
 sr = 44100
 ev = json.load(open(sys.argv[1])); dur = float(sys.argv[2]); out = sys.argv[3]
+MIN_GAP = .6
 n = int(sr * dur); x = np.zeros(n)
 rng = np.random.default_rng(7)
 
@@ -53,17 +54,20 @@ def chime(base=880):
         s[d:] += ss * .5
     return s
 
-last = {}; cnt = 0
+cnt = 0; last_any = -9; last_scene = -9
 for e in sorted(ev, key=lambda v: v['t']):
     k, t = e['k'], e['t']
-    if t - last.get(k, -1) < .06: continue
-    last[k] = t; cnt += 1
-    if k == 'scene': add(t - .12, whoosh(), .55)
-    elif k == 'logo': add(t, thump(), .9); add(t + .08, chime(988), .35)
-    elif k in ('pop', 'spin'): add(t + .05, pop(480 + (cnt % 5) * 70, 1000 + (cnt % 5) * 90), .5)
-    elif k == 'left': add(t + .05, tick(700, 1.0), .5)
-    elif k == 'right': add(t + .05, tick(860, 1.0), .5)
-    elif k in ('up', 'down'): add(t + .05, tick(1020, .8), .42)
+    if k == 'scene':
+        add(t - .12, whoosh(), .55); last_scene = t; cnt += 1; continue
+    if k == 'logo':
+        add(t, thump(), .9); add(t + .08, chime(988), .35); last_any = t; cnt += 1; continue
+    # 장면 전환음이 겹치는 구간과, 직전 소리와 너무 가까운 소리는 생략
+    if t - last_scene < .3 or t - last_any < MIN_GAP: continue
+    last_any = t; cnt += 1
+    if k in ('pop', 'spin'): add(t + .03, pop(480 + (cnt % 4) * 80, 1000 + (cnt % 4) * 100), .5)
+    elif k == 'left': add(t + .03, tick(700, 1.0), .5)
+    elif k == 'right': add(t + .03, tick(860, 1.0), .5)
+    else: add(t + .03, tick(1020, .8), .42)
 x = np.tanh(x * 1.1)
 w = wave.open(out, 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
 w.writeframes((x * .9 * 32767).astype(np.int16).tobytes()); w.close()
