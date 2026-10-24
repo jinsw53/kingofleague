@@ -1,0 +1,34 @@
+// 실제 사이트 캡처 (로그인 불필요한 공개 화면). 사용: node capture.js
+const { chromium } = require('playwright');
+const fs = require('fs');
+(async () => {
+  const b = await chromium.launch();
+  const p = await b.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
+  await p.goto('https://boakoarchive.co.kr', { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
+  await p.waitForTimeout(4000);
+  const rect = sel => p.evaluate(s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }, sel);
+  const R = {};
+  R.guide_btn = await rect('#ext-guide-dismiss');
+  R.ext = await rect('#btn-extension-install');
+  await p.screenshot({ path: 'shots/guide.png' });
+  await p.click('#ext-guide-dismiss').catch(() => {});
+  await p.waitForTimeout(1200);
+  R.kakao = await rect('.btn-kakao');
+  R.nav_records = await rect('#menu-records');
+  R.nav_rank = await rect('#menu-ranking');
+  await p.screenshot({ path: 'shots/home.png' });
+  await p.evaluate(() => Boako.View.render('records'));
+  await p.waitForTimeout(4500);
+  await p.addStyleTag({ content: 'td[data-handler="archive-tooltip"] span.font-black{filter:blur(6px)}' });
+  R.nav_records2 = await rect('#menu-records');
+  R.first_row = await p.evaluate(() => { const e = document.querySelector('tbody tr'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  await p.screenshot({ path: 'shots/records.png' });
+  await p.evaluate(() => Boako.View.render('team_list'));
+  await p.waitForTimeout(4500);
+  R.nav_teams = await rect('#menu-team-list');
+  R.nav_create = await rect('#menu-team');
+  await p.screenshot({ path: 'shots/teams.png' });
+  fs.writeFileSync('shots/rects.json', JSON.stringify(R, null, 1));
+  console.log(JSON.stringify(R));
+  await b.close();
+})();
