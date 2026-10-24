@@ -218,8 +218,116 @@ scene(34,42.001,'mid',(s,t)=>{
   const d=mk('sub','11월 1일 개막 · 1명부터 OK',s);d.style.marginTop='22px';inAt(d,t+2.3,'up')});
 hdr.style.opacity=0;A(hdr,[{opacity:0},{opacity:1}],{delay:4000,duration:300});
 }
-(VID==='a'?buildA:buildB)();
-window.DUR=VID==='a'?32.4:42;
+
+function buildC(){
+  const cursor=(par,t,pts)=>{ // pts: [[x,y],...] 이동 후 마지막에서 클릭
+    const c=mk('','<svg width="34" height="34" viewBox="0 0 24 24"><path d="M3 2l7 19 3-8 8-3z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg>',par);
+    c.style.cssText='position:absolute;left:0;top:0;z-index:5;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))';
+    const kf=pts.map(q=>({transform:`translate(${q[0]}px,${q[1]}px)`}));
+    A(c,kf,{delay:t*1000,duration:900,easing:'ease-in-out'});
+    const last=pts[pts.length-1];
+    const r=mk('',null,par);r.style.cssText=`position:absolute;left:${last[0]-14}px;top:${last[1]-14}px;width:44px;height:44px;border-radius:50%;border:4px solid #fbbf24;opacity:0;z-index:4`;
+    A(r,[{opacity:0,transform:'scale(.4)'},{opacity:1,transform:'scale(1)',offset:.3},{opacity:0,transform:'scale(1.8)'}],{delay:(t+.95)*1000,duration:600,easing:'linear'});
+    return c};
+  const step=(s,n,title,t)=>{
+    const h=mk('',null,s);h.style.cssText='display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:26px';
+    const dots=[1,2,3,4,5].map(i=>`<i style="display:inline-block;width:${i===n?34:12}px;height:12px;border-radius:9px;background:${i<=n?'#fbbf24':'rgba(255,255,255,.3)'}"></i>`).join('<span style="width:6px;display:inline-block"></span>');
+    const chip=mk('pill',`STEP ${n}`,h);inAt(chip,t+.05,'pop');
+    const dd=mk('',dots,h);inAt(dd,t+.15,'fade');
+    T(h,'t2',title,t+.25)};
+  const ring=(el,t)=>{el.style.boxShadow='0 0 0 0 rgba(251,191,36,.9)';A(el,[{boxShadow:'0 0 0 0 rgba(251,191,36,.9)'},{boxShadow:'0 0 0 18px rgba(251,191,36,0)'}],{delay:t*1000,duration:900,iterations:Infinity,easing:'ease-out'})};
+
+  // S1 도입
+  scene(0,5.99,'mid',(s,t)=>{
+    const e=mk('emo big','🤔',s);inAt(e,t+.2,'pop');
+    T(s,'t1','보아코 아카이브,<br><span class="hl">어떻게 쓰죠?</span>',t+.5);
+    const row=mk('',null,s);row.style.cssText='display:flex;gap:12px;margin-top:34px';
+    for(let i=1;i<=5;i++){const d=mk('',String(i),row);d.style.cssText='width:56px;height:56px;border-radius:50%;background:#fbbf24;color:#1e0a3c;font-weight:900;font-size:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(0,0,0,.3)';inAt(d,3.95+i*.2,'pop')}
+    const tx=mk('t t2','딱 <span class="hl">5단계</span>면 끝!',s);tx.style.marginTop='24px';inAt(tx,3.9,'up')});
+  // S2 로그인
+  scene(5.99,10.13,'',(s,t)=>{
+    step(s,1,'<span class="hl">카카오</span>로 로그인',t);
+    const w=mk('',null,s);w.style.cssText='position:relative;width:100%';
+    const c=mk('card','',w);c.style.cssText+=';padding:26px 22px;text-align:center';
+    c.innerHTML=`<div class="logo" style="color:#7c3aed;font-size:46px;letter-spacing:-3px">BOAKO</div><div style="color:var(--sub);font-weight:700;margin:6px 0 18px;font-size:15px">로그인하고 내 전적을 기록하세요</div>`;
+    const kb=mk('',`🟡 카카오 로그인`,c);kb.style.cssText='background:#fee500;color:#191919;font-weight:900;font-size:22px;border-radius:14px;padding:16px;';
+    inAt(c,t+.6,'up');ring(kb,t+1.2);cursor(w,t+1.2,[[420,250],[250,128]]);
+    const n=mk('note','※ 화면은 예시입니다',s)});
+  // S3 닉네임
+  scene(10.13,16.84,'',(s,t)=>{
+    step(s,2,'<span class="hl">BGA 닉네임</span> 입력',t);
+    const w=mk('',null,s);w.style.cssText='position:relative;width:100%';
+    const c=mk('card','',w);c.style.cssText+=';padding:0;overflow:hidden';
+    c.innerHTML=`<div style="background:#4f46e5;padding:20px;text-align:center;color:#fff"><div style="font-weight:900;font-size:24px">BGA 닉네임 설정</div><div style="font-size:13px;font-weight:700;color:#e0e7ff;margin-top:4px">리그 기록 연동을 위해 꼭 필요합니다!</div></div>
+    <div style="padding:20px"><div style="text-align:center;font-weight:700;color:#475569;font-size:15px;line-height:1.5">현재 <b>보드게임 아레나</b>에서 사용 중인<br><span id="exact" style="color:#ef4444;text-decoration:underline">정확한 닉네임</span>을 입력해 주세요.</div>
+    <div style="text-align:center;color:#4f46e5;font-weight:900;font-size:13px;margin:10px 0 14px">↗ BGA에서 내 닉네임 확인하러 가기</div>
+    <div id="inp" style="border:2px solid #cbd5e1;border-radius:12px;padding:14px;font-weight:900;font-size:19px;color:#1e293b;min-height:54px"><span id="typed"></span><span id="ph" style="color:#94a3b8;font-weight:700;font-size:14px">대소문자 구별하여 정확히 입력</span></div>
+    <div id="okb" style="margin-top:14px;background:#1e293b;color:#fff;font-weight:900;font-size:18px;border-radius:12px;padding:15px;text-align:center">✅ 확인 및 설정 완료</div></div>`;
+    inAt(c,t+.5,'up');
+    const txt='MyBgaNick',ty=c.querySelector('#typed'),ph=c.querySelector('#ph'),inp=c.querySelector('#inp'),ex=c.querySelector('#exact');
+    ticks.push(tt=>{const k=Math.max(0,Math.min(1,(tt-11.3)/1.3));const n=Math.round(k*txt.length);ty.textContent=txt.slice(0,n);ph.style.display=n?'none':'inline'});
+    A(inp,[{borderColor:'#cbd5e1'},{borderColor:'#ef4444'},{borderColor:'#ef4444'},{borderColor:'#cbd5e1'}],{delay:13.4*1000,duration:2200,easing:'linear'});
+    A(ex,[{transform:'scale(1)'},{transform:'scale(1.18)'},{transform:'scale(1)'}],{delay:13.4*1000,duration:700});
+    const bub=mk('pill','⚠️ 대소문자까지 똑같이!',w);bub.style.cssText+=';position:absolute;right:-4px;top:100px;font-size:16px;padding:8px 14px;z-index:6';inAt(bub,13.5,'pop');
+    const ok=c.querySelector('#okb');ring(ok,15.0);cursor(w,15.0,[[430,380],[260,436]]);
+    const tos=mk('card','🎉 BGA 닉네임이 연동되었습니다!',s);tos.style.cssText+=';margin-top:18px;text-align:center;font-weight:900;font-size:18px;padding:14px';inAt(tos,16.1,'up');
+    mk('note','※ 화면은 예시입니다',s)});
+  // S4 기록기 설치
+  scene(16.84,22.75,'',(s,t)=>{
+    step(s,3,'<span class="hl">🧩 기록기</span> 설치',t);
+    const w=mk('',null,s);w.style.cssText='position:relative;width:100%';
+    const nav=mk('card','',w);nav.style.cssText+=';padding:14px 16px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;color:#475569';
+    nav.innerHTML=`<span style="white-space:nowrap">📰 소식지</span><span style="white-space:nowrap">🏆 랭킹</span><span style="white-space:nowrap">📋 전적</span><span id="ib" style="margin-left:auto;white-space:nowrap;background:#7c3aed;color:#fff;border-radius:12px;padding:10px 14px;font-weight:900">🧩 기록기 설치</span>`;
+    inAt(nav,t+.5,'up');ring(nav.querySelector('#ib'),t+1);cursor(w,t+1,[[420,160],[400,34]]);
+    const st=mk('card','',w);st.style.cssText+=';margin-top:18px;display:flex;align-items:center;gap:14px';
+    st.innerHTML=`<img src="icon.png" width="64" height="64" style="border-radius:14px"><div style="flex:1"><div style="font-weight:900;font-size:18px">BOAKO 팀 리그 기록 저장</div><div style="color:var(--sub);font-size:13px;font-weight:700">Chrome 웹 스토어</div></div><div id="add" style="background:#1a73e8;color:#fff;font-weight:900;border-radius:10px;padding:12px 14px;font-size:15px;white-space:nowrap">Chrome에 추가</div>`;
+    inAt(st,t+2.3,'up');ring(st.querySelector('#add'),t+3.2);
+    const chip=mk('pill pu','⚠️ 크롬 계열 브라우저만 지원해요',s);chip.style.cssText+=';margin-top:22px;font-size:17px';inAt(chip,t+4,'pop');
+    mk('note','※ 화면은 예시입니다',s)});
+  // S5 게임 + 자동 저장
+  scene(22.75,29.74,'',(s,t)=>{
+    step(s,4,'<span class="hl">BGA</span>에서 게임 → <span class="hl">자동 저장</span>',t);
+    const w=mk('',null,s);w.style.cssText='position:relative;width:100%';
+    const g=mk('card','',w);g.style.padding='0';g.style.overflow='hidden';
+    g.innerHTML=`<div style="background:#334155;color:#fff;padding:10px 16px;font-weight:900;font-size:15px">🎲 보드게임 아레나 · 게임 진행 중</div><div id="gb" style="padding:22px;text-align:center;min-height:150px"><div class="emo" style="font-size:64px">🎲 🃏 🏰</div><div style="font-weight:900;font-size:19px;margin-top:8px;color:#334155">평소처럼 게임하세요</div></div>`;
+    inAt(g,t+.5,'up');
+    const gb=g.querySelector('#gb');
+    const res=mk('',`<div class="emo" style="font-size:60px">🏆</div><div style="font-weight:900;font-size:22px;color:#1e293b">게임 종료!</div><div style="font-weight:900;font-size:19px;color:#7c3aed;margin-top:4px">🥇 1위</div>`,g);
+    res.style.cssText='position:absolute;left:0;right:0;top:46px;bottom:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center';
+    A(res,[{opacity:0},{opacity:1}],{delay:25.6*1000,duration:400});
+    const toast=mk('',`<div style="font-size:26px" class="emo">✅</div><div><div style="font-weight:900;font-size:15px">BOAKO 기록 저장</div><div style="font-size:13px;color:#cbd5e1;font-weight:700">게임 결과가 자동으로 저장됐어요</div></div>`,w);
+    toast.style.cssText='position:absolute;right:-6px;top:-18px;background:#1e293b;color:#fff;border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.45);z-index:6;width:300px';
+    inAt(toast,27.0,'right');
+    const p=mk('pill','게임이 끝나면 자동으로!',s);p.style.cssText+=';margin-top:36px';inAt(p,27.4,'up');
+    mk('note','※ 화면은 예시입니다',s)});
+  // S6 확인
+  scene(29.74,34.6,'',(s,t)=>{
+    step(s,5,'<span class="hl">전적기록</span>·<span class="hl">랭킹</span> 확인',t);
+    const c=mk('card','',s);inAt(c,t+.5,'up');
+    c.innerHTML=`<div class="row" style="gap:20px;font-weight:900;font-size:17px;color:#475569;border-bottom:3px solid #e2e8f0;margin:-6px 0 12px"><span style="color:#7c3aed;border-bottom:3px solid #7c3aed;padding-bottom:8px;margin-bottom:-3px">📋 전적기록</span><span>🏆 랭킹</span></div>`;
+    [['방금 저장!','🥇 1위','+RP',1],['어제','🥈 2위','+RP',0],['어제','🥇 1위','+RP',0]].forEach((r,i)=>{
+      const d=mk('row',`<div class="av" style="width:44px;height:44px;font-size:22px">🎲</div><b style="font-size:17px">${r[0]}</b><span style="margin-left:auto;font-weight:900">${r[1]}</span><b style="color:#7c3aed">${r[2]}</b>`,c);
+      d.style.cssText='padding:10px 8px;border-radius:12px;'+(r[3]?'background:#fef3c7':'');inAt(d,t+1+i*.4,'right');
+      if(r[3]){A(d,[{background:'#fef3c7'},{background:'#fde68a'},{background:'#fef3c7'}],{delay:(t+1.8)*1000,duration:900,iterations:Infinity,easing:'ease-in-out',composite:'replace'})}});
+    const p=mk('pill','내 기록이 쌓였어요 🎉',s);p.style.marginTop='30px';inAt(p,t+2.6,'pop');
+    mk('note','※ 화면은 예시입니다',s)});
+  // S7 보너스
+  scene(34.6,38.88,'',(s,t)=>{
+    T(s,'t2','<span class="hl">보너스!</span> 팀도 만들어요',t);
+    const w=mk('',null,s);w.style.cssText='display:flex;flex-direction:column;gap:14px;width:100%;margin-top:30px';
+    [['🛡️','팀 창단','내 팀을 직접 만들어요'],['👥','팀 목록','마음에 드는 팀에 합류해요']].forEach((r,i)=>{
+      const d=mk('card',`<div class="row"><div class="emo" style="font-size:42px">${r[0]}</div><div><b style="font-size:25px">${r[1]}</b><div style="color:var(--sub);font-weight:700;font-size:16px">${r[2]}</div></div></div>`,w);d.style.padding='18px 20px';inAt(d,t+.5+i*.4,'left')});
+    const p=mk('pill','🏁 11월 1일 팀 리그 개막!',s);p.style.marginTop='26px';inAt(p,t+1.9,'up')});
+  // S8 마무리
+  scene(38.88,43.001,'mid',(s,t)=>{
+    const l=mk('logo','BOAKO',s);l.style.fontSize='104px';inAt(l,t+.1,'pop');
+    T(s,'t2','지금 바로 시작해요!',t+.6);
+    const u=mk('pill wh','boakoarchive.co.kr',s);u.style.cssText+=';margin-top:30px;font-size:26px';inAt(u,t+1.1,'up');pulse(u,1000)});
+  hdr.style.opacity=0;A(hdr,[{opacity:0},{opacity:1}],{delay:5990,duration:300});
+}
+
+(VID==='a'?buildA:VID==='c'?buildC:buildB)();
+window.DUR=VID==='a'?32.4:VID==='c'?43:42;
 window.render=function(t){anims.forEach(a=>{a.currentTime=t*1000});ticks.forEach(f=>f(t))};
 window.ready=document.fonts.load('900 40px "Noto Sans KR"').then(()=>document.fonts.ready).then(()=>true);
 </script>
