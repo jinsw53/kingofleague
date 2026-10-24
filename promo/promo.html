@@ -42,7 +42,7 @@ body{font-family:'Noto Sans KR','Noto Color Emoji',sans-serif;word-break:keep-al
 <script>
 const params=new URLSearchParams(location.search);const VID=params.get('v')||'a';
 const stage=document.getElementById('stage');
-const anims=[],ticks=[];
+const anims=[],ticks=[],EV=[];window.EV=EV;
 const EASE={out:'cubic-bezier(.16,1,.3,1)',back:'cubic-bezier(.34,1.56,.64,1)',io:'ease-in-out',lin:'linear'};
 function A(e,kf,o){const a=e.animate(kf,Object.assign({fill:'both',easing:EASE.out},o));a.pause();anims.push(a);return a}
 function mk(cls,html,parent){const d=document.createElement('div');d.className=cls;if(html!=null)d.innerHTML=html;(parent||stage).append(d);return d}
@@ -53,11 +53,11 @@ const KF={up:[{opacity:0,transform:'translateY(80px)'},{opacity:1,transform:'non
  right:[{opacity:0,transform:'translateX(160px)'},{opacity:1,transform:'none'}],
  fade:[{opacity:0},{opacity:1}],
  spin:[{opacity:0,transform:'scale(.2) rotate(-180deg)'},{opacity:1,transform:'scale(1) rotate(0)'}]};
-function inAt(e,t,k='up',dur=650){A(e,KF[k],{delay:t*1000,duration:dur,easing:(k==='pop'||k==='spin')?EASE.back:EASE.out});return e}
+function inAt(e,t,k='up',dur=650){EV.push({t,k:e.classList&&e.classList.contains('logo')?'logo':k});A(e,KF[k],{delay:t*1000,duration:dur,easing:(k==='pop'||k==='spin')?EASE.back:EASE.out});return e}
 function bob(e,amp=12,per=2400,ph=0){A(e,[{transform:'translateY(0)'},{transform:`translateY(${-amp}px)`},{transform:'translateY(0)'}],{duration:per,iterations:Infinity,easing:EASE.io,delay:-ph*1000})}
 function pulse(e,per=900){A(e,[{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:per,iterations:Infinity,easing:EASE.io})}
 function grow(e,t,dur=900,to=1){A(e,[{transform:'scaleX(0)'},{transform:`scaleX(${to})`}],{delay:t*1000,duration:dur})}
-function scene(s,e,cls,build){
+function scene(s,e,cls,build){EV.push({t:s,k:'scene'});
   const sc=mk('scene '+(cls||''));
   const D=(e-s)*1000,f=Math.min(260,D/4)/D;
   A(sc,[{opacity:0,offset:0},{opacity:1,offset:f},{opacity:1,offset:1-f},{opacity:0,offset:1}],{delay:s*1000,duration:D,easing:'linear'});
