@@ -73,17 +73,17 @@ const hdr=mk('','<div class="logo" style="font-size:34px;opacity:.95">BOAKO<span
 <script>
 function buildA(){
 // 0-3 hook
-scene(0,3,'mid',(s,t)=>{
+scene(0,2.7,'mid',(s,t)=>{
   const e=mk('emo big','📋',s);e.style.marginBottom='10px';inAt(e,t+.1,'pop');
   T(s,'t1','보드게임 전적,<br><span class="hl">어디에 쌓고 계세요?</span>',t+.4)});
 // 3-6 logo
-scene(3,6,'mid',(s,t)=>{
+scene(2.7,5.28,'mid',(s,t)=>{
   const l=mk('logo','BOAKO',s);l.style.fontSize='120px';inAt(l,t+.1,'pop');
   const l2=mk('t t3','ARCHIVE',s);l2.style.letterSpacing='10px';inAt(l2,t+.5,'up');
   const p=mk('sub','내 보드게임 기록을 한 곳에 모으는<br>보드게임 아레나 아카이브',s);inAt(p,t+.9,'up')});
-hdr&&A(hdr,[{opacity:0},{opacity:1}],{delay:6000,duration:300});
+hdr&&A(hdr,[{opacity:0},{opacity:1}],{delay:5280,duration:300});
 // 6-10 recorder
-scene(6,10,'',(s,t)=>{
+scene(5.28,8.8,'',(s,t)=>{
   T(s,'t2','<span class="hl">🧩 기록기</span> 하나면<br>전적이 알아서 쌓여요',t);
   const c=mk('card','',s);c.style.marginTop='34px';
   c.innerHTML=`<div class="row" style="margin-bottom:12px"><b style="font-size:21px">📋 전적기록</b><span class="tag" style="margin-left:auto">자동 기록</span></div>`;
@@ -93,7 +93,7 @@ scene(6,10,'',(s,t)=>{
     d.style.cssText='padding:10px 0;border-top:1px solid var(--bd)';inAt(d,t+1.1+i*.45,'right')});
   const n=mk('note','※ 화면은 예시입니다',s)});
 // 10-14 ranking
-scene(10,14,'',(s,t)=>{
+scene(8.8,11.59,'',(s,t)=>{
   T(s,'t2','<span class="hl">🏆 랭킹</span>으로<br>실력을 증명하세요',t);
   const c=mk('card','',s);c.style.marginTop='34px';inAt(c,t+.4,'up');
   [['보드왕','👑',100],['주사위장인','🥈',82],['카탄러버','🥉',66],['윙스팬러','4',48],['뉴비탈출','5',30]].forEach((r,i)=>{
@@ -101,40 +101,40 @@ scene(10,14,'',(s,t)=>{
     d.style.padding='9px 0';const bar=d.querySelector('i');bar.style.width=r[2]+'%';grow(bar,t+.9+i*.25,900);inAt(d,t+.6+i*.2,'left')});
   mk('note','※ 화면은 예시입니다',s)});
 // 14-18 rival
-scene(14,18,'',(s,t)=>{
+scene(11.59,14.69,'',(s,t)=>{
   T(s,'t2','<span class="hl">⚡ 라이벌 매치</span><br>1:1 도전장을 던져!',t);
   const c=mk('card','',s);c.style.marginTop='36px';
   c.innerHTML=`<div class="row" style="justify-content:space-around"><div style="text-align:center"><div class="av" style="margin:auto;background:#ddd6fe">😎</div><b style="font-size:18px">도전자</b></div><div class="emo" style="font-size:54px">⚡</div><div style="text-align:center"><div class="av" style="margin:auto;background:#fde68a">🦊</div><b style="font-size:18px">라이벌</b></div></div><div style="text-align:center;margin-top:16px;font-weight:700;color:var(--sub);font-size:18px">이기면 포인트 보상!<br>응원(승자 예측)만 해도 포인트가 쌓여요</div>`;
   inAt(c,t+.5,'pop');const v=c.querySelector('.emo');pulse(v,700)});
 // 18-22 achievements
-scene(18,22,'',(s,t)=>{
+scene(14.69,17.59,'',(s,t)=>{
   T(s,'t2','<span class="hl">🎖️ 업적</span>을 모으고<br>첫 승리를 기록해요',t);
   const g=mk('',null,s);g.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;margin-top:34px';
   [['🥇','첫 승리'],['🔥','연승'],['🎯','도전자'],['🏅','업적'],['👑','챔피언'],['🌟','레전드']].forEach((b,i)=>{
     const d=mk('card',`<div class="emo" style="font-size:46px;text-align:center">${b[0]}</div><div style="text-align:center;font-weight:900;font-size:16px;margin-top:4px">${b[1]}</div>`,g);d.style.padding='16px 6px';inAt(d,t+.4+i*.2,'pop')});
   const p=mk('pill','🎲 오늘의 주사위 · 하루 1회 무료',s);p.style.marginTop='26px';p.style.fontSize='19px';inAt(p,t+1.8,'up')});
 // 22-26 team & schedule
-scene(22,26,'',(s,t)=>{
+scene(17.59,19.75,'',(s,t)=>{
   T(s,'t2','팀을 만들고,<br><span class="hl">일정도 한눈에</span>',t);
   const w=mk('',null,s);w.style.cssText='display:flex;flex-direction:column;gap:14px;width:100%;margin-top:32px';
   [['🛡️','팀 창단','내 팀을 직접 만들어요'],['👥','팀 목록','팀을 찾아서 합류해요'],['📅','일정표','카카오톡 캘린더로 알림까지']].forEach((r,i)=>{
     const d=mk('card',`<div class="row"><div class="emo" style="font-size:40px">${r[0]}</div><div><b style="font-size:24px">${r[1]}</b><div style="color:var(--sub);font-weight:700;font-size:16px">${r[2]}</div></div></div>`,w);d.style.padding='16px 20px';inAt(d,t+.4+i*.35,'left')})});
 // 26-30 together & tournament
-scene(26,30,'',(s,t)=>{
+scene(19.75,23.14,'',(s,t)=>{
   T(s,'t2','<span class="hl">🤝 같이 하자</span> · <span class="hl">🏅 토너먼트</span><br>같이 놀 사람, 여기 있어요',t);
   const c1=mk('card',`<div class="row"><b style="font-size:22px">🤝 같이 하자</b><span class="tag" style="margin-left:auto">모집중</span></div><div style="margin:10px 0 8px;font-weight:700;color:var(--sub)">오늘 밤 윙스팬 한 판?</div><div class="bar"><i style="width:50%"></i></div><div style="text-align:right;font-weight:900;color:var(--p);margin-top:4px">2 / 4명</div>`,s);
   c1.style.marginTop='30px';inAt(c1,t+.5,'left');
   const c2=mk('card',`<div class="row"><b style="font-size:22px">🏅 토너먼트</b><span class="tag" style="margin-left:auto;background:#fef3c7;color:#b45309">개최 공지</span></div><div style="margin-top:10px;font-weight:700;color:var(--sub)">개최 요청 · 종목 투표 · 일정 공지</div>`,s);
   c2.style.marginTop='16px';inAt(c2,t+1.1,'right')});
 // 30-34 shop
-scene(30,34,'',(s,t)=>{
+scene(23.14,26.67,'',(s,t)=>{
   T(s,'t2','활동하면 포인트가 쌓이고<br><span class="hl">🛒 포인트 샵</span>에서 사용!',t);
   const g=mk('',null,s);g.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;margin-top:34px';
   ['🎖️','🏵️','🎀','🧢','💎','🔮'].forEach((e,i)=>{const d=mk('card',`<div class="emo" style="font-size:44px;text-align:center">${e}</div><div style="text-align:center;margin-top:6px"><span class="tag">배지</span></div>`,g);d.style.padding='14px 6px';inAt(d,t+.4+i*.15,'pop')});
   const p=mk('pill pu','게시글 · 라이벌전 · 업적 → 포인트 적립',s);p.style.cssText+=';margin-top:26px;font-size:17px';inAt(p,t+1.6,'up');
   mk('note','※ 화면은 예시입니다',s)});
 // 34-40 CTA
-scene(34,40.001,'mid',(s,t)=>{
+scene(26.67,32.401,'mid',(s,t)=>{
   const l=mk('logo','BOAKO',s);l.style.fontSize='104px';inAt(l,t+.1,'pop');
   T(s,'t2','보드게임 기록의 모든 것',t+.5);
   const u=mk('pill wh','boakoarchive.co.kr',s);u.style.cssText+=';margin-top:30px;font-size:26px';inAt(u,t+1,'up');pulse(u,1000);
@@ -219,7 +219,7 @@ scene(34,42.001,'mid',(s,t)=>{
 hdr.style.opacity=0;A(hdr,[{opacity:0},{opacity:1}],{delay:4000,duration:300});
 }
 (VID==='a'?buildA:buildB)();
-window.DUR=VID==='a'?40:42;
+window.DUR=VID==='a'?32.4:42;
 window.render=function(t){anims.forEach(a=>{a.currentTime=t*1000});ticks.forEach(f=>f(t))};
 window.ready=document.fonts.load('900 40px "Noto Sans KR"').then(()=>document.fonts.ready).then(()=>true);
 </script>

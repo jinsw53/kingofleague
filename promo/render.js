@@ -24,7 +24,7 @@ const fs = require('fs');
     return;
   }
 
-  const fps = 30, n = dur * fps;
+  const fps = 30, n = Math.round(dur * fps);
   const args = ['-y', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-'];
   if (third) args.push('-i', third);
   args.push('-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'medium');
