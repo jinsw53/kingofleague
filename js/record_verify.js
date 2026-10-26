@@ -127,7 +127,7 @@ Boako.RecordVerify = {
                 <p class="text-sm font-bold text-indigo-600 mb-4">${Boako.Util.escapeHtml(item.nickname)} - ${Boako.Util.escapeHtml(item.game_name)}</p>
                 <p class="text-xs font-bold text-slate-500 leading-relaxed mb-4">
                     이 판은 첫 승이 아닙니다. 실제 첫 승 판의 번호(또는 BGA 판 주소)를 입력하면,
-                    나중에 그 판 기록이 들어올 때 <b class="text-slate-700">자동으로 첫 승으로 매칭</b>되어 이 목록에 올라옵니다.
+                    나중에 그 판 기록이 들어오면 <b class="text-slate-700">자동으로 첫 승 인증(승인 완료)</b>까지 처리됩니다. 번호는 꼭 BGA에서 직접 확인한 값만 입력해 주세요.
                 </p>
                 <label class="block text-xs font-black text-slate-600 mb-1">실제 첫 승 판 번호 / 주소</label>
                 <input id="record-reject-input" type="text" autocomplete="off"
@@ -138,7 +138,7 @@ Boako.RecordVerify = {
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-4 text-[11px] font-bold text-slate-500 leading-relaxed">
                     반려하면<br>
                     · 이 기록은 일반 승리 기록으로 돌아갑니다 (첫 승 보너스 RP 제외)<br>
-                    · 첫 승 기록은 다시 "대기" 상태가 됩니다
+                    · 입력한 판 번호는 기억해 두었다가, 그 판이 들어오면 반려한 사람의 확인으로 자동 승인됩니다
                 </div>
                 <div class="flex gap-2 mt-5">
                     <button onclick="Boako.RecordVerify.closeReject()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-black rounded-xl">취소</button>
@@ -191,9 +191,9 @@ Boako.RecordVerify = {
             }
             this.closeReject();
             if (data && data.matched_record_id) {
-                Boako.Util.toast("❌ 반려했습니다. 입력한 판 기록이 이미 있어 바로 첫 승 인증 대기에 올렸어요.");
+                Boako.Util.toast("❌ 반려했습니다. 입력한 판 기록이 이미 있어 바로 첫 승으로 인증했어요.");
             } else if (tableNo) {
-                Boako.Util.toast("❌ 반려했습니다. 판 " + tableNo + " 기록이 들어오면 자동으로 첫 승 인증 대기에 올라옵니다.");
+                Boako.Util.toast("❌ 반려했습니다. 판 " + tableNo + " 기록이 들어오면 자동으로 첫 승 인증됩니다.");
             } else {
                 Boako.Util.toast("❌ 반려했습니다. 첫 승 표시가 해제되었습니다.");
             }
