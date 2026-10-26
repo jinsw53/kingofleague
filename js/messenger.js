@@ -313,11 +313,17 @@ Boako.Messenger = {
         }
     },
 
-    sendDirect: async (receiverId, content, receiverName, actionType = 'DEFAULT', metadata = {}, matchId = null) => {
+    setSendAsAdmin: (on) => {
+        Boako.Messenger.sendAsAdmin = !!on;
+        try { localStorage.setItem('boako_send_as_admin', on ? '1' : '0'); } catch (e) {}
+    },
+
+    sendDirect: async (receiverId, content, receiverName, actionType = 'DEFAULT', metadata = {}, matchId = null, asAdmin = false) => {
         try {
             const payload = {
                 sender_id: Boako.state.user.id,
-                sender_name_override: Boako.state.user.nickname,
+                // 관리자 계정이 '관리자 이름으로 보내기'를 켠 경우에만 '관리자'로 표시 (서버 트리거가 관리자 권한도 한 번 더 검증)
+                sender_name_override: asAdmin ? '관리자' : Boako.state.user.nickname,
                 receiver_id: receiverId,
                 receiver_name_override: receiverName,
                 content: content,
@@ -783,6 +789,17 @@ Boako.Messenger = {
 
         openRoom: (roomId) => {
             Boako.Messenger.currentRoomId = roomId;
+            // 관리자 계정 여부를 한 번만 조회 (관리자면 입력창에 '관리자 이름으로 보내기' 선택지 표시)
+            if (Boako.Messenger.isAdmin === undefined && Boako.state.user) {
+                Boako.Messenger.isAdmin = false;
+                Boako.db.from('profiles').select('is_admin').eq('id', Boako.state.user.id).single().then(({ data }) => {
+                    if (data && data.is_admin) {
+                        Boako.Messenger.isAdmin = true;
+                        try { Boako.Messenger.sendAsAdmin = localStorage.getItem('boako_send_as_admin') === '1'; } catch (e) {}
+                        if (Boako.Messenger.currentRoomId === roomId) Boako.Messenger.View.openRoom(roomId);
+                    }
+                }).catch(() => {});
+            }
             const room = Boako.Messenger.chatRooms[roomId];
             const contentContainer = document.getElementById('chat-room-content');
             if (!room || !contentContainer) return;
@@ -984,8 +1001,14 @@ Boako.Messenger = {
             });
             messagesHtml += '</div>';
 
-            const inputHtml = `
-                <div class="p-4 bg-white border-t border-slate-200 flex gap-2 z-10">
+            const canAdminName = Boako.Messenger.isAdmin === true && !room.isMatchChannel && !room.isTogether && !room.isChallengeChat;
+            const adminToggleHtml = canAdminName ? `
+                <label class="px-4 pt-3 bg-white border-t border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
+                    <input type="checkbox" ${Boako.Messenger.sendAsAdmin ? 'checked' : ''} onchange="Boako.Messenger.setSendAsAdmin(this.checked)">
+                    <span>관리자 이름으로 보내기</span>
+                </label>` : '';
+            const inputHtml = adminToggleHtml + `
+                <div class="p-4 bg-white ${canAdminName ? '' : 'border-t border-slate-200'} flex gap-2 z-10">
                     <textarea id="chat-input" rows="1" placeholder="메시지를 입력하세요... (엔터로 전송)" class="flex-1 resize-none border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"></textarea>
                     <button onclick="Boako.Messenger.View.executeChatSend()" class="bg-slate-800 hover:bg-slate-900 text-white px-5 rounded-xl font-bold transition-colors flex items-center justify-center">전송</button>
                 </div>
@@ -1028,7 +1051,7 @@ Boako.Messenger = {
             } else {
                 const matchId = room.isMatch ? room.id : null;
 const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.gameName } : {};
-                success = await Boako.Messenger.sendDirect(room.otherId, content, room.otherName, 'DEFAULT', metadata, matchId);
+                success = await Boako.Messenger.sendDirect(room.otherId, content, room.otherName, 'DEFAULT', metadata, matchId, Boako.Messenger.isAdmin === true && !!Boako.Messenger.sendAsAdmin);
             }
 
             if (success) {
