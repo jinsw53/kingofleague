@@ -865,6 +865,14 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                 }, 0);
                 break;
 
+            case 'games':
+                if (!Boako.Games || !Boako.Games.init) {
+                    await Boako.Util.loadScript('js/games.js');
+                }
+                html = `<div id="games-root" class="w-full"></div>`;
+                setTimeout(() => { if (Boako.Games && typeof Boako.Games.init === 'function') Boako.Games.init(); }, 0);
+                break;
+
             case 'schedule':
                 if (!Boako.Schedule || !Boako.Schedule.View) {
                     await Boako.Util.loadScript('js/schedule.js');
