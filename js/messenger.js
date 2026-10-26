@@ -1002,10 +1002,13 @@ Boako.Messenger = {
             messagesHtml += '</div>';
 
             const canAdminName = Boako.Messenger.isAdmin === true && !room.isMatchChannel && !room.isTogether && !room.isChallengeChat;
+            // 첫 승 반려 쪽지 / 첫 승 신고 쪽지가 오간 대화방에서는 관리자 이름으로 자동 발송
+            const isFirstWinThread = canAdminName && room.messages.some(m =>
+                m.action_type === 'FIRST_WIN_NOTICE' || String(m.content || '').startsWith('🚩 [첫 승 판 번호 신고]'));
             const adminToggleHtml = canAdminName ? `
-                <label class="px-4 pt-3 bg-white border-t border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
-                    <input type="checkbox" ${Boako.Messenger.sendAsAdmin ? 'checked' : ''} onchange="Boako.Messenger.setSendAsAdmin(this.checked)">
-                    <span>관리자 이름으로 보내기</span>
+                <label class="px-4 pt-3 bg-white border-t border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-600 ${isFirstWinThread ? '' : 'cursor-pointer'} select-none">
+                    <input type="checkbox" ${(isFirstWinThread || Boako.Messenger.sendAsAdmin) ? 'checked' : ''} ${isFirstWinThread ? 'disabled' : ''} onchange="Boako.Messenger.setSendAsAdmin(this.checked)">
+                    <span>관리자 이름으로 보내기${isFirstWinThread ? ' (첫 승 신고·반려 대화: 자동)' : ''}</span>
                 </label>` : '';
             const inputHtml = adminToggleHtml + `
                 <div class="p-4 bg-white ${canAdminName ? '' : 'border-t border-slate-200'} flex gap-2 z-10">
@@ -1051,7 +1054,7 @@ Boako.Messenger = {
             } else {
                 const matchId = room.isMatch ? room.id : null;
 const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.gameName } : {};
-                success = await Boako.Messenger.sendDirect(room.otherId, content, room.otherName, 'DEFAULT', metadata, matchId, Boako.Messenger.isAdmin === true && !!Boako.Messenger.sendAsAdmin);
+                success = await Boako.Messenger.sendDirect(room.otherId, content, room.otherName, 'DEFAULT', metadata, matchId, Boako.Messenger.isAdmin === true && (!!Boako.Messenger.sendAsAdmin || (room.messages || []).some(m => m.action_type === 'FIRST_WIN_NOTICE' || String(m.content || '').startsWith('🚩 [첫 승 판 번호 신고]'))));
             }
 
             if (success) {
