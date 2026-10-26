@@ -961,6 +961,13 @@ Boako.Messenger = {
                     else if (status === 'ACCEPTED') btnHtml = `<div class="mt-3 text-xs text-blue-600 text-center bg-blue-50 py-1.5 rounded-lg">✅ 승인됨</div>`;
                     else btnHtml = `<div class="mt-3 text-xs text-red-500 text-center bg-red-50 py-1.5 rounded-lg">❌ 거절됨</div>`;
                     messagesHtml += `<div class="flex flex-col items-${isMe ? 'end' : 'start'} self-${isMe ? 'end' : 'start'} mb-2">${!isMe ? `<div class="font-bold text-xs text-slate-800 mb-1 ml-1">${senderName}</div>` : ''}<div class="flex items-end gap-2">${isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}<div class="bg-white border border-blue-200 rounded-2xl p-4 w-64 shadow-sm text-slate-800"><div class="font-black text-blue-600 text-xs mb-2">${isJoin ? '🛡️ 입단 지원' : '💌 스카웃 제안'}</div><div class="text-sm font-bold bg-slate-50 p-2.5 rounded-lg text-center border">[${Boako.Util.escapeHtml(pData.team_name)}] 합류</div>${btnHtml}</div>${!isMe ? `<span class="text-[10px] text-slate-400 mb-1">${timeStr}</span>` : ''}</div></div>`;
+                } else if (msg.action_type === 'FIRST_WIN_NOTICE' && !isMe) {
+                    // 반려 후 발송되는 '첫 승 판 기록 요청' 쪽지: 링크가 사실과 다르면 관리자에게 신고
+                    const nStatus = msg.action_status || 'PENDING';
+                    const reportHtml = nStatus === 'PENDING'
+                        ? `<button onclick="Boako.Messenger.View.reportFirstWin('${msg.message_id}')" class="mt-3 w-full text-xs font-black py-2 rounded-lg border border-rose-200 text-rose-600 bg-white hover:bg-rose-50">🚩 위 링크가 사실과 달라요 (관리자에게 신고)</button>`
+                        : `<div class="mt-3 text-xs text-slate-500 font-bold text-center bg-slate-50 py-1.5 rounded-lg border border-slate-200">🚩 신고 완료 · 관리자가 확인합니다</div>`;
+                    messagesHtml += `<div class="flex items-end justify-start gap-2 self-start max-w-[85%]"><div class="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm text-sm break-words leading-relaxed"><div class="font-bold text-xs text-slate-800 mb-1">${senderName}</div>${Boako.Util.linkifyBga(Boako.Util.escapeHtml(msg.content)).replace(/\n/g, '<br>')}${reportHtml}</div><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span></div>`;
                 } else if (msg.type === 'TOGETHER_CHAT' || msg.type === 'CHALLENGE_CHAT') {
                     if (isMe) {
                         messagesHtml += `<div class="flex items-end justify-end gap-2 self-end max-w-[85%]"><span class="text-[10px] text-slate-400 mb-1">${timeStr}</span><div class="bg-sky-600 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm text-sm break-words leading-relaxed">${Boako.Util.linkifyBga(Boako.Util.escapeHtml(msg.content)).replace(/\n/g, '<br>')}</div></div>`;
@@ -1037,6 +1044,14 @@ const metadata = room.isMatch ? { match_type: room.matchType, game_name: room.ga
             if (!room.isMatch) { Boako.Util.toast("매치 전용 대화방에서만 가능합니다."); return; }
 
             Boako.Messenger.ScheduleModal.open(roomId);
+        },
+
+        reportFirstWin: async (messageId) => {
+            if (!confirm('안내된 링크가 사실과 다르다고 관리자에게 신고하시겠습니까?\n신고하면 해당 첫 승 업적은 자동 승인되지 않고 관리자 확인을 거칩니다.')) return;
+            const { error } = await Boako.db.rpc('report_first_win_link', { p_message_id: Number(messageId) });
+            if (error) { Boako.Util.toast('❌ 신고에 실패했습니다: ' + (error.message || '')); return; }
+            Boako.Util.toast('🚩 신고가 접수되었습니다. 관리자가 확인합니다.');
+            await Boako.Messenger.View.refreshRoomList(); Boako.Messenger.View.openRoom(Boako.Messenger.currentRoomId);
         },
 
         replySchedule: async (messageId, status, chosenTime = null) => {

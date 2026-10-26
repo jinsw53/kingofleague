@@ -217,6 +217,9 @@ Boako.MobileMessenger = {
                         <div style="max-width:220px; padding:8px 12px; border-radius:14px; font-size:12.5px; line-height:1.4;
                             ${isMe ? 'background:#4f46e5; color:#fff; border-bottom-right-radius:4px;' : 'background:#fff; border:1px solid #e2e8f0; color:#0f172a; border-bottom-left-radius:4px;'}">
                             ${Boako.Util.linkifyBga(Boako.MobileMessenger.escapeHtml(m.content))}
+                            ${(m.action_type === 'FIRST_WIN_NOTICE' && !isMe) ? ((m.action_status || 'PENDING') === 'PENDING'
+                                ? `<button onclick="Boako.MobileMessenger.reportFirstWin('${m.message_id}')" style="display:block; width:100%; margin-top:8px; padding:7px 0; border:1px solid #fecdd3; border-radius:8px; background:#fff; color:#e11d48; font-size:11px; font-weight:900;">🚩 위 링크가 사실과 달라요 (관리자에게 신고)</button>`
+                                : `<div style="margin-top:8px; padding:6px 0; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; color:#64748b; font-size:11px; font-weight:800; text-align:center;">🚩 신고 완료 · 관리자가 확인합니다</div>`) : ''}
                         </div>
                         <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0; text-align:${isMe ? 'right' : 'left'};">${time}</div>
                     </div>
@@ -643,6 +646,19 @@ Boako.MobileMessenger = {
         } catch (e) {
             console.error('일정 응답 처리 실패:', e);
             Boako.Util.toast('❌ 캘린더 등록에 실패했습니다.');
+        }
+        await Boako.MobileMessenger._refreshAfterAction();
+    },
+
+    reportFirstWin: async (messageId) => {
+        if (!confirm('안내된 링크가 사실과 다르다고 관리자에게 신고하시겠습니까?\n신고하면 해당 첫 승 업적은 자동 승인되지 않고 관리자 확인을 거칩니다.')) return;
+        try {
+            const { error } = await Boako.db.rpc('report_first_win_link', { p_message_id: Number(messageId) });
+            if (error) throw error;
+            Boako.Util.toast('🚩 신고가 접수되었습니다. 관리자가 확인합니다.');
+        } catch (e) {
+            console.error('첫 승 링크 신고 실패:', e);
+            Boako.Util.toast('❌ 신고에 실패했습니다.');
         }
         await Boako.MobileMessenger._refreshAfterAction();
     },

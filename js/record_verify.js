@@ -33,7 +33,14 @@ Boako.RecordVerify = {
 
             if (error) throw error;
             
-            this.pendingList = data || [];
+            // 리더가 '나에게서 숨기기'한 기록은 제외 (실패해도 목록 자체는 정상 표시)
+            let hiddenIds = new Set();
+            try {
+                const { data: hid } = await Boako.db.from('verify_hidden').select('record_id');
+                hiddenIds = new Set((hid || []).map(h => String(h.record_id)));
+            } catch (e) { console.warn('숨김 목록 로드 실패:', e); }
+
+            this.pendingList = (data || []).filter(it => !hiddenIds.has(String(it.id)));
             this.renderList();
 
         } catch (err) {
@@ -134,19 +141,16 @@ Boako.RecordVerify = {
                        placeholder="예: 888919529 또는 boardgamearena.com/table?table=888919529"
                        oninput="Boako.RecordVerify.checkRejectInput()"
                        class="w-full border-2 border-slate-200 focus:border-indigo-400 outline-none rounded-xl px-3.5 py-3 text-sm font-bold text-slate-800">
-                <p id="record-reject-hint" class="text-[11px] font-bold text-slate-400 mt-1.5 min-h-[16px]">모르면 비워 두세요. 이 판의 첫 승 표시만 해제됩니다.</p>
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-4 text-[11px] font-bold text-slate-500 leading-relaxed">
-                    반려하면<br>
-                    · 이 기록은 일반 승리 기록으로 돌아갑니다 (첫 승 보너스 RP 제외)<br>
-                    · 입력한 판 번호는 기억해 두었다가, 그 판이 들어오면 반려한 사람의 확인으로 자동 승인됩니다
-                </div>
+                <p id="record-reject-hint" class="text-[11px] font-bold text-slate-400 mt-1.5 min-h-[16px]"></p>
+                <div id="record-reject-info" class="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-4 text-[11px] font-bold text-slate-500 leading-relaxed"></div>
                 <div class="flex gap-2 mt-5">
                     <button onclick="Boako.RecordVerify.closeReject()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-black rounded-xl">취소</button>
-                    <button onclick="Boako.RecordVerify.submitReject()" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white text-sm font-black rounded-xl shadow-sm active:scale-[0.98]">반려하기</button>
+                    <button id="record-reject-submit" onclick="Boako.RecordVerify.submitReject()" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white text-sm font-black rounded-xl shadow-sm active:scale-[0.98]">반려하기</button>
                 </div>
             </div>`;
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+        this.checkRejectInput();
         setTimeout(() => { const i = document.getElementById('record-reject-input'); if (i) i.focus(); }, 50);
     },
 
@@ -159,12 +163,22 @@ Boako.RecordVerify = {
     checkRejectInput: function() {
         const input = document.getElementById('record-reject-input');
         const hint = document.getElementById('record-reject-hint');
+        const info = document.getElementById('record-reject-info');
+        const btn = document.getElementById('record-reject-submit');
         if (!input || !hint) return;
         const r = this.parseTableNo(input.value);
+        const rejectInfo = '반려하면<br>· 이 기록은 일반 승리 기록으로 돌아갑니다 (첫 승 보너스 RP 제외)<br>· 입력한 판 번호는 기억해 두었다가, 그 판이 들어오면 반려한 사람의 확인으로 자동 승인됩니다<br>· 해당 선수에게 기록 요청 쪽지가 발송됩니다';
+        const hideInfo = '판 번호를 비우면 <b class="text-slate-700">반려되지 않습니다.</b><br>· 이 기록은 내 화면에서만 숨겨집니다<br>· 첫 승 표시와 점수는 그대로이고, 다른 리더에게는 계속 보입니다';
         if (r === null) {
-            hint.textContent = '모르면 비워 두세요. 이 판의 첫 승 표시만 해제됩니다.';
+            hint.textContent = '실제 첫 승 판 번호를 모르면 비워 두세요. 승인하지 않고 내 화면에서만 숨깁니다.';
             hint.className = 'text-[11px] font-bold text-slate-400 mt-1.5 min-h-[16px]';
-        } else if (r === false) {
+            if (info) info.innerHTML = hideInfo;
+            if (btn) { btn.textContent = '나에게서 숨기기'; btn.className = 'flex-1 py-3 bg-slate-700 hover:bg-slate-800 text-white text-sm font-black rounded-xl shadow-sm active:scale-[0.98]'; }
+            return;
+        }
+        if (info) info.innerHTML = rejectInfo;
+        if (btn) { btn.textContent = '반려하기'; btn.className = 'flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white text-sm font-black rounded-xl shadow-sm active:scale-[0.98]'; }
+        if (r === false) {
             hint.textContent = '판 번호(숫자) 또는 BGA 판 주소를 입력해 주세요.';
             hint.className = 'text-[11px] font-bold text-rose-500 mt-1.5 min-h-[16px]';
         } else {
@@ -178,6 +192,25 @@ Boako.RecordVerify = {
         const input = document.getElementById('record-reject-input');
         const tableNo = this.parseTableNo(input ? input.value : '');
         if (tableNo === false) { this.checkRejectInput(); return; }
+
+        // 판 번호가 비어 있으면 '반려'가 아니라 이 리더 화면에서만 숨김
+        if (tableNo === null) {
+            try {
+                this.isRejecting = true;
+                const { error } = await Boako.db.from('verify_hidden')
+                    .upsert({ record_id: Number(this.rejectTargetId) }, { onConflict: 'leader_id,record_id', ignoreDuplicates: true });
+                if (error) throw error;
+                this.closeReject();
+                Boako.Util.toast("🙈 내 화면에서만 숨겼습니다. 다른 리더에게는 계속 보입니다.");
+                await this.loadPendingData();
+            } catch (err) {
+                console.error("숨기기 에러:", err);
+                Boako.Util.toast("숨기기 중 오류가 발생했습니다.");
+            } finally {
+                this.isRejecting = false;
+            }
+            return;
+        }
 
         try {
             this.isRejecting = true;
@@ -195,7 +228,7 @@ Boako.RecordVerify = {
             } else if (tableNo) {
                 Boako.Util.toast("❌ 반려했습니다. 판 " + tableNo + " 기록이 들어오면 자동으로 첫 승 인증됩니다.");
             } else {
-                Boako.Util.toast("❌ 반려했습니다. 첫 승 표시가 해제되었습니다.");
+                Boako.Util.toast("❌ 반려했습니다.");
             }
             await this.loadPendingData();
             if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
