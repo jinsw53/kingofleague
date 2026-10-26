@@ -2471,6 +2471,12 @@
     return div.innerHTML;
   }
 
+  // 이미 escapeHtml 된 문자열 안의 BGA 주소(https://boardgamearena.com/...)만 새 창 링크로 변환 (다른 도메인은 글자 그대로)
+  function linkifyBga(escaped, color) {
+    return String(escaped || '').replace(/https:\/\/boardgamearena\.com\/[A-Za-z0-9_\-.\/?=%#]*/g,
+      (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer" style="color:${color || '#4f46e5'}; text-decoration:underline; font-weight:800; word-break:break-all;">${u}</a>`);
+  }
+
   function renderBody() {
     const body = document.getElementById('boako-panel-body');
     const title = document.getElementById('boako-panel-title');
@@ -2569,7 +2575,10 @@
           <div>
             <div style="max-width:220px; padding:8px 12px; border-radius:14px; font-size:12.5px; line-height:1.4;
               ${isMe ? 'background:#4f46e5; color:#fff; border-bottom-right-radius:4px;' : 'background:#fff; color:#0f172a; border-bottom-left-radius:4px; box-shadow:0 1px 2px rgba(0,0,0,.05);'}">
-              ${escapeHtml(m.content)}
+              ${linkifyBga(escapeHtml(m.content), isMe ? '#fff' : '#4f46e5')}
+              ${(m.action_type === 'FIRST_WIN_NOTICE' && !isMe) ? ((m.action_status || 'PENDING') === 'PENDING'
+                ? `<button class="boako-thread-action-btn" data-action="firstwin-report" data-msg-id="${m.message_id}" style="display:block; width:100%; margin-top:8px; padding:7px 0; border:1px solid #fecdd3; border-radius:8px; background:#fff; color:#e11d48; font-size:11px; font-weight:900; cursor:pointer;">🚩 위 링크가 사실과 달라요 (관리자에게 신고)</button>`
+                : `<div style="margin-top:8px; padding:6px 0; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; color:#64748b; font-size:11px; font-weight:800; text-align:center;">🚩 신고 완료 · 관리자가 확인합니다</div>`) : ''}
             </div>
             <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0; text-align:${isMe ? 'right' : 'left'};">${time}</div>
           </div>
@@ -2752,6 +2761,7 @@
     else if (action === 'teamjoin-reject') replyTeamJoin(messageId, 'REJECTED');
     else if (action === 'teaminvite-accept') replyTeamInvite(messageId, 'ACCEPTED');
     else if (action === 'teaminvite-reject') replyTeamInvite(messageId, 'REJECTED');
+    else if (action === 'firstwin-report') reportFirstWin(messageId);
     else if (action === 'thread-leave') leaveConversation(btn.dataset.otherId);
     else if (action === 'thread-schedule') openScheduleModal({ matchId: btn.dataset.matchId, gameName: btn.dataset.gameName, matchType: btn.dataset.matchType });
   }
@@ -2784,6 +2794,22 @@
     } catch (e) {
       boakoErr('일정 응답 처리 실패:', e);
       showToast('system', '❌', '처리 실패', '캘린더 등록에 실패했습니다.');
+    }
+    await refreshAfterThreadAction();
+  }
+
+  async function reportFirstWin(messageId) {
+    if (!confirm('안내된 링크가 사실과 다르다고 관리자에게 신고하시겠습니까?\n신고하면 해당 첫 승 업적은 자동 승인되지 않고 관리자 확인을 거칩니다.')) return;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/report_first_win_link`, {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ p_message_id: Number(messageId) })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('system', '🚩', '신고 접수', '관리자가 확인합니다.');
+    } catch (e) {
+      boakoErr('첫 승 링크 신고 실패:', e);
+      showToast('system', '❌', '신고 실패', '잠시 후 다시 시도해 주세요.');
     }
     await refreshAfterThreadAction();
   }
