@@ -123,8 +123,8 @@ Boako.Games = {
             listEl.innerHTML = S.rows.map(g => {
                 const img = g.image_url ? Boako.Util.cdn(g.image_url) : '';
                 const thumb = img
-                    ? `<img src="${img}" loading="lazy" style="width:56px; height:56px; border-radius:12px; object-fit:cover; background:#f1f5f9;" onerror="this.outerHTML='<div style=&quot;width:56px;height:56px;border-radius:12px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:24px;&quot;>🎲</div>'">`
-                    : `<div style="width:56px; height:56px; border-radius:12px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:24px;">🎲</div>`;
+                    ? `<img src="${img}" loading="lazy" style="width:64px; height:64px; border-radius:12px; object-fit:contain; background:#fff; border:1px solid #f1f5f9; padding:2px; box-sizing:border-box; flex-shrink:0;" onerror="this.outerHTML='<div style=&quot;width:64px;height:64px;border-radius:12px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:24px;&quot;>🎲</div>'">`
+                    : `<div style="width:64px; height:64px; border-radius:12px; background:#f1f5f9; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:24px;">🎲</div>`;
                 const statusBadge = g.game_status && g.game_status !== 'NORMAL'
                     ? `<span style="font-size:10px; font-weight:900; padding:2px 6px; border-radius:6px; background:#fef3c7; color:#92400e;">${esc(g.game_status)}</span>` : '';
                 const coopBadge = g.is_cooperative
