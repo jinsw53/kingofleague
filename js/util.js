@@ -41,6 +41,11 @@ Boako.Util = {
     // 🛡️ [보안] 사용자 입력(채팅/닉네임/글 내용 등)을 innerHTML 에 넣기 전에 반드시 통과시키는 이스케이프
     escapeHtml: (str) => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
     // 🛡️ [보안] onclick="fn('...')" 처럼 HTML 속성 안의 JS 문자열 리터럴에 값을 넣을 때 사용
+    // 이미 escapeHtml 된 문자열 안의 BGA 주소(https://boardgamearena.com/...)만 새 창 링크로 변환 (다른 도메인은 그대로 글자)
+    linkifyBga: (escapedHtml, style = 'text-decoration:underline; font-weight:800; word-break:break-all;') =>
+        String(escapedHtml ?? '').replace(/https:\/\/boardgamearena\.com\/[A-Za-z0-9_\-.\/?=%#]*/g,
+            (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="${style}">${u}</a>`),
+
     escapeJsAttr: (str) => String(str ?? '').replace(/[\\'"<>&\n\r`$]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')),
     // 💬 1. 알림창 띄우기 (기존 코드 그대로)
     toast: (msg) => {

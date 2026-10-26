@@ -216,7 +216,7 @@ Boako.MobileMessenger = {
                     <div>
                         <div style="max-width:220px; padding:8px 12px; border-radius:14px; font-size:12.5px; line-height:1.4;
                             ${isMe ? 'background:#4f46e5; color:#fff; border-bottom-right-radius:4px;' : 'background:#fff; border:1px solid #e2e8f0; color:#0f172a; border-bottom-left-radius:4px;'}">
-                            ${Boako.MobileMessenger.escapeHtml(m.content)}
+                            ${Boako.Util.linkifyBga(Boako.MobileMessenger.escapeHtml(m.content))}
                         </div>
                         <div style="font-size:9.5px; color:#94a3b8; margin:2px 6px 0; text-align:${isMe ? 'right' : 'left'};">${time}</div>
                     </div>
