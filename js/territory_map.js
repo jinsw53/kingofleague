@@ -156,6 +156,46 @@ Boako.TerritoryMap = {
         ].sort((a, b) => a.firstDay - b.firstDay);
     },
 
+    // 🌟 파워 다이어그램 가중치 보정: 각 사이트의 영역 면적이 목표 비중(targets, 합=1)과 같아지도록
+    // 가산 가중치 w를 반복 조정. cells = [[x,y],...] (면적을 재는 샘플 점들). 반환: w 배열.
+    fitPowerWeights: function(sites, targets, cells) {
+        const n = sites.length;
+        const w = new Array(n).fill(0);
+        if (n <= 1 || cells.length === 0) return w;
+        const total = cells.length;
+        const D = this.W * this.W + this.H * this.H;
+        const counts = new Array(n);
+        for (let it = 0; it < 220; it++) {
+            counts.fill(0);
+            for (let k = 0; k < total; k++) {
+                const px = cells[k][0], py = cells[k][1];
+                let bi = 0, bv = Infinity;
+                for (let i = 0; i < n; i++) {
+                    const dx = px - sites[i].x, dy = py - sites[i].y;
+                    const v = dx * dx + dy * dy - w[i];
+                    if (v < bv) { bv = v; bi = i; }
+                }
+                counts[bi]++;
+            }
+            let maxErr = 0;
+            const eta = 0.25 * Math.max(0.15, 1 - it / 200);
+            for (let i = 0; i < n; i++) {
+                const err = targets[i] - counts[i] / total;
+                if (Math.abs(err) > maxErr) maxErr = Math.abs(err);
+                w[i] += eta * err * D * 0.5;
+            }
+            if (maxErr < 0.004) break;
+        }
+        return w;
+    },
+
+    // 라벨이 캔버스 밖으로 잘리지 않도록 실제 크기를 재서 안쪽으로 밀어 넣음
+    placeLabel: function(el, x, y) {
+        const hw = (el.offsetWidth || 60) / 2 + 4, hh = (el.offsetHeight || 20) / 2 + 4;
+        el.style.left = Math.min(Math.max(x, hw), Math.max(hw, this.W - hw)) + 'px';
+        el.style.top = Math.min(Math.max(y, hh), Math.max(hh, this.H - hh)) + 'px';
+    },
+
     weightOf: function(share) { return Math.sqrt(Math.max(0, share)); },
 
     setupDom: function() {
@@ -243,43 +283,77 @@ Boako.TerritoryMap = {
             return;
         }
 
-        // 🌟 [핵심] 그날 순위로 중심으로부터의 거리를 결정 — 1등(rankIdx 0)은 거리 0(정중앙),
-        // 순위가 밀릴수록 자기 고정 방향(e.angle)을 따라 바깥쪽으로. 방향 자체는 안 바뀜.
-        // 1등에게는 isRank1 플래그를 붙여서 라벨에 👑를 붙일 수 있게 함.
+        // 🌟 [재설계] 면적이 RP 비중과 "실제로" 일치하도록 — 파워 다이어그램(가산 가중치 보로노이)의 가중치를
+        //    반복 보정해서 각 영역의 면적을 목표 비중(캔버스 전체 × 비중)에 맞춤.
+        //    (이전 방식은 거리/가중치 비율 보로노이라 1·2등이 가운데서 작은 원으로 갇히고 약한 개체가
+        //     큰 원이 되는 왜곡이 있었음.) 사이트(씨앗) 위치는 그날 순위 기준으로만 정하고, 면적은 가중치가 책임짐.
         const cx = this.W / 2, cy = this.H / 2;
         const ranked = topRaw.slice().sort((a, b) => b.value - a.value);
-        ranked.forEach((x, rankIdx) => {
-            const dist = this.scaleTop * rankIdx;
-            x.e.cx = cx + dist * Math.cos(x.e.angle);
-            x.e.cy = cy + dist * Math.sin(x.e.angle);
-            x.isRank1 = rankIdx === 0;
-        });
-
+        const nTop = ranked.length;
         const topSum = topRaw.reduce((s, x) => s + x.value, 0);
-        topRaw.forEach(x => { x.weight = this.weightOf(x.value / topSum); });
-
-        const memberWeightsByTeam = {};
-        topRaw.forEach(x => {
-            if (x.e.kind !== 'team') return;
-            const activeMembers = x.e.team.memberList
-                .map((m, mi) => ({ m, mi, raw: sumUpTo(m.daily) }))
-                .filter(o => o.raw > 0);
-
-            // 팀원도 동일 원리: 방향(m.angle)은 고정, 팀 내부 그날 순위로 팀 중심에서의 거리만 결정
-            const rankedMembers = activeMembers.slice().sort((a, b) => b.raw - a.raw);
-            rankedMembers.forEach((o, rankIdx) => {
-                const dist = this.scaleMember * rankIdx;
-                o.m.dx = dist * Math.cos(o.m.angle);
-                o.m.dy = dist * Math.sin(o.m.angle);
-            });
-
-            const raws = activeMembers.map(o => o.raw + EPS);
-            const sum = raws.reduce((a, b) => a + b, 0);
-            memberWeightsByTeam[x.e.key] = activeMembers.map((o, idx) => ({ m: o.m, mi: o.mi, weight: this.weightOf(raws[idx] / sum) }));
+        ranked.forEach((x, rankIdx) => {
+            // 1등은 정중앙, 순위가 밀릴수록 자기 고정 방향(e.angle)을 따라 바깥쪽 (sqrt 분포로 캔버스 안에 고르게)
+            const f = nTop > 1 ? Math.sqrt(rankIdx / (nTop - 1)) : 0;
+            x.e.cx = cx + this.W * 0.34 * f * Math.cos(x.e.angle);
+            x.e.cy = cy + this.H * 0.34 * f * Math.sin(x.e.angle);
+            x.isRank1 = rankIdx === 0;
+            x.share = x.value / topSum;
         });
 
         const W = this.W, H = this.H, STEP = this.STEP;
         const COLS = Math.ceil(W / STEP), ROWS = Math.ceil(H / STEP);
+
+        // 코어스 격자(가중치 보정용) — 전체 캔버스 셀 목록
+        const FS = Math.max(5, Math.round(W / 110));
+        const coarse = [];
+        for (let y = FS / 2; y < H; y += FS) for (let x = FS / 2; x < W; x += FS) coarse.push([x, y]);
+
+        const topSites = topRaw.map(x => ({ x: x.e.cx, y: x.e.cy }));
+        const topW = this.fitPowerWeights(topSites, topRaw.map(x => x.share), coarse);
+        topRaw.forEach((x, i) => { x.w = topW[i]; });
+
+        // 팀 안 팀원: 그 팀이 실제로 차지한 코어스 셀 안에서 같은 방식으로 면적 분할
+        const topOwnerOf = (px, py) => {
+            let bi = 0, bv = Infinity;
+            for (let i = 0; i < topRaw.length; i++) {
+                const dx = px - topSites[i].x, dy = py - topSites[i].y;
+                const v = dx * dx + dy * dy - topW[i];
+                if (v < bv) { bv = v; bi = i; }
+            }
+            return bi;
+        };
+        const teamCells = topRaw.map(() => []);
+        coarse.forEach(pt => { teamCells[topOwnerOf(pt[0], pt[1])].push(pt); });
+
+        const memberWeightsByTeam = {};
+        topRaw.forEach((x, ti) => {
+            if (x.e.kind !== 'team') return;
+            const activeMembers = x.e.team.memberList
+                .map((m, mi) => ({ m, mi, raw: sumUpTo(m.daily) }))
+                .filter(o => o.raw > 0);
+            const cells = teamCells[ti];
+            const rankedMembers = activeMembers.slice().sort((a, b) => b.raw - a.raw);
+            // 팀이 실제 차지한 영역의 무게중심/크기를 기준으로 팀원 씨앗을 배치
+            let mcx = x.e.cx, mcy = x.e.cy, rad = 20;
+            if (cells.length > 0) {
+                mcx = cells.reduce((s, p) => s + p[0], 0) / cells.length;
+                mcy = cells.reduce((s, p) => s + p[1], 0) / cells.length;
+                rad = Math.sqrt(cells.length * FS * FS / Math.PI) * 0.55;
+            }
+            const nm = rankedMembers.length;
+            rankedMembers.forEach((o, rankIdx) => {
+                const f = nm > 1 ? Math.sqrt(rankIdx / (nm - 1)) : 0;
+                o.sx = mcx + rad * f * Math.cos(o.m.angle);
+                o.sy = mcy + rad * f * Math.sin(o.m.angle);
+                o.m.dx = o.sx - x.e.cx; o.m.dy = o.sy - x.e.cy;
+            });
+            const raws = activeMembers.map(o => o.raw + EPS);
+            const rsum = raws.reduce((a, b) => a + b, 0);
+            const mSites = activeMembers.map(o => ({ x: o.sx, y: o.sy }));
+            const mW = this.fitPowerWeights(mSites, raws.map(v => v / rsum), cells.length ? cells : coarse);
+            memberWeightsByTeam[x.e.key] = activeMembers.map((o, idx) => ({ m: o.m, mi: o.mi, sx: o.sx, sy: o.sy, w: mW[idx] }));
+        });
+
         const topKeyGrid = new Array(ROWS), ownerKeyGrid = new Array(ROWS), fillGrid = new Array(ROWS);
         const topCentroid = {}, ownerCentroid = {};
 
@@ -288,28 +362,27 @@ Boako.TerritoryMap = {
             const y = r * STEP + STEP / 2;
             for (let c = 0; c < COLS; c++) {
                 const x = c * STEP + STEP / 2;
-                let best = null, bestRatio = Infinity;
+                let bestI = 0, bestV = Infinity;
                 for (let i = 0; i < topRaw.length; i++) {
-                    const t = topRaw[i];
-                    const d = Math.hypot(x - t.e.cx, y - t.e.cy);
-                    const ratio = d / t.weight;
-                    if (ratio < bestRatio) { bestRatio = ratio; best = t; }
+                    const dx = x - topSites[i].x, dy = y - topSites[i].y;
+                    const v = dx * dx + dy * dy - topW[i];
+                    if (v < bestV) { bestV = v; bestI = i; }
                 }
+                const best = topRaw[bestI];
                 let ownerKey, fillColor;
                 const hue = this.HUES[best.hueIdx];
                 if (best.e.kind === 'solo') {
                     ownerKey = best.e.key; fillColor = hue[400];
                 } else {
                     const mws = memberWeightsByTeam[best.e.key];
-                    let bestM = null, bestMi = 0, bestMR = Infinity;
+                    let bestInfo = mws[0], bestMV = Infinity;
                     mws.forEach((info) => {
-                        const mx = best.e.cx + info.m.dx, my = best.e.cy + info.m.dy;
-                        const d = Math.hypot(x - mx, y - my);
-                        const ratio = d / info.weight;
-                        if (ratio < bestMR) { bestMR = ratio; bestM = info; bestMi = info.mi; }
+                        const dx = x - info.sx, dy = y - info.sy;
+                        const v = dx * dx + dy * dy - info.w;
+                        if (v < bestMV) { bestMV = v; bestInfo = info; }
                     });
-                    ownerKey = bestM.m.name;
-                    fillColor = hue[bestMi % 2 === 0 ? 400 : 200];
+                    ownerKey = bestInfo.m.name;
+                    fillColor = hue[bestInfo.mi % 2 === 0 ? 400 : 200];
                 }
                 topKeyGrid[r][c] = best.e.key; ownerKeyGrid[r][c] = ownerKey; fillGrid[r][c] = fillColor;
                 const tc = topCentroid[best.e.key] || (topCentroid[best.e.key] = { sx: 0, sy: 0, n: 0 });
@@ -352,27 +425,36 @@ Boako.TerritoryMap = {
                 const total = e.team.memberList.reduce((s, m) => s + sumUpTo(m.daily), 0);
                 const center = centroidOf(topCentroid, e.key, e.cx, e.cy);
                 const el = this.labelDivs[e.key + '-team'];
-                el.style.left = center.x + 'px'; el.style.top = Math.max(16, center.y - 46) + 'px';
+                
                 const logoHtml = e.team.logoUrl
                     ? `<img src="${Boako.Util.cdn(e.team.logoUrl)}" style="width:20px; height:20px; object-fit:contain; border-radius:4px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.4);">`
                     : `<span style="width:20px; height:20px; border-radius:50%; background:${this.HUES[x.hueIdx][800]}; color:#fff; font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;">${e.key.charAt(0)}</span>`;
-                el.innerHTML = `${crownDiv}<div style="display:flex; align-items:center; justify-content:center; gap:5px;">${logoHtml}<span style="font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${e.key}</span></div>
+                el.innerHTML = `${crownDiv}<div style="display:flex; align-items:center; justify-content:center; gap:5px;">${logoHtml}<span style="font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${Boako.Util.escapeHtml(e.key)}</span></div>
                     <div style="font-size:11px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6); margin-top:2px;">${Math.round(total)} RP</div>`;
+                this.placeLabel(el, center.x, center.y - 46);
                 const mws = memberWeightsByTeam[e.key] || [];
                 mws.forEach(info => {
                     const m = info.m;
                     const mCenter = centroidOf(ownerCentroid, m.name, e.cx + m.dx, e.cy + m.dy);
                     const mel = this.labelDivs[m.name];
-                    mel.style.left = mCenter.x + 'px'; mel.style.top = mCenter.y + 'px';
                     mel.innerHTML = `<div style="font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${Boako.Util.escapeHtml(m.name)}</div>`;
+                    this.placeLabel(mel, mCenter.x, mCenter.y);
+                    // 팀 라벨(팀명/RP)과 겹치면 팀 라벨 바로 아래로 내림
+                    const tl = parseFloat(el.style.left), tt = parseFloat(el.style.top);
+                    const thw = el.offsetWidth / 2, thh = el.offsetHeight / 2;
+                    const ml = parseFloat(mel.style.left), mt = parseFloat(mel.style.top);
+                    const mhw = mel.offsetWidth / 2, mhh = mel.offsetHeight / 2;
+                    if (Math.abs(ml - tl) < thw + mhw && Math.abs(mt - tt) < thh + mhh) {
+                        this.placeLabel(mel, ml, tt + thh + mhh + 2);
+                    }
                 });
             } else {
                 const total = sumUpTo(e.solo.daily);
                 const center = centroidOf(ownerCentroid, e.key, e.cx, e.cy);
                 const el = this.labelDivs[e.key];
-                el.style.left = center.x + 'px'; el.style.top = center.y + 'px';
-                el.innerHTML = `${crownDiv}<div style="font-size:13px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${e.key}</div>
+                el.innerHTML = `${crownDiv}<div style="font-size:13px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${Boako.Util.escapeHtml(e.key)}</div>
                     <div style="font-size:11px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">${Math.round(total)} RP</div>`;
+                this.placeLabel(el, center.x, center.y);
             }
         });
     }
