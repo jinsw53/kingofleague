@@ -76,8 +76,13 @@ Boako.RecordVerify = {
                         ${conditionBadge}
                     </div>
                     
-                    <div onclick="event.stopPropagation()">
-                        <button onclick="Boako.RecordVerify.approve('${item.id}', '${item.match_type}')" 
+                    <div onclick="event.stopPropagation()" class="flex gap-2 shrink-0">
+                        ${(!isTournament && item.is_first == 1) ? `
+                        <button onclick="Boako.RecordVerify.openReject('${item.id}')"
+                                class="px-4 py-2.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-black rounded-lg transition-all active:scale-[0.98]">
+                            ❌ 반려
+                        </button>` : ''}
+                        <button onclick="Boako.RecordVerify.approve('${item.id}', '${item.match_type}')"
                                 class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black rounded-lg transition-all shadow-sm active:scale-[0.98]">
                             ✅ 승인
                         </button>
@@ -88,6 +93,120 @@ Boako.RecordVerify = {
 
         html += `</div>`;
         container.innerHTML = html;
+    },
+
+    // ❌ 반려: 첫 승 표시를 해제하고, 실제 첫 승 판 번호를 입력하면 DB(first_wins.expected_game_id)에 기억해 두었다가
+    // 그 판의 기록이 들어오는 순간 자동으로 첫 승으로 매칭(인증 대기 등록)한다.
+    rejectTargetId: null,
+    isRejecting: false,
+
+    // BGA 판 번호/주소 → 숫자 문자열. 빈 값은 null, 형식 오류는 false
+    parseTableNo: function(v) {
+        v = String(v || '').trim();
+        if (!v) return null;
+        const m = v.match(/table=(\d+)/) || v.match(/^(\d{6,12})$/);
+        return m ? m[1] : false;
+    },
+
+    openReject: function(recordId) {
+        const item = this.pendingList.find(x => String(x.id) === String(recordId));
+        if (!item) return;
+        this.rejectTargetId = String(item.id);
+
+        let modal = document.getElementById('record-reject-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'record-reject-modal';
+            modal.className = 'hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm items-center justify-center p-4';
+            modal.style.zIndex = '9999';
+            document.body.appendChild(modal);
+        }
+        modal.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                <h3 class="text-lg font-black text-slate-800 mb-1">❌ 첫 승 기록 반려</h3>
+                <p class="text-sm font-bold text-indigo-600 mb-4">${Boako.Util.escapeHtml(item.nickname)} - ${Boako.Util.escapeHtml(item.game_name)}</p>
+                <p class="text-xs font-bold text-slate-500 leading-relaxed mb-4">
+                    이 판은 첫 승이 아닙니다. 실제 첫 승 판의 번호(또는 BGA 판 주소)를 입력하면,
+                    나중에 그 판 기록이 들어올 때 <b class="text-slate-700">자동으로 첫 승으로 매칭</b>되어 이 목록에 올라옵니다.
+                </p>
+                <label class="block text-xs font-black text-slate-600 mb-1">실제 첫 승 판 번호 / 주소</label>
+                <input id="record-reject-input" type="text" autocomplete="off"
+                       placeholder="예: 888919529 또는 boardgamearena.com/table?table=888919529"
+                       oninput="Boako.RecordVerify.checkRejectInput()"
+                       class="w-full border-2 border-slate-200 focus:border-indigo-400 outline-none rounded-xl px-3.5 py-3 text-sm font-bold text-slate-800">
+                <p id="record-reject-hint" class="text-[11px] font-bold text-slate-400 mt-1.5 min-h-[16px]">모르면 비워 두세요. 이 판의 첫 승 표시만 해제됩니다.</p>
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mt-4 text-[11px] font-bold text-slate-500 leading-relaxed">
+                    반려하면<br>
+                    · 이 기록은 일반 승리 기록으로 돌아갑니다 (첫 승 보너스 RP 제외)<br>
+                    · 첫 승 기록은 다시 "대기" 상태가 됩니다
+                </div>
+                <div class="flex gap-2 mt-5">
+                    <button onclick="Boako.RecordVerify.closeReject()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-black rounded-xl">취소</button>
+                    <button onclick="Boako.RecordVerify.submitReject()" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white text-sm font-black rounded-xl shadow-sm active:scale-[0.98]">반려하기</button>
+                </div>
+            </div>`;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => { const i = document.getElementById('record-reject-input'); if (i) i.focus(); }, 50);
+    },
+
+    closeReject: function() {
+        const modal = document.getElementById('record-reject-modal');
+        if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+        this.rejectTargetId = null;
+    },
+
+    checkRejectInput: function() {
+        const input = document.getElementById('record-reject-input');
+        const hint = document.getElementById('record-reject-hint');
+        if (!input || !hint) return;
+        const r = this.parseTableNo(input.value);
+        if (r === null) {
+            hint.textContent = '모르면 비워 두세요. 이 판의 첫 승 표시만 해제됩니다.';
+            hint.className = 'text-[11px] font-bold text-slate-400 mt-1.5 min-h-[16px]';
+        } else if (r === false) {
+            hint.textContent = '판 번호(숫자) 또는 BGA 판 주소를 입력해 주세요.';
+            hint.className = 'text-[11px] font-bold text-rose-500 mt-1.5 min-h-[16px]';
+        } else {
+            hint.textContent = '✔ 판 번호 ' + r + ' 로 기억합니다.';
+            hint.className = 'text-[11px] font-bold text-emerald-600 mt-1.5 min-h-[16px]';
+        }
+    },
+
+    submitReject: async function() {
+        if (this.isRejecting || !this.rejectTargetId) return;
+        const input = document.getElementById('record-reject-input');
+        const tableNo = this.parseTableNo(input ? input.value : '');
+        if (tableNo === false) { this.checkRejectInput(); return; }
+
+        try {
+            this.isRejecting = true;
+            const { data, error } = await Boako.db.rpc('reject_cross_verification', {
+                p_record_id: this.rejectTargetId,
+                p_actual_game_id: tableNo ? Number(tableNo) : null
+            });
+            if (error) {
+                Boako.Util.toast("❌ " + (error.message || "반려 처리에 실패했습니다."));
+                return;
+            }
+            this.closeReject();
+            if (data && data.matched_record_id) {
+                Boako.Util.toast("❌ 반려했습니다. 입력한 판 기록이 이미 있어 바로 첫 승 인증 대기에 올렸어요.");
+            } else if (tableNo) {
+                Boako.Util.toast("❌ 반려했습니다. 판 " + tableNo + " 기록이 들어오면 자동으로 첫 승 인증 대기에 올라옵니다.");
+            } else {
+                Boako.Util.toast("❌ 반려했습니다. 첫 승 표시가 해제되었습니다.");
+            }
+            await this.loadPendingData();
+            if (Boako.Auth && typeof Boako.Auth.checkLeaderMenu === 'function') {
+                Boako.Auth.checkLeaderMenu();
+            }
+        } catch (err) {
+            console.error("반려 처리 에러:", err);
+            Boako.Util.toast("반려 처리 중 오류가 발생했습니다.");
+        } finally {
+            this.isRejecting = false;
+        }
     },
 
   // 연속 타격(더블 클릭) 방어용 락 플래그
