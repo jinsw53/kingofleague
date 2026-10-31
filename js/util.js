@@ -51,8 +51,18 @@ Boako.Util = {
     toast: (msg) => {
         const t = document.getElementById('boako-toast');
         if(!t) return;
+        // 🌟 [모션] 이미 떠 있는 상태에서 다시 호출되면 타이머를 새로 잡고(먼저 걸린 타이머가 새 메시지를
+        //    일찍 닫아버리던 문제 방지) 살짝 튀어 "갱신됐다"는 걸 알려준다.
+        const wasShown = t.classList.contains('show');
         t.innerText = msg; t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3000);
+        if (wasShown) { t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump'); }
+        clearTimeout(Boako.Util._toastTimer);
+        Boako.Util._toastTimer = setTimeout(() => t.classList.remove('show', 'bump'), 3000);
+        // 🌟 [모션] "…입력해 주세요/확인해 주세요" 류 경고면, 지금 포커스된 입력창을 흔들어 어디가 문제인지 알려준다.
+        const a = document.activeElement;
+        if (window.Boako.Motion && a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && /입력|선택|확인해|필요/.test(String(msg))) {
+            Boako.Motion.shake(a);
+        }
     },
 
     // 🌟 [신규] 카카오톡 공유 — 피드 템플릿(이미지+제목/본문+버튼 1개)으로 공유 시트 오픈

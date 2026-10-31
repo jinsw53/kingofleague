@@ -1,0 +1,181 @@
+/**
+ * [MOTION] 마이크로 인터랙션 공통 CSS (PC index.html / mobile/index.html 공용)
+ *
+ * 설계 원칙
+ *  - transform 대신 개별 속성 scale / translate 를 쓴다 → Tailwind 의 transform(active:scale-95,
+ *    hover:-translate-y-1 등)이나 요소 자체의 transform 과 서로 덮어쓰지 않고 합성된다.
+ *  - 이미 Tailwind 의 transition 클래스가 있는 요소는 건드리지 않는다([class*="transition"] 제외).
+ *    (transition 단축 속성을 덮어쓰면 기존 색/그림자 전환이 깨지기 때문)
+ *  - 움직임 줄이기 설정(prefers-reduced-motion)을 켠 사용자에게는 전부 끈다.
+ *  - 스태거(순차 등장)는 CSS 가 아니라 js/motion.js 가 담당한다.
+ *  - 개별 요소에서 끄고 싶으면 data-no-motion 속성을 붙인다.
+ */
+
+:root {
+    --mo-ease: cubic-bezier(.2, .8, .2, 1);
+    --mo-spring: cubic-bezier(.34, 1.56, .64, 1);
+    --mo-fast: 120ms;
+    --mo-base: 220ms;
+    --mo-ring: rgba(124, 58, 237, .18);
+}
+
+/* ── 1. 버튼 눌림 / 복귀 ─────────────────────────────────────────── */
+:where(button:not([class*="transition"]):not(:disabled),
+       [role="button"]:not([class*="transition"]),
+       .menu-item,
+       [onclick]:not(button):not(a):not(.fixed):not(body):not([onclick*="event"]):not([class*="transition"])) {
+    transition:
+        scale var(--mo-fast) var(--mo-ease),
+        translate var(--mo-base) var(--mo-ease),
+        background-color var(--mo-base) var(--mo-ease),
+        border-color var(--mo-base) var(--mo-ease),
+        color var(--mo-base) var(--mo-ease),
+        box-shadow var(--mo-base) var(--mo-ease),
+        opacity var(--mo-base) var(--mo-ease);
+}
+
+/* Tailwind 의 active:scale-* 이 이미 있는 버튼은 중복 축소를 피한다 */
+button:not(:disabled):not([class*="active:scale"]):active,
+[role="button"]:not([class*="active:scale"]):active,
+.menu-item:active,
+.btn-kakao:active {
+    scale: .965;
+}
+/* onclick 으로 동작하는 카드/행(버튼 태그가 아닌 요소) */
+[onclick]:not(button):not(a):not(.fixed):not(body):not([onclick*="event"]):not([class*="active:scale"]):active {
+    scale: .98;
+}
+
+button:disabled { cursor: not-allowed; }
+
+/* ── 2. 카드형으로 눌러 쓰는 요소(Tailwind rounded + cursor-pointer) 호버 들림 ── */
+:where(.cursor-pointer[class*="rounded"]:not(button):not([class*="transition"])) {
+    transition: translate var(--mo-base) var(--mo-ease), scale var(--mo-fast) var(--mo-ease), box-shadow var(--mo-base) var(--mo-ease);
+}
+.cursor-pointer[class*="rounded"]:not(button):hover {
+    translate: 0 -2px;
+}
+.cursor-pointer[class*="rounded"]:not(button):not([class*="active:scale"]):active {
+    scale: .985;
+    translate: 0 0;
+}
+
+/* ── 3. 상단 메뉴 ───────────────────────────────────────────────── */
+.menu-item:hover:not(.active) {
+    color: var(--primary, #7c3aed);
+    border-bottom-color: var(--primary-light, #a78bfa);
+}
+
+/* ── 4. 입력창 포커스 링 ────────────────────────────────────────── */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([class*="transition"]),
+       textarea:not([class*="transition"]),
+       select:not([class*="transition"])) {
+    transition: border-color var(--mo-base) var(--mo-ease), box-shadow var(--mo-base) var(--mo-ease), background-color var(--mo-base) var(--mo-ease);
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    box-shadow: 0 0 0 3px var(--mo-ring);
+}
+
+/* 검색창 전체(입력 + 버튼)가 하나의 컨트롤처럼 반응 */
+:where(.search-box) {
+    transition: box-shadow var(--mo-base) var(--mo-ease), translate var(--mo-base) var(--mo-ease);
+}
+.search-box:focus-within {
+    box-shadow: 0 0 0 4px var(--mo-ring), var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / .1));
+}
+
+/* ── 5. 토스트: 아래에서 튀어 올라오고, 연속 호출 시 살짝 흔들려 갱신을 알림 ── */
+#boako-toast {
+    translate: 0 14px;
+    scale: .94;
+    transition:
+        opacity .26s var(--mo-ease),
+        translate .42s var(--mo-spring),
+        scale .42s var(--mo-spring),
+        bottom .42s var(--mo-spring);
+}
+#boako-toast.show {
+    translate: 0 0;
+    scale: 1;
+}
+#boako-toast.bump {
+    animation: mo-bump .34s var(--mo-spring);
+}
+@keyframes mo-bump {
+    0%   { scale: 1; }
+    40%  { scale: 1.07; }
+    100% { scale: 1; }
+}
+
+/* ── 6. 모달/전체화면 오버레이: 배경 페이드 + 내용 스프링 등장 ─────────── */
+.fixed.inset-0:not([data-no-motion]) {
+    animation: mo-fade .22s var(--mo-ease) backwards;
+}
+.fixed.inset-0:not([data-no-motion]) > :first-child {
+    animation: mo-pop .36s var(--mo-spring) backwards;
+}
+@keyframes mo-fade {
+    from { opacity: 0; }
+}
+@keyframes mo-pop {
+    from { opacity: 0; scale: .94; translate: 0 10px; }
+}
+
+/* ── 6-1. 첫 화면 구성요소(헤더/메뉴/사이드바) 순차 등장 — 첫 렌더에서만 한 번 재생 ── */
+.header .inner > *,
+.ticker-bar,
+.nav .menu-list,
+.side-content > * {
+    animation: mo-rise .55s var(--mo-ease) backwards;
+}
+.header .inner > :nth-child(2) { animation-delay: .06s; }
+.header .inner > :nth-child(3) { animation-delay: .12s; }
+.ticker-bar { animation-delay: .14s; }
+.nav .menu-list { animation-delay: .2s; }
+.side-content > :nth-child(1) { animation-delay: .25s; }
+.side-content > :nth-child(2) { animation-delay: .32s; }
+.side-content > :nth-child(3) { animation-delay: .39s; }
+@keyframes mo-rise {
+    from { opacity: 0; translate: 0 12px; }
+}
+
+.logo { transition: scale var(--mo-base) var(--mo-spring); }
+.logo:hover { scale: 1.04; }
+.logo:active { scale: .97; }
+.btn-kakao { transition: scale var(--mo-fast) var(--mo-ease), translate var(--mo-base) var(--mo-ease), box-shadow var(--mo-base) var(--mo-ease), filter var(--mo-base); }
+.btn-kakao:hover { translate: 0 -2px; filter: brightness(1.03); }
+.btn-search:hover { filter: brightness(1.12); }
+
+/* ── 7. 공통 보조 클래스(JS 가 붙이거나 템플릿에서 직접 사용) ──────────── */
+.mo-shake { animation: mo-shake .38s var(--mo-ease); }
+@keyframes mo-shake {
+    20% { translate: -6px 0; }
+    40% { translate: 5px 0; }
+    60% { translate: -3px 0; }
+    80% { translate: 2px 0; }
+}
+
+/* ── 8. 움직임 줄이기 ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    button, [role="button"], .menu-item, .btn-kakao, .search-box,
+    .cursor-pointer[class*="rounded"], #boako-toast, input, textarea, select {
+        transition-duration: .01ms !important;
+    }
+    button:active, [role="button"]:active, .menu-item:active, .btn-kakao:active,
+    .cursor-pointer[class*="rounded"]:hover, .cursor-pointer[class*="rounded"]:active {
+        scale: none !important;
+        translate: none !important;
+    }
+    .fixed.inset-0:not([data-no-motion]),
+    .fixed.inset-0:not([data-no-motion]) > :first-child,
+    #boako-toast.bump,
+    .mo-shake,
+    .header .inner > *, .ticker-bar, .nav .menu-list, .side-content > * {
+        animation: none !important;
+    }
+    .logo, .btn-kakao { transition-duration: .01ms !important; }
+    .logo:hover, .logo:active, .btn-kakao:hover { scale: none !important; translate: none !important; }
+    [onclick]:not(button):not(a):active { scale: none !important; }
+}
