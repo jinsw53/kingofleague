@@ -2077,11 +2077,15 @@ Boako.League.calcRuleSimulator = function() {
 Boako.League.getChampionHTML = function() {
     return `
         <div class="space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4 text-amber-500"></i> 실시간 시즌 인기 게임 및 종목별 MVP 챔피언</h5>
-                <div class="relative w-full max-w-xs">
-                    <input onkeyup="Boako.League.filterChampions()" id="champion-search" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3.5 pr-10 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white" placeholder="게임 혹은 플레이어 검색...">
-                    <i data-lucide="search" class="absolute right-3.5 top-2 w-4 h-4 text-slate-400"></i>
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <h5 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4 text-amber-500"></i> <span id="champion-title">인기 게임 및 종목별 MVP 챔피언</span></h5>
+                <div class="flex items-center gap-2">
+                    <!-- 🌟 기간 선택: 아카이브 기록실의 시즌 드롭다운과 같은 디자인 (renderChampionSeasonDropdown) -->
+                    <div id="champion-season-container" class="relative w-[130px] shrink-0"></div>
+                    <div class="relative w-[200px]">
+                        <input onkeyup="Boako.League.filterChampions()" id="champion-search" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3.5 pr-10 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white" placeholder="게임 혹은 플레이어 검색...">
+                        <i data-lucide="search" class="absolute right-3.5 top-2 w-4 h-4 text-slate-400"></i>
+                    </div>
                 </div>
             </div>
             <div class="border border-slate-200/80 rounded-2xl overflow-hidden bg-white shadow-sm overflow-x-auto">
@@ -2098,21 +2102,121 @@ Boako.League.getChampionHTML = function() {
     `;
 };
 
+// ----- 기간(시즌) 선택 ------------------------------------------------------------
+// 🌟 [기간 선택] 예전엔 v_game_popularity_mvp 뷰를 시즌 조건 없이 그대로 읽어서, 시즌 1 기록이 쌓이기 시작하면
+// "시즌 번호 없는(비시즌) 묶음"과 "시즌 1 묶음"이 각자 1위부터 매긴 순위가 한 표에 섞여 나올 수 있었음.
+// 이제 하부 뷰(v_game_popularity_all_players)를 직접 읽어 기간을 명시적으로 고른다.
+//   'all'  = 전체 기간(올타임) / 'none' = 비시즌(season_no NULL) / 숫자 = 해당 시즌
+// 용어/값은 아카이브 기록실(archive.js)의 시즌 드롭다운과 동일.
+Boako.League.championEmptyText = function() {
+    const q = (document.getElementById('champion-search')?.value || '').trim();
+    if (q) return '검색 결과가 없습니다.';
+    const sv = Boako.League.State.championSeason;
+    if (sv === 'none') return '비시즌 기간에 집계된 데이터가 없습니다.';
+    if (typeof sv === 'number') return `시즌 ${sv}에 집계된 데이터가 없습니다.`;
+    return '집계된 데이터가 없습니다.';
+};
+
+Boako.League.updateChampionTitle = function() {
+    const el = document.getElementById('champion-title'); if (!el) return;
+    const sv = Boako.League.State.championSeason;
+    el.textContent = sv === 'none' ? '비시즌 인기 게임 및 종목별 MVP 챔피언'
+        : typeof sv === 'number' ? `실시간 시즌 ${sv} 인기 게임 및 종목별 MVP 챔피언`
+        : '전체 기간 인기 게임 및 종목별 MVP 챔피언';
+};
+
+// 시작한 시즌 목록과 기본 선택값을 최초 1회 결정: 진행 중인 시즌에 기록이 있으면 그 시즌, 아니면 전체 기간
+Boako.League.initChampionSeason = async function() {
+    const S = Boako.League.State;
+    S.championSeasons = []; S.championSeason = 'all';
+    try {
+        const nowIso = new Date().toISOString();
+        const { data: ss } = await Boako.db.from('seasons').select('season_no, end_date').lte('start_date', nowIso).order('season_no', { ascending: true });
+        S.championSeasons = (ss || []).map(r => r.season_no);
+        const cur = (ss || []).find(r => new Date(r.end_date) >= new Date());
+        if (cur) {
+            const { count } = await Boako.db.from('v_game_popularity_all_players').select('game_name', { count: 'exact', head: true })
+                .eq('is_alltime', false).eq('team_only', true).eq('player_rank', 1).eq('season_no', cur.season_no);
+            if (count > 0) S.championSeason = cur.season_no;
+        }
+    } catch (e) { console.warn('챔피언 기간 목록 로드 실패(전체 기간으로 표시):', e); }
+};
+
+Boako.League.toggleChampionDropdown = function() {
+    const menu = document.getElementById('league-champion-season-menu');
+    const overlay = document.getElementById('league-champion-season-overlay');
+    if (menu && overlay) { menu.classList.toggle('hidden'); overlay.classList.toggle('hidden'); }
+};
+
+Boako.League.selectChampionSeason = function(val) {
+    Boako.League.toggleChampionDropdown();
+    if (Boako.League.State.championSeason === val) return;
+    Boako.League.State.championSeason = val;
+    Boako.League.renderChampionSeasonDropdown();
+    Boako.League.fetchAndRenderChampions();
+};
+
+// 🌟 디자인은 archive.js renderSeasonDropdown 과 동일(흰 버튼 + 달력 아이콘 / 슬레이트 팝오버 / 선택 항목 인디고)
+Boako.League.renderChampionSeasonDropdown = function() {
+    const container = document.getElementById('champion-season-container'); if (!container) return;
+    const S = Boako.League.State, cur = S.championSeason === undefined ? 'all' : S.championSeason;
+    const label = cur === 'all' ? '전체' : cur === 'none' ? '비시즌' : `시즌 ${cur}`;
+    const item = (val, text) => {
+        const arg = typeof val === 'number' ? val : `'${val}'`;
+        const on = cur === val;
+        return `<div onclick="Boako.League.selectChampionSeason(${arg})" class="px-4 py-3 text-xs font-black cursor-pointer transition-colors ${on ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}">${text}</div>`;
+    };
+    container.innerHTML = `
+        <button onclick="Boako.League.toggleChampionDropdown()" class="w-full bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between gap-2 text-xs font-black text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+            <div class="flex items-center gap-2"><i data-lucide="calendar" class="text-indigo-500 w-4 h-4"></i> <span>${label}</span></div>
+            <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+        </button>
+        <div id="league-champion-season-overlay" onclick="Boako.League.toggleChampionDropdown()" class="hidden fixed inset-0 z-40"></div>
+        <div id="league-champion-season-menu" class="hidden absolute top-full left-0 mt-2 w-full bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            ${item('all', '전체')}
+            ${item('none', '비시즌')}
+            ${(S.championSeasons || []).map(n => item(n, `시즌 ${n}`)).join('')}
+        </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+};
+
 Boako.League.fetchAndRenderChampions = async function() {
     const tbody = document.getElementById('champion-tbody'); if (!tbody) return;
+    const S = Boako.League.State;
+    const token = S.championReq = (S.championReq || 0) + 1;      // 기간을 빠르게 바꿀 때 늦게 온 이전 응답이 덮어쓰지 않도록
+    const note = (msg, color) => {
+        const cls = color || 'text-slate-400';
+        tbody.innerHTML = tbody.tagName === 'TBODY'
+            ? `<tr><td colspan="6" class="p-10 text-center ${cls} font-bold">${msg}</td></tr>`
+            : `<div style="text-align:center; padding:30px 0; color:${color ? '#f87171' : '#94a3b8'}; font-weight:700; font-size:12px;">${msg}</div>`;
+    };
     try {
-        if (!Boako.db) { tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-slate-400 font-bold">⚠️ Supabase 인스턴스가 발견되지 않았습니다.</td></tr>`; return; }
-        // 🌟 [버그수정] 인기 순위가 동률이면 v_game_popularity_mvp에 같은 게임이 공동 챔피언 수만큼
-        // 여러 행으로 나옴(예: 동일 RP로 2명이 공동 1위) — 예전엔 정렬 없이 그냥 행 10개만
-        // 잘라와서(limit(10)), 한 게임이 2행을 쓰면 다른 게임 하나가 밀려나 실제로는 게임 9개만
-        // 표시되던 문제. game_popularity_rank로 명시적으로 정렬해 넉넉히(50행) 가져온 뒤,
-        // "서로 다른 게임이 10개" 채워질 때까지만 담되, 이미 포함된 게임의 공동 챔피언 행은
-        // 계속 포함시킴(11번째로 새로운 게임이 나오는 시점에만 멈춤) — 게임은 항상 정확히 10개,
-        // 챔피언 수는 공동 챔피언 때문에 10명을 넘을 수 있음(의도된 동작).
-        const { data, error } = await Boako.db.from('v_game_popularity_mvp').select('*').order('game_popularity_rank', { ascending: true }).limit(50);
-        if (error) throw error;
+        if (!Boako.db) { note('⚠️ Supabase 인스턴스가 발견되지 않았습니다.'); return; }
+        if (S.championSeason === undefined) await Boako.League.initChampionSeason();
+        if (token !== S.championReq) return;
+        Boako.League.renderChampionSeasonDropdown();
+        Boako.League.updateChampionTitle();
+        if (S.champions && S.champions.length) note('🔄 데이터 요청 중...');
 
-        const rows = data || [];
+        // 🌟 [버그수정] 인기 순위가 동률이면 같은 게임이 공동 챔피언 수만큼 여러 행으로 나옴(예: 동일 RP로 2명이 공동 1위) —
+        // game_popularity_rank로 명시적으로 정렬해 넉넉히(50행) 가져온 뒤, "서로 다른 게임이 10개" 채워질 때까지만 담되
+        // 이미 포함된 게임의 공동 챔피언 행은 계속 포함시킴(11번째로 새로운 게임이 나오는 시점에만 멈춤).
+        // 게임은 항상 정확히 10개, 챔피언 수는 공동 챔피언 때문에 10명을 넘을 수 있음(의도된 동작).
+        let query = Boako.db.from('v_game_popularity_all_players').select('*').eq('team_only', true).eq('player_rank', 1);
+        const sv = S.championSeason;
+        if (sv === 'all') query = query.eq('is_alltime', true);
+        else if (sv === 'none') query = query.eq('is_alltime', false).is('season_no', null);
+        else query = query.eq('is_alltime', false).eq('season_no', sv);
+        const { data, error } = await query.order('game_popularity_rank', { ascending: true }).limit(50);
+        if (error) throw error;
+        if (token !== S.championReq) return;
+
+        // 화면(drawChampionRows)은 v_game_popularity_mvp 의 mvp_* 컬럼명을 쓰므로 같은 이름으로 맞춰 줌
+        const rows = (data || []).map(r => Object.assign({}, r, {
+            mvp_nickname: r.player_nickname, mvp_team_name: r.player_team_name,
+            mvp_total_rp: r.player_total_rp, mvp_team_logo: r.player_team_logo
+        }));
         const seenGames = new Set();
         const trimmed = [];
         for (const row of rows) {
@@ -2121,13 +2225,14 @@ Boako.League.fetchAndRenderChampions = async function() {
             trimmed.push(row);
         }
 
-        Boako.League.State.champions = trimmed; Boako.League.drawChampionRows(Boako.League.State.champions);
-    } catch (err) { tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-red-400 font-bold">❌ 가상 뷰 연동 실패</td></tr>`; }
+        S.champions = trimmed; Boako.League.drawChampionRows(S.champions);
+        if (document.getElementById('champion-search')?.value) Boako.League.filterChampions();
+    } catch (err) { if (token === S.championReq) note('❌ 챔피언 데이터를 불러오지 못했습니다.', 'text-red-400'); }
 };
 
 Boako.League.drawChampionRows = function(dataList) {
     const tbody = document.getElementById('champion-tbody'); if (!tbody) return; tbody.innerHTML = '';
-    if (dataList.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400 font-bold">이번 시즌 집계된 데이터가 없습니다.</td></tr>`; return; }
+    if (dataList.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400 font-bold">${Boako.League.championEmptyText()}</td></tr>`; return; }
     let rowsHtml = '';
     dataList.forEach((row, i) => {
         const gameRank = i + 1; const gameName = row.game_name || '미정 종목'; const mvpName = row.mvp_nickname || '집계 중'; const mvpTeam = row.mvp_team_name || '무소속'; const totalRp = row.mvp_total_rp || 0; const totalPlays = row.total_records_count || 0; const uniquePlayers = row.total_unique_players || 0;

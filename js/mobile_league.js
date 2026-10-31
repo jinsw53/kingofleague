@@ -68,7 +68,11 @@ Boako.MobileLeague = {
             return `
                 <div style="display:flex; flex-direction:column; gap:12px;">
                     <div style="font-size:13px; font-weight:900; color:#1e293b; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">🏆 인기 게임 · 종목별 MVP 챔피언</div>
-                    <input onkeyup="Boako.League.filterChampions()" id="champion-search" type="text" placeholder="게임 혹은 플레이어 검색..." style="width:100%; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; font-size:13px; font-weight:700; color:#1e293b;">
+                    <div style="display:flex; gap:8px; align-items:stretch;">
+                        <!-- 🌟 기간 선택: 아카이브 기록실의 시즌 드롭다운과 같은 디자인 (Boako.League.renderChampionSeasonDropdown, js/league.js) -->
+                        <div id="champion-season-container" class="relative shrink-0" style="width:124px;"></div>
+                        <input onkeyup="Boako.League.filterChampions()" id="champion-search" type="text" placeholder="게임 혹은 플레이어 검색..." style="flex:1; min-width:0; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; font-size:13px; font-weight:700; color:#1e293b;">
+                    </div>
                     <div id="champion-tbody" style="display:flex; flex-direction:column; gap:8px;">
                         <div style="text-align:center; padding:30px 0; color:#94a3b8; font-weight:700; font-size:12px;">🔄 v_game_popularity_mvp 뷰 데이터 동기화 중...</div>
                     </div>
@@ -82,7 +86,7 @@ Boako.MobileLeague = {
             const container = document.getElementById('champion-tbody');
             if (!container) return;
             if (dataList.length === 0) {
-                container.innerHTML = `<div style="text-align:center; padding:30px 0; color:#94a3b8; font-weight:700; font-size:12px;">이번 시즌 집계된 데이터가 없습니다.</div>`;
+                container.innerHTML = `<div style="text-align:center; padding:30px 0; color:#94a3b8; font-weight:700; font-size:12px;">${Boako.League.championEmptyText()}</div>`;
                 return;
             }
             container.innerHTML = dataList.map((row, i) => {
