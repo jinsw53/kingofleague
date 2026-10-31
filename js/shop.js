@@ -170,7 +170,7 @@ if (window.sfx) window.sfx.buy();
                             </div>
                             <div class="text-right">
                                 <div class="text-[10px] font-black text-slate-400 uppercase tracking-wider">보유 포인트</div>
-                                <div class="text-lg font-black text-slate-700">${myPoints.toLocaleString()} P</div>
+                                <div class="text-lg font-black text-slate-700" data-countup="${Number(myPoints)}">${myPoints.toLocaleString()} P</div>
                             </div>
                         </div>
 
@@ -576,7 +576,7 @@ if (window.sfx) window.sfx.buy();
                         <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-center justify-between">
                             <div>
                                 <div class="text-[10px] font-black text-amber-500 uppercase tracking-wider">우리 팀 금고</div>
-                                <div class="text-lg font-black text-amber-800">${teamPoints.toLocaleString()} P</div>
+                                <div class="text-lg font-black text-amber-800" data-countup="${Number(teamPoints)}">${teamPoints.toLocaleString()} P</div>
                             </div>
                             <div class="text-right">
                                 <div class="text-[10px] font-black text-slate-400 uppercase tracking-wider">보유 도전권</div>

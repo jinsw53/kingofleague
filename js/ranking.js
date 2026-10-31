@@ -229,7 +229,7 @@ const mainRow = `
                             <i data-lucide="chevron-${isExpanded ? 'up' : 'down'}" class="w-3.5 h-3.5 text-slate-300"></i>
                         </div>
                     </td>
-                    <td class="py-3 px-3 text-right font-black text-indigo-700">🏆 ${Number(r.total_lp).toLocaleString()} LP</td>
+                    <td class="py-3 px-3 text-right font-black text-indigo-700" data-countup="${Number(r.total_lp)}">🏆 ${Number(r.total_lp).toLocaleString()} LP</td>
                 </tr>
             `;
 
@@ -473,7 +473,7 @@ Boako.Ranking.getHofHTML = function() {
                 <div>
                     <div class="text-[10px] font-black text-amber-300 uppercase tracking-widest mb-1">👑 시즌 우승팀</div>
                     <div class="text-2xl font-black text-white">${Boako.Util.escapeHtml(d.championTeam.team_name)}</div>
-                    <div class="text-sm font-bold text-indigo-200 mt-1">🏆 ${Number(d.championTeam.total_lp).toLocaleString()} LP</div>
+                    <div class="text-sm font-bold text-indigo-200 mt-1" data-countup="${Number(d.championTeam.total_lp)}">🏆 ${Number(d.championTeam.total_lp).toLocaleString()} LP</div>
                 </div>
             </div>
         </div>
@@ -489,7 +489,7 @@ Boako.Ranking.getHofHTML = function() {
             <div>
                 <div class="text-[10px] font-black text-violet-500 uppercase tracking-widest mb-1">⭐ 시즌 MVP</div>
                 <div class="text-xl font-black text-slate-800">${Boako.Util.escapeHtml(d.mvp.nickname)}</div>
-                <div class="text-xs font-bold text-slate-400 mt-1">${d.mvp.team || '무소속'} · <span class="text-amber-500">${d.mvp.rp.toLocaleString()} RP</span></div>
+                <div class="text-xs font-bold text-slate-400 mt-1">${d.mvp.team || '무소속'} · <span class="text-amber-500" data-countup="${Number(d.mvp.rp)}">${d.mvp.rp.toLocaleString()} RP</span></div>
             </div>
         </div>
     ` : `
@@ -697,7 +697,7 @@ Boako.Ranking.loadPrizeBanner = async function() {
 
         el.innerHTML = `
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span>🏆 이번 시즌 예상 상금: <b>${Number(data.total_estimate).toLocaleString()}P</b> (진행 중, 변동 가능)</span>
+                <span>🏆 이번 시즌 예상 상금: <b data-countup="${Number(data.total_estimate)}">${Number(data.total_estimate).toLocaleString()}P</b> (진행 중, 변동 가능)</span>
                 <button onclick="Boako.Ranking.togglePrizeInfo()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:18px; height:18px; border-radius:50%; font-size:11px; font-weight:900; cursor:pointer; line-height:1;">ⓘ</button>
             </div>
             <div id="ranking-prize-info" class="hidden" style="margin-top:8px; font-size:12px; font-weight:600; opacity:0.85; line-height:1.6; max-width:600px;">
