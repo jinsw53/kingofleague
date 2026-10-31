@@ -669,7 +669,7 @@ Boako.Ranking.loadPrizeBanner = async function() {
 
         if (!data || !data.active) {
             // 🌟 진행 중인 시즌이 없으면 로고/배지 헤더는 비우고, 다음 시즌 시작일이 있는 경우 같이 안내
-            if (headerEl) headerEl.innerHTML = '';
+            if (headerEl) { headerEl.innerHTML = ''; const bn = headerEl.closest('.main-banner'); if (bn) { bn.style.height = ''; bn.style.minHeight = ''; bn.style.padding = ''; } }
             if (data && data.next_start_date) {
                 const dateStr = new Date(data.next_start_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
                 el.innerHTML = `진행 중인 시즌이 없습니다. 다음 시즌(시즌 ${data.next_season_no})은 ${dateStr}부터 시작됩니다.`;
@@ -687,12 +687,18 @@ Boako.Ranking.loadPrizeBanner = async function() {
                     ? `<a href="${Boako.Util.safeHref(data.title_sponsor_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px; text-decoration:none; color:inherit;">🏷️ ${Boako.Util.escapeHtml(data.title_sponsor_name)}배</a>`
                     : `<span style="display:inline-block; background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:999px; font-size:12px; font-weight:900; letter-spacing:-0.5px;">🏷️ ${Boako.Util.escapeHtml(data.title_sponsor_name)}배</span>`)
                 : '';
+            // 🌟 [수정] 시즌 로고가 가로로 긴 이미지(약 2.1:1)인데 56x56 정사각 박스에 contain 으로 넣어서 실제로는
+            // 56x26px 정도로 쪼그라들어 보였음 → 원본 비율 그대로 높이 기준으로 키움(스폰서 배지가 함께 있으면 공간 때문에 조금 작게)
+            const logoH = badgeHtml ? 72 : 92;
             const logoHtml = data.season_logo_url
-                ? `<img src="${Boako.Util.cdn(data.season_logo_url)}" style="width:56px; height:56px; object-fit:contain;">`
+                ? `<img src="${Boako.Util.cdn(data.season_logo_url)}" alt="시즌 로고" style="height:${logoH}px; width:auto; max-width:min(100%, 280px); object-fit:contain; filter:drop-shadow(0 4px 10px rgba(0,0,0,0.25));">`
                 : '';
             headerEl.innerHTML = (badgeHtml || logoHtml)
-                ? `<div style="display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:8px;">${badgeHtml}${logoHtml}</div>`
+                ? `<div style="display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:8px;">${badgeHtml}${logoHtml}</div>`
                 : '';
+            // 배너는 높이 200px 고정이라, 로고/배지가 들어가면 내용이 넘치지 않도록 최소 높이만 두고 늘어나게 함
+            const bannerEl = headerEl.closest('.main-banner');
+            if (bannerEl && (badgeHtml || logoHtml)) { bannerEl.style.height = 'auto'; bannerEl.style.minHeight = '200px'; bannerEl.style.padding = '22px 16px'; }
         }
 
         el.innerHTML = `
