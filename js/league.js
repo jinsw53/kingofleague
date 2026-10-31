@@ -2125,20 +2125,17 @@ Boako.League.updateChampionTitle = function() {
         : '전체 기간 인기 게임 및 종목별 MVP 챔피언';
 };
 
-// 시작한 시즌 목록과 기본 선택값을 최초 1회 결정: 진행 중인 시즌에 기록이 있으면 그 시즌, 아니면 전체 기간
+// 시작한 시즌 목록과 기본 선택값을 최초 1회 결정: 기본은 "가장 최신 시즌"(이미 시작한 시즌 중 번호가 가장 큰 것).
+// 시즌 사이 휴지기에는 직전 시즌 결과가, 시즌 시작 직후 기록이 없을 땐 빈 상태 문구가 보인다.
+// 아직 시작한 시즌이 하나도 없으면 전체 기간.
 Boako.League.initChampionSeason = async function() {
     const S = Boako.League.State;
     S.championSeasons = []; S.championSeason = 'all';
     try {
         const nowIso = new Date().toISOString();
-        const { data: ss } = await Boako.db.from('seasons').select('season_no, end_date').lte('start_date', nowIso).order('season_no', { ascending: true });
+        const { data: ss } = await Boako.db.from('seasons').select('season_no').lte('start_date', nowIso).order('season_no', { ascending: true });
         S.championSeasons = (ss || []).map(r => r.season_no);
-        const cur = (ss || []).find(r => new Date(r.end_date) >= new Date());
-        if (cur) {
-            const { count } = await Boako.db.from('v_game_popularity_all_players').select('game_name', { count: 'exact', head: true })
-                .eq('is_alltime', false).eq('team_only', true).eq('player_rank', 1).eq('season_no', cur.season_no);
-            if (count > 0) S.championSeason = cur.season_no;
-        }
+        if (S.championSeasons.length) S.championSeason = S.championSeasons[S.championSeasons.length - 1];
     } catch (e) { console.warn('챔피언 기간 목록 로드 실패(전체 기간으로 표시):', e); }
 };
 
