@@ -15,6 +15,7 @@ Boako.Ranking.State = {
     selectedSeason: null,
     rankingRows: [],
     expandedTeam: null,
+    roundRp: null, // 🌟 [신규] 라운드별 팀 RP/순위 (js/round_rp.js 가 채움)
     hofSeasons: [],
     hofSelectedSeason: null,
     hofData: null,
@@ -195,6 +196,7 @@ Boako.Ranking.loadRankingTab = async function() {
         Boako.Ranking.State.rankingRows = rankedRows;
         content.innerHTML = Boako.Ranking.getRankingHTML(seasonInfo, isCurrent);
         if (window.lucide) window.lucide.createIcons();
+        Boako.Ranking.startRoundRp(seasonNo, !!isCurrent);
 
     } catch (e) {
         console.error('랭킹 로드 실패:', e);
@@ -270,6 +272,7 @@ const mainRow = `
                                 })()}</div>
                             </div>
                         </div>
+                        <div class="text-[10px] font-black text-slate-400 mb-2">라운드별 LP</div>
                         <div class="grid grid-cols-3 sm:grid-cols-9 gap-2">
                             ${[1,2,3,4,5,6,7,8,9].map(n => {
                                 const val = r[`round_${n}_lp`];
@@ -286,6 +289,11 @@ const mainRow = `
                             }).join('')}
                         </div>
                         <div class="text-[10px] text-slate-400 font-bold mt-2 text-center">정규리그는 상위 7라운드만 반영, 하위 2라운드는 제외됩니다.</div>
+                        <!-- 🌟 [신규] 라운드별 RP · 순위 (LP 와 별개의 줄. 제외 라운드 효과는 LP 에만 적용) -->
+                        <div class="mt-3 pt-3 border-t border-dashed border-slate-200">
+                            <div class="text-[10px] font-black text-slate-400 mb-2">라운드별 RP · 순위${isCurrent ? ' <span class="text-slate-300 font-bold">(실시간 · 60초마다 갱신)</span>' : ''}</div>
+                            <div id="rk-rp-grid" class="grid grid-cols-3 sm:grid-cols-9 gap-2">${Boako.Ranking.getRoundRpCellsHtml(r.team_name)}</div>
+                        </div>
                     </td>
                 </tr>
             ` : '';
@@ -336,6 +344,48 @@ Boako.Ranking.toggleSeasonDropdown = function() {
         menu.classList.toggle('hidden');
         overlay.classList.toggle('hidden');
     }
+};
+
+// ====================================================================
+// 🌟 [신규] 라운드별 RP · 순위 (계산/주기 갱신은 js/round_rp.js, 여기는 PC 화면만 담당)
+//  - 진행 중인 시즌은 60초마다 갱신(화면이 가려지거나 이 탭을 떠나면 멈춤), 끝난 시즌은 한 번만 읽음
+//  - 해당 라운드에 참여하지 않은 팀은 "-", 같은 RP는 공동순위 (규칙 설명은 round_rp.js 상단)
+// ====================================================================
+Boako.Ranking.startRoundRp = async function(seasonNo, isCurrent) {
+    Boako.Ranking.State.roundRp = null;
+    try {
+        if (!Boako.RoundRp) await Boako.Util.loadScript('js/round_rp.js');
+    } catch (e) { console.warn('round_rp.js 로드 실패(RP 줄은 비어 보임):', e); return; }
+    Boako.RoundRp.start(seasonNo, {
+        poll: isCurrent,
+        isAlive: () => !!document.getElementById('rk-content')
+            && Boako.Ranking.State.currentTab === 'ranking'
+            && Boako.Ranking.State.selectedSeason === seasonNo,
+        onData: (data) => { Boako.Ranking.State.roundRp = data; Boako.Ranking.paintRoundRp(); }
+    });
+};
+
+Boako.Ranking.paintRoundRp = function() {
+    const el = document.getElementById('rk-rp-grid');     // 펼쳐진 팀이 있을 때만 존재
+    if (el) el.innerHTML = Boako.Ranking.getRoundRpCellsHtml(Boako.Ranking.State.expandedTeam, true);
+};
+
+Boako.Ranking.getRoundRpCellsHtml = function(team) {
+    const d = Boako.Ranking.State.roundRp;
+    const cur = d ? d.currentRound : null;
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => {          // 모듈/데이터가 아직 없어도 빈 칸("-")으로 먼저 그려 둠
+        const c = (d && Boako.RoundRp) ? Boako.RoundRp.cell(d, team, n) : null;
+        const f = n === cur;
+        const rankHtml = c
+            ? `<div class="mt-1 pt-1 border-t border-dashed ${f ? 'border-indigo-200' : 'border-slate-200'} text-[10px] font-black ${c.rank === 1 ? 'text-amber-500' : 'text-slate-500'}">${c.rank === 1 ? '🥇 ' : ''}${c.tied ? '공동 ' : ''}${c.rank}위</div>`
+            : `<div class="mt-1 pt-1 border-t border-dashed ${f ? 'border-indigo-200' : 'border-slate-200'} text-[10px] font-black text-slate-300">-</div>`;
+        return `
+            <div class="${f ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-slate-200'} border rounded-xl p-2 text-center">
+                <div class="text-[9px] font-black ${f ? 'text-indigo-500' : 'text-slate-400'} uppercase">R${n}${f ? ' · 진행 중' : ''}</div>
+                <div class="text-sm font-black ${c ? (f ? 'text-indigo-700' : 'text-slate-700') : 'text-slate-300'}">${c ? c.rp.toLocaleString() : '-'}</div>
+                ${rankHtml}
+            </div>`;
+    }).join('');
 };
 
 Boako.Ranking.changeSeason = async function(seasonNo) {

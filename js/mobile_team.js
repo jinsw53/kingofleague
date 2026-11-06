@@ -14,7 +14,8 @@ Boako.MobileTeam = {
         seasons: [],
         selectedSeason: null,
         rows: [],
-        expandedTeam: null
+        expandedTeam: null,
+        roundRp: null   // 🌟 [신규] 라운드별 팀 RP/순위 (js/round_rp.js 가 채움)
     },
 
     render: async (container) => {
@@ -27,6 +28,7 @@ Boako.MobileTeam = {
             }
             await Boako.MobileTeam.loadRanking();
             Boako.MobileTeam.draw();
+            Boako.MobileTeam.startRoundRp();
         } catch (e) {
             console.error('모바일 팀 순위 로드 실패:', e);
             container.innerHTML = `<div style="padding:40px 16px; text-align:center; color:#ef4444; font-weight:700; font-size:13px;">로드 실패: ${Boako.Util.escapeHtml(e.message)}</div>`;
@@ -119,7 +121,7 @@ Boako.MobileTeam = {
                     시즌 선택 ▾
                 </button>
             </div>
-            <div style="display:flex; flex-direction:column; gap:8px;">${cardsHtml}</div>
+            <div id="mt-rank-root" style="display:flex; flex-direction:column; gap:8px;">${cardsHtml}</div>
         `;
     },
 
@@ -167,12 +169,57 @@ Boako.MobileTeam = {
                     ${summaryCell('챔피언', r.champion_lp ?? 0, false)}
                     ${summaryCell('정규리그', regularNet, true)}
                 </div>
+                <div style="font-size:10px; font-weight:900; color:#94a3b8; margin-bottom:6px;">라운드별 LP</div>
                 <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">
                     ${roundCells}
                 </div>
                 <div style="font-size:10px; color:#94a3b8; font-weight:700; margin-top:8px; text-align:center;">정규리그는 상위 7라운드만 반영, 하위 2라운드는 제외됩니다.</div>
+                <!-- 🌟 [신규] 라운드별 RP · 순위 (LP 와 별개의 줄. 제외 라운드 효과는 LP 에만 적용) -->
+                <div style="margin-top:12px; padding-top:12px; border-top:1px dashed #e2e8f0;">
+                    <div style="font-size:10px; font-weight:900; color:#94a3b8; margin-bottom:6px;">라운드별 RP · 순위${Boako.MobileTeam.State._isCurrent ? ' <span style="color:#cbd5e1; font-weight:700;">(실시간 · 60초마다 갱신)</span>' : ''}</div>
+                    <div id="mt-rp-grid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">${Boako.MobileTeam.roundRpCellsHtml(r.team_name)}</div>
+                </div>
             </div>
         `;
+    },
+
+    // ====================================================================
+    // 🌟 [신규] 라운드별 RP · 순위 — 계산/주기 갱신은 js/round_rp.js(PC 랭킹과 공용), 여기는 모바일 화면만 담당
+    //  - 진행 중인 시즌은 60초마다 갱신(화면이 가려지거나 이 화면을 떠나면 멈춤), 끝난 시즌은 한 번만 읽음
+    //  - 참여하지 않은 라운드는 "-", 같은 RP는 공동순위
+    // ====================================================================
+    startRoundRp: async () => {
+        const S = Boako.MobileTeam.State, seasonNo = S.selectedSeason;
+        S.roundRp = null;
+        try {
+            if (!Boako.RoundRp) await Boako.Util.loadScript('/js/round_rp.js');
+        } catch (e) { console.warn('round_rp.js 로드 실패(RP 줄은 비어 보임):', e); return; }
+        Boako.RoundRp.start(seasonNo, {
+            poll: !!S._isCurrent,
+            isAlive: () => !!document.getElementById('mt-rank-root') && S.selectedSeason === seasonNo,
+            onData: (data) => { S.roundRp = data; Boako.MobileTeam.paintRoundRp(); }
+        });
+    },
+
+    paintRoundRp: () => {
+        const el = document.getElementById('mt-rp-grid');     // 펼쳐진 팀이 있을 때만 존재
+        if (el) el.innerHTML = Boako.MobileTeam.roundRpCellsHtml(Boako.MobileTeam.State.expandedTeam);
+    },
+
+    roundRpCellsHtml: (team) => {
+        const d = Boako.MobileTeam.State.roundRp;
+        const cur = d ? d.currentRound : null;
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => {         // 모듈/데이터가 아직 없어도 빈 칸("-")으로 먼저 그려 둠
+            const c = (d && Boako.RoundRp) ? Boako.RoundRp.cell(d, team, n) : null;
+            const f = n === cur;
+            const rankText = c ? `${c.rank === 1 ? '🥇 ' : ''}${c.tied ? '공동 ' : ''}${c.rank}위` : '-';
+            return `
+                <div style="background:${f ? '#eef2ff' : '#fff'}; border:1px solid ${f ? '#a5b4fc' : '#e2e8f0'}; border-radius:10px; padding:7px 4px; text-align:center;">
+                    <div style="font-size:9px; font-weight:900; color:${f ? '#6366f1' : '#94a3b8'}; text-transform:uppercase;">R${n}${f ? ' · 진행 중' : ''}</div>
+                    <div style="font-size:12.5px; font-weight:900; color:${c ? (f ? '#4338ca' : '#334155') : '#cbd5e1'}; margin-top:1px;">${c ? c.rp.toLocaleString() : '-'}</div>
+                    <div style="margin-top:3px; padding-top:3px; border-top:1px dashed ${f ? '#c7d2fe' : '#e2e8f0'}; font-size:10px; font-weight:900; color:${c ? (c.rank === 1 ? '#f59e0b' : '#64748b') : '#cbd5e1'};">${rankText}</div>
+                </div>`;
+        }).join('');
     },
 
     toggle: (teamName) => {
@@ -200,5 +247,6 @@ Boako.MobileTeam = {
         container.innerHTML = `<div style="padding:40px 0; text-align:center; color:#94a3b8; font-weight:700; font-size:13px;">불러오는 중...</div>`;
         await Boako.MobileTeam.loadRanking();
         Boako.MobileTeam.draw();
+        Boako.MobileTeam.startRoundRp();
     }
 };
