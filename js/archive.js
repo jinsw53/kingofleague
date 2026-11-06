@@ -150,19 +150,22 @@ Boako.Archive = {
 
         container.innerHTML = `
             <div class="w-full animate-in fade-in duration-500">
-                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 gap-4">
+                <div class="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 gap-4">
                     <div class="flex items-center gap-2">
                         <div class="bg-indigo-600 p-1.5 rounded-lg shadow-md">
                             <i data-lucide="trophy" class="text-white w-5 h-5"></i>
                         </div>
                         <h1 id="archive-brand-title" class="text-lg font-black tracking-tighter text-indigo-950 uppercase">Boako Team League</h1>
                     </div>
-                    <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1 overflow-x-auto max-w-full">
+                    <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner gap-1 overflow-x-auto max-w-full shrink-0">   <!-- 🌟 탭이 5개가 되어 한 줄에 안 들어가면 로고 아래 줄로 내려가도록 shrink-0 + 부모 flex-wrap -->
                         <button onclick="Boako.Archive.switchTab('records')" id="tab-records" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-indigo-600 shadow-sm border border-slate-200/60 whitespace-nowrap shrink-0">
                             <i data-lucide="history" class="w-4 h-4"></i> 기록실
                         </button>
                         <button onclick="Boako.Archive.switchTab('rankings')" id="tab-rankings" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
                             <i data-lucide="trending-up" class="w-4 h-4"></i> 랭킹보드
+                        </button>
+                        <button onclick="Boako.Archive.switchTab('team_rounds')" id="tab-team_rounds" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
+                            <i data-lucide="layout-grid" class="w-4 h-4"></i> 팀 라운드
                         </button>
                         <button onclick="Boako.Archive.switchTab('games')" id="tab-games" class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:text-indigo-600 hover:bg-white/50 transition-all whitespace-nowrap shrink-0">
                             <i data-lucide="gamepad-2" class="w-4 h-4"></i> 게임별 통계
@@ -391,6 +394,9 @@ Boako.Archive = {
         const from = (this.currentPage - 1) * limit;
         const to = from + limit - 1;
 
+        // 💡 [분기 0] 팀 라운드 탭 — 자체 조회/렌더(시즌 필터만 사용)
+        if (this.currentTab === 'team_rounds') { this.fetchTeamRounds(); return; }
+
         // 💡 [분기 1] 게임별 통계 탭 — v_game_popularity_all_players는 team_only 차원으로 팀만/무소속포함을 둘 다 제공
         if (this.currentTab === 'games') {
             let query = Boako.db.from('v_game_popularity_all_players').select('*', { count: 'exact' });
@@ -478,6 +484,7 @@ Boako.Archive = {
     // 4. 탭 전환 로직
     switchTab: async function(tabName) {
         this.currentTab = tabName;
+        this._stopTeamRoundsTimer();
         this.currentPage = 1;
 
         if (tabName === 'rankings' && this.prevMvpNickname === null) {
@@ -490,6 +497,7 @@ Boako.Archive = {
         document.getElementById('tab-records').className = tabName === 'records' ? activeClass : inactiveClass;
         document.getElementById('tab-rankings').className = tabName === 'rankings' ? activeClass : inactiveClass;
         document.getElementById('tab-games').className = tabName === 'games' ? activeClass : inactiveClass;
+        document.getElementById('tab-team_rounds').className = tabName === 'team_rounds' ? activeClass : inactiveClass;
         document.getElementById('tab-territory_map').className = tabName === 'territory_map' ? activeClass : inactiveClass;
         
         const titleEl = document.getElementById('archive-page-title');
@@ -520,6 +528,13 @@ Boako.Archive = {
             if (roundFilter) roundFilter.style.display = 'none';
             if (seasonFilter) seasonFilter.style.display = 'block';
             if (filterRow) filterRow.style.display = 'flex';
+        } else if (tabName === 'team_rounds') {
+            titleEl.innerText = '팀 라운드 점수';
+            descEl.innerText = '시즌 라운드별 팀 RP입니다. (팀 소속 선수의 인증 완료 기록만 집계)';
+            if (subDescEl) subDescEl.style.display = 'none';
+            if (roundFilter) roundFilter.style.display = 'none';
+            if (seasonFilter) seasonFilter.style.display = 'block';
+            if (filterRow) filterRow.style.display = 'none';   // 닉네임 검색/무소속 토글은 이 탭에 해당 없음(무소속은 항상 제외)
         } else if (tabName === 'territory_map') {
             titleEl.innerText = '영향력 히스토리';
             descEl.innerText = '최근 90일간 RP 비중으로 나눈 팀/개인 영향력 지도입니다.';
@@ -832,6 +847,127 @@ Boako.Archive = {
         });
 
         if(window.lucide) lucide.createIcons();
+    },
+
+    // ====================================================================
+    // 🌟 [신규] 팀 라운드 탭 — 시즌 라운드(R1~R9)별 팀 RP 합계
+    //  - 정식 순위(LP)는 랭킹 메뉴, 여기는 라운드마다 팀이 쌓은 RP(라운드 점수)를 실시간으로 보여줌
+    //  - 집계 기준은 랭킹보드와 동일: 인증 완료(is_verified=0) + 팀 소속(b_all_team) 기록만. 무소속은 항상 제외.
+    //  - 조회는 v_boako_total_records(season_no/round_no/rp 사용), 1000건씩 끝까지 읽어 클라이언트에서 합산(DB 변경 없음)
+    //  - 이 탭이 열려 있는 동안 30초마다 조용히 갱신(바뀐 게 없으면 다시 그리지 않음)
+    // ====================================================================
+    _teamRoundsTimer: null,
+    _teamRoundsReq: 0,
+    _teamRoundsSig: '',
+
+    _stopTeamRoundsTimer: function() {
+        if (this._teamRoundsTimer) { clearInterval(this._teamRoundsTimer); this._teamRoundsTimer = null; }
+    },
+
+    fetchTeamRounds: async function(silent) {
+        const area = document.getElementById('archive-content-area');
+        if (!area) return;
+        const seasonVal = this.currentSeasonFilter;
+        if (typeof seasonVal !== 'number') {
+            this._stopTeamRoundsTimer();
+            area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">위에서 시즌을 선택하면 팀별 라운드 점수가 표시돼요.</div>`;
+            return;
+        }
+        if (!silent) { this._teamRoundsSig = ''; area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">데이터 요청 중...</div>`; }
+        const token = ++this._teamRoundsReq;     // 시즌을 빠르게 바꿀 때 늦게 온 응답이 덮어쓰지 않도록
+
+        try {
+            const PAGE = 1000;
+            let rows = [];
+            for (let from = 0; ; from += PAGE) {
+                const { data, error } = await Boako.db.from('v_boako_total_records')
+                    .select('b_all_team, round_no, rp')
+                    .eq('season_no', seasonVal).eq('is_verified', 0).not('b_all_team', 'is', null)
+                    .order('created_at', { ascending: true }).order('id', { ascending: true })
+                    .range(from, from + PAGE - 1);
+                if (error) throw error;
+                rows = rows.concat(data || []);
+                if (!data || data.length < PAGE) break;
+            }
+            const [{ data: teams, error: tErr }, infoRes] = await Promise.all([
+                Boako.db.from('teams').select('team_name, logo_url'),
+                Boako.db.rpc('get_season_info', { p_date: new Date().toISOString() }).then(r => r, () => ({ data: null }))
+            ]);
+            if (tErr) throw tErr;
+            if (token !== this._teamRoundsReq || this.currentTab !== 'team_rounds') return;
+
+            // 팀 × 라운드 RP 합산
+            const agg = {};
+            rows.forEach(r => {
+                if (!r.round_no) return;
+                (agg[r.b_all_team] = agg[r.b_all_team] || {})[r.round_no] = ((agg[r.b_all_team] || {})[r.round_no] || 0) + (r.rp || 0);
+            });
+            const info = Array.isArray(infoRes.data) ? infoRes.data[0] : infoRes.data;
+            const currentRound = (info && info.season_no === seasonVal) ? info.round_no : null;
+
+            const sig = JSON.stringify([seasonVal, currentRound, agg, (teams || []).map(t => t.team_name)]);
+            if (silent && sig === this._teamRoundsSig) return;   // 변화 없으면 그대로 둠
+            this._teamRoundsSig = sig;
+
+            this.renderTeamRounds(area, teams || [], agg, currentRound);
+
+            // 실시간 느낌: 열려 있는 동안 30초마다 조용히 갱신
+            if (!this._teamRoundsTimer) {
+                this._teamRoundsTimer = setInterval(() => {
+                    if (this.currentTab !== 'team_rounds' || document.hidden) return;
+                    this.fetchTeamRounds(true);
+                }, 30000);
+            }
+        } catch (err) {
+            console.error('팀 라운드 점수 로드 실패:', err);
+            if (!silent) area.innerHTML = `<div class="text-center py-20 text-red-400 font-bold">팀 라운드 점수를 불러오지 못했습니다.</div>`;
+        }
+    },
+
+    renderTeamRounds: function(area, teams, agg, currentRound) {
+        const ROUNDS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+        // 보여줄 기준 라운드: 진행 중인 라운드, 없으면(지난 시즌) 데이터가 있는 마지막 라운드
+        let focus = currentRound;
+        if (!focus) ROUNDS.forEach(n => { if (teams.some(t => (agg[t.team_name] || {})[n] > 0)) focus = n; });
+
+        const rpOf = (t, n) => (agg[t.team_name] || {})[n];
+        const total = t => ROUNDS.reduce((s, n) => s + (rpOf(t, n) || 0), 0);
+        // 기준 라운드 RP 높은 팀부터(동점이면 누적 RP, 그다음 팀명)
+        const sorted = teams.slice().sort((a, b) => ((rpOf(b, focus) || 0) - (rpOf(a, focus) || 0)) || (total(b) - total(a)) || a.team_name.localeCompare(b.team_name, 'ko'));
+        const defaultLogo = 'https://qrredwrxdnvqwdxzanba.supabase.co/storage/v1/object/public/teams/etc/challenge%20(1).png';
+
+        if (sorted.length === 0) {
+            area.innerHTML = `<div class="text-center py-20 text-slate-400 font-bold">집계된 팀이 없습니다.</div>`;
+            return;
+        }
+
+        const cards = sorted.map(t => {
+            const cells = ROUNDS.map(n => {
+                const v = rpOf(t, n);
+                const isFocus = n === focus;
+                const has = v !== undefined;
+                return `
+                    <div class="${isFocus ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-slate-200'} border rounded-xl p-2 text-center">
+                        <div class="text-[9px] font-black ${isFocus ? 'text-indigo-500' : 'text-slate-400'} uppercase">R${n}${isFocus && currentRound ? ' · 진행 중' : ''}</div>
+                        <div class="text-sm font-black ${has ? (isFocus ? 'text-indigo-700' : 'text-slate-700') : 'text-slate-300'}">${has ? Number(v).toLocaleString() : '-'}</div>
+                    </div>`;
+            }).join('');
+            return `
+                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <img src="${Boako.Util.cdn(t.logo_url || defaultLogo)}" class="w-9 h-9 rounded-lg object-contain bg-slate-50 border border-slate-100 shrink-0" alt="">
+                        <span class="font-black text-slate-800 text-sm">${Boako.Util.escapeHtml(t.team_name)}</span>
+                    </div>
+                    <div class="grid grid-cols-3 sm:grid-cols-9 gap-2">${cells}</div>
+                </div>`;
+        }).join('');
+
+        area.innerHTML = `
+            <div class="space-y-3">
+                <div class="text-[11px] text-slate-400 font-bold px-1">RP는 라운드마다 새로 쌓이는 점수입니다. 팀 순위(LP)는 랭킹 메뉴에서 확인하세요. 이 화면은 열려 있는 동안 자동으로 갱신됩니다.</div>
+                ${cards}
+            </div>`;
+        if (window.lucide) lucide.createIcons();
     },
 
     // 7. 게임별 통계 렌더링
