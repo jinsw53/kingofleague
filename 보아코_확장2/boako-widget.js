@@ -1984,6 +1984,18 @@
     const logoUrl = champion ? champion.logo_url : season.season_logo_url;
     if (!logoUrl) return null;
 
+    // 🌟 [버그수정] 로고 이미지가 큰 파일(수 MB)이라, 이미지를 받기 전에 오버레이가 뜨면 로고가 날아드는
+    //    1.15초 애니메이션이 이미지 없이 지나가 궤적이 안 보였다. 이미지를 미리 받아 디코딩까지 끝낸 뒤에
+    //    오버레이(애니메이션·사운드)를 시작한다. (최대 10초만 기다리고 그래도 진행)
+    await Promise.race([
+      (async () => {
+        const pre = new Image();
+        pre.src = cdnUrl(logoUrl);
+        try { await pre.decode(); } catch (e) { /* 실패해도 그대로 진행 */ }
+      })(),
+      new Promise((r) => setTimeout(r, 10000))
+    ]);
+
     ensureSeasonSplashStyle();
 
     const fmtDate = (d) => {
