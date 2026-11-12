@@ -100,6 +100,17 @@ Boako.MobileShell = {
 
     activeTab: 'feed',
 
+    // 🌟 [신규] 시즌 스플래시 — 모바일은 auth.js의 로그인 흐름을 쓰지 않아서 PC처럼 자동으로 안 떴음.
+    // 팀 소속자는 'global', 무소속/비로그인은 'ranking' 규칙(season_splash.js가 둘을 구분)을 그대로 사용.
+    // 하루 1회 노출 여부와 중복 방지는 season_splash.js 내부에서 판단.
+    triggerSeasonSplash: async () => {
+        try {
+            if (!Boako.SeasonSplash) await Boako.Util.loadScript('/js/season_splash.js');
+            const isTeamMember = !!(Boako.state.team && Boako.state.team.info);
+            Boako.SeasonSplash.maybeShow(isTeamMember ? 'global' : 'ranking');
+        } catch (e) { console.warn('시즌 스플래시 로드 실패', e); }
+    },
+
     init: async () => {
         // 🌟 [신규] 친구 초대 링크(?ref=추천인id) 캡처 — PC auth.js와 동일하게, Boako.db 생성보다도
         // 먼저(로그인 여부 무관하게) 실행돼야 함. Boako.Auth.captureReferralParam은 DOM 의존이
@@ -185,6 +196,7 @@ Boako.MobileShell = {
         // 🌟 [신규] PC가 첫 로드 시 View.render('main')(=소식지)을 그리는 것과 동일하게,
         // 모바일도 앱을 열자마자 하단 탭바의 기본 탭(소식지)을 자동으로 로드
         Boako.MobileShell.switchTab('feed');
+        Boako.MobileShell.triggerSeasonSplash();
 
         // 로그인 상태 변화(로그아웃 등)에도 드로어 내용이 갱신되도록
         Boako.db.auth.onAuthStateChange(async (e, s) => {
@@ -206,6 +218,7 @@ Boako.MobileShell = {
                 if (!Boako.RecommendNotify) await Boako.Util.loadScript('/js/recommend_notify.js');
                 Boako.RecommendNotify.startRealtime();
                 Boako.RecommendNotify.checkUnseenResults();
+                Boako.MobileShell.triggerSeasonSplash();
             } else {
                 Boako.state.team = null;
                 Boako.MobileShell.stopMessengerRealtime();

@@ -16,12 +16,13 @@ Boako.SeasonSplash = {
   // 🌟 context: 'global'(팀 소속자, 사이트 전체 트리거) | 'ranking'(무소속/비로그인, 랭킹 페이지 트리거)
   // 이 함수 하나로 두 트리거 지점 모두 커버 — 소속 여부에 안 맞는 context는 조용히 무시함
   maybeShow: async (context) => {
-    if (Boako.SeasonSplash._shown) return;
+    if (Boako.SeasonSplash._shown || Boako.SeasonSplash._running) return; // 이미 떴거나 지금 뜨는 중이면 중복 방지
 
     const isTeamMember = !!(Boako.state.team && Boako.state.team.info);
     if (context === 'global' && !isTeamMember) return;   // 팀 소속자 전용 트리거
     if (context === 'ranking' && isTeamMember) return;   // 팀 소속자는 이미 global에서 처리됨 (중복 방지)
 
+    Boako.SeasonSplash._running = true;
     try {
       const today = Boako.SeasonSplash._todayStr();
       const anonKey = 'boako_season_splash_seen';
@@ -46,6 +47,8 @@ Boako.SeasonSplash = {
       }
     } catch (err) {
       console.error('시즌 스플래시 확인 실패:', err);
+    } finally {
+      Boako.SeasonSplash._running = false;
     }
   },
 
