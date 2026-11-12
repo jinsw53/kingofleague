@@ -11,12 +11,12 @@ Boako.Sponsor = {
             return;
         }
         await Boako.Sponsor.loadActive();
+        Boako.Sponsor.render();   // 관리자 여부 조회를 기다리지 않고 먼저 노출
 
         if (Boako.state.user) {
             const { data: profile } = await Boako.db.from('profiles').select('is_admin').eq('id', Boako.state.user.id).single();
             Boako.Sponsor.isAdmin = !!(profile && profile.is_admin);
         }
-        Boako.Sponsor.render();
     },
 
     loadActive: async function() {
@@ -27,19 +27,53 @@ Boako.Sponsor = {
         Boako.Sponsor.banners = data || [];
     },
 
+    // 🌟 [개선] 노출 중인 후원 배너가 여러 장이면 같은 자리에서 display_order 순서대로 돌아가며 보여줌
+    //   (예전엔 첫 번째 1장만 고정 노출했음). 1장이면 그대로 고정. 한 장당 노출 시간: ROTATE_MS.
+    ROTATE_MS: 5000,
+    _timer: null,
+    _index: 0,
+
     render: function() {
         const area = document.getElementById('sponsor-banner-area');
         if (!area) return;
 
-        const current = Boako.Sponsor.banners[0];
+        if (Boako.Sponsor._timer) { clearInterval(Boako.Sponsor._timer); Boako.Sponsor._timer = null; }
 
-        const bannerHtml = current ? `
-            <a href="${Boako.Util.safeHref(current.link_url)}" target="${current.link_url ? '_blank' : '_self'}" style="display:flex; align-items:center; height:56px;">
-                <img src="${Boako.Util.cdn(current.image_url)}" alt="${Boako.Util.escapeHtml(current.name)}" style="max-height:56px; max-width:200px; object-fit:contain;">
-            </a>
-        ` : '';
+        const list = Boako.Sponsor.banners || [];
+        if (list.length === 0) { area.innerHTML = ''; return; }
 
-        area.innerHTML = `<div style="display:flex; align-items:center;">${bannerHtml}</div>`;
+        // 모든 배너를 같은 자리(높이 56px)에 겹쳐 놓고 투명도로 전환 — 배너가 바뀌어도 헤더 레이아웃이 움직이지 않음
+        const itemsHtml = list.map((b, i) => `
+            <a class="sponsor-slide" data-idx="${i}" href="${Boako.Util.safeHref(b.link_url)}" target="${b.link_url ? '_blank' : '_self'}" rel="noopener"
+               style="position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; transition:opacity .6s ease; opacity:${i === 0 ? 1 : 0}; pointer-events:${i === 0 ? 'auto' : 'none'};">
+                <img src="${Boako.Util.cdn(b.image_url)}" alt="${Boako.Util.escapeHtml(b.name)}" style="max-height:56px; max-width:200px; object-fit:contain;">
+            </a>`).join('');
+
+        area.innerHTML = `<div id="sponsor-rotator" style="position:relative; height:56px; width:200px;">${itemsHtml}</div>`;
+
+        Boako.Sponsor._index = 0;
+        if (list.length < 2) return;
+
+        const show = (next) => {
+            const slides = area.querySelectorAll('.sponsor-slide');
+            slides.forEach((el, i) => {
+                const on = i === next;
+                el.style.opacity = on ? 1 : 0;
+                el.style.pointerEvents = on ? 'auto' : 'none';
+            });
+            Boako.Sponsor._index = next;
+        };
+
+        let hovering = false;
+        const box = document.getElementById('sponsor-rotator');
+        box.addEventListener('mouseenter', () => { hovering = true; });
+        box.addEventListener('mouseleave', () => { hovering = false; });
+
+        Boako.Sponsor._timer = setInterval(() => {
+            if (document.hidden || hovering) return;        // 탭이 가려져 있거나 마우스를 올려둔 동안은 멈춤
+            if (!document.getElementById('sponsor-rotator')) { clearInterval(Boako.Sponsor._timer); Boako.Sponsor._timer = null; return; }
+            show((Boako.Sponsor._index + 1) % list.length);
+        }, Boako.Sponsor.ROTATE_MS);
     },
 
     openManageModal: async function() {
