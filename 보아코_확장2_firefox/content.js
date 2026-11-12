@@ -1140,16 +1140,77 @@ gameResultObserver.observe(document.body, {
   attributeFilter: ["style", "class"],
 });
 
-// 친선전(랭크 미반영) 판별: 라이브 결과 화면은 iframe 안에서 돌아가 옵션 칸이 안 보일 수 있어서
-// 현재 문서와 최상위 문서 양쪽에서 "랭크 미반영 게임 (친선전)" 라벨(#game_unranked_label)이
-// 실제로 보이는지, 그리고 기존 옵션 칸(#gameoption_201_displayed_value)이 "친선전"인지 함께 본다.
-function isUnrankedGame() {
+// 친선전(랭크 미반영) 판별
+// - 게임 "진행 중"에 상단 메뉴의 게임 옵션("게임 모드" 줄)을 읽어 테이블별로 기억해 둔다.
+//   (게임이 끝난 뒤에는 메뉴가 바뀌거나 사라질 수 있어서, 끝난 시점이 아니라 진행 중에 먼저 판단)
+// - 끝난 뒤에는 기억해 둔 값을 우선 사용하고, 현재 화면의 표시들(#game_unranked_label, 옵션 칸)도 함께 본다.
+// - 현재 문서와 최상위 문서 양쪽을 모두 확인한다(iframe 대비).
+const boakoGameModeCache = {};
+
+function boakoCurrentTableId() {
+  const m = window.location.href.match(/[?&]table=(\d+)/);
+  return m ? m[1] : null;
+}
+
+function boakoDocsToCheck() {
   const docs = [document];
   try {
     if (window.top && window.top.document && window.top.document !== document) docs.push(window.top.document);
   } catch (e) { /* cross-origin 이면 현재 문서만 */ }
+  return docs;
+}
 
-  for (const doc of docs) {
+// 화면의 게임 옵션에서 "게임 모드" 값을 읽어 반환 (못 찾으면 null)
+function readGameModeFromPage() {
+  for (const doc of boakoDocsToCheck()) {
+    for (const label of doc.querySelectorAll(".row-data .row-label")) {
+      if (label.textContent.trim() !== "게임 모드") continue;
+      const value = label.parentElement && label.parentElement.querySelector(".row-value");
+      const text = value ? value.textContent.trim() : "";
+      if (text) return text;
+    }
+  }
+  return null;
+}
+
+// 진행 중에 게임 모드를 읽어 기억 (페이지를 새로고침해도 이어지도록 sessionStorage 에도 저장)
+function rememberGameMode() {
+  const tableId = boakoCurrentTableId();
+  if (!tableId) return true;
+  if (boakoGameModeCache[tableId]) return true;
+  const mode = readGameModeFromPage();
+  if (!mode) return false;
+  boakoGameModeCache[tableId] = mode;
+  try { sessionStorage.setItem("boako_game_mode_" + tableId, mode); } catch (e) {}
+  console.log("[게임 모드] 테이블 " + tableId + " → " + mode);
+  return true;
+}
+
+function getRememberedGameMode() {
+  const tableId = boakoCurrentTableId();
+  if (!tableId) return null;
+  if (boakoGameModeCache[tableId]) return boakoGameModeCache[tableId];
+  try { return sessionStorage.getItem("boako_game_mode_" + tableId); } catch (e) { return null; }
+}
+
+(function startGameModeWatcher() {
+  if (!boakoCurrentTableId()) return;
+  if (rememberGameMode()) return;
+  // 게임 화면이 그려질 때까지 1초 간격으로 확인 (최대 3분)
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries++;
+    if (rememberGameMode() || tries >= 180) clearInterval(timer);
+  }, 1000);
+})();
+
+function isUnrankedGame() {
+  // 1) 진행 중에 기억해 둔 게임 모드
+  rememberGameMode();
+  if (getRememberedGameMode() === "친선전") return true;
+
+  // 2) 지금 화면에 보이는 표시들
+  for (const doc of boakoDocsToCheck()) {
     const view = doc.defaultView || window;
     const label = doc.querySelector("#game_unranked_label");
     if (label) {
@@ -1162,14 +1223,6 @@ function isUnrankedGame() {
     }
     const opt = doc.querySelector("#gameoption_201_displayed_value");
     if (opt && opt.innerText.trim() === "친선전") return true;
-
-    // 게임 진행 화면 메뉴의 "게임 옵션" 목록: <div class="row-label">게임 모드</div><div class="row-value">친선전</div>
-    // (숨겨진 메뉴 안에 있어도 텍스트는 읽히므로 textContent 로 본다)
-    for (const label of doc.querySelectorAll(".row-data .row-label")) {
-      if (label.textContent.trim() !== "게임 모드") continue;
-      const value = label.parentElement && label.parentElement.querySelector(".row-value");
-      if (value && value.textContent.trim() === "친선전") return true;
-    }
   }
   return false;
 }
