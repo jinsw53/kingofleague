@@ -27,53 +27,67 @@ Boako.Sponsor = {
         Boako.Sponsor.banners = data || [];
     },
 
-    // 🌟 [개선] 노출 중인 후원 배너가 여러 장이면 같은 자리에서 display_order 순서대로 돌아가며 보여줌
-    //   (예전엔 첫 번째 1장만 고정 노출했음). 1장이면 그대로 고정. 한 장당 노출 시간: ROTATE_MS.
-    ROTATE_MS: 5000,
-    _timer: null,
-    _index: 0,
+    // 🌟 [개선] 노출 중인 후원 배너를 검색바 오른쪽의 남는 공간 전체를 써서 전광판처럼 오른쪽→왼쪽으로 흘려보냄
+    //   (예전엔 첫 번째 1장만 고정 노출했음). 배너가 1장이면 그대로 고정. 마우스를 올리면 멈춤.
+    SCROLL_PX_PER_SEC: 45,   // 흐르는 속도
+    GAP_PX: 56,              // 배너 사이 간격
 
     render: function() {
         const area = document.getElementById('sponsor-banner-area');
         if (!area) return;
 
-        if (Boako.Sponsor._timer) { clearInterval(Boako.Sponsor._timer); Boako.Sponsor._timer = null; }
-
         const list = Boako.Sponsor.banners || [];
         if (list.length === 0) { area.innerHTML = ''; return; }
 
-        // 모든 배너를 같은 자리(높이 56px)에 겹쳐 놓고 투명도로 전환 — 배너가 바뀌어도 헤더 레이아웃이 움직이지 않음
-        const itemsHtml = list.map((b, i) => `
-            <a class="sponsor-slide" data-idx="${i}" href="${Boako.Util.safeHref(b.link_url)}" target="${b.link_url ? '_blank' : '_self'}" rel="noopener"
-               style="position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; transition:opacity .6s ease; opacity:${i === 0 ? 1 : 0}; pointer-events:${i === 0 ? 'auto' : 'none'};">
-                <img src="${Boako.Util.cdn(b.image_url)}" alt="${Boako.Util.escapeHtml(b.name)}" style="max-height:56px; max-width:200px; object-fit:contain;">
-            </a>`).join('');
+        // 남는 공간을 모두 차지(검색바는 자기 크기 그대로) — 넘치는 부분은 잘리고 양쪽 끝은 서서히 투명해짐
+        area.style.flex = '1 1 0';
+        area.style.minWidth = '0';
+        area.style.overflow = 'hidden';
 
-        area.innerHTML = `<div id="sponsor-rotator" style="position:relative; height:56px; width:200px;">${itemsHtml}</div>`;
+        const itemHtml = (b) => `
+            <a class="sponsor-item" href="${Boako.Util.safeHref(b.link_url)}" target="${b.link_url ? '_blank' : '_self'}" rel="noopener"
+               style="flex:0 0 auto; display:flex; align-items:center; height:56px;">
+                <img src="${Boako.Util.cdn(b.image_url)}" alt="${Boako.Util.escapeHtml(b.name)}" style="max-height:56px; max-width:200px; object-fit:contain; display:block;" draggable="false">
+            </a>`;
 
-        Boako.Sponsor._index = 0;
-        if (list.length < 2) return;
+        // 1장이면 오른쪽 끝에 고정
+        if (list.length === 1) {
+            area.style.webkitMaskImage = area.style.maskImage = '';
+            area.innerHTML = `<div style="display:flex; justify-content:flex-end; align-items:center; height:56px;">${itemHtml(list[0])}</div>`;
+            return;
+        }
 
-        const show = (next) => {
-            const slides = area.querySelectorAll('.sponsor-slide');
-            slides.forEach((el, i) => {
-                const on = i === next;
-                el.style.opacity = on ? 1 : 0;
-                el.style.pointerEvents = on ? 'auto' : 'none';
-            });
-            Boako.Sponsor._index = next;
-        };
+        const setHtml = list.map(itemHtml).join('');
+        area.style.webkitMaskImage = area.style.maskImage = 'linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%)';
+        area.innerHTML = `<div id="sponsor-track" style="display:flex; align-items:center; gap:${Boako.Sponsor.GAP_PX}px; width:max-content; height:56px; will-change:transform;">${setHtml}</div>`;
 
-        let hovering = false;
-        const box = document.getElementById('sponsor-rotator');
-        box.addEventListener('mouseenter', () => { hovering = true; });
-        box.addEventListener('mouseleave', () => { hovering = false; });
+        const track = document.getElementById('sponsor-track');
+        const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        track.addEventListener('mouseenter', () => { track.style.animationPlayState = 'paused'; });
+        track.addEventListener('mouseleave', () => { track.style.animationPlayState = 'running'; });
 
-        Boako.Sponsor._timer = setInterval(() => {
-            if (document.hidden || hovering) return;        // 탭이 가려져 있거나 마우스를 올려둔 동안은 멈춤
-            if (!document.getElementById('sponsor-rotator')) { clearInterval(Boako.Sponsor._timer); Boako.Sponsor._timer = null; return; }
-            show((Boako.Sponsor._index + 1) % list.length);
-        }, Boako.Sponsor.ROTATE_MS);
+        // 이미지 크기를 알아야 폭을 계산할 수 있으므로 모두 불러온 뒤(실패한 이미지는 제외) 흐름 시작
+        const imgs = Array.from(track.querySelectorAll('img'));
+        Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
+            new Promise(res => { img.onload = res; img.onerror = () => { const a2 = img.closest('.sponsor-item'); if (a2) a2.remove(); res(); }; })
+        )).then(() => {
+            if (!document.getElementById('sponsor-track') || reduceMotion) return;
+            const oneSetW = track.scrollWidth + Boako.Sponsor.GAP_PX;      // 1세트 폭(마지막 간격 포함)
+            const boxW = area.clientWidth || 300;
+            if (!oneSetW || track.children.length === 0) return;
+            // 한 줄이 보이는 영역보다 짧으면 이어 붙이는 틈이 보이므로 세트를 반복해서 채움
+            const repeat = Math.max(1, Math.ceil(boxW / oneSetW));
+            const half = setHtml.repeat(repeat);
+            track.innerHTML = half + half;                                  // 앞 절반만큼 이동하면 제자리로 돌아와 끊김 없이 순환
+            track.querySelectorAll('img').forEach(i => { i.onerror = () => { const a3 = i.closest('.sponsor-item'); if (a3) a3.style.display = 'none'; }; });
+            const distance = oneSetW * repeat;
+            const dur = Math.max(8, distance / Boako.Sponsor.SCROLL_PX_PER_SEC);
+            const styleId = 'sponsor-marquee-style';
+            let st = document.getElementById(styleId);
+            if (!st) { st = document.createElement('style'); st.id = styleId; document.head.appendChild(st); }
+            st.textContent = `@keyframes sponsor-marquee { from { transform: translateX(0); } to { transform: translateX(-${distance}px); } }`;
+            track.style.animation = `sponsor-marquee ${dur}s linear infinite`;
+        });
     },
 
     openManageModal: async function() {
