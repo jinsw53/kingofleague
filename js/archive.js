@@ -177,7 +177,7 @@ Boako.Archive = {
                     <div>
                         <h2 id="archive-page-title" class="text-3xl font-black text-slate-900 tracking-tight leading-none">시즌 경기 기록실</h2>
                         <p id="archive-page-desc" class="text-slate-400 mt-2 font-medium text-sm">시즌, 라운드 별로 팀 리그 기록을 확인하실 수 있습니다.</p>
-                        <p id="archive-page-subdesc" class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )</p>
+                        <p id="archive-page-subdesc" class="text-slate-400 mt-1 font-medium text-xs">( 🧠 = 웨이트 | ⏳ = 플레이타임 | 🎲 = 리그 배점 )<br><span class="text-red-500 font-bold"><span class="bg-red-500 text-white text-[8px] px-1 rounded font-black align-middle">1ST</span> 첫승 기록은 배점에 <b>+5</b>가 더해져 계산됩니다. ( 🧠 × ⏳ × (🎲 + 5) )</span></p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 relative z-30">
                         <div id="season-filter-container" class="relative w-[130px]"></div>
@@ -656,7 +656,9 @@ Boako.Archive = {
                             <span class="text-slate-300 text-xs">×</span>
                             <div class="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-500 border border-slate-200 rounded-md text-[11px] font-black shadow-sm" title="Playtime">${rec.playtime || 0}</div>
                             <span class="text-slate-300 text-xs">×</span>
-                            <div class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[11px] font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>
+                            ${rec.is_first == 1
+                                ? `<div class="h-7 px-1.5 flex items-center gap-0.5 bg-red-50 text-red-600 border border-red-200 rounded-md text-[11px] font-black shadow-sm" title="첫승 보너스: 배점 +5">${rec.multiplier || 0}<span class="text-[9px]">+5</span></div>`
+                                : `<div class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[11px] font-black shadow-sm" title="Multiplier">${rec.multiplier || 0}</div>`}
                         </div>
                     </td>
                     <td class="px-4 py-4 text-right">${rpCellHTML}</td>

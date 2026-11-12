@@ -206,7 +206,9 @@ Boako.MobileArchive = {
                             <span style="font-size:10px; font-weight:900; color:#cbd5e1;">×</span>
                             <span style="font-size:9.5px; font-weight:800; background:#f8fafc; border:1px solid #f1f5f9; border-radius:5px; padding:3px 6px; color:#64748b;">⏳ ${rec.playtime || 0}</span>
                             <span style="font-size:10px; font-weight:900; color:#cbd5e1;">×</span>
-                            <span style="font-size:9.5px; font-weight:800; background:#eef2ff; border:1px solid #e0e7ff; border-radius:5px; padding:3px 6px; color:#4f46e5;">🎲 ${rec.multiplier || 0}</span>
+                            ${rec.is_first == 1
+                                ? `<span style="font-size:9.5px; font-weight:800; background:#fef2f2; border:1px solid #fecaca; border-radius:5px; padding:3px 6px; color:#dc2626;">🎲 ${rec.multiplier || 0} +5</span>`
+                                : `<span style="font-size:9.5px; font-weight:800; background:#eef2ff; border:1px solid #e0e7ff; border-radius:5px; padding:3px 6px; color:#4f46e5;">🎲 ${rec.multiplier || 0}</span>`}
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             ${statusIconHtml}
