@@ -1140,6 +1140,32 @@ gameResultObserver.observe(document.body, {
   attributeFilter: ["style", "class"],
 });
 
+// 친선전(랭크 미반영) 판별: 라이브 결과 화면은 iframe 안에서 돌아가 옵션 칸이 안 보일 수 있어서
+// 현재 문서와 최상위 문서 양쪽에서 "랭크 미반영 게임 (친선전)" 라벨(#game_unranked_label)이
+// 실제로 보이는지, 그리고 기존 옵션 칸(#gameoption_201_displayed_value)이 "친선전"인지 함께 본다.
+function isUnrankedGame() {
+  const docs = [document];
+  try {
+    if (window.top && window.top.document && window.top.document !== document) docs.push(window.top.document);
+  } catch (e) { /* cross-origin 이면 현재 문서만 */ }
+
+  for (const doc of docs) {
+    const view = doc.defaultView || window;
+    const label = doc.querySelector("#game_unranked_label");
+    if (label) {
+      let visible = true;
+      for (let el = label; el && el.nodeType === 1; el = el.parentElement) {
+        const cs = view.getComputedStyle(el);
+        if (cs.display === "none" || cs.visibility === "hidden") { visible = false; break; }
+      }
+      if (visible) return true;
+    }
+    const opt = doc.querySelector("#gameoption_201_displayed_value");
+    if (opt && opt.innerText.trim() === "친선전") return true;
+  }
+  return false;
+}
+
 // 기존 버튼 상태만 업데이트하는 함수
 function updateExistingButtonState(button) {
   // 게임이 진행 중인지 확인
@@ -1162,8 +1188,7 @@ function updateExistingButtonState(button) {
     return element && getComputedStyle(element).display === "block";
   });
 
-  let gameModeElement = document.querySelector("#gameoption_201_displayed_value");
-  let isUnranked = gameModeElement ? gameModeElement.innerText.trim() === "친선전" : false;
+  let isUnranked = isUnrankedGame();
 
   // 사용자가 참여하지 않은 게임인지 확인
   let isNotParticipated = false;
@@ -1325,12 +1350,7 @@ function addSaveButtons() {
         return element && getComputedStyle(element).display === "block";
       });
 
-      let gameModeElement = document.querySelector(
-        "#gameoption_201_displayed_value"
-      );
-      let isUnranked = gameModeElement
-        ? gameModeElement.innerText.trim() === "친선전"
-        : false;
+      let isUnranked = isUnrankedGame();
 
       // 사용자가 참여하지 않은 게임인지 확인
       let isNotParticipated = false;
@@ -2372,10 +2392,7 @@ function updateLiveButtonState(button) {
     return element && getComputedStyle(element).display === "block";
   });
 
-  let gameModeElement = document.querySelector("#gameoption_201_displayed_value");
-  let isUnranked = gameModeElement
-    ? gameModeElement.innerText.trim() === "친선전"
-    : false;
+  let isUnranked = isUnrankedGame();
 
   let isNotParticipated = false;
   const userNickname = getCurrentUserNickname();
