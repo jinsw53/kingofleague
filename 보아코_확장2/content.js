@@ -1163,7 +1163,8 @@ function boakoDocsToCheck() {
 // 화면의 게임 옵션에서 "게임 모드" 값을 읽어 반환 (못 찾으면 null)
 function readGameModeFromPage() {
   for (const doc of boakoDocsToCheck()) {
-    for (const label of doc.querySelectorAll(".row-data .row-label")) {
+    const menu = doc.querySelector("#ingame_menu_content") || doc;   // 게임 메뉴 안에서만 찾아 조회 범위를 줄인다
+    for (const label of menu.querySelectorAll(".row-data .row-label")) {
       if (label.textContent.trim() !== "게임 모드") continue;
       const value = label.parentElement && label.parentElement.querySelector(".row-value");
       const text = value ? value.textContent.trim() : "";
@@ -1196,12 +1197,18 @@ function getRememberedGameMode() {
 (function startGameModeWatcher() {
   if (!boakoCurrentTableId()) return;
   if (rememberGameMode()) return;
-  // 게임 화면이 그려질 때까지 1초 간격으로 확인 (최대 3분)
-  let tries = 0;
-  const timer = setInterval(() => {
-    tries++;
-    if (rememberGameMode() || tries >= 180) clearInterval(timer);
-  }, 1000);
+  // 게임 화면이 그려질 때까지 가볍게 확인한다 (게임 진행에 영향이 없도록):
+  //  - 처음 10초는 1초 간격, 이후는 5초 간격으로 간격을 늘리고, 최대 5분까지만 시도
+  //  - 탭이 가려져 있으면(document.hidden) 그 회차는 건너뜀
+  //  - 한 번 확인할 때 하는 일은 작은 선택자 조회 한 번뿐이고, 찾으면 즉시 종료
+  const startedAt = Date.now();
+  const tick = () => {
+    const elapsed = Date.now() - startedAt;
+    if (elapsed > 5 * 60 * 1000) return;
+    if (!document.hidden && rememberGameMode()) return;
+    setTimeout(tick, elapsed < 10000 ? 1000 : 5000);
+  };
+  setTimeout(tick, 1000);
 })();
 
 function isUnrankedGame() {
