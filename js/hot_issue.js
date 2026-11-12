@@ -30,9 +30,12 @@ Boako.HotIssue = {
     },
 
     fetchItems: async () => {
-        let items = [];
+        // 🌟 [속도] 예전엔 6개 소스를 차례로 기다려서 느렸다. 서로 의존하지 않으므로 동시에 조회하고, 결과는 예전과 같은 순서로 합친다.
+        const sections = [];
 
         // 1. 라이벌 매치 도전 (최근 발행분)
+        sections.push((async () => {
+            const items = [];
         try {
             const { data: matches } = await Boako.db
                 .from('rival_matches')
@@ -56,8 +59,12 @@ Boako.HotIssue = {
                 });
             }
         } catch (e) { console.error("라이벌 이슈 로드 실패:", e); }
+            return items;
+        })());
 
         // 2. 토너먼트 개최 공지
+        sections.push((async () => {
+            const items = [];
         try {
             const { data } = await Boako.db
                 .from('tournament_posts')
@@ -76,8 +83,12 @@ Boako.HotIssue = {
                 });
             });
         } catch (e) { console.error("토너먼트 이슈 로드 실패:", e); }
+            return items;
+        })());
 
         // 3. 같이하자 모임 확정
+        sections.push((async () => {
+            const items = [];
         try {
             const { data } = await Boako.db
                 .from('together_posts')
@@ -96,8 +107,12 @@ Boako.HotIssue = {
                 });
             });
         } catch (e) { console.error("같이하자 이슈 로드 실패:", e); }
+            return items;
+        })());
 
         // 4. 게시판 — 새 질문 게시글
+        sections.push((async () => {
+            const items = [];
         try {
             const { data } = await Boako.db
                 .from('board_posts')
@@ -118,11 +133,15 @@ Boako.HotIssue = {
                 });
             });
         } catch (e) { console.error("질문 게시글 이슈 로드 실패:", e); }
+            return items;
+        })());
 
         // 5. 업적 달성 (최근 획득분)
         //    🌟 OO매니아류는 achievements.name에 'OO' 플레이스홀더가 그대로 들어있어서,
         //    meta.game_name으로 치환해줘야 함 (소식지 트리거와 동일한 규칙)
         //    🌟 [수정] 클릭 이동 위치 확정 — 전적기록실로 이동 (소식지 트리거와 동일하게 ARCHIVE 사용).
+        sections.push((async () => {
+            const items = [];
         try {
             const { data: uas } = await Boako.db
                 .from('user_achievements')
@@ -151,9 +170,13 @@ Boako.HotIssue = {
                 });
             }
         } catch (e) { console.error("업적 이슈 로드 실패:", e); }
+            return items;
+        })());
 
         // 6. 🌟 [신규] 5연속 전적 기록 ("수배전단") — 전용 테이블이 없고 소식지(news_feed_items)를
         //    소스로 재사용. event_type='RECORD_STREAK'인 것만 필터링.
+        sections.push((async () => {
+            const items = [];
         try {
             const { data: streaks } = await Boako.db
                 .from('news_feed_items')
@@ -172,7 +195,11 @@ Boako.HotIssue = {
                 });
             });
         } catch (e) { console.error("연속기록 이슈 로드 실패:", e); }
+            return items;
+        })());
 
+
+        const items = (await Promise.all(sections)).flat();
         items.sort((a, b) => new Date(b.time) - new Date(a.time));
         return items.slice(0, 5);
     },

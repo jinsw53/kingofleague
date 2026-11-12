@@ -268,65 +268,72 @@ Boako.NewsFeed = {
     // 필러 후보 풀을 넉넉하게 만든다 (반복 사용을 피하기 위해 데이터 개수를 늘림).
     // 개별 쿼리가 실패해도 나머지는 계속 진행되도록 각각 try/catch로 감싼다.
     buildFillerPool: async () => {
-        const pool = [];
+        // 🌟 [속도] 예전엔 팀 → 랭킹 → 게시글 → 게임 개수 → 게임 1건씩 4번을 "차례로" 기다려서 첫 화면이
+        // 이 보조 데이터 때문에 수 초씩 늦어졌다. 서로 의존하지 않는 조회는 동시에 보내고, 결과는 예전과 같은 순서로 합친다.
+        const fromTeams = async () => {
+            try {
+                const { data } = await Boako.db
+                    .from('view_team_list_sorted')
+                    .select('id, team_name, member_count, logo_url')
+                    .limit(4);
+                return (data || []).map(t => ({ title: `🛡️ ${t.team_name} · ${t.member_count}명`, image: t.logo_url, icon: '🛡️', linkType: 'TEAM', linkId: t.id }));
+            } catch (e) { console.error('필러(팀 목록) 로드 실패:', e); return []; }
+        };
 
-        try {
-            const { data } = await Boako.db
-                .from('view_team_list_sorted')
-                .select('id, team_name, member_count, logo_url')
-                .limit(4);
-            (data || []).forEach(t => {
-                pool.push({ title: `🛡️ ${t.team_name} · ${t.member_count}명`, image: t.logo_url, icon: '🛡️', linkType: 'TEAM', linkId: t.id });
-            });
-        } catch (e) { console.error('필러(팀 목록) 로드 실패:', e); }
+        const fromRanking = async () => {
+            try {
+                const { data } = await Boako.db
+                    .from('v_season_current_ranking')
+                    .select('season_no, team_name, total_lp, logo_url')
+                    .order('season_no', { ascending: false })
+                    .order('total_lp', { ascending: false })
+                    .limit(4);
+                return (data || []).map(r => ({ title: `🏆 ${r.team_name} — 시즌${r.season_no} 순위권 (LP ${r.total_lp})`, image: r.logo_url, icon: '🏆', linkType: 'SEASON_RANKING', linkId: r.team_name }));
+            } catch (e) { console.error('필러(랭킹) 로드 실패:', e); return []; }
+        };
 
-        try {
-            const { data } = await Boako.db
-                .from('v_season_current_ranking')
-                .select('season_no, team_name, total_lp, logo_url')
-                .order('season_no', { ascending: false })
-                .order('total_lp', { ascending: false })
-                .limit(4);
-            (data || []).forEach(r => {
-                pool.push({ title: `🏆 ${r.team_name} — 시즌${r.season_no} 순위권 (LP ${r.total_lp})`, image: r.logo_url, icon: '🏆', linkType: 'SEASON_RANKING', linkId: r.team_name });
-            });
-        } catch (e) { console.error('필러(랭킹) 로드 실패:', e); }
+        const fromBoard = async () => {
+            try {
+                const { data } = await Boako.db
+                    .from('board_posts')
+                    .select('id, title, category')
+                    .eq('is_deleted', false)
+                    .eq('is_draft', false)
+                    .order('created_at', { ascending: false })
+                    .limit(4);
+                return (data || []).map(p => ({ title: `📝 [${p.category}] ${p.title}`, image: null, icon: '📝', linkType: 'BOARD_POST', linkId: p.id }));
+            } catch (e) { console.error('필러(게시글) 로드 실패:', e); return []; }
+        };
 
-        try {
-            const { data } = await Boako.db
-                .from('board_posts')
-                .select('id, title, category')
-                .eq('is_deleted', false)
-                .eq('is_draft', false)
-                .order('created_at', { ascending: false })
-                .limit(4);
-            (data || []).forEach(p => {
-                pool.push({ title: `📝 [${p.category}] ${p.title}`, image: null, icon: '📝', linkType: 'BOARD_POST', linkId: p.id });
-            });
-        } catch (e) { console.error('필러(게시글) 로드 실패:', e); }
-
-        try {
-            const { count } = await Boako.db.from('games').select('id', { count: 'exact', head: true });
-            if (count) {
-                // 🌟 서로 다른 랜덤 위치에서 최대 4개까지 중복 없이 뽑기
+        const fromGames = async () => {
+            try {
+                const { count } = await Boako.db.from('games').select('id', { count: 'exact', head: true });
+                if (!count) return [];
+                // 🌟 서로 다른 랜덤 위치에서 최대 4개까지 중복 없이 뽑기 (4건은 동시에 조회)
                 const pickCount = Math.min(4, count);
                 const offsets = new Set();
                 while (offsets.size < pickCount) {
                     offsets.add(Math.floor(Math.random() * count));
                 }
-                for (const offset of offsets) {
-                    const { data } = await Boako.db
-                        .from('games')
+                const rows = await Promise.all([...offsets].map(offset =>
+                    Boako.db.from('games')
                         .select('game_name, min_players, max_players, playtime, image_url, bga_url')
-                        .range(offset, offset);
+                        .range(offset, offset)
+                ));
+                const out = [];
+                rows.forEach(({ data }) => {
                     if (data && data[0]) {
                         const g = data[0];
                         const playerLabel = g.min_players === g.max_players ? `${g.min_players}인` : `${g.min_players}-${g.max_players}인`;
-                        pool.push({ title: `🎲 ${g.game_name} · ${playerLabel} · ${g.playtime}분`, image: g.image_url, icon: '🎲', externalUrl: g.bga_url || null });
+                        out.push({ title: `🎲 ${g.game_name} · ${playerLabel} · ${g.playtime}분`, image: g.image_url, icon: '🎲', externalUrl: g.bga_url || null });
                     }
-                }
-            }
-        } catch (e) { console.error('필러(보드게임) 로드 실패:', e); }
+                });
+                return out;
+            } catch (e) { console.error('필러(보드게임) 로드 실패:', e); return []; }
+        };
+
+        const parts = await Promise.all([fromTeams(), fromRanking(), fromBoard(), fromGames()]);
+        const pool = parts.flat();
 
         // 위 4개 쿼리가 전부 실패하는 극단적인 경우를 대비한 최소한의 안전장치
         if (pool.length === 0) {
