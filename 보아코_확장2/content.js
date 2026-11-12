@@ -1162,6 +1162,14 @@ function isUnrankedGame() {
     }
     const opt = doc.querySelector("#gameoption_201_displayed_value");
     if (opt && opt.innerText.trim() === "친선전") return true;
+
+    // 게임 진행 화면 메뉴의 "게임 옵션" 목록: <div class="row-label">게임 모드</div><div class="row-value">친선전</div>
+    // (숨겨진 메뉴 안에 있어도 텍스트는 읽히므로 textContent 로 본다)
+    for (const label of doc.querySelectorAll(".row-data .row-label")) {
+      if (label.textContent.trim() !== "게임 모드") continue;
+      const value = label.parentElement && label.parentElement.querySelector(".row-value");
+      if (value && value.textContent.trim() === "친선전") return true;
+    }
   }
   return false;
 }
