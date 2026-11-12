@@ -326,6 +326,9 @@ document.addEventListener("DOMContentLoaded", function() {
     <script src="js/hot_issue.js"></script>
     <script src="js/ticker.js"></script>
     <script src="js/sponsor.js"></script>
+    <!-- 🌟 [속도] 첫 화면에 필요한 파일을 미리 내려받기 시작(state_restore는 main.js가 시작 전에 불러오던 파일이라 정적 로드로 전환) -->
+    <link rel="preload" as="script" href="js/newsfeed.js">
+    <script src="js/state_restore.js"></script>
     <script src="js/main.js"></script>
     <script src="js/motion.js"></script>
 

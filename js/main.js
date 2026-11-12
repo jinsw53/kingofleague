@@ -1,7 +1,9 @@
 /**
  * [MAIN] 스크립트 실행 진입점
  */
-window.onload = async () => {
+// 🌟 [속도] window.onload 는 이미지·폰트·외부 스크립트까지 전부 끝나야 발생해서 앱 시작이 그만큼 늦어졌음.
+// 필요한 스크립트는 모두 이 파일보다 앞에서 동기 로드되므로 DOM 파싱이 끝나는 즉시(DOMContentLoaded) 시작한다.
+const boakoStartApp = async () => {
     // 🌟 [신규] 새로고침 시 보던 화면 복원 모듈 — Auth.init()이 첫 화면을 그리기 전에 먼저 장착해야 함.
     // 로딩에 실패해도 사이트 동작에는 영향 없도록 try/catch.
     try { await Boako.Util.loadScript('js/state_restore.js'); } catch (e) { console.warn('state_restore 로드 실패', e); }
@@ -47,3 +49,9 @@ window.onload = async () => {
     // 경쟁(race condition)이 생겨 "이미 사용된 refresh_token"으로 요청하는 400 에러가
     // 반복적으로 발생했습니다. 수동 호출 없이도 세션 유지에는 문제가 없습니다.
 };
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boakoStartApp);
+} else {
+    boakoStartApp();
+}
