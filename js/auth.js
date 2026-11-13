@@ -391,7 +391,10 @@ Boako.Auth = {
         const user = Boako.state.user;
         if (!user) {
             area.innerHTML = `<button class="btn-kakao" onclick="Boako.Auth.login()">🟡 카카오 로그인</button>
-            <a href="/__view/mobile" style="display:block; text-align:center; margin-top:10px; font-size:12px; font-weight:700; color:#94a3b8;">📱 모바일 버전으로 보기</a>`;
+            <div style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:10px; font-size:12px; font-weight:700;">
+                <a href="${Boako.Auth.usageVideoUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">📺 사용법 영상</a>
+                <a href="/__view/mobile" style="color:#94a3b8;">📱 모바일 버전으로 보기</a>
+            </div>`;
         } else {
             const kakaoAvatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://') || null;
 
@@ -460,7 +463,10 @@ Boako.Auth = {
                 </div>
 
             <button class="btn-logout" style="width:100%; padding:12px; color:#94a3b8; font-size:13px; font-weight:600; border:1px solid #e2e8f0; border-radius:10px; margin-top:15px;" onclick="Boako.Auth.logout()">로그아웃</button>
-            <a href="/__view/mobile" style="display:block; text-align:center; margin-top:10px; font-size:12px; font-weight:700; color:#94a3b8;">📱 모바일 버전으로 보기</a>`;
+            <div style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:10px; font-size:12px; font-weight:700;">
+                <a href="${Boako.Auth.usageVideoUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">📺 사용법 영상</a>
+                <a href="/__view/mobile" style="color:#94a3b8;">📱 모바일 버전으로 보기</a>
+            </div>`;
 
             // 아바타 hover 시 "사진 변경" 힌트 보이게
             if (!document.getElementById('avatar-hover-hint-style')) {
