@@ -1294,7 +1294,7 @@ Boako.Auth = {
                             <h3 class="text-lg font-black text-white leading-tight truncate">${escapeHtml(notice.title)}</h3>
                         </div>
                     </div>
-                    <div class="p-6 overflow-y-auto text-sm text-slate-700 leading-relaxed prose max-w-none">${notice.content}</div>
+                    <div class="p-6 overflow-y-auto text-sm text-slate-700 leading-relaxed prose max-w-none">${Boako.Util.sanitizeHtml(notice.content)}</div>
                     <div class="p-5 border-t border-slate-100 shrink-0">
                         <button onclick="Boako.Auth.confirmNotice(${notice.id})" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-3.5 rounded-xl transition-all shadow-lg active:scale-95">
                             확인했습니다${queue.length > 1 ? ` (${queue.length}개 중 1번째)` : ''}

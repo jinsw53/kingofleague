@@ -40,6 +40,35 @@ Boako.Util = {
     },
     // 🛡️ [보안] 사용자 입력(채팅/닉네임/글 내용 등)을 innerHTML 에 넣기 전에 반드시 통과시키는 이스케이프
     escapeHtml: (str) => String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+    // 🛡️ [보안] DB에 저장된 리치 HTML(공지 본문 등)을 화면에 넣기 전에 통과시키는 정화 함수.
+    // 게시판 상세의 Boako.Board.sanitizeContent 와 같은 기준(script/style/object/embed/link/meta/base/form/svg/math 제거,
+    // 유튜브(youtube-nocookie) 외 iframe 제거, on* 속성·javascript:/vbscript: 링크·data: URL(이미지 제외) 제거).
+    // board.js 는 필요할 때만 로드돼서, 항상 로드되는 util.js 에 공용으로 둔다.
+    sanitizeHtml: (html) => {
+        const tpl = document.createElement('template');   // template 으로 파싱하면 <img onerror> 가 정화 전에 실행되지 않음
+        tpl.innerHTML = String(html ?? '');
+        const div = tpl.content;
+        div.querySelectorAll('script, style, object, embed, link, meta, base, form, svg, math').forEach(el => el.remove());
+        div.querySelectorAll('iframe').forEach(el => {
+            const src = el.getAttribute('src') || '';
+            if (!/^https:\/\/www\.youtube-nocookie\.com\/embed\//.test(src)) el.remove();
+            else el.removeAttribute('srcdoc');
+        });
+        div.querySelectorAll('*').forEach(el => {
+            [...el.attributes].forEach(attr => {
+                const name = attr.name.toLowerCase();
+                const value = attr.value.toLowerCase().replace(/[\u0000-\u0020\u007f-\u009f]/g, '');
+                if (name.startsWith('on') || name === 'srcdoc' || name === 'formaction' ||
+                    /^(javascript|vbscript):/.test(value) ||
+                    (/^data:/.test(value) && !(name === 'src' && /^data:image\/(png|jpe?g|gif|webp);/.test(value)))) {
+                    el.removeAttribute(attr.name);
+                }
+            });
+        });
+        const out = document.createElement('div');
+        out.appendChild(div);
+        return out.innerHTML;
+    },
     // 🛡️ [보안] onclick="fn('...')" 처럼 HTML 속성 안의 JS 문자열 리터럴에 값을 넣을 때 사용
     // 이미 escapeHtml 된 문자열 안의 BGA 주소(https://boardgamearena.com/...)만 새 창 링크로 변환 (다른 도메인은 그대로 글자)
     linkifyBga: (escapedHtml, style = 'text-decoration:underline; font-weight:800; word-break:break-all;') =>
