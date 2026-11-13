@@ -1159,6 +1159,44 @@ const isLeader = Boako.state.team.type === 'LEADER';
         }
     },
 
+   // 🌟 [신규] 팀 멤버 "마지막 접속" 표시 — 사이트 접속과 확장 프로그램 사용 중 더 최근 시각 기준.
+   //   fn_get_team_member_activity(DB 함수)는 그 팀의 활성 팀원만 호출할 수 있다. PC/모바일이 같이 쓰므로 인라인 스타일만 사용.
+   //   색상 기준: 0~2일 초록 / 3~6일 노랑 / 7일 이상 빨강 / 기록 없음 회색. (날짜는 한국 시간 기준 달력 일수)
+   memberActivityChip: function(lastSeenIso) {
+        const styles = {
+            g: 'background:#dcfce7; color:#15803d;', y: 'background:#fef3c7; color:#b45309;',
+            r: 'background:#fee2e2; color:#b91c1c;', n: 'background:#f1f5f9; color:#64748b;'
+        };
+        const chip = (cls, text, title) =>
+            `<span title="${Boako.Util.escapeHtml(title)}" style="${styles[cls]} font-size:11px; font-weight:900; border-radius:999px; padding:4px 10px; white-space:nowrap; display:inline-block;">${text}</span>`;
+        if (!lastSeenIso) return chip('n', '⚪ 접속 기록 없음', '방문 기록이 없습니다 (기록은 2026-09-17부터 쌓입니다)');
+        const kstDay = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }); // YYYY-MM-DD
+        const days = Math.max(0, Math.round((new Date(kstDay(new Date())) - new Date(kstDay(lastSeenIso))) / 86400000));
+        const when = new Date(lastSeenIso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        const title = `마지막 접속: ${when}`;
+        if (days === 0) return chip('g', '🟢 오늘 접속', title);
+        if (days === 1) return chip('g', '🟢 어제 접속', title);
+        if (days <= 2) return chip('g', `🟢 ${days}일째 미접속`, title);
+        if (days <= 6) return chip('y', `🟡 ${days}일째 미접속`, title);
+        return chip('r', `🔴 ${days}일째 미접속`, title);
+   },
+
+   // data-member-activity="닉네임" 자리표시 요소를 찾아 채운다. 실패해도 팀 화면에는 영향 없음.
+   fillMemberActivity: async function(teamId) {
+        try {
+            const slots = document.querySelectorAll('[data-member-activity]');
+            if (slots.length === 0) return;
+            const { data, error } = await Boako.db.rpc('fn_get_team_member_activity', { p_team_id: teamId });
+            if (error) throw error;
+            const byName = Object.fromEntries((data || []).map(r => [r.player_name, r.last_seen_at]));
+            slots.forEach(el => {
+                const name = el.getAttribute('data-member-activity');
+                if (!(name in byName)) return;   // 조회 결과에 없으면(권한 없음 등) 표시하지 않음
+                el.innerHTML = Boako.Team.memberActivityChip(byName[name]);
+            });
+        } catch (e) { console.warn('팀원 접속 현황 로드 실패:', e); }
+   },
+
    loadTeamPointHistory: async function() {
         const container = document.getElementById('team-point-history-container');
         if (!container) return;

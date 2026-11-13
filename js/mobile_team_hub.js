@@ -276,8 +276,11 @@ Boako.MobileTeamHub = {
                         <span style="font-size:10px; font-weight:900; color:#fff; background:${m.role === 'LEADER' ? '#7c3aed' : '#94a3b8'}; padding:3px 8px; border-radius:6px; flex-shrink:0;">${m.role}</span>
                         <span style="font-size:13.5px; font-weight:800; color:#1e293b;">${Boako.MobileTeamHub.escapeHtml(m.player_name)}${isMe ? ' <span style="color:#7c3aed;">(나)</span>' : ''}</span>
                     </div>
+                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                    <span data-member-activity="${Boako.MobileTeamHub.escapeHtml(m.player_name)}"></span>
                     ${isLeader && m.role !== 'LEADER' ? `<button onclick="Boako.MobileTeamHub.kick('${escapedName}')" style="font-size:11px; font-weight:800; color:#ef4444; border:1px solid #fee2e2; background:#fff; padding:6px 10px; border-radius:8px; flex-shrink:0;">방출</button>` : ''}
                     ${!isLeader && isMe ? `<button onclick="Boako.Team.leave()" style="font-size:11px; font-weight:800; color:#64748b; border:1px solid #e2e8f0; background:#fff; padding:6px 10px; border-radius:8px; flex-shrink:0;">탈퇴</button>` : ''}
+                    </div>
                 </div>
             `;
         }).join('');
@@ -307,6 +310,8 @@ Boako.MobileTeamHub = {
         // 🌟 PC와 동일한 함수를 그대로 재사용 — '#team-point-history-container' id만 참조하는
         // 자기완결형 함수라 모바일에서도 안전. (Boako.Team은 이미 render()에서 로드됨)
         if (Boako.Team && Boako.Team.loadTeamPointHistory) Boako.Team.loadTeamPointHistory();
+        // 🌟 [신규] 팀 멤버별 마지막 접속(며칠째 미접속) 표시 — PC와 같은 함수 재사용
+        if (Boako.Team && Boako.Team.fillMemberActivity) Boako.Team.fillMemberActivity(team.id);
 
         await Boako.MobileTeamHub.renderWallet();
     },

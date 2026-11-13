@@ -464,7 +464,8 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                                                     <strong style="font-size:16px;">${Boako.Util.escapeHtml(m.player_name)} ${isMe ? '<small style="color:var(--primary);">(나)</small>' : ''}</strong>
                                                     ${isDraggable ? `<small style="color:#94a3b8; font-size:11px;">↕ 드래그해서 포인트 지급</small>` : ''}
                                                 </div>
-                                                <div>
+                                                <div style="display:flex; align-items:center; gap:12px;">
+                                                    <span data-member-activity="${Boako.Util.escapeHtml(m.player_name)}"></span>
                                                     ${isLeader && m.role !== 'LEADER' ? `<button class="btn-edit-small" style="color:red; border-color:#fee2e2;" onclick="Boako.Team.kick('${Boako.Util.escapeJsAttr(m.player_name)}')">방출</button>` : ''}
                                                     ${!isLeader && isMe ? `<button class="btn-edit-small" onclick="Boako.Team.leave()">팀 탈퇴</button>` : ''}
                                                 </div>
@@ -508,6 +509,10 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                         }
                         if (Boako.Team && Boako.Team.loadTeamPointHistory) {
                             Boako.Team.loadTeamPointHistory();
+                        }
+                        // 🌟 [신규] 팀 멤버별 마지막 접속(며칠째 미접속) 표시
+                        if (Boako.Team && Boako.Team.fillMemberActivity) {
+                            Boako.Team.fillMemberActivity(team.id);
                         }
                     }, 0);
 
