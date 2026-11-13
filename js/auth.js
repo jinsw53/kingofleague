@@ -1110,7 +1110,7 @@ Boako.Auth = {
                 .single();
 
             const status = profile?.tutorial_status || {};
-            if (status.ext_guide_seen) { Boako.Auth._extGuidePending = false; return; } // 이미 확인한 사람 — 다시 안 띄움
+            if (status.ext_guide_seen) { Boako.Auth._extGuidePending = false; Boako.Auth.maybeShowUsageVideoPrompt(); return; } // 이미 확인한 사람 — 설치 안내는 다시 안 띄우고, 사용법 영상 안내만 확인
 
             Boako.Auth.showExtensionGuideOverlay(async () => {
                 try {
@@ -1125,6 +1125,7 @@ Boako.Auth = {
                     console.error('기록기 가이드 확인 상태 저장 실패:', err);
                 } finally {
                     Boako.Auth._extGuidePending = false;
+                    Boako.Auth.maybeShowUsageVideoPrompt();   // 설치 안내 다음 순서: 사용법 영상 안내
                 }
             });
         } catch (err) {
@@ -1134,15 +1135,90 @@ Boako.Auth = {
     },
 
     // 🌟 비로그인 방문객: 계정이 없어 DB에 기록할 수 없으므로 브라우저 기준(localStorage)으로만 판별
+    // ========== 🌟 [신규] 사용법 영상 안내 (설치 안내 다음 순서, PC·모바일 공통) ==========
+    // "영상 보기" → 새 탭에서 유튜브 열기 / "나중에" → 닫기. 어느 쪽이든 한 번 답하면 다시 안 뜸.
+    //  - 로그인: profiles.tutorial_status.usage_video_seen / 비로그인: localStorage
+    //  - 기존 회원·방문자에게도 다음 접속 때 한 번 뜸. 닉네임/설치 안내/시즌 스플래시가 떠 있으면 끝난 뒤에 노출.
+    usageVideoUrl: 'https://www.youtube.com/shorts/q43o0CxP6M8',
+    _usageVideoPending: false,
+
+    maybeShowUsageVideoPrompt: async () => {
+        if (Boako.Auth._usageVideoPending || document.getElementById('usage-video-prompt')) return;
+        Boako.Auth._usageVideoPending = true;   // 공지 모달이 이 안내가 끝날 때까지 기다리도록
+        try {
+            const ANON_KEY = 'boako_usage_video_seen_anon';
+            const user = Boako.state && Boako.state.user;
+
+            // 1) 이미 답한 사람은 제외
+            if (user) {
+                const { data: profile } = await Boako.db.from('profiles').select('tutorial_status').eq('id', user.id).single();
+                if ((profile?.tutorial_status || {}).usage_video_seen) return;
+            } else if (localStorage.getItem(ANON_KEY)) {
+                return;
+            }
+
+            // 2) 다른 안내/오버레이가 떠 있으면 끝날 때까지 대기 (최대 약 90초)
+            for (let i = 0; i < 180; i++) {
+                const busy = document.getElementById('bga-nick-modal') || document.getElementById('mobile-nick-modal') ||
+                             document.getElementById('ext-guide-overlay') || document.getElementById('season-splash-overlay') ||
+                             Boako.Auth._extGuidePending;
+                if (!busy) break;
+                await new Promise(r => setTimeout(r, 500));
+            }
+            if (document.getElementById('usage-video-prompt')) return;
+
+            // 3) 답을 기록하고 닫는 공통 처리
+            const answer = async (openVideo) => {
+                document.getElementById('usage-video-prompt')?.remove();
+                if (openVideo) window.open(Boako.Auth.usageVideoUrl, '_blank', 'noopener');
+                try {
+                    if (user) {
+                        const { data: fresh } = await Boako.db.from('profiles').select('tutorial_status').eq('id', user.id).single();
+                        const st = fresh?.tutorial_status || {};
+                        st.usage_video_seen = true;
+                        await Boako.db.from('profiles').update({ tutorial_status: st }).eq('id', user.id);
+                    } else {
+                        localStorage.setItem(ANON_KEY, '1');
+                    }
+                } catch (e) { console.error('사용법 영상 안내 상태 저장 실패:', e); }
+            };
+
+            const el = document.createElement('div');
+            el.id = 'usage-video-prompt';
+            el.setAttribute('data-no-motion', '');
+            el.style.cssText = 'position:fixed; inset:0; z-index:99990; background:rgba(15,23,42,.62); display:flex; align-items:center; justify-content:center; padding:16px;';
+            el.innerHTML = `
+                <div style="width:min(340px,100%); background:#fff; border-radius:16px; padding:22px 20px 18px; box-shadow:0 12px 30px rgba(0,0,0,.35); text-align:center;">
+                    <div style="font-size:30px; margin-bottom:6px;">📺</div>
+                    <div style="font-weight:900; font-size:15px; color:#1e293b; margin-bottom:6px;">사용법 영상을 준비했어요</div>
+                    <div style="font-size:12.5px; color:#64748b; font-weight:600; line-height:1.6; margin-bottom:16px;">BOAKO 아카이브를 짧게 둘러볼 수 있어요.<br>지금 보시겠어요?</div>
+                    <div style="display:flex; gap:8px;">
+                        <button id="usage-video-later" style="flex:1; background:#f1f5f9; color:#475569; font-weight:800; font-size:12.5px; padding:11px; border-radius:10px; cursor:pointer;">나중에</button>
+                        <button id="usage-video-watch" style="flex:1; background:#7c3aed; color:#fff; font-weight:800; font-size:12.5px; padding:11px; border-radius:10px; cursor:pointer;">▶ 영상 보기</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(el);
+            document.getElementById('usage-video-later').addEventListener('click', () => answer(false));
+            document.getElementById('usage-video-watch').addEventListener('click', () => answer(true));
+            el.addEventListener('click', (e) => { if (e.target === el) answer(false); });   // 바깥을 눌러 닫으면 "나중에"와 같음
+        } catch (err) {
+            console.error('사용법 영상 안내 확인 실패:', err);
+        } finally {
+            Boako.Auth._usageVideoPending = false;
+        }
+    },
+
     requireExtensionGuideAnonymous: () => {
         const STORAGE_KEY = 'boako_ext_guide_seen_anon';
-        if (localStorage.getItem(STORAGE_KEY)) return;
+        // 설치 안내를 이미 본 방문자는 안내를 건너뛰고 사용법 영상 안내만 확인
+        if (localStorage.getItem(STORAGE_KEY)) { Boako.Auth.maybeShowUsageVideoPrompt(); return; }
         if (document.getElementById('ext-guide-overlay')) return;
 
         // 다른 초기화 스크립트가 레이아웃을 잡을 시간을 살짝 준 뒤 노출
         setTimeout(() => {
             Boako.Auth.showExtensionGuideOverlay(() => {
                 localStorage.setItem(STORAGE_KEY, '1');
+                Boako.Auth.maybeShowUsageVideoPrompt();   // 설치 안내 다음 순서: 사용법 영상 안내
             });
         }, 900);
     },
@@ -1158,7 +1234,7 @@ Boako.Auth = {
         if (document.getElementById('notice-modal')) return;
 
         // 닉네임 모달이나 기록기 설치 가이드가 아직 진행 중이면, 끝난 뒤에 순서대로 노출
-        if (document.getElementById('bga-nick-modal') || Boako.Auth._extGuidePending || document.getElementById('ext-guide-overlay')) {
+        if (document.getElementById('bga-nick-modal') || Boako.Auth._extGuidePending || document.getElementById('ext-guide-overlay') || Boako.Auth._usageVideoPending || document.getElementById('usage-video-prompt')) {
             setTimeout(() => Boako.Auth.requireNoticeModal(), 400);
             return;
         }

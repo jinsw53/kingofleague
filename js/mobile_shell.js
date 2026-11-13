@@ -107,7 +107,7 @@ Boako.MobileShell = {
         try {
             if (!Boako.SeasonSplash) await Boako.Util.loadScript('/js/season_splash.js');
             const isTeamMember = !!(Boako.state.team && Boako.state.team.info);
-            Boako.SeasonSplash.maybeShow(isTeamMember ? 'global' : 'ranking');
+            await Boako.SeasonSplash.maybeShow(isTeamMember ? 'global' : 'ranking');   // 스플래시를 띄웠다면 확인 버튼을 누를 때까지 기다림
         } catch (e) { console.warn('시즌 스플래시 로드 실패', e); }
     },
 
@@ -196,7 +196,9 @@ Boako.MobileShell = {
         // 🌟 [신규] PC가 첫 로드 시 View.render('main')(=소식지)을 그리는 것과 동일하게,
         // 모바일도 앱을 열자마자 하단 탭바의 기본 탭(소식지)을 자동으로 로드
         Boako.MobileShell.switchTab('feed');
-        Boako.MobileShell.triggerSeasonSplash();
+        // 🌟 [신규] 사용법 영상 안내 — 모바일은 기록기 설치 안내가 없어서 앱을 열 때 직접 호출 (이미 답했으면 안 뜸).
+        // 시즌 스플래시가 먼저 뜨면 그 확인이 끝난 뒤에 이어서 노출.
+        Boako.MobileShell.triggerSeasonSplash().finally(() => Boako.Auth.maybeShowUsageVideoPrompt());
 
         // 로그인 상태 변화(로그아웃 등)에도 드로어 내용이 갱신되도록
         Boako.db.auth.onAuthStateChange(async (e, s) => {
