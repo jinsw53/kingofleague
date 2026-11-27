@@ -275,7 +275,7 @@ Boako.Auth = {
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.Auth._referralChannel) return; // 이미 구독 중이면 중복 방지
 
-        Boako.Auth._referralChannel = Boako.db
+        Boako.Auth._referralChannel = Boako.RT
             .channel(`referral-bonus-${Boako.state.user.id}`)
             .on('postgres_changes', {
                 event: 'INSERT',
@@ -302,7 +302,7 @@ Boako.Auth = {
 
     stopReferralRealtime: () => {
         if (Boako.Auth._referralChannel && Boako.db) {
-            Boako.db.removeChannel(Boako.Auth._referralChannel);
+            Boako.RT.removeChannel(Boako.Auth._referralChannel);
             Boako.Auth._referralChannel = null;
         }
     },
@@ -801,7 +801,7 @@ Boako.Auth = {
 
     _subscribeTournamentBadgeAsLeader: function() {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._tournamentBadgeChannel) return;
-        Boako.Auth._tournamentBadgeChannel = Boako.db.channel('tournament-badge-global')
+        Boako.Auth._tournamentBadgeChannel = Boako.RT.channel('tournament-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
                 Boako.Util.debounce('badge-tournament', () => {
                     Boako.Auth.checkTournamentBadge();
@@ -858,7 +858,7 @@ Boako.Auth = {
 
     _subscribeBoardRequestBadgeAsLeader: function() {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._boardRequestBadgeChannel) return;
-        Boako.Auth._boardRequestBadgeChannel = Boako.db.channel('board-request-badge-global')
+        Boako.Auth._boardRequestBadgeChannel = Boako.RT.channel('board-request-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
                 Boako.Util.debounce('badge-board', () => {
                     Boako.Auth.checkBoardRequestBadge();
@@ -901,7 +901,7 @@ Boako.Auth = {
 
     _subscribeTogetherBadgeAsLeader: function() {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._togetherBadgeChannel) return;
-        Boako.Auth._togetherBadgeChannel = Boako.db.channel('together-badge-global')
+        Boako.Auth._togetherBadgeChannel = Boako.RT.channel('together-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
                 Boako.Util.debounce('badge-together', () => {
                     Boako.Auth.checkTogetherBadge();

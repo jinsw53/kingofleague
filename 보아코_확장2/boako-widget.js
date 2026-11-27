@@ -79,6 +79,8 @@
  *    계속 돌며 채널 6개를 구독한 상태로 남았음(끊길 때마다 1개씩 누적). 이제 클라이언트는 탭당 하나만 만들고
  *    재접속은 realtime-js에 맡기되 간격만 우리 백오프(2s→…최대 5분, 30초 이상 유지돼야 초기화)로 지정.
  *    클라이언트를 버리는 건 로그아웃/리더 이양 때뿐이고, 그때는 반드시 disconnect()로 자체 재접속까지 멈춤.
+ * 🌟 [부하 개선] Realtime 구독을 postgres_changes 채널 6개 → Broadcast private 채널 2개(user:<id>, pub:feed)로 전환.
+ *    DB 트리거(fn_rt_emit)가 변경 1건을 받을 사람에게만 한 번씩 보내서 Realtime 서버의 DB 감시·권한 확인 부하가 사라짐.
  * 🌟 [버그수정] 팀챗에서 나 말고 다른 팀원이 전부 "팀원"으로만 표기되던 문제 — fetchTeamChats()가
  *    sender_id만 가져오고 이름을 안 가져오고 있었음. PC team.js Chat.init()과 동일하게 PostgREST
  *    임베드(profiles(full_name))로 실제 발신자 이름을 조회해서 표시.
@@ -1232,98 +1234,55 @@
     enqueueFullscreenOverlay(() => renderRecommendBonusOverlay(payload.new.game_name, payload.new.bonus_point));
   }
 
-  function _subscribeAllChannels(client) {
+  // 🌟 [Broadcast 전환] 예전엔 postgres_changes 채널 6개(쪽지/팀챗/소식/업적/라이벌/추천)를 따로 구독해서
+  // Realtime 서버가 구독마다 DB를 감시했음. 이제 DB 트리거(fn_rt_emit)가 변경 1건을 받을 사람의 토픽으로
+  // 한 번만 보내므로 private 채널 2개(user:<내 id>, pub:feed)만 구독하고 table 이름으로 나눠서 처리함.
+  // 받는 payload는 { table, operation, record, old_record } → 기존 처리 함수가 쓰던 { new, old } 모양으로 맞춰서 넘김.
+  // 토픽 규칙은 supabase/sql/2026-11-27_realtime_broadcast.sql 과 같아야 함.
+  function _toPgPayload(p) {
+    return { schema: p.schema || 'public', table: p.table, eventType: p.operation, new: p.record || {}, old: p.old_record || {} };
+  }
 
-    // 내 쪽지함 실시간 구독
-    const msgTopic = `messages-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${msgTopic}`);
-    const msgChannel = client.channel(msgTopic, { config: {} });
-    msgChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${State.session.user.id}` }, (payload) => {
-      onMessageInsert(payload);
-      broadcastToFollowers('message-insert', payload);
-    });
-    msgChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${msgTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${msgTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT, CSP/네트워크 문제 가능성): ${msgTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${msgTopic}`);
-    });
-
-    // 팀챗 실시간 구독 (팀 소속인 경우만)
-    if (State.teamId) {
-      const teamTopic = `team-chats-${State.teamId}`;
-      boakoLog(`채널 구독 시도: ${teamTopic}`);
-      const teamChannel = client.channel(teamTopic, { config: {} });
-      teamChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'team_chats', filter: `team_id=eq.${State.teamId}` }, (payload) => {
-        onTeamChatInsert(payload);
-        broadcastToFollowers('team-chat-insert', payload);
-      });
-      teamChannel.subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${teamTopic}`);
-        else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${teamTopic}`, err);
-        else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${teamTopic}`);
-        else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${teamTopic}`);
-      });
+  function _dispatchBroadcast(p) {
+    if (!p || !p.table || !State.session) return;
+    const me = State.session.user.id;
+    const payload = _toPgPayload(p);
+    const rec = payload.new;
+    switch (p.table) {
+      case 'messages':
+        if (p.operation !== 'INSERT' || rec.receiver_id !== me) return; // 내가 보낸 쪽지는 알림 대상 아님
+        onMessageInsert(payload); broadcastToFollowers('message-insert', payload); return;
+      case 'team_chats':
+        if (p.operation !== 'INSERT' || !State.teamId || String(rec.team_id) !== String(State.teamId)) return;
+        onTeamChatInsert(payload); broadcastToFollowers('team-chat-insert', payload); return;
+      case 'news_feed_items':
+        if (p.operation !== 'INSERT') return;
+        onNewsInsert(payload); broadcastToFollowers('news-insert', payload); return;
+      case 'user_achievements':
+        if (p.operation !== 'INSERT' || rec.user_id !== me) return;
+        onAchievementInsert(payload); broadcastToFollowers('achievement-insert', payload); return;
+      case 'rival_match_votes':
+        if (p.operation !== 'UPDATE' || rec.voter_id !== me) return;
+        onRivalVoteUpdate(payload); broadcastToFollowers('rival-vote-update', payload); return;
+      case 'daily_recommend_bonus_claims':
+        if (p.operation !== 'UPDATE' || rec.user_id !== me) return;
+        onRecommendBonusUpdate(payload); broadcastToFollowers('recommend-bonus-update', payload); return;
+      default: return; // 같은 토픽에 오는 다른 테이블(팀 포인트, 같이하자 등)은 확장에서 안 씀
     }
+  }
 
-    // 🌟 아카이브 소식(news_feed_items) 실시간 구독
-    const newsTopic = 'archive-news-feed';
-    boakoLog(`채널 구독 시도: ${newsTopic}`);
-    const newsChannel = client.channel(newsTopic, { config: {} });
-    newsChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, (payload) => {
-      onNewsInsert(payload);
-      broadcastToFollowers('news-insert', payload);
-    });
-    newsChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${newsTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${newsTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${newsTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${newsTopic}`);
-    });
-
-    // 🌟 업적 획득 실시간 구독
-    const achvTopic = `achievements-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${achvTopic}`);
-    const achvChannel = client.channel(achvTopic, { config: {} });
-    achvChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${State.session.user.id}` }, (payload) => {
-      onAchievementInsert(payload);
-      broadcastToFollowers('achievement-insert', payload);
-    });
-    achvChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${achvTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${achvTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${achvTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${achvTopic}`);
-    });
-
-    // 🌟 라이벌전 승자 예측 투표 결과 실시간 구독
-    const rivalTopic = `rival-votes-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${rivalTopic}`);
-    const rivalChannel = client.channel(rivalTopic, { config: {} });
-    rivalChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rival_match_votes', filter: `voter_id=eq.${State.session.user.id}` }, (payload) => {
-      onRivalVoteUpdate(payload);
-      broadcastToFollowers('rival-vote-update', payload);
-    });
-    rivalChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${rivalTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${rivalTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${rivalTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${rivalTopic}`);
-    });
-
-    // 🌟 오늘의 추천 게임 보너스 지급 실시간 구독
-    const recTopic = `recommend-bonus-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${recTopic}`);
-    const recChannel = client.channel(recTopic, { config: {} });
-    recChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_recommend_bonus_claims', filter: `user_id=eq.${State.session.user.id}` }, (payload) => {
-      onRecommendBonusUpdate(payload);
-      broadcastToFollowers('recommend-bonus-update', payload);
-    });
-    recChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${recTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${recTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${recTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${recTopic}`);
+  function _subscribeAllChannels(client) {
+    const topicNames = [`user:${State.session.user.id}`, 'pub:feed'];
+    topicNames.forEach((topic) => {
+      boakoLog(`채널 구독 시도: ${topic}`);
+      const ch = client.channel(topic, { config: { private: true } });
+      ch.on('broadcast', { event: '*' }, (msg) => _dispatchBroadcast(msg && msg.payload));
+      ch.subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${topic}`);
+        else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR, 권한/토큰 문제 가능성): ${topic}`, err);
+        else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT, CSP/네트워크 문제 가능성): ${topic}`);
+        else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${topic}`);
+      });
     });
   }
 

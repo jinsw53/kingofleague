@@ -84,7 +84,7 @@ Boako.Together = {
     // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
     _subscribeAsLeader: () => {
         if (Boako.Together.State.realtimeChannel) return; // 중복 구독 방지
-        Boako.Together.State.realtimeChannel = Boako.db
+        Boako.Together.State.realtimeChannel = Boako.RT
             .channel('together-board-realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.Together._onRemoteChange())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_participants' }, () => Boako.Together._onRemoteChange())

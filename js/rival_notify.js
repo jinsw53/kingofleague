@@ -33,7 +33,7 @@ Boako.RivalNotify = {
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.RivalNotify.channel) return; // 이미 구독 중이면 중복 방지
 
-        Boako.RivalNotify.channel = Boako.db
+        Boako.RivalNotify.channel = Boako.RT
             .channel(`rival-vote-result-${Boako.state.user.id}`)
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -113,7 +113,7 @@ Boako.RivalNotify = {
 
     stopRealtime: () => {
         if (Boako.RivalNotify.channel && Boako.db) {
-            Boako.db.removeChannel(Boako.RivalNotify.channel);
+            Boako.RT.removeChannel(Boako.RivalNotify.channel);
             Boako.RivalNotify.channel = null;
         }
     },

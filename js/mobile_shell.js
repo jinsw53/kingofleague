@@ -347,7 +347,7 @@ Boako.MobileShell = {
     // 로그인 여부와 무관하게 항상 구독하고, 쪽지/그룹챗은 로그인 상태일 때만 구독함.
     _subscribeShellAsLeader: () => {
         if (!Boako.MobileShell._moreBadgeChannel) {
-            Boako.MobileShell._moreBadgeChannel = Boako.db.channel('mobile-more-badge-global')
+            Boako.MobileShell._moreBadgeChannel = Boako.RT.channel('mobile-more-badge-global')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.MobileShell._onMoreBadgeChange())
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => Boako.MobileShell._onMoreBadgeChange())
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => Boako.MobileShell._onMoreBadgeChange())
@@ -364,7 +364,7 @@ Boako.MobileShell = {
                 if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('dm', payload.new);
             };
             const _myUid = Boako.state.user.id;
-            Boako.MobileShell._messengerChannel = Boako.db.channel('mobile-messages-changes')
+            Boako.MobileShell._messengerChannel = Boako.RT.channel('mobile-messages-changes')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${_myUid}` }, _onMsg)
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${_myUid}` }, _onMsg)
                 .subscribe();
@@ -373,7 +373,7 @@ Boako.MobileShell = {
         // 🌟 [4단계 추가] 그룹채팅 3종 + 부가 상태변화 3종, PC와 동일한 반응(방 목록 갱신/열려있으면
         // 즉시 재렌더/아니면 토스트)을 Boako.MobileMessenger.handleGroupChatEvent에 위임
         if (Boako.MobileShell._groupChatChannel) return;
-        Boako.MobileShell._groupChatChannel = Boako.db.channel('mobile-group-chats-changes')
+        Boako.MobileShell._groupChatChannel = Boako.RT.channel('mobile-group-chats-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, (payload) => {
                 Boako.MobileShell._relayGroupChatEvent('match_channel', `match_channel_${payload.new.room_id}`, payload.new, '📣 [대항전] 채널에 새 메시지가 도착했습니다!');
             })
@@ -431,11 +431,11 @@ Boako.MobileShell = {
 
     stopMessengerRealtime: () => {
         if (Boako.MobileShell._messengerChannel) {
-            Boako.db.removeChannel(Boako.MobileShell._messengerChannel);
+            Boako.RT.removeChannel(Boako.MobileShell._messengerChannel);
             Boako.MobileShell._messengerChannel = null;
         }
         if (Boako.MobileShell._groupChatChannel) {
-            Boako.db.removeChannel(Boako.MobileShell._groupChatChannel);
+            Boako.RT.removeChannel(Boako.MobileShell._groupChatChannel);
             Boako.MobileShell._groupChatChannel = null;
         }
     },

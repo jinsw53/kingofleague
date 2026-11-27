@@ -91,7 +91,7 @@ Boako.Tournament = {
     // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독 — 양쪽 탭 다 실시간 반영
     _subscribeAsLeader: () => {
         if (Boako.Tournament.State.realtimeChannel) return; // 이미 구독 중이면 중복 방지
-        Boako.Tournament.State.realtimeChannel = Boako.db
+        Boako.Tournament.State.realtimeChannel = Boako.RT
             .channel('tournament-posts-realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => Boako.Tournament._onRemoteChange())
             .subscribe();

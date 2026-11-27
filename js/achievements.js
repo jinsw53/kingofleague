@@ -72,7 +72,7 @@ Boako.Achievements = {
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.Achievements.channel) return; // 이미 구독 중이면 중복 방지
 
-        Boako.Achievements.channel = Boako.db
+        Boako.Achievements.channel = Boako.RT
             .channel(`achievements-realtime-${Boako.state.user.id}`)
             .on('postgres_changes', {
                 event: 'INSERT',
@@ -151,7 +151,7 @@ Boako.Achievements = {
 
     stopRealtime: () => {
         if (Boako.Achievements.channel && Boako.db) {
-            Boako.db.removeChannel(Boako.Achievements.channel);
+            Boako.RT.removeChannel(Boako.Achievements.channel);
             Boako.Achievements.channel = null;
         }
     },

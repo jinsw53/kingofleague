@@ -33,7 +33,7 @@ Boako.RecommendNotify = {
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.RecommendNotify.channel) return; // 이미 구독 중이면 중복 방지
 
-        Boako.RecommendNotify.channel = Boako.db
+        Boako.RecommendNotify.channel = Boako.RT
             .channel(`recommend-bonus-${Boako.state.user.id}`)
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -113,7 +113,7 @@ Boako.RecommendNotify = {
 
     stopRealtime: () => {
         if (Boako.RecommendNotify.channel && Boako.db) {
-            Boako.db.removeChannel(Boako.RecommendNotify.channel);
+            Boako.RT.removeChannel(Boako.RecommendNotify.channel);
             Boako.RecommendNotify.channel = null;
         }
     },

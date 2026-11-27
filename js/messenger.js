@@ -467,7 +467,7 @@ Boako.Messenger = {
         await Boako.Messenger.View.refreshRoomList();
     },
 
-    // 🌟 리더 탭에서만 호출됨 — 실제 Boako.db.channel(...).subscribe()가 여기 안에만 존재
+    // 🌟 리더 탭에서만 호출됨 — 실제 Boako.RT.channel(...).subscribe()가 여기 안에만 존재
     _subscribeChannelsAsLeader: () => {
         if (!Boako.state.user || Boako.Messenger.realtimeChannels.length > 0) return;
 
@@ -477,47 +477,47 @@ Boako.Messenger = {
             Boako.RealtimeCoordinator.broadcast('messenger:message-insert', payload.new);
         };
         const _myUid = Boako.state.user.id;
-        const msgChannel = Boako.db.channel('messages-changes')
+        const msgChannel = Boako.RT.channel('messages-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${_myUid}` }, _onMsg)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${_myUid}` }, _onMsg)
             .subscribe();
 
-        const matchChannel = Boako.db.channel('grandprix-chats-changes')
+        const matchChannel = Boako.RT.channel('grandprix-chats-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, (payload) => {
                 Boako.Messenger._onMatchChatInsert(payload.new);
                 Boako.RealtimeCoordinator.broadcast('messenger:match-chat-insert', payload.new);
             }).subscribe();
 
         // 🌟 [추가] 투표 데이터 리얼타임 감지
-        const pollChannel = Boako.db.channel('grandprix-polls-changes')
+        const pollChannel = Boako.RT.channel('grandprix-polls-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_polls' }, (payload) => {
                 Boako.Messenger._onPollChange(payload.new);
                 Boako.RealtimeCoordinator.broadcast('messenger:poll-change', payload.new);
             }).subscribe();
 
         // 🌟 [추가] 같이하자 채팅 리얼타임 감지
-        const togetherChannel = Boako.db.channel('together-chats-changes')
+        const togetherChannel = Boako.RT.channel('together-chats-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'together_chats' }, (payload) => {
                 Boako.Messenger._onTogetherChatInsert(payload.new);
                 Boako.RealtimeCoordinator.broadcast('messenger:together-chat-insert', payload.new);
             }).subscribe();
 
         // 🌟 [추가] 같이하자 모집글 상태 변화(확정/취소) 감지 → 방 목록 자체가 새로 생기거나 사라짐
-        const togetherPostsChannel = Boako.db.channel('together-posts-status-changes')
+        const togetherPostsChannel = Boako.RT.channel('together-posts-status-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
                 Boako.Messenger._onTogetherPostsChange();
                 Boako.RealtimeCoordinator.broadcast('messenger:together-posts-change', null);
             }).subscribe();
 
         // 🌟 [신규] 챌린지 그룹채팅 리얼타임 감지
-        const challengeChatChannel = Boako.db.channel('challenge-chats-changes')
+        const challengeChatChannel = Boako.RT.channel('challenge-chats-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'challenge_chats' }, (payload) => {
                 Boako.Messenger._onChallengeChatInsert(payload.new);
                 Boako.RealtimeCoordinator.broadcast('messenger:challenge-chat-insert', payload.new);
             }).subscribe();
 
         // 🌟 [신규] 챌린지 매칭 상태 변화 감지 → 방 목록 자체가 새로 생기거나 사라짐
-        const challengesChannel = Boako.db.channel('challenges-status-changes')
+        const challengesChannel = Boako.RT.channel('challenges-status-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, () => {
                 Boako.Messenger._onChallengesChange();
                 Boako.RealtimeCoordinator.broadcast('messenger:challenges-change', null);

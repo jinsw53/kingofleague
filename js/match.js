@@ -18,7 +18,7 @@ Boako.Match = {
             Boako.Match._rtGroup.teardown();
             Boako.Match._rtGroup = null;
             if (Boako.Match.scoreChannel) {
-                Boako.db.removeChannel(Boako.Match.scoreChannel);
+                Boako.RT.removeChannel(Boako.Match.scoreChannel);
                 Boako.Match.scoreChannel = null;
             }
         }
@@ -39,7 +39,7 @@ Boako.Match = {
     _subscribeScoreAsLeader: (seasonNo) => {
         if (Boako.Match.scoreChannel) return;
         // 해당 시즌의 grandprix_game_scores 테이블의 모든 변화(INSERT, UPDATE)를 감시
-        Boako.Match.scoreChannel = Boako.db.channel(`match-score-season-${seasonNo}`)
+        Boako.Match.scoreChannel = Boako.RT.channel(`match-score-season-${seasonNo}`)
             .on('postgres_changes', {
                 event: '*', 
                 schema: 'public',
@@ -795,7 +795,7 @@ Boako.Match = {
             // 🌟 3. 리얼타임 구독 — [리팩토링] 같은 방을 여러 탭에서 열어두면 탭마다 각자 채널을
             // 구독해서 소켓이 늘어나던 문제 방지. realtime_coordinator.js의 화면 전용 미니
             // 코디네이터(createGroup)를 roomId별로 격리해서 적용.
-            if (Boako.Match.Chat.channel) { Boako.db.removeChannel(Boako.Match.Chat.channel); Boako.Match.Chat.channel = null; }
+            if (Boako.Match.Chat.channel) { Boako.RT.removeChannel(Boako.Match.Chat.channel); Boako.Match.Chat.channel = null; }
             if (Boako.Match.Chat._rtGroup) Boako.Match.Chat._rtGroup.teardown();
 
             Boako.Match.Chat._rtGroup = Boako.RealtimeCoordinator.createGroup('match-chat', roomId);
@@ -810,7 +810,7 @@ Boako.Match = {
         // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
         _subscribeAsLeader: (roomId) => {
             if (Boako.Match.Chat.channel) return;
-            Boako.Match.Chat.channel = Boako.db.channel(`match-chat-${roomId}`)
+            Boako.Match.Chat.channel = Boako.RT.channel(`match-chat-${roomId}`)
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats', filter: `room_id=eq.${roomId}` }, (payload) => {
                     Boako.Match.Chat._onChatInsert(payload.new);
                     Boako.Match.Chat._rtGroup.broadcast('chat-insert', payload.new);
@@ -846,7 +846,7 @@ Boako.Match = {
             const calModal = document.getElementById('poll-calendar-modal');
             if (calModal) calModal.remove();
             if (Boako.Match.Chat.channel) {
-                Boako.db.removeChannel(Boako.Match.Chat.channel);
+                Boako.RT.removeChannel(Boako.Match.Chat.channel);
                 Boako.Match.Chat.channel = null;
             }
             if (Boako.Match.Chat._rtGroup) {
