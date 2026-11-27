@@ -18,6 +18,8 @@ window.onload = async () => {
         // init이 끝나면 저장된 화면을 복원(없으면 기록만 시작). 딥링크 처리보다 먼저 등록해야 함.
         const ready = () => { if (Boako.StateRestore && Boako.StateRestore.mobileReady) Boako.StateRestore.mobileReady(); };
         Promise.resolve(shellInit).then(ready, ready);
+        // 🌟 [신규 2026-11-28] 깃뿔 위젯의 "고치기 ↗"로 들어온 경우 위키 고치기 창 (PC 는 Auth.init 에서)
+        Promise.resolve(shellInit).then(() => Boako.Auth.maybeOpenWikiEdit(), () => Boako.Auth.maybeOpenWikiEdit());
     } else {
         console.error("모바일 셸 모듈 로딩에 실패했습니다.");
         return;
