@@ -144,6 +144,11 @@ create policy "rt_receive_public_topic" on realtime.messages
   for select to anon, authenticated
   using (realtime.topic() in ('pub:feed', 'pub:scores'));
 
+-- ── 5) 내부 함수는 API(RPC)로 직접 못 부르게 막음 (누구나 임의 토픽에 메시지를 쏘거나 팀원 id를 조회하는 것 방지)
+revoke all on function public.fn_rt_send(text, text, text, jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.fn_rt_team_uids(bigint[]) from public, anon, authenticated;
+revoke all on function public.fn_rt_emit() from public, anon, authenticated;
+
 -- 되돌리기:
 --   do $$ declare t text; begin foreach t in array array['messages','user_achievements','point_history',
 --     'daily_recommend_bonus_claims','rival_match_votes','team_chats','team_chat_reads','team_point_history',
