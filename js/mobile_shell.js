@@ -745,6 +745,10 @@ Boako.MobileShell = {
                 <!-- 🌟 [신규] 사용법 영상 다시 보기 — 영상 안내에서 "나중에"를 눌러도 여기서 언제든 찾을 수 있게 맨 아래에 둠.
                      모바일 웹뷰에서 window.open이 막히는 경우가 있어 실제 <a> 태그 사용 -->
                 <a href="${Boako.Auth.usageVideoUrl}" target="_blank" rel="noopener" style="display:block; padding:12px 4px; font-size:14px; font-weight:700; color:inherit; text-decoration:none;">📺 사용법 영상</a>
+                <div style="display:flex; gap:12px; padding:12px 4px; font-size:12px;">
+                    <a href="/terms.html" target="_blank" rel="noopener" style="color:#94a3b8;">이용약관</a>
+                    <a href="/privacy.html" target="_blank" rel="noopener" style="color:#94a3b8; font-weight:700;">개인정보처리방침</a>
+                </div>
             </div>
         `;
     },

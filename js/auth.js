@@ -394,6 +394,10 @@ Boako.Auth = {
             <div style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:10px; font-size:12px; font-weight:700;">
                 <a href="${Boako.Auth.usageVideoUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">📺 사용법 영상</a>
                 <a href="/__view/mobile" style="color:#94a3b8;">📱 모바일 버전으로 보기</a>
+            </div>
+            <div style="display:flex; justify-content:center; gap:10px; margin-top:8px; font-size:11px;">
+                <a href="/terms.html" target="_blank" rel="noopener" style="color:#94a3b8;">이용약관</a>
+                <a href="/privacy.html" target="_blank" rel="noopener" style="color:#94a3b8; font-weight:700;">개인정보처리방침</a>
             </div>`;
         } else {
             const kakaoAvatarUrl = user.user_metadata?.avatar_url?.replace('http://', 'https://') || null;
@@ -466,6 +470,10 @@ Boako.Auth = {
             <div style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:10px; font-size:12px; font-weight:700;">
                 <a href="${Boako.Auth.usageVideoUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">📺 사용법 영상</a>
                 <a href="/__view/mobile" style="color:#94a3b8;">📱 모바일 버전으로 보기</a>
+            </div>
+            <div style="display:flex; justify-content:center; gap:10px; margin-top:8px; font-size:11px;">
+                <a href="/terms.html" target="_blank" rel="noopener" style="color:#94a3b8;">이용약관</a>
+                <a href="/privacy.html" target="_blank" rel="noopener" style="color:#94a3b8; font-weight:700;">개인정보처리방침</a>
             </div>`;
 
             // 아바타 hover 시 "사진 변경" 힌트 보이게
