@@ -480,6 +480,14 @@ Boako.Board = {
         Boako.Board.loadPosts();
     },
 
+    // 🌟 [신규 2026-11-28] 룰 가이드(깃뿔) 모듈 — 실패해도 게시판은 그대로 동작
+    loadRuleGuide: async () => {
+        try {
+            if (!Boako.RuleGuide) await Boako.Util.loadScript('/js/rule_guide.js');
+            return Boako.RuleGuide || null;
+        } catch (e) { return null; }
+    },
+
     loadGuideGameGrid: async () => {
         const container = document.getElementById('board-list-container');
         const paginationContainer = document.getElementById('board-pagination-container');
@@ -497,16 +505,27 @@ Boako.Board = {
             return;
         }
 
-        if (!posts || posts.length === 0) {
-            container.innerHTML = `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">아직 공략글이 없습니다. 첫 공략글을 남겨보세요!</div>`;
-            return;
-        }
-
         const countMap = {};
-        posts.forEach(p => {
+        (posts || []).forEach(p => {
             const key = p.game_name || Boako.Board.GUIDE_UNSPECIFIED;
             countMap[key] = (countMap[key] || 0) + 1;
         });
+
+        // 🌟 [신규 2026-11-28] 깃뿔에 룰 가이드가 있는 게임은 "📖 가이드" 표시, 공략글이 없어도 목록에 넣는다
+        const RG = await Boako.Board.loadRuleGuide();
+        const guideGames = RG ? await RG.listGames() : [];
+        const norm = (x) => String(x || '').replace(/\s+/g, '').toLowerCase();
+        const guideSet = new Set();
+        guideGames.forEach(g => {
+            const hit = Object.keys(countMap).find(k => norm(k) === norm(g.title));
+            if (hit) guideSet.add(hit);
+            else { countMap[g.title] = 0; guideSet.add(g.title); }
+        });
+
+        if (Object.keys(countMap).length === 0) {
+            container.innerHTML = `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">아직 공략글이 없습니다. 첫 공략글을 남겨보세요!</div>`;
+            return;
+        }
 
         const gameNames = Object.keys(countMap).filter(k => k !== Boako.Board.GUIDE_UNSPECIFIED);
         let logoMap = {};
@@ -518,6 +537,7 @@ Boako.Board = {
         const sortedKeys = Object.keys(countMap).sort((a, b) => countMap[b] - countMap[a]);
 
         container.innerHTML = `
+            ${guideSet.size ? `<p class="text-[13px] text-slate-500 mb-3"><b style="color:#7c3aed">📖 가이드</b> 표시가 있는 게임은 들어가면 규칙을 그림으로 보고 AI에게 물어볼 수 있어요.</p>` : ''}
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 ${sortedKeys.map(key => {
                     const isUnspecified = key === Boako.Board.GUIDE_UNSPECIFIED;
@@ -526,12 +546,13 @@ Boako.Board = {
                     const clickArg = isUnspecified ? `'${Boako.Board.GUIDE_UNSPECIFIED}'` : `'${key.replace(/'/g, "\\'")}'`;
                     return `
                         <div onclick="Boako.Board.selectGuideGame(${clickArg})"
-                             class="flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-teal-300 transition-all">
+                             class="relative flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-teal-300 transition-all">
+                            ${guideSet.has(key) ? `<span style="position:absolute; top:8px; right:8px; font-size:11px; font-weight:900; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; padding:2px 7px; border-radius:999px;">📖 가이드</span>` : ''}
                             <div class="w-16 h-16 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
                                 ${logo ? `<img src="${logo}" class="w-full h-full object-contain p-1">` : `<span class="text-3xl">🎲</span>`}
                             </div>
                             <span class="text-xs font-bold text-slate-700 text-center truncate w-full">${Boako.Board.escapeHtml(displayName)}</span>
-                            <span class="text-[10px] font-black text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">${countMap[key]}개</span>
+                            ${countMap[key] ? `<span class="text-[10px] font-black text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">${countMap[key]}개</span>` : `<span class="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">공략글 없음</span>`}
                         </div>
                     `;
                 }).join('')}
@@ -632,12 +653,17 @@ Boako.Board = {
         Boako.Board.State.posts = posts || [];
         Boako.Board.State.totalCount = count || 0;
 
+        const inGuideGame = Boako.Board.State.currentCategory === '공략' && Boako.Board.State.selectedGuideGame && Boako.Board.State.selectedGuideGame !== Boako.Board.GUIDE_UNSPECIFIED;
+
         if (posts.length === 0) {
             const isFirstPage = page === 1;
-            container.innerHTML = isFirstPage
-                ? `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">아직 게시글이 없습니다. 첫 글을 남겨보세요!</div>`
-                : `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">해당 페이지에 게시글이 없습니다.</div>`;
+            // 🌟 [2026-11-28] 공략 탭의 게임(룰 가이드만 있고 공략글이 없을 수 있음)은 돌아가기 버튼과 공략글 안내를 보여 줌
+            const backBtn = inGuideGame ? `<button onclick="Boako.Board.backToGuideGrid()" class="text-sm font-bold text-teal-600 hover:text-teal-700 mb-3">← 게임 목록으로</button>` : '';
+            container.innerHTML = backBtn + (isFirstPage
+                ? `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">${inGuideGame ? '아직 공략글이 없어요. 첫 공략글을 남겨 보세요!' : '아직 게시글이 없습니다. 첫 글을 남겨보세요!'}</div>`
+                : `<div class="text-center py-16 text-slate-400 font-bold border border-dashed border-slate-300 rounded-xl bg-white">해당 페이지에 게시글이 없습니다.</div>`);
             Boako.Board.renderPagination(count || 0);
+            if (inGuideGame) Boako.Board.attachRuleGuide(container);
             return;
         }
 
@@ -678,6 +704,20 @@ Boako.Board = {
         }).join('');
 
         Boako.Board.renderPagination(count || 0);
+        if (inGuideGame) Boako.Board.attachRuleGuide(container);
+    },
+
+    // 🌟 [신규 2026-11-28] 공략 탭에서 고른 게임에 깃뿔 룰 가이드가 있으면 "← 게임 목록으로" 바로 아래에 접힌 카드를 넣는다
+    attachRuleGuide: async (container) => {
+        const name = Boako.Board.State.selectedGuideGame;
+        const RG = await Boako.Board.loadRuleGuide();
+        const game = RG ? await RG.findByName(name) : null;
+        // 그사이 다른 게임·탭으로 옮겼으면 그리지 않는다
+        if (!game || Boako.Board.State.selectedGuideGame !== name || !container.isConnected) return;
+        const slot = document.createElement('div');
+        const back = container.firstElementChild && container.firstElementChild.tagName === 'BUTTON' ? container.firstElementChild : null;
+        if (back) back.after(slot); else container.prepend(slot);
+        RG.renderCard(slot, game);
     },
 
     // ========== 임시글함 ==========
