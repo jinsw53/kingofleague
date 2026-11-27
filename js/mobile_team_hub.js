@@ -811,7 +811,7 @@ Boako.MobileTeamHub = {
     // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
     _subscribeChatAsLeader: (teamId) => {
         if (Boako.MobileTeamHub.chatChannel) return;
-        Boako.MobileTeamHub.chatChannel = Boako.db.channel(`mobile-team-chat-${teamId}`)
+        Boako.MobileTeamHub.chatChannel = Boako.RT.channel(`mobile-team-chat-${teamId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'team_chats', filter: `team_id=eq.${teamId}` }, async (payload) => {
                 await Boako.MobileTeamHub._onChatRemoteMessage(payload.new, teamId);
                 if (Boako.MobileTeamHub._chatRtGroup) Boako.MobileTeamHub._chatRtGroup.broadcast('chat', payload.new);
@@ -833,7 +833,7 @@ Boako.MobileTeamHub = {
     // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
     _subscribeChatReadsAsLeader: (teamId) => {
         if (Boako.MobileTeamHub.chatReadsChannel) return;
-        Boako.MobileTeamHub.chatReadsChannel = Boako.db.channel(`mobile-team-chat-reads-${teamId}`)
+        Boako.MobileTeamHub.chatReadsChannel = Boako.RT.channel(`mobile-team-chat-reads-${teamId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_chat_reads', filter: `team_id=eq.${teamId}` }, async () => {
                 await Boako.MobileTeamHub._onChatReadsRemoteChange(teamId);
                 if (Boako.MobileTeamHub._chatReadsRtGroup) Boako.MobileTeamHub._chatReadsRtGroup.broadcast('reads', null);
@@ -848,8 +848,8 @@ Boako.MobileTeamHub = {
     },
 
     teardownChat: () => {
-        if (Boako.MobileTeamHub.chatChannel) { Boako.db.removeChannel(Boako.MobileTeamHub.chatChannel); Boako.MobileTeamHub.chatChannel = null; }
-        if (Boako.MobileTeamHub.chatReadsChannel) { Boako.db.removeChannel(Boako.MobileTeamHub.chatReadsChannel); Boako.MobileTeamHub.chatReadsChannel = null; }
+        if (Boako.MobileTeamHub.chatChannel) { Boako.RT.removeChannel(Boako.MobileTeamHub.chatChannel); Boako.MobileTeamHub.chatChannel = null; }
+        if (Boako.MobileTeamHub.chatReadsChannel) { Boako.RT.removeChannel(Boako.MobileTeamHub.chatReadsChannel); Boako.MobileTeamHub.chatReadsChannel = null; }
         if (Boako.MobileTeamHub._chatRtGroup) { Boako.MobileTeamHub._chatRtGroup.teardown(); Boako.MobileTeamHub._chatRtGroup = null; }
         if (Boako.MobileTeamHub._chatReadsRtGroup) { Boako.MobileTeamHub._chatReadsRtGroup.teardown(); Boako.MobileTeamHub._chatReadsRtGroup = null; }
     },

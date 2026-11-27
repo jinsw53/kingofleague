@@ -256,7 +256,7 @@ Boako.League.initChallengeData = async function() {
 // 🚨 [리팩토링] 리더 탭에서만 실제 Supabase 채널을 구독 (탭 수만큼 소켓이 늘어나던 문제 방지)
 Boako.League._subscribeAsLeader = function() {
     if (!Boako.RealtimeCoordinator.isLeader() || Boako.League.State.realtimeChannel) return;
-    Boako.League.State.realtimeChannel = Boako.db
+    Boako.League.State.realtimeChannel = Boako.RT
         .channel('league-multi-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, (payload) => {
             Boako.League._onChallengeChange(payload);
@@ -2843,7 +2843,7 @@ Boako.League.KOL.subscribeRealtime = function() {
 Boako.League.KOL._subscribeAsLeader = function() {
     if (Boako.League.KOL.realtimeChannel || !Boako.db) return;
 
-    Boako.League.KOL.realtimeChannel = Boako.db
+    Boako.League.KOL.realtimeChannel = Boako.RT
         .channel('kol-events-realtime')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kol_events' }, (payload) => {
             Boako.League.KOL._handleEvent(payload.new);
@@ -2890,7 +2890,7 @@ Boako.League.KOL._handleEvent = function(ev) {
 
 Boako.League.KOL.unsubscribeRealtime = function() {
     if (Boako.League.KOL.realtimeChannel && Boako.db) {
-        Boako.db.removeChannel(Boako.League.KOL.realtimeChannel);
+        Boako.RT.removeChannel(Boako.League.KOL.realtimeChannel);
         Boako.League.KOL.realtimeChannel = null;
     }
     if (Boako.League.KOL._rtGroup) {

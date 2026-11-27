@@ -1273,7 +1273,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
     _subscribePointHistoryAsLeader: function(teamId) {
         if (Boako.Team.pointHistoryChannel || !Boako.db) return;
 
-        Boako.Team.pointHistoryChannel = Boako.db
+        Boako.Team.pointHistoryChannel = Boako.RT
             .channel(`team-point-history-${teamId}`)
             .on('postgres_changes', {
                 event: 'INSERT',
@@ -1289,7 +1289,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
 
     unsubscribePointHistoryRealtime: function() {
         if (Boako.Team.pointHistoryChannel && Boako.db) {
-            Boako.db.removeChannel(Boako.Team.pointHistoryChannel);
+            Boako.RT.removeChannel(Boako.Team.pointHistoryChannel);
             Boako.Team.pointHistoryChannel = null;
         }
         if (Boako.Team._pointHistoryRtGroup) {
@@ -1603,8 +1603,8 @@ const isLeader = Boako.state.team.type === 'LEADER';
                     if (info && info.tabId === Boako.Team.Chat._tabId) localStorage.removeItem(Boako.Team.Chat._leaderKey);
                 } catch (e) { /* noop */ }
             }
-            if (Boako.Team.Chat.channel && Boako.db) { Boako.db.removeChannel(Boako.Team.Chat.channel); Boako.Team.Chat.channel = null; }
-            if (Boako.Team.Chat.readsChannel && Boako.db) { Boako.db.removeChannel(Boako.Team.Chat.readsChannel); Boako.Team.Chat.readsChannel = null; }
+            if (Boako.Team.Chat.channel && Boako.db) { Boako.RT.removeChannel(Boako.Team.Chat.channel); Boako.Team.Chat.channel = null; }
+            if (Boako.Team.Chat.readsChannel && Boako.db) { Boako.RT.removeChannel(Boako.Team.Chat.readsChannel); Boako.Team.Chat.readsChannel = null; }
             if (Boako.Team.Chat._bc) { try { Boako.Team.Chat._bc.close(); } catch (e) {} Boako.Team.Chat._bc = null; }
             Boako.Team.Chat._isLeader = false;
             Boako.Team.Chat._coordTeamId = null;
@@ -1631,7 +1631,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
             if (!Boako.Team.Chat._isLeader) return;
             if (Boako.Team.Chat.channel) return; // 이미 구독 중이면 중복 방지
 
-            Boako.Team.Chat.channel = Boako.db.channel(`team-chat-${teamId}`)
+            Boako.Team.Chat.channel = Boako.RT.channel(`team-chat-${teamId}`)
                 .on('postgres_changes', {
                     event: 'INSERT',
                     schema: 'public',
@@ -1643,7 +1643,7 @@ const isLeader = Boako.state.team.type === 'LEADER';
                 })
                 .subscribe();
 
-            Boako.Team.Chat.readsChannel = Boako.db.channel(`team-chat-reads-${teamId}`)
+            Boako.Team.Chat.readsChannel = Boako.RT.channel(`team-chat-reads-${teamId}`)
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',

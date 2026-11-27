@@ -310,3 +310,161 @@ Boako.RealtimeCoordinator.createGroup = function (namespace, instanceId) {
 };
 
 Boako.RealtimeCoordinator.init();
+
+// ============================================================================
+// 🌟 [Broadcast 전환] Boako.RT — postgres_changes 구독을 Broadcast(private 채널)로 받는 호환 레이어
+// 기존: Boako.db.channel('이름').on('postgres_changes', {table, event, filter}, cb).subscribe()
+//   → Realtime 서버가 구독마다 DB 변경을 감시하고 구독자마다 RLS 확인 쿼리를 돌림(구독이 많을수록 DB 부하).
+// 지금: DB 트리거(fn_rt_emit)가 변경 1건을 받을 토픽(user:<내 id> / pub:feed / pub:scores / auth:chat)에 한 번만 보냄.
+//   각 모듈 코드는 그대로 두고 Boako.db.channel → Boako.RT.channel, Boako.db.removeChannel → Boako.RT.removeChannel
+//   로만 바꾸면 됨. 콜백이 받는 payload 모양({eventType, new, old, table})도 postgres_changes와 같게 맞춰줌.
+// 탭 안에서 같은 토픽은 실제 채널 하나만 열고, 모듈별 구독은 그 위에 리스너로만 붙음(구독 수가 토픽 수로 줄어듦).
+// 토픽과 테이블 매핑은 supabase/sql/2026-11-27_realtime_broadcast.sql 의 fn_rt_emit과 반드시 같아야 함.
+// ============================================================================
+Boako.RT = (function () {
+    const TABLE_TOPIC = {
+        // 본인에게 오는 것 (트리거가 받을 사람마다 user:<uid>로 나눠 보냄)
+        messages: 'user', user_achievements: 'user', point_history: 'user',
+        daily_recommend_bonus_claims: 'user', rival_match_votes: 'user',
+        team_chats: 'user', team_chat_reads: 'user', team_point_history: 'user',
+        challenge_chats: 'user', together_chats: 'user',
+        // 누구나 받는 것
+        news_feed_items: 'pub:feed', rival_matches: 'pub:feed', tournament_posts: 'pub:feed',
+        together_posts: 'pub:feed', together_participants: 'pub:feed', challenges: 'pub:feed',
+        kol_events: 'pub:feed', board_posts: 'pub:feed', board_comments: 'pub:feed',
+        grandprix_game_scores: 'pub:scores',
+        // 로그인 사용자만
+        grandprix_match_chats: 'auth:chat', schedule_polls: 'auth:chat'
+    };
+    const topics = {}; // topic -> { channel, listeners: Set, status }
+
+    function topicFor(table) {
+        const t = TABLE_TOPIC[table];
+        if (!t) return null;
+        if (t === 'user' || t === 'auth:chat') {
+            const uid = Boako.state && Boako.state.user && Boako.state.user.id;
+            if (!uid) return null; // 로그인 전에는 본인/로그인 전용 토픽 구독 안 함
+            return t === 'user' ? `user:${uid}` : t;
+        }
+        return t;
+    }
+
+    // 'col=eq.value' 형태만 지원 (지금 코드에서 쓰는 필터가 전부 이 형태)
+    function parseFilter(f) {
+        if (!f) return null;
+        const m = /^([a-zA-Z0-9_]+)=eq\.(.*)$/.exec(f);
+        if (!m) { console.warn('[BOAKO RT] 지원하지 않는 필터 — 무시하고 전부 받음:', f); return null; }
+        return { col: m[1], val: m[2] };
+    }
+
+    function matches(l, p) {
+        if (l.table !== p.table) return false;
+        if (l.event !== '*' && l.event !== p.operation) return false;
+        if (l.filter) {
+            const row = p.record || p.old_record;
+            if (!row || String(row[l.filter.col]) !== l.filter.val) return false;
+        }
+        return true;
+    }
+
+    function toPgPayload(p) {
+        return {
+            schema: p.schema || 'public', table: p.table, eventType: p.operation,
+            new: p.record || {}, old: p.old_record || {},
+            commit_timestamp: new Date().toISOString(), errors: null
+        };
+    }
+
+    function notifyStatus(entry, status, err) {
+        entry.status = status;
+        entry.listeners.forEach(l => {
+            if (l.shim._statusCb && !l.shim._statusSent[status]) {
+                l.shim._statusSent[status] = true;
+                try { l.shim._statusCb(status, err); } catch (e) { /* noop */ }
+            }
+        });
+    }
+
+    function ensureTopic(topic) {
+        if (topics[topic]) return topics[topic];
+        const entry = { channel: null, listeners: new Set(), status: 'JOINING' };
+        topics[topic] = entry;
+        // private 채널은 join 시 내 토큰으로 권한(realtime.messages 정책)을 확인함 → 최신 토큰을 먼저 넣어둠
+        Promise.resolve()
+            .then(() => (Boako.db.realtime && Boako.db.realtime.setAuth) ? Boako.db.realtime.setAuth() : null)
+            .catch(() => null)
+            .then(() => {
+                if (topics[topic] !== entry || entry.listeners.size === 0) { delete topics[topic]; return; }
+                entry.channel = Boako.db.channel(topic, { config: { private: true } })
+                    .on('broadcast', { event: '*' }, (msg) => {
+                        const p = msg && msg.payload;
+                        if (!p || !p.table) return;
+                        entry.listeners.forEach(l => {
+                            if (!matches(l, p)) return;
+                            try { l.cb(toPgPayload(p)); } catch (e) { console.error(`[BOAKO RT] 콜백 오류 (${p.table}):`, e); }
+                        });
+                    })
+                    .subscribe((status, err) => {
+                        if (status === 'CHANNEL_ERROR') console.warn(`[BOAKO RT] 채널 구독 실패: ${topic}`, err);
+                        notifyStatus(entry, status, err);
+                    });
+            });
+        return entry;
+    }
+
+    function releaseTopic(topic) {
+        const entry = topics[topic];
+        if (!entry || entry.listeners.size > 0) return;
+        delete topics[topic];
+        if (entry.channel) { try { Boako.db.removeChannel(entry.channel); } catch (e) { /* noop */ } }
+    }
+
+    function Shim(name) {
+        this.name = name;
+        this._bindings = [];
+        this._attached = []; // [{topic, listener}]
+        this._statusCb = null;
+        this._statusSent = {};
+    }
+    Shim.prototype.on = function (type, spec, cb) {
+        if (type !== 'postgres_changes') {
+            console.error(`[BOAKO RT] ${this.name}: Boako.RT.channel은 postgres_changes만 지원함 (${type}는 Boako.db.channel 사용)`);
+            return this;
+        }
+        this._bindings.push({ table: spec.table, event: (spec.event || '*').toUpperCase(), filter: parseFilter(spec.filter), cb });
+        return this;
+    };
+    Shim.prototype.subscribe = function (statusCb) {
+        if (this._attached.length) return this; // 중복 subscribe 방지
+        this._statusCb = typeof statusCb === 'function' ? statusCb : null;
+        this._bindings.forEach(b => {
+            const topic = topicFor(b.table);
+            if (!topic) return;
+            const listener = Object.assign({ shim: this }, b);
+            const entry = ensureTopic(topic);
+            entry.listeners.add(listener);
+            this._attached.push({ topic, listener });
+            if (entry.status === 'SUBSCRIBED') notifyStatus(entry, 'SUBSCRIBED');
+        });
+        return this;
+    };
+    Shim.prototype.unsubscribe = function () {
+        this._attached.forEach(({ topic, listener }) => {
+            const entry = topics[topic];
+            if (entry) { entry.listeners.delete(listener); releaseTopic(topic); }
+        });
+        this._attached = [];
+        return Promise.resolve('ok');
+    };
+
+    return {
+        channel: (name) => new Shim(name),
+        // 🌟 Shim이면 리스너만 떼고(토픽에 남은 리스너가 없으면 실제 채널 정리), 아니면 원래 removeChannel
+        removeChannel: (ch) => {
+            if (!ch) return Promise.resolve('ok');
+            if (ch instanceof Shim) return ch.unsubscribe();
+            return Boako.db.removeChannel(ch);
+        },
+        _topics: topics // 디버그용: 콘솔에서 Boako.RT._topics로 열린 토픽 확인
+    };
+})();

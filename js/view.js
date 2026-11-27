@@ -878,6 +878,13 @@ case 4: // 대항전 본게임 진행 중 (60일~)
                 setTimeout(() => { if (Boako.Games && typeof Boako.Games.init === 'function') Boako.Games.init(); }, 0);
                 break;
 
+            case 'rule_guide':
+                // 🌟 [신규 2026-11-28] 📖 룰 가이드 — 깃뿔 위젯 (js/rule_guide.js)
+                if (!Boako.RuleGuide) await Boako.Util.loadScript('js/rule_guide.js');
+                html = `<div id="rule-guide-root" class="w-full"></div>`;
+                setTimeout(() => { if (Boako.RuleGuide) Boako.RuleGuide.render(document.getElementById('rule-guide-root')); }, 0);
+                break;
+
             case 'schedule':
                 if (!Boako.Schedule || !Boako.Schedule.View) {
                     await Boako.Util.loadScript('js/schedule.js');

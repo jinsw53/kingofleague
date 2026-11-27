@@ -232,7 +232,7 @@ Boako.HotIssue = {
         // 🌟 [통합] ticker.js가 같은 테이블을 이미 구독하므로 채널 하나를 공유함 (ticker.js의 'feed-realtime')
         if (Boako.Ticker && Boako.Ticker._subscribeAsLeader) { Boako.Ticker._subscribeAsLeader(); return; }
         if (Boako.HotIssue._channel) return;
-        Boako.HotIssue._channel = Boako.db.channel('hot-issue-realtime')
+        Boako.HotIssue._channel = Boako.RT.channel('hot-issue-realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, () => Boako.HotIssue._onRemoteChange())
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, () => Boako.HotIssue._onRemoteChange())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.HotIssue._onRemoteChange())

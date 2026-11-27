@@ -44,7 +44,7 @@ Boako.MobileTournament = {
     // 🌟 이 탭이 리더일 때만(그리고 아직 구독 안 했을 때만) 실제 채널 구독
     _subscribeAsLeader: () => {
         if (Boako.MobileTournament.State.realtimeChannel) return;
-        Boako.MobileTournament.State.realtimeChannel = Boako.db
+        Boako.MobileTournament.State.realtimeChannel = Boako.RT
             .channel('mobile-tournament-posts-realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => Boako.MobileTournament._onRemoteChange())
             .subscribe();

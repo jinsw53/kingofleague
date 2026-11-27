@@ -74,6 +74,13 @@
  *    State.realtimeClient를 비워서, 이미 새 연결로 교체된 뒤 뒤늦게 도착한 옛 소켓의 끊김 신호가
  *    멀쩡한 새 연결까지 지워버리고 불필요한 재연결을 유발함 (Supabase Realtime 동시연결 폭증의 원인).
  *    이전 연결을 명시적으로 disconnect() 후 시작하고, onClose에서 자기 자신의 소켓일 때만 정리하도록 수정.
+ * 🌟 [버그수정] Realtime 연결 폭증(좀비 클라이언트) — 끊김 시 onClose가 State.realtimeClient를 비운 뒤
+ *    새 클라이언트를 만들어서, 옛 클라이언트는 disconnect()가 안 불린 채 realtime-js 자체 재접속(10ms~5s)을
+ *    계속 돌며 채널 6개를 구독한 상태로 남았음(끊길 때마다 1개씩 누적). 이제 클라이언트는 탭당 하나만 만들고
+ *    재접속은 realtime-js에 맡기되 간격만 우리 백오프(2s→…최대 5분, 30초 이상 유지돼야 초기화)로 지정.
+ *    클라이언트를 버리는 건 로그아웃/리더 이양 때뿐이고, 그때는 반드시 disconnect()로 자체 재접속까지 멈춤.
+ * 🌟 [부하 개선] Realtime 구독을 postgres_changes 채널 6개 → Broadcast private 채널 2개(user:<id>, pub:feed)로 전환.
+ *    DB 트리거(fn_rt_emit)가 변경 1건을 받을 사람에게만 한 번씩 보내서 Realtime 서버의 DB 감시·권한 확인 부하가 사라짐.
  * 🌟 [버그수정] 팀챗에서 나 말고 다른 팀원이 전부 "팀원"으로만 표기되던 문제 — fetchTeamChats()가
  *    sender_id만 가져오고 이름을 안 가져오고 있었음. PC team.js Chat.init()과 동일하게 PostgREST
  *    임베드(profiles(full_name))로 실제 발신자 이름을 조회해서 표시.
@@ -258,8 +265,7 @@
     activeTab: 'messages',
     activeConversation: null, // { otherId, otherName }
     realtimeClient: null,
-    reconnectAttempts: 0, // 🌟 [신규] 자동 재연결 시도 횟수 (지수 백오프 계산용)
-    reconnectTimer: null, // 🌟 [신규] 예약된 재연결 타이머
+    reconnectAttempts: 0, // 🌟 [신규] 자동 재연결 시도 횟수 (지수 백오프 계산용 — realtime-js 재접속 간격에 사용)
     intentionalDisconnect: false, // 🌟 [신규] 로그아웃 등 의도적 연결 해제인지 구분 (true면 재연결 안 함)
     messages: [],   // 최근 쪽지 (내가 받은/보낸 것 중 상대방별 최신 1건씩)
     threadMessages: [], // 🌟 [신규] 현재 열어본 대화 상대와 주고받은 전체 메시지
@@ -732,11 +738,7 @@
     boakoWarn(`리더 자리를 내려놓음 — ${reason}`);
     if (leaderHeartbeatTimer) { clearInterval(leaderHeartbeatTimer); leaderHeartbeatTimer = null; }
     _stopTokenRefreshTimer();
-    if (State.reconnectTimer) { clearTimeout(State.reconnectTimer); State.reconnectTimer = null; }
-    State.reconnectAttempts = 0;
-    const client = State.realtimeClient;
-    State.realtimeClient = null;
-    if (client) { try { client.disconnect(); } catch (e) { /* noop */ } }
+    _destroyRealtimeClient();
     becomeFollower();
   }
 
@@ -857,26 +859,30 @@
     _doConnect();
   }
 
-  function _scheduleReconnect() {
-    if (State.intentionalDisconnect) return; // 로그아웃 등 의도적 해제면 재연결 안 함
-    if (State.reconnectTimer) return; // 이미 예약돼 있으면 중복 예약 방지
-
-    // 🌟 [수정] 상한 30초 → 5분. 연속 실패가 쌓이면 간격이 계속 늘어남(연결이 30초 이상 유지돼야 횟수가 0으로 돌아옴).
-    // 이전엔 서버가 계속 거절하는 경우 30초마다 영원히 재접속해서 한 명이 하루 수천 번 연결을 만들 수 있었음.
-    // 네트워크가 복구되거나(online) 탭이 다시 보이면 대기 없이 즉시 재시도하므로 정상 복구는 느려지지 않음.
+  // 🌟 [버그수정] 재접속 간격 — realtime-js에 reconnectAfterMs로 넘겨서 라이브러리 자체 재접속이 이 간격을 따르게 함.
+  // 라이브러리 기본값(10ms, 50ms, 100ms … 5초)은 서버가 계속 끊는 상황에서 초당 수 회 재접속하므로 쓰지 않음.
+  // 횟수는 라이브러리의 tries 대신 State.reconnectAttempts를 씀 — 라이브러리는 열리자마자 tries를 0으로 되돌려서
+  // "열렸다가 즉시 끊김"이 반복되면 계속 최소 간격이 됨. 우리 카운터는 30초 이상 유지된 뒤에만 초기화(onOpen 참고).
+  function _nextReconnectDelay() {
     const delay = Math.min(2000 * Math.pow(2, State.reconnectAttempts), 300000);
     State.reconnectAttempts += 1;
     boakoWarn(`${(delay / 1000).toFixed(0)}초 후 실시간 연결 재시도 (${State.reconnectAttempts}번째 시도)`);
-
-    State.reconnectTimer = setTimeout(() => {
-      State.reconnectTimer = null;
-      if (State.realtimeClient) {
-        try { State.realtimeClient.disconnect(); } catch (e) { /* noop */ }
-        State.realtimeClient = null;
-      }
-      if (!State.intentionalDisconnect && State.session && isRealtimeLeader) _doConnect();
-    }, delay);
+    return delay;
   }
+
+  // 🌟 [버그수정] 클라이언트를 버리는 유일한 경로(로그아웃/리더 이양). 먼저 State에서 떼고 disconnect()해서
+  // realtime-js 자체 재접속 타이머까지 멈춤 — 이걸 안 하면 버린 클라이언트가 혼자 재접속하는 좀비가 됨.
+  function _destroyRealtimeClient() {
+    State.reconnectAttempts = 0;
+    const client = State.realtimeClient;
+    State.realtimeClient = null;
+    if (client) {
+      boakoLog('실시간 연결 해제');
+      try { client.disconnect(); } catch (e) { /* noop */ }
+    }
+  }
+
+  let _realtimeClientCreatedCount = 0; // 🌟 디버그용 — 이 탭에서 클라이언트를 몇 번 만들었는지 (정상이면 로그인/리더 승격 횟수와 같음)
 
   // 🌟 [버그수정] 연결을 새로 만들기 직전에 background.js에 세션을 다시 요청해서 (만료 5분 전이면 거기서
   // 리프레시까지 해줌) 항상 유효한 access_token으로 연결. 이전엔 페이지 로드 때 받은 토큰을 계속 재사용해서,
@@ -912,6 +918,7 @@
         // 세션이 죽었거나(로그아웃/리프레시 실패) 확장 컨텍스트가 무효화된 상태 — 재접속 루프를 돌리지 않고 멈춤
         boakoWarn('유효한 세션을 받지 못해 실시간 재연결을 중단함');
         State.session = null;
+        _destroyRealtimeClient(); // 🌟 남아 있는 클라이언트의 자체 재접속까지 멈춤
         return;
       }
       // 갱신 대기 중에 로그아웃/해제됐거나 리더 자리를 잃었으면 연결하지 않음
@@ -923,16 +930,29 @@
   }
 
   function _doConnectNow() {
-    // 🌟 [버그수정] 이전 연결을 확실히 끊고 시작 (경합 방지, Realtime 연결 폭증 원인)
-    if (State.realtimeClient) {
-      try { State.realtimeClient.disconnect(); } catch (e) { /* noop */ }
-      State.realtimeClient = null;
+    // 🌟 [버그수정] 클라이언트는 탭당 하나만 — 이미 있으면 새로 만들지 않고 최신 토큰만 적용해서 다시 붙임.
+    // 채널은 클라이언트에 그대로 붙어 있어서 소켓이 다시 열리면 realtime-js가 알아서 재구독함.
+    const existing = State.realtimeClient;
+    if (existing) {
+      try { existing.setAuth(State.session.access_token); } catch (e) { /* noop */ }
+      if (!existing.isConnected()) {
+        boakoLog('기존 실시간 클라이언트로 즉시 재접속 (새 클라이언트 안 만듦)');
+        try { existing.reconnectTimer?.reset(); } catch (e) { /* noop */ } // 예약된 라이브러리 재접속과 겹치지 않게
+        existing.connect();
+      }
+      return;
     }
 
     const wsUrl = `${SUPABASE_URL.replace('https://', 'wss://')}/realtime/v1`;
-    boakoLog('웹소켓 연결 시도:', wsUrl);
+    _realtimeClientCreatedCount += 1;
+    boakoLog(`웹소켓 연결 시도 (이 탭에서 ${_realtimeClientCreatedCount}번째 클라이언트):`, wsUrl);
 
-    const client = new BoakoRealtimeClient(wsUrl, { params: { apikey: SUPABASE_KEY } });
+    const client = new BoakoRealtimeClient(wsUrl, {
+      params: { apikey: SUPABASE_KEY },
+      reconnectAfterMs: _nextReconnectDelay,
+      // 🌟 채널 재구독 간격도 완만하게 (기본 1s·2s·5s 후 10초마다 무한 반복 → 2s부터 두 배씩, 최대 2분)
+      rejoinAfterMs: (tries) => Math.min(2000 * Math.pow(2, tries - 1), 120000)
+    });
     State.realtimeClient = client;
 
     // 🌟 [버그수정] onOpen/onClose/onError는 client(RealtimeClient) 최상위가 아니라
@@ -950,13 +970,15 @@
       resyncMessages('웹소켓 연결됨').then((ran) => { if (ran) broadcastToFollowers('resync', {}); });
     });
     client.socketAdapter.onClose((e) => {
-      boakoWarn('웹소켓 연결 종료됨:', e);
       if (stableTimer) { clearTimeout(stableTimer); stableTimer = null; }
-      // 🌟 [버그수정] 자기 자신의 소켓일 때만 정리 (새 연결로 교체된 뒤 뒤늦은 신호가 덮어쓰는 것 방지)
-      if (State.realtimeClient === client) {
-        State.realtimeClient = null;
-        _scheduleReconnect();
+      if (State.realtimeClient !== client) {
+        // 🌟 [버그수정] 이미 버린 클라이언트에서 온 신호 — 혹시 남은 자체 재접속이 있으면 확실히 멈춤
+        try { client.disconnect(); } catch (err) { /* noop */ }
+        return;
       }
+      // 🌟 [버그수정] 여기서 State.realtimeClient를 비우거나 새 클라이언트를 만들지 않음 —
+      // 같은 클라이언트가 reconnectAfterMs(_nextReconnectDelay) 간격으로 스스로 다시 붙음
+      boakoWarn('웹소켓 연결 종료됨 — 같은 클라이언트로 자동 재접속 대기:', e);
     });
     client.socketAdapter.onError((e) => boakoErr('웹소켓 연결 오류 발생 — BGA 페이지의 CSP가 Supabase 연결을 막고 있을 가능성이 있음. 개발자 도구 콘솔에 "Refused to connect" 또는 "violates the following Content Security Policy" 에러가 같이 떠 있는지 확인해보세요.', e));
 
@@ -1212,113 +1234,61 @@
     enqueueFullscreenOverlay(() => renderRecommendBonusOverlay(payload.new.game_name, payload.new.bonus_point));
   }
 
-  function _subscribeAllChannels(client) {
+  // 🌟 [Broadcast 전환] 예전엔 postgres_changes 채널 6개(쪽지/팀챗/소식/업적/라이벌/추천)를 따로 구독해서
+  // Realtime 서버가 구독마다 DB를 감시했음. 이제 DB 트리거(fn_rt_emit)가 변경 1건을 받을 사람의 토픽으로
+  // 한 번만 보내므로 private 채널 2개(user:<내 id>, pub:feed)만 구독하고 table 이름으로 나눠서 처리함.
+  // 받는 payload는 { table, operation, record, old_record } → 기존 처리 함수가 쓰던 { new, old } 모양으로 맞춰서 넘김.
+  // 토픽 규칙은 supabase/sql/2026-11-27_realtime_broadcast.sql 과 같아야 함.
+  function _toPgPayload(p) {
+    return { schema: p.schema || 'public', table: p.table, eventType: p.operation, new: p.record || {}, old: p.old_record || {} };
+  }
 
-    // 내 쪽지함 실시간 구독
-    const msgTopic = `messages-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${msgTopic}`);
-    const msgChannel = client.channel(msgTopic, { config: {} });
-    msgChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${State.session.user.id}` }, (payload) => {
-      onMessageInsert(payload);
-      broadcastToFollowers('message-insert', payload);
-    });
-    msgChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${msgTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${msgTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT, CSP/네트워크 문제 가능성): ${msgTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${msgTopic}`);
-    });
-
-    // 팀챗 실시간 구독 (팀 소속인 경우만)
-    if (State.teamId) {
-      const teamTopic = `team-chats-${State.teamId}`;
-      boakoLog(`채널 구독 시도: ${teamTopic}`);
-      const teamChannel = client.channel(teamTopic, { config: {} });
-      teamChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'team_chats', filter: `team_id=eq.${State.teamId}` }, (payload) => {
-        onTeamChatInsert(payload);
-        broadcastToFollowers('team-chat-insert', payload);
-      });
-      teamChannel.subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${teamTopic}`);
-        else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${teamTopic}`, err);
-        else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${teamTopic}`);
-        else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${teamTopic}`);
-      });
+  function _dispatchBroadcast(p) {
+    if (!p || !p.table || !State.session) return;
+    const me = State.session.user.id;
+    const payload = _toPgPayload(p);
+    const rec = payload.new;
+    switch (p.table) {
+      case 'messages':
+        if (p.operation !== 'INSERT' || rec.receiver_id !== me) return; // 내가 보낸 쪽지는 알림 대상 아님
+        onMessageInsert(payload); broadcastToFollowers('message-insert', payload); return;
+      case 'team_chats':
+        if (p.operation !== 'INSERT' || !State.teamId || String(rec.team_id) !== String(State.teamId)) return;
+        onTeamChatInsert(payload); broadcastToFollowers('team-chat-insert', payload); return;
+      case 'news_feed_items':
+        if (p.operation !== 'INSERT') return;
+        onNewsInsert(payload); broadcastToFollowers('news-insert', payload); return;
+      case 'user_achievements':
+        if (p.operation !== 'INSERT' || rec.user_id !== me) return;
+        onAchievementInsert(payload); broadcastToFollowers('achievement-insert', payload); return;
+      case 'rival_match_votes':
+        if (p.operation !== 'UPDATE' || rec.voter_id !== me) return;
+        onRivalVoteUpdate(payload); broadcastToFollowers('rival-vote-update', payload); return;
+      case 'daily_recommend_bonus_claims':
+        if (p.operation !== 'UPDATE' || rec.user_id !== me) return;
+        onRecommendBonusUpdate(payload); broadcastToFollowers('recommend-bonus-update', payload); return;
+      default: return; // 같은 토픽에 오는 다른 테이블(팀 포인트, 같이하자 등)은 확장에서 안 씀
     }
+  }
 
-    // 🌟 아카이브 소식(news_feed_items) 실시간 구독
-    const newsTopic = 'archive-news-feed';
-    boakoLog(`채널 구독 시도: ${newsTopic}`);
-    const newsChannel = client.channel(newsTopic, { config: {} });
-    newsChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, (payload) => {
-      onNewsInsert(payload);
-      broadcastToFollowers('news-insert', payload);
-    });
-    newsChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${newsTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${newsTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${newsTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${newsTopic}`);
-    });
-
-    // 🌟 업적 획득 실시간 구독
-    const achvTopic = `achievements-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${achvTopic}`);
-    const achvChannel = client.channel(achvTopic, { config: {} });
-    achvChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${State.session.user.id}` }, (payload) => {
-      onAchievementInsert(payload);
-      broadcastToFollowers('achievement-insert', payload);
-    });
-    achvChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${achvTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${achvTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${achvTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${achvTopic}`);
-    });
-
-    // 🌟 라이벌전 승자 예측 투표 결과 실시간 구독
-    const rivalTopic = `rival-votes-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${rivalTopic}`);
-    const rivalChannel = client.channel(rivalTopic, { config: {} });
-    rivalChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rival_match_votes', filter: `voter_id=eq.${State.session.user.id}` }, (payload) => {
-      onRivalVoteUpdate(payload);
-      broadcastToFollowers('rival-vote-update', payload);
-    });
-    rivalChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${rivalTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${rivalTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${rivalTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${rivalTopic}`);
-    });
-
-    // 🌟 오늘의 추천 게임 보너스 지급 실시간 구독
-    const recTopic = `recommend-bonus-${State.session.user.id}`;
-    boakoLog(`채널 구독 시도: ${recTopic}`);
-    const recChannel = client.channel(recTopic, { config: {} });
-    recChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_recommend_bonus_claims', filter: `user_id=eq.${State.session.user.id}` }, (payload) => {
-      onRecommendBonusUpdate(payload);
-      broadcastToFollowers('recommend-bonus-update', payload);
-    });
-    recChannel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${recTopic}`);
-      else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR): ${recTopic}`, err);
-      else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT): ${recTopic}`);
-      else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${recTopic}`);
+  function _subscribeAllChannels(client) {
+    const topicNames = [`user:${State.session.user.id}`, 'pub:feed'];
+    topicNames.forEach((topic) => {
+      boakoLog(`채널 구독 시도: ${topic}`);
+      const ch = client.channel(topic, { config: { private: true } });
+      ch.on('broadcast', { event: '*' }, (msg) => _dispatchBroadcast(msg && msg.payload));
+      ch.subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') boakoOk(`채널 구독 성공: ${topic}`);
+        else if (status === 'CHANNEL_ERROR') boakoErr(`채널 구독 실패(CHANNEL_ERROR, 권한/토큰 문제 가능성): ${topic}`, err);
+        else if (status === 'TIMED_OUT') boakoErr(`채널 구독 타임아웃(TIMED_OUT, CSP/네트워크 문제 가능성): ${topic}`);
+        else if (status === 'CLOSED') boakoWarn(`채널 닫힘(CLOSED): ${topic}`);
+      });
     });
   }
 
   function disconnectRealtime() {
     State.intentionalDisconnect = true; // 🌟 로그아웃 등 의도적 해제 — 재연결 스케줄러가 다시 붙지 않도록
-    if (State.reconnectTimer) {
-      clearTimeout(State.reconnectTimer);
-      State.reconnectTimer = null;
-    }
-    State.reconnectAttempts = 0;
-    if (State.realtimeClient) {
-      boakoLog('실시간 연결 해제');
-      State.realtimeClient.disconnect();
-      State.realtimeClient = null;
-    }
+    _destroyRealtimeClient();
     teardownRealtimeCoordination(); // 🌟 리더였다면 자리 비켜주고, 하트비트/방송 채널 정리
   }
 
@@ -3194,14 +3164,10 @@
     if (Date.now() - _lastResyncAt > RESYNC_VISIBLE_STALE_MS) resyncMessages('탭 복귀');
 
     if (isRealtimeLeader) {
-      if (State.realtimeClient) return; // 이미 연결 살아있으면 할 일 없음
+      if (State.realtimeClient && State.realtimeClient.isConnected()) return; // 이미 연결 살아있으면 할 일 없음
       boakoLog('탭이 다시 활성화됨(리더) — 실시간 연결 상태 확인 중...');
-      if (State.reconnectTimer) {
-        clearTimeout(State.reconnectTimer);
-        State.reconnectTimer = null;
-      }
       State.intentionalDisconnect = false;
-      _doConnect();
+      _doConnect(); // 🌟 기존 클라이언트가 있으면 그걸로 재접속만 함 (새로 안 만듦)
     } else {
       // 팔로워: 리더가 그 사이 죽었는지만 확인하고, 죽었으면 즉시 승격 시도
       const info = getLeaderInfo();
@@ -3214,11 +3180,11 @@
 
   // 🌟 [신규] 네트워크가 복구되면 백오프 대기(최대 5분)를 기다리지 않고 리더 탭이 바로 재연결
   window.addEventListener('online', () => {
-    if (!isRealtimeLeader || !State.session || State.realtimeClient) return;
+    if (!isRealtimeLeader || !State.session) return;
+    if (State.realtimeClient && State.realtimeClient.isConnected()) return;
     boakoLog('네트워크 복구 감지(리더) — 즉시 재연결 시도');
-    if (State.reconnectTimer) { clearTimeout(State.reconnectTimer); State.reconnectTimer = null; }
     State.reconnectAttempts = 0;
-    _doConnect();
+    _doConnect(); // 🌟 기존 클라이언트가 있으면 그걸로 재접속만 함 (새로 안 만듦)
   });
 
   if (document.readyState === 'loading') {

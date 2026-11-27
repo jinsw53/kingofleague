@@ -52,7 +52,7 @@ Boako.Ticker = {
             Boako.Ticker._onRemoteChange();
             if (Boako.HotIssue && Boako.HotIssue._onRemoteChange) Boako.HotIssue._onRemoteChange();
         };
-        Boako.Ticker._channel = Boako.db.channel('feed-realtime')
+        Boako.Ticker._channel = Boako.RT.channel('feed-realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed_items' }, both)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rival_matches' }, both)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tournament_posts' }, both)

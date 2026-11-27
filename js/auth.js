@@ -112,6 +112,9 @@ Boako.Auth = {
         // 처리 후엔 새로고침해도 다시 안 뜨도록 URL에서 쿼리를 지움.
         Boako.Auth.handleDeepLinkFromExtension();
 
+        // 🌟 [신규 2026-11-28] 깃뿔 위젯의 "고치기 ↗"로 들어온 경우(?wiki_type=&wiki_id=) 위키 고치기 창을 연다
+        Boako.Auth.maybeOpenWikiEdit();
+
         // 🌟 토너먼트 개최 요청 미해결 건수 — 로그인 여부 무관하게 항상 표시
         Boako.Auth.checkTournamentBadge();
         Boako.Auth.subscribeTournamentBadge(); 
@@ -203,6 +206,17 @@ Boako.Auth = {
     // 🌟 [신규] 크롬 확장(boako-widget.js)의 아카이브 소식 토스트 클릭 시 넘어오는
     // ?open=LINK_TYPE&id=LINK_ID 쿼리를 읽어서 Boako.Util.navigateToLink()로 해당 화면으로 이동시킴.
     // 로그인 여부와 무관하게(비로그인 방문객도) 동작해야 하므로 Auth.init()에서 로그인 분기 밖에서 호출됨.
+    // 🌟 [신규 2026-11-28] 깃뿔 규칙 위키 고치기 — 필요할 때만 js/wiki_edit.js 를 불러온다 (PC·모바일 공용)
+    maybeOpenWikiEdit: async () => {
+        let pending = null;
+        try { pending = localStorage.getItem('boako.wikiEdit'); } catch (e) { /* 저장소 못 씀 */ }
+        if (!/[?&]wiki_type=/.test(window.location.search) && !pending) return;
+        try {
+            if (!Boako.WikiEdit) await Boako.Util.loadScript('/js/wiki_edit.js');
+            await Boako.WikiEdit.check();
+        } catch (e) { console.error('위키 고치기 창 열기 실패:', e); }
+    },
+
     handleDeepLinkFromExtension: () => {
         const params = new URLSearchParams(window.location.search);
         const linkType = params.get('open');
@@ -275,7 +289,7 @@ Boako.Auth = {
         if (!Boako.state.user || !Boako.db) return;
         if (Boako.Auth._referralChannel) return; // 이미 구독 중이면 중복 방지
 
-        Boako.Auth._referralChannel = Boako.db
+        Boako.Auth._referralChannel = Boako.RT
             .channel(`referral-bonus-${Boako.state.user.id}`)
             .on('postgres_changes', {
                 event: 'INSERT',
@@ -302,7 +316,7 @@ Boako.Auth = {
 
     stopReferralRealtime: () => {
         if (Boako.Auth._referralChannel && Boako.db) {
-            Boako.db.removeChannel(Boako.Auth._referralChannel);
+            Boako.RT.removeChannel(Boako.Auth._referralChannel);
             Boako.Auth._referralChannel = null;
         }
     },
@@ -801,7 +815,7 @@ Boako.Auth = {
 
     _subscribeTournamentBadgeAsLeader: function() {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._tournamentBadgeChannel) return;
-        Boako.Auth._tournamentBadgeChannel = Boako.db.channel('tournament-badge-global')
+        Boako.Auth._tournamentBadgeChannel = Boako.RT.channel('tournament-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_posts' }, () => {
                 Boako.Util.debounce('badge-tournament', () => {
                     Boako.Auth.checkTournamentBadge();
@@ -858,7 +872,7 @@ Boako.Auth = {
 
     _subscribeBoardRequestBadgeAsLeader: function() {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._boardRequestBadgeChannel) return;
-        Boako.Auth._boardRequestBadgeChannel = Boako.db.channel('board-request-badge-global')
+        Boako.Auth._boardRequestBadgeChannel = Boako.RT.channel('board-request-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
                 Boako.Util.debounce('badge-board', () => {
                     Boako.Auth.checkBoardRequestBadge();
@@ -901,7 +915,7 @@ Boako.Auth = {
 
     _subscribeTogetherBadgeAsLeader: function() {
         if (!Boako.RealtimeCoordinator.isLeader() || Boako.Auth._togetherBadgeChannel) return;
-        Boako.Auth._togetherBadgeChannel = Boako.db.channel('together-badge-global')
+        Boako.Auth._togetherBadgeChannel = Boako.RT.channel('together-badge-global')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => {
                 Boako.Util.debounce('badge-together', () => {
                     Boako.Auth.checkTogetherBadge();

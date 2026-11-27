@@ -347,7 +347,7 @@ Boako.MobileShell = {
     // 로그인 여부와 무관하게 항상 구독하고, 쪽지/그룹챗은 로그인 상태일 때만 구독함.
     _subscribeShellAsLeader: () => {
         if (!Boako.MobileShell._moreBadgeChannel) {
-            Boako.MobileShell._moreBadgeChannel = Boako.db.channel('mobile-more-badge-global')
+            Boako.MobileShell._moreBadgeChannel = Boako.RT.channel('mobile-more-badge-global')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'together_posts' }, () => Boako.MobileShell._onMoreBadgeChange())
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => Boako.MobileShell._onMoreBadgeChange())
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'board_comments' }, () => Boako.MobileShell._onMoreBadgeChange())
@@ -364,7 +364,7 @@ Boako.MobileShell = {
                 if (Boako.MobileShell._rtGroup) Boako.MobileShell._rtGroup.broadcast('dm', payload.new);
             };
             const _myUid = Boako.state.user.id;
-            Boako.MobileShell._messengerChannel = Boako.db.channel('mobile-messages-changes')
+            Boako.MobileShell._messengerChannel = Boako.RT.channel('mobile-messages-changes')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${_myUid}` }, _onMsg)
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${_myUid}` }, _onMsg)
                 .subscribe();
@@ -373,7 +373,7 @@ Boako.MobileShell = {
         // 🌟 [4단계 추가] 그룹채팅 3종 + 부가 상태변화 3종, PC와 동일한 반응(방 목록 갱신/열려있으면
         // 즉시 재렌더/아니면 토스트)을 Boako.MobileMessenger.handleGroupChatEvent에 위임
         if (Boako.MobileShell._groupChatChannel) return;
-        Boako.MobileShell._groupChatChannel = Boako.db.channel('mobile-group-chats-changes')
+        Boako.MobileShell._groupChatChannel = Boako.RT.channel('mobile-group-chats-changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'grandprix_match_chats' }, (payload) => {
                 Boako.MobileShell._relayGroupChatEvent('match_channel', `match_channel_${payload.new.room_id}`, payload.new, '📣 [대항전] 채널에 새 메시지가 도착했습니다!');
             })
@@ -431,11 +431,11 @@ Boako.MobileShell = {
 
     stopMessengerRealtime: () => {
         if (Boako.MobileShell._messengerChannel) {
-            Boako.db.removeChannel(Boako.MobileShell._messengerChannel);
+            Boako.RT.removeChannel(Boako.MobileShell._messengerChannel);
             Boako.MobileShell._messengerChannel = null;
         }
         if (Boako.MobileShell._groupChatChannel) {
-            Boako.db.removeChannel(Boako.MobileShell._groupChatChannel);
+            Boako.RT.removeChannel(Boako.MobileShell._groupChatChannel);
             Boako.MobileShell._groupChatChannel = null;
         }
     },
@@ -551,6 +551,14 @@ Boako.MobileShell = {
         if (!Boako.MobileSchedule) await Boako.Util.loadScript('/js/mobile_schedule.js');
         const area = document.getElementById('mobile-content-area');
         if (area) await Boako.MobileSchedule.render(area);
+    },
+
+    // 🌟 [신규 2026-11-28] 더보기 시트의 "📖 룰 가이드" 진입점 — 깃뿔 위젯(js/rule_guide.js)
+    openRuleGuide: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.RuleGuide) await Boako.Util.loadScript('/js/rule_guide.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.RuleGuide.render(area);
     },
 
     // 🌟 [신규] 더보기 시트의 "⚡ 라이벌 매치" 진입점 — 본문 영역에 라이벌 매치(js/mobile_rival.js)를 그림
@@ -742,6 +750,7 @@ Boako.MobileShell = {
                 </div>
                 <div onclick="Boako.MobileShell.openShop()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛒 포인트 샵</div>
                 <div onclick="Boako.MobileShell.openSchedule()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">📅 일정표</div>
+                <div onclick="Boako.MobileShell.openRuleGuide()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">📖 룰 가이드</div>
                 <!-- 🌟 [신규] 사용법 영상 다시 보기 — 영상 안내에서 "나중에"를 눌러도 여기서 언제든 찾을 수 있게 맨 아래에 둠.
                      모바일 웹뷰에서 window.open이 막히는 경우가 있어 실제 <a> 태그 사용 -->
                 <a href="${Boako.Auth.usageVideoUrl}" target="_blank" rel="noopener" style="display:block; padding:12px 4px; font-size:14px; font-weight:700; color:inherit; text-decoration:none;">📺 사용법 영상</a>
