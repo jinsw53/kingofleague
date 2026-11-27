@@ -553,6 +553,14 @@ Boako.MobileShell = {
         if (area) await Boako.MobileSchedule.render(area);
     },
 
+    // 🌟 [신규 2026-11-28] 더보기 시트의 "📖 룰 가이드" 진입점 — 깃뿔 위젯(js/rule_guide.js)
+    openRuleGuide: async () => {
+        Boako.MobileShell.closeAll();
+        if (!Boako.RuleGuide) await Boako.Util.loadScript('/js/rule_guide.js');
+        const area = document.getElementById('mobile-content-area');
+        if (area) await Boako.RuleGuide.render(area);
+    },
+
     // 🌟 [신규] 더보기 시트의 "⚡ 라이벌 매치" 진입점 — 본문 영역에 라이벌 매치(js/mobile_rival.js)를 그림
     openRival: async () => {
         Boako.MobileShell.closeAll();
@@ -742,6 +750,7 @@ Boako.MobileShell = {
                 </div>
                 <div onclick="Boako.MobileShell.openShop()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">🛒 포인트 샵</div>
                 <div onclick="Boako.MobileShell.openSchedule()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">📅 일정표</div>
+                <div onclick="Boako.MobileShell.openRuleGuide()" style="padding:12px 4px; font-size:14px; font-weight:700; cursor:pointer;">📖 룰 가이드</div>
                 <!-- 🌟 [신규] 사용법 영상 다시 보기 — 영상 안내에서 "나중에"를 눌러도 여기서 언제든 찾을 수 있게 맨 아래에 둠.
                      모바일 웹뷰에서 window.open이 막히는 경우가 있어 실제 <a> 태그 사용 -->
                 <a href="${Boako.Auth.usageVideoUrl}" target="_blank" rel="noopener" style="display:block; padding:12px 4px; font-size:14px; font-weight:700; color:inherit; text-decoration:none;">📺 사용법 영상</a>
